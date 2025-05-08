@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import type { DiscoveredSignal, PriceDiscoverySignal, PriceChangeSignal } from './types';
 import { format } from 'date-fns';
@@ -21,12 +21,12 @@ const LogCardFace: React.FC<LogCardFaceProps> = ({ signal, isBack, onDelete }) =
         <>
           <CardHeader>
             <CardTitle className="text-xl">{discoverySignal.symbol}</CardTitle>
-            <CardDescription>Price Revealed</CardDescription>
+            <CardDescription>Price</CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold">${discoverySignal.price.toFixed(2)}</p>
             <p className="text-xs text-muted-foreground mt-1">
-              At: {format(new Date(discoverySignal.timestamp), 'PP p')}
+              {format(new Date(discoverySignal.timestamp), 'PP p')}
             </p>
           </CardContent>
         </>
@@ -36,16 +36,16 @@ const LogCardFace: React.FC<LogCardFaceProps> = ({ signal, isBack, onDelete }) =
       const priceDiff = changeSignal.price2 - changeSignal.price1;
       const absPriceDiff = Math.abs(priceDiff);
       let TrendIcon = Minus;
-      let trendColor = 'text-foreground'; // Default, will be overridden by theme
+      let trendColorClass = 'text-foreground'; 
       let trendText = 'FLAT';
 
       if (priceDiff > 0) {
         TrendIcon = ArrowUpRight;
-        trendColor = 'text-green-600'; // Using specific colors for up/down trend indication
+        trendColorClass = 'text-green-600'; 
         trendText = 'INCREASE';
       } else if (priceDiff < 0) {
         TrendIcon = ArrowDownRight;
-        trendColor = 'text-red-600'; // Using specific colors for up/down trend indication
+        trendColorClass = 'text-red-600';
         trendText = 'DECREASE';
       }
       content = (
@@ -55,11 +55,11 @@ const LogCardFace: React.FC<LogCardFaceProps> = ({ signal, isBack, onDelete }) =
             <CardDescription>Price Change Signal</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className={`flex items-center ${trendColor} mb-1`}>
+            <div className={`flex items-center ${trendColorClass} mb-1`}>
               <TrendIcon className="h-8 w-8 mr-2" />
               <p className="text-3xl font-bold">${absPriceDiff.toFixed(2)}</p>
             </div>
-            <p className={`text-lg font-semibold ${trendColor}`}>{trendText}</p>
+            <p className={`text-lg font-semibold ${trendColorClass}`}>{trendText}</p>
             <p className="text-xs text-muted-foreground mt-1">
               {format(new Date(changeSignal.timestamp1), 'p')} &rarr; {format(new Date(changeSignal.timestamp2), 'p')}
             </p>
@@ -78,7 +78,7 @@ const LogCardFace: React.FC<LogCardFaceProps> = ({ signal, isBack, onDelete }) =
     return (
       <>
         {content}
-        {onDelete && (
+        {onDelete && !isBack && ( // Show delete button only on the front face
           <Button
             variant="ghost"
             size="icon"
@@ -96,20 +96,14 @@ const LogCardFace: React.FC<LogCardFaceProps> = ({ signal, isBack, onDelete }) =
   const renderBackContent = () => {
     if (signal.type === 'price_discovery') {
       const discoverySignal = signal as PriceDiscoverySignal;
+      const explanation = `${discoverySignal.symbol}'s stock price was $${discoverySignal.price.toFixed(2)} at ${format(new Date(discoverySignal.timestamp), 'p on PP')}. This price point was logged on ${format(new Date(discoverySignal.discoveredAt), 'PP p')}.`;
       return (
         <>
           <CardHeader>
-            <CardTitle className="text-lg">{discoverySignal.symbol} Price Revealed</CardTitle>
-            <CardDescription>Details</CardDescription>
+            <CardTitle className="text-lg">{discoverySignal.symbol} Price Details</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-1 text-sm">
-            <p className="font-semibold">Price: ${discoverySignal.price.toFixed(2)}</p>
-            <p className="text-xs text-muted-foreground">
-              Data Timestamp: {format(new Date(discoverySignal.timestamp), 'PP p')}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Discovered: {format(new Date(discoverySignal.discoveredAt), 'PP p')}
-            </p>
+          <CardContent className="space-y-2 text-sm">
+            <p>{explanation}</p>
           </CardContent>
         </>
       );
@@ -117,27 +111,18 @@ const LogCardFace: React.FC<LogCardFaceProps> = ({ signal, isBack, onDelete }) =
       const changeSignal = signal as PriceChangeSignal;
       const priceDiff = changeSignal.price2 - changeSignal.price1;
       const absPriceDiff = Math.abs(priceDiff);
-      let trendText = 'FLAT';
-      if (priceDiff > 0) trendText = 'INCREASE';
-      else if (priceDiff < 0) trendText = 'DECREASE';
+      let trendText = 'remained flat';
+      if (priceDiff > 0) trendText = `increased by $${absPriceDiff.toFixed(2)}`;
+      else if (priceDiff < 0) trendText = `decreased by $${absPriceDiff.toFixed(2)}`;
 
+      const explanation = `The price for ${changeSignal.symbol} ${trendText}, from $${changeSignal.price1.toFixed(2)} (at ${format(new Date(changeSignal.timestamp1), 'p')}) to $${changeSignal.price2.toFixed(2)} (at ${format(new Date(changeSignal.timestamp2), 'p')}). This signal was generated on ${format(new Date(changeSignal.generatedAt), 'PP p')}.`;
       return (
         <>
           <CardHeader>
-            <CardTitle className="text-lg">{changeSignal.symbol} Price Change</CardTitle>
-            <CardDescription>Detailed Report</CardDescription>
+            <CardTitle className="text-lg">{changeSignal.symbol} Price Change Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-1 text-sm">
-            <p>Price {trendText} by ${absPriceDiff.toFixed(2)}</p>
-            <p className="text-xs text-muted-foreground">
-              From ${changeSignal.price1.toFixed(2)} ({format(new Date(changeSignal.timestamp1), 'p')})
-            </p>
-            <p className="text-xs text-muted-foreground">
-              To ${changeSignal.price2.toFixed(2)} ({format(new Date(changeSignal.timestamp2), 'p')})
-            </p>
-            <p className="text-xs text-muted-foreground mt-2">
-              Signal Generated: {format(new Date(changeSignal.generatedAt), 'PP p')}
-            </p>
+            <p>{explanation}</p>
           </CardContent>
         </>
       );
@@ -155,7 +140,6 @@ const LogCardFace: React.FC<LogCardFaceProps> = ({ signal, isBack, onDelete }) =
       <div className="flex-grow overflow-y-auto">
         {isBack ? renderBackContent() : renderFrontContent()}
       </div>
-      {/* Footer removed from back as delete button moved to front */}
     </Card>
   );
 };

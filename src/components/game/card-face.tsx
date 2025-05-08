@@ -18,7 +18,7 @@ const CardFace: React.FC<CardFaceProps> = ({ card, isBack, onExamine }) => {
         return (
           <>
             <CardHeader>
-              <CardTitle className="text-lg">AAPL Price Details</CardTitle>
+              <CardTitle className="text-lg">{priceCard.faceData.symbol} Price Details</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm">{priceCard.backData.explanation}</p>
@@ -42,7 +42,7 @@ const CardFace: React.FC<CardFaceProps> = ({ card, isBack, onExamine }) => {
             <CardContent>
               <p className="text-3xl font-bold">${priceCard.faceData.price.toFixed(2)}</p>
               <p className="text-xs text-muted-foreground mt-1">
-                {format(priceCard.faceData.timestamp, 'PP p')}
+                {format(new Date(priceCard.faceData.timestamp), 'PP p')}
               </p>
             </CardContent>
           </>
@@ -62,9 +62,9 @@ const CardFace: React.FC<CardFaceProps> = ({ card, isBack, onExamine }) => {
           </>
         );
       } else {
-        let trendColor = 'text-foreground';
-        if (trendCard.faceData.trend === 'UP') trendColor = 'text-green-600';
-        if (trendCard.faceData.trend === 'DOWN') trendColor = 'text-red-600';
+        let trendColorClass = 'text-foreground'; // Default color from theme
+        if (trendCard.faceData.trend === 'UP') trendColorClass = 'text-green-600'; // Explicit color for UP
+        if (trendCard.faceData.trend === 'DOWN') trendColorClass = 'text-red-600'; // Explicit color for DOWN
         
         return (
           <>
@@ -73,9 +73,9 @@ const CardFace: React.FC<CardFaceProps> = ({ card, isBack, onExamine }) => {
               <CardDescription>Price Trend (5-min)</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className={`text-3xl font-bold ${trendColor}`}>{trendCard.faceData.trend}</p>
+              <p className={`text-3xl font-bold ${trendColorClass}`}>{trendCard.faceData.trend}</p>
                <p className="text-xs text-muted-foreground mt-1">
-                {format(trendCard.faceData.referenceTimeStart, 'p')} - {format(trendCard.faceData.referenceTimeEnd, 'p')}
+                {format(new Date(trendCard.faceData.referenceTimeStart), 'p')} - {format(new Date(trendCard.faceData.referenceTimeEnd), 'p')}
               </p>
             </CardContent>
           </>
