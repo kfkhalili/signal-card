@@ -82,21 +82,27 @@ const LogCardFace: React.FC<LogCardFaceProps> = ({ card, isBack, onDelete }) => 
     return (
       <>
         {content}
+        
+        {/* NEW Badge: always visible if new and unflipped, on the front, top-left */}
+        {isNewAndUnflipped && !isBack && (
+          <div className="absolute top-2 left-2 z-10">
+            <Badge variant="default" className="text-xs px-1.5 py-0.5 h-5">
+              NEW
+            </Badge>
+          </div>
+        )}
+
+        {/* Delete Button: appears on hover, on the front, top-right */}
         {onDelete && !isBack && ( 
-          <div className="absolute top-2 right-2 flex items-center opacity-0 group-hover/logcard:opacity-100 z-10">
-            {isNewAndUnflipped && (
-              <Badge variant="default" className="mr-1 text-xs px-1.5 py-0.5 h-5">NEW</Badge>
-            )}
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-muted-foreground hover:bg-destructive hover:text-destructive-foreground focus-visible:ring-destructive"
+              className="absolute top-2 right-2 z-10 h-7 w-7 text-muted-foreground hover:bg-destructive hover:text-destructive-foreground focus-visible:ring-destructive opacity-0 group-hover/logcard:opacity-100 transition-opacity"
               onClick={onDelete}
               aria-label="Delete card" 
             >
               <X className="h-4 w-4" />
             </Button>
-          </div>
         )}
       </>
     );
