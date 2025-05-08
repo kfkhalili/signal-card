@@ -1,27 +1,21 @@
-
 import React from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+// Removed Button, Badge, X icon from here as they will be in LogCard
 import type { DiscoveredCard, PriceDiscoverySignal, PriceChangeSignal } from './types'; 
 import { format } from 'date-fns';
-import { ArrowDownRight, ArrowUpRight, Minus, X } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-
+import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react'; // Kept for trend indication
 
 interface LogCardFaceProps {
   card: DiscoveredCard; 
   isBack: boolean;
-  onDelete?: (event: React.MouseEvent) => void;
+  // Removed onDelete, as the button will be handled by LogCard itself
 }
 
-const LogCardFace: React.FC<LogCardFaceProps> = ({ card, isBack, onDelete }) => { 
+const LogCardFace: React.FC<LogCardFaceProps> = ({ card, isBack }) => { 
   const renderFrontContent = () => {
-    let content;
-    const isNewAndUnflipped = card.hasBeenFlippedAtLeastOnce === false;
-
     if (card.type === 'price_discovery') {
-      const discoveryCard = card as PriceDiscoverySignal; 
-      content = (
+      const discoveryCard = card as PriceDiscoverySignal;
+      return (
         <>
           <CardHeader>
             <CardTitle className="text-xl">{discoveryCard.symbol}</CardTitle>
@@ -36,7 +30,7 @@ const LogCardFace: React.FC<LogCardFaceProps> = ({ card, isBack, onDelete }) => 
         </>
       );
     } else if (card.type === 'price_change') {
-      const changeCard = card as PriceChangeSignal; 
+      const changeCard = card as PriceChangeSignal;
       const priceDiff = changeCard.price2 - changeCard.price1;
       const absPriceDiff = Math.abs(priceDiff);
       let TrendIcon = Minus;
@@ -52,7 +46,7 @@ const LogCardFace: React.FC<LogCardFaceProps> = ({ card, isBack, onDelete }) => 
         trendColorClass = 'text-red-600';
         trendText = 'DECREASE';
       }
-      content = (
+      return (
         <>
           <CardHeader>
             <CardTitle className="text-xl">{changeCard.symbol}</CardTitle>
@@ -70,49 +64,18 @@ const LogCardFace: React.FC<LogCardFaceProps> = ({ card, isBack, onDelete }) => 
           </CardContent>
         </>
       );
-    } else {
-      content = (
-        <CardContent>
-          <p>Unknown card type.</p> 
-          <pre className="text-xs">{JSON.stringify(card, null, 2)}</pre> 
-        </CardContent>
-      );
     }
-
     return (
-      <>
-        {content}
-        
-        {/* Container for NEW badge and X button in top-right */}
-        {(!isBack && (onDelete || isNewAndUnflipped)) && (
-          <div className="absolute top-2 right-2 z-10 flex items-center space-x-1">
-            {/* NEW Badge: visible if new and unflipped */}
-            {isNewAndUnflipped && (
-              <Badge variant="default" className="text-xs px-1.5 py-0.5 h-5">
-                NEW
-              </Badge>
-            )}
-            {/* Delete Button: appears on hover */}
-            {onDelete && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground hover:bg-destructive hover:text-destructive-foreground focus-visible:ring-destructive opacity-0 group-hover/logcard:opacity-100 transition-opacity"
-                onClick={onDelete}
-                aria-label="Delete card" 
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        )}
-      </>
+      <CardContent>
+        <p>Unknown card type.</p> 
+        <pre className="text-xs">{JSON.stringify(card, null, 2)}</pre>
+      </CardContent>
     );
   };
 
   const renderBackContent = () => {
     if (card.type === 'price_discovery') {
-      const discoveryCard = card as PriceDiscoverySignal; 
+      const discoveryCard = card as PriceDiscoverySignal;
       const explanation = `${discoveryCard.symbol}'s stock price was $${discoveryCard.price.toFixed(2)} at ${format(new Date(discoveryCard.timestamp), "p 'on' PP")}. This price point was logged on ${format(new Date(discoveryCard.discoveredAt), "PP 'at' p")}.`;
       return (
         <>
@@ -125,7 +88,7 @@ const LogCardFace: React.FC<LogCardFaceProps> = ({ card, isBack, onDelete }) => 
         </>
       );
     } else if (card.type === 'price_change') {
-      const changeCard = card as PriceChangeSignal; 
+      const changeCard = card as PriceChangeSignal;
       const priceDiff = changeCard.price2 - changeCard.price1;
       const absPriceDiff = Math.abs(priceDiff);
       let trendText = 'remained flat';
@@ -146,20 +109,18 @@ const LogCardFace: React.FC<LogCardFaceProps> = ({ card, isBack, onDelete }) => 
     }
     return (
       <CardContent>
-        <p>Unknown card type (back).</p> 
-        <pre className="text-xs">{JSON.stringify(card, null, 2)}</pre> 
+        <p>Unknown card type (back).</p>
+        <pre className="text-xs">{JSON.stringify(card, null, 2)}</pre>
       </CardContent>
     );
   };
 
+  // Return a fragment, not the full Card component
   return (
-    <Card className={`card-face ${isBack ? 'card-back' : 'card-front'} h-full flex flex-col shadow-lg relative`}>
-      <div className="flex-grow overflow-y-auto">
-        {isBack ? renderBackContent() : renderFrontContent()}
-      </div>
-    </Card>
+    <>
+      {isBack ? renderBackContent() : renderFrontContent()}
+    </>
   );
 };
 
 export default LogCardFace;
-
