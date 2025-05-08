@@ -1,3 +1,4 @@
+
 export interface PriceCardFaceData {
   symbol: string;
   price: number;
@@ -43,7 +44,7 @@ export interface TrendGameCard extends BaseGameCard {
 
 export type ActiveGameCard = PriceGameCard | TrendGameCard;
 
-export interface PriceChangeSignal {
+export interface PriceChangeSignal { // This name describes the *type* of card, so it's okay.
   id: string;
   type: 'price_change';
   symbol: string;
@@ -52,18 +53,20 @@ export interface PriceChangeSignal {
   timestamp1: Date;
   timestamp2: Date;
   generatedAt: Date;
-  isFlipped: boolean; // Added for log card flipping
+  isFlipped: boolean; 
 }
 
-export interface PriceDiscoverySignal {
+export interface PriceDiscoverySignal { // This name describes the *type* of card, so it's okay.
   id: string;
   type: 'price_discovery';
   symbol: string;
   price: number;
   timestamp: Date; // Price data timestamp
   discoveredAt: Date; // When card was revealed/secured
-  isFlipped: boolean; // Added for log card flipping
+  isFlipped: boolean; 
 }
 
-export type DiscoveredSignal = PriceChangeSignal | PriceDiscoverySignal;
+// This is the union type for items in the "Discovered Cards" area.
+export type DiscoveredCard = PriceChangeSignal | PriceDiscoverySignal; // Renamed from DiscoveredSignal
+
 

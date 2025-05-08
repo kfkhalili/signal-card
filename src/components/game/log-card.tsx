@@ -2,33 +2,32 @@
 "use client";
 
 import React from 'react';
-import type { DiscoveredSignal } from './types';
+import type { DiscoveredCard } from './types'; // Updated type import
 import LogCardFace from './log-card-face';
 import { cn } from '@/lib/utils';
 
 interface LogCardProps {
-  signal: DiscoveredSignal;
-  onToggleFlip: (signalId: string) => void;
-  onDeleteSignal: (signalId: string) => void;
+  card: DiscoveredCard; // Renamed prop and updated type
+  onToggleFlip: (cardId: string) => void;
+  onDeleteCard: (cardId: string) => void; // Renamed prop
 }
 
-const LogCard: React.FC<LogCardProps> = ({ signal, onToggleFlip, onDeleteSignal }) => {
+const LogCard: React.FC<LogCardProps> = ({ card, onToggleFlip, onDeleteCard }) => { // Renamed props
   const handleCardClick = (event: React.MouseEvent | React.KeyboardEvent) => {
-    // Prevent flipping if the click target is the delete button or inside it
-    if ((event.target as HTMLElement).closest('[aria-label="Delete signal"]')) {
+    if ((event.target as HTMLElement).closest('[aria-label="Delete card"]')) { // Updated aria-label check
       return;
     }
-    onToggleFlip(signal.id);
+    onToggleFlip(card.id);
   };
 
   const handleDeleteClick = (event: React.MouseEvent) => {
-    event.stopPropagation(); // Prevent card flip when delete button is clicked
-    onDeleteSignal(signal.id);
+    event.stopPropagation(); 
+    onDeleteCard(card.id); // Use renamed prop
   };
 
   const cardContainerClasses = cn(
-    'card-container group/logcard w-64 h-80 cursor-pointer relative', // Added group/logcard and relative
-    { 'is-flipped': signal.isFlipped },
+    'card-container group/logcard w-64 h-80 cursor-pointer relative', 
+    { 'is-flipped': card.isFlipped },
     'shadow-md hover:shadow-xl transition-shadow'
   );
 
@@ -39,11 +38,11 @@ const LogCard: React.FC<LogCardProps> = ({ signal, onToggleFlip, onDeleteSignal 
       onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleCardClick(e)}
       role="button"
       tabIndex={0}
-      aria-label={`Signal card ${signal.id}, type ${signal.type}. ${signal.isFlipped ? "Showing back." : "Showing front."} Click to flip, or use delete button on hover.`}
+      aria-label={`Discovered card ${card.id}, type ${card.type}. ${card.isFlipped ? "Showing back." : "Showing front."} Click to flip, or use delete button on hover.`} // Updated aria-label
     >
       <div className="card-inner">
-        <LogCardFace signal={signal} isBack={false} onDelete={handleDeleteClick} />
-        <LogCardFace signal={signal} isBack={true} />
+        <LogCardFace card={card} isBack={false} onDelete={handleDeleteClick} /> {/* Pass card prop */}
+        <LogCardFace card={card} isBack={true} /> {/* Pass card prop */}
       </div>
     </div>
   );

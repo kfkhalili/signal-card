@@ -1,10 +1,11 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import ActiveCardsArea from '@/components/game/active-cards-area';
-import DiscoveredSignalsLog from '@/components/game/discovered-signals-log';
-import type { ActiveGameCard, PriceGameCard, TrendGameCard, PriceChangeSignal, PriceCardFaceData, TrendCardFaceData, DiscoveredSignal, PriceDiscoverySignal } from '@/components/game/types';
+import DiscoveredCards from '@/components/game/discovered-cards'; // Renamed import
+import type { ActiveGameCard, PriceGameCard, TrendGameCard, PriceChangeSignal, PriceCardFaceData, TrendCardFaceData, DiscoveredCard, PriceDiscoverySignal } from '@/components/game/types'; // Renamed DiscoveredSignal to DiscoveredCard
 import { useMockPriceFeed, type PriceData } from '@/hooks/use-mock-price-feed';
 import useLocalStorage from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
@@ -16,12 +17,12 @@ const FADE_DURATION_MS = FADE_DURATION_MINUTES * 60 * 1000;
 
 // Define initial values for useLocalStorage outside the component to ensure stable references
 const INITIAL_ACTIVE_CARDS: ActiveGameCard[] = [];
-const INITIAL_DISCOVERED_SIGNALS: DiscoveredSignal[] = [];
+const INITIAL_DISCOVERED_CARDS: DiscoveredCard[] = []; // Renamed
 
 
 export default function FinSignalGamePage() {
   const [activeCards, setActiveCards] = useLocalStorage<ActiveGameCard[]>('finSignal-activeCards', INITIAL_ACTIVE_CARDS);
-  const [discoveredSignals, setDiscoveredSignals] = useLocalStorage<DiscoveredSignal[]>('finSignal-discoveredSignals', INITIAL_DISCOVERED_SIGNALS);
+  const [discoveredCards, setDiscoveredCards] = useLocalStorage<DiscoveredCard[]>('finSignal-discoveredCards', INITIAL_DISCOVERED_CARDS); // Renamed state and key
   const [selectedCardsForCombine, setSelectedCardsForCombine] = useState<string[]>([]);
   
   const { toast } = useToast();
@@ -87,25 +88,25 @@ export default function FinSignalGamePage() {
 
     if (cardBeingSecured && !cardBeingSecured.isSecured) {
       // Create PriceDiscoverySignal for the log
-      const newDiscoverySignal: PriceDiscoverySignal = {
+      const newDiscoveryCard: PriceDiscoverySignal = { // Renamed variable
         id: uuidv4(),
         type: 'price_discovery',
         symbol: cardBeingSecured.faceData.symbol,
         price: cardBeingSecured.faceData.price,
         timestamp: new Date(cardBeingSecured.faceData.timestamp), 
         discoveredAt: new Date(),
-        isFlipped: false, // Discovered signals start unflipped
+        isFlipped: false, // Discovered cards start unflipped
       };
       
-      const signalExists = discoveredSignals.some(signal => 
-        signal.type === 'price_discovery' &&
-        (signal as PriceDiscoverySignal).symbol === newDiscoverySignal.symbol &&
-        (signal as PriceDiscoverySignal).price === newDiscoverySignal.price &&
-        new Date((signal as PriceDiscoverySignal).timestamp).getTime() === newDiscoverySignal.timestamp.getTime()
+      const cardExists = discoveredCards.some(card =>  // Renamed variable and array
+        card.type === 'price_discovery' &&
+        (card as PriceDiscoverySignal).symbol === newDiscoveryCard.symbol &&
+        (card as PriceDiscoverySignal).price === newDiscoveryCard.price &&
+        new Date((card as PriceDiscoverySignal).timestamp).getTime() === newDiscoveryCard.timestamp.getTime()
       );
 
-      if (!signalExists) {
-        setDiscoveredSignals(prevSignals => [newDiscoverySignal, ...prevSignals].sort((a, b) => new Date(b.discoveredAt || b.generatedAt).getTime() - new Date(a.discoveredAt || a.generatedAt).getTime()));
+      if (!cardExists) {
+        setDiscoveredCards(prevCards => [newDiscoveryCard, ...prevCards].sort((a, b) => new Date(b.discoveredAt || b.generatedAt).getTime() - new Date(a.discoveredAt || a.generatedAt).getTime())); // Renamed setter
         toast({ 
           title: "Price Card Secured & Discovered!", 
           description: `Details of ${cardBeingSecured.faceData.symbol} at $${cardBeingSecured.faceData.price.toFixed(2)} logged.` 
@@ -126,7 +127,7 @@ export default function FinSignalGamePage() {
       );
       
     }
-  }, [activeCards, setActiveCards, setDiscoveredSignals, discoveredSignals, toast]);
+  }, [activeCards, setActiveCards, setDiscoveredCards, discoveredCards, toast]); // Renamed dependencies
 
 
   const handleFadedOut = useCallback((cardId: string) => {
@@ -259,7 +260,7 @@ export default function FinSignalGamePage() {
       ? [card1FromState, card2FromState]
       : [card2FromState, card1FromState];
 
-    const newSignal: PriceChangeSignal = {
+    const newPriceChangeCard: PriceChangeSignal = { // Renamed variable
       id: uuidv4(),
       type: 'price_change',
       symbol: 'AAPL', // Assuming symbol is consistent or derived from cards
@@ -271,31 +272,29 @@ export default function FinSignalGamePage() {
       isFlipped: false, 
     };
 
-    setDiscoveredSignals(prev => [newSignal, ...prev].sort((a, b) => new Date(b.discoveredAt || b.generatedAt).getTime() - new Date(a.discoveredAt || a.generatedAt).getTime()));
+    setDiscoveredCards(prev => [newPriceChangeCard, ...prev].sort((a, b) => new Date(b.discoveredAt || b.generatedAt).getTime() - new Date(a.discoveredAt || a.generatedAt).getTime())); // Renamed setter
     
     setActiveCards(prevActiveCards => 
       prevActiveCards.filter(card => card.id !== card1FromState.id && card.id !== card2FromState.id)
     );
 
-    toast({ title: "Price Change Signal Discovered!", description: `Comparing prices from ${format(newSignal.timestamp1, 'p')} and ${format(newSignal.timestamp2, 'p')}. Cards removed.` });
+    toast({ title: "Price Change Signal Discovered!", description: `Comparing prices from ${format(newPriceChangeCard.timestamp1, 'p')} and ${format(newPriceChangeCard.timestamp2, 'p')}. Cards removed.` });
     setSelectedCardsForCombine([]);
-  }, [selectedCardsForCombine, activeCards, setActiveCards, setDiscoveredSignals, toast]);
+  }, [selectedCardsForCombine, activeCards, setActiveCards, setDiscoveredCards, toast]); // Renamed dependency
 
 
-  const handleToggleFlipSignal = useCallback((signalId: string) => {
-    setDiscoveredSignals(prevSignals =>
-      prevSignals.map(s =>
-        s.id === signalId ? { ...s, isFlipped: !s.isFlipped } : s
+  const handleToggleFlipDiscoveredCard = useCallback((cardId: string) => { // Renamed handler
+    setDiscoveredCards(prevCards => // Renamed setter
+      prevCards.map(s =>
+        s.id === cardId ? { ...s, isFlipped: !s.isFlipped } : s
       )
     );
-  }, [setDiscoveredSignals]);
+  }, [setDiscoveredCards]); // Renamed dependency
 
-  const handleDeleteSignal = useCallback((signalId: string) => {
-    setDiscoveredSignals(prevSignals => prevSignals.filter(s => s.id !== signalId));
-    toast({ title: "Signal Deleted", description: "The signal has been removed from the log." });
-    // No longer need to interact with activeCards here.
-    // Active cards and discovered signals are independent after the signal is created.
-  }, [setDiscoveredSignals, toast]);
+  const handleDeleteDiscoveredCard = useCallback((cardId: string) => { // Renamed handler
+    setDiscoveredCards(prevCards => prevCards.filter(s => s.id !== cardId)); // Renamed setter
+    toast({ title: "Card Deleted", description: "The card has been removed from the discovered list." }); // Updated toast message
+  }, [setDiscoveredCards, toast]); // Renamed dependency
 
 
   return (
@@ -308,13 +307,14 @@ export default function FinSignalGamePage() {
         selectedCardsForCombine={selectedCardsForCombine}
         onSelectCardForCombine={handleSelectCardForCombine}
         onCombineCards={handleCombineCards}
-        onToggleFlipCard={handleToggleFlipCard} // Pass directly for GameCard to use
+        onToggleFlipCard={handleToggleFlipCard} 
       />
-      <DiscoveredSignalsLog 
-        signals={discoveredSignals} 
-        onToggleFlipSignal={handleToggleFlipSignal}
-        onDeleteSignal={handleDeleteSignal}
+      <DiscoveredCards 
+        cards={discoveredCards} 
+        onToggleFlipCard={handleToggleFlipDiscoveredCard} // Renamed prop
+        onDeleteCard={handleDeleteDiscoveredCard} // Renamed prop
       />
     </div>
   );
 }
+
