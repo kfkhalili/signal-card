@@ -54,6 +54,7 @@ export interface PriceChangeSignal { // This name describes the *type* of card, 
   timestamp2: Date;
   generatedAt: Date;
   isFlipped: boolean; 
+  hasBeenFlippedAtLeastOnce?: boolean; // Added to track flip state
 }
 
 export interface PriceDiscoverySignal { // This name describes the *type* of card, so it's okay.
@@ -64,9 +65,8 @@ export interface PriceDiscoverySignal { // This name describes the *type* of car
   timestamp: Date; // Price data timestamp
   discoveredAt: Date; // When card was revealed/secured
   isFlipped: boolean; 
+  hasBeenFlippedAtLeastOnce?: boolean; // Added to track flip state
 }
 
 // This is the union type for items in the "Discovered Cards" area.
-export type DiscoveredCard = PriceChangeSignal | PriceDiscoverySignal; // Renamed from DiscoveredSignal
-
-
+export type DiscoveredCard = PriceChangeSignal | PriceDiscoverySignal;

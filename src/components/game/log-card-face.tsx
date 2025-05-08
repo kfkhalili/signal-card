@@ -2,21 +2,25 @@
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import type { DiscoveredCard, PriceDiscoverySignal, PriceChangeSignal } from './types'; // Updated type import
+import type { DiscoveredCard, PriceDiscoverySignal, PriceChangeSignal } from './types'; 
 import { format } from 'date-fns';
 import { ArrowDownRight, ArrowUpRight, Minus, X } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+
 
 interface LogCardFaceProps {
-  card: DiscoveredCard; // Renamed prop and updated type
+  card: DiscoveredCard; 
   isBack: boolean;
   onDelete?: (event: React.MouseEvent) => void;
 }
 
-const LogCardFace: React.FC<LogCardFaceProps> = ({ card, isBack, onDelete }) => { // Renamed prop
+const LogCardFace: React.FC<LogCardFaceProps> = ({ card, isBack, onDelete }) => { 
   const renderFrontContent = () => {
     let content;
+    const isNewAndUnflipped = card.hasBeenFlippedAtLeastOnce === false;
+
     if (card.type === 'price_discovery') {
-      const discoveryCard = card as PriceDiscoverySignal; // Renamed variable
+      const discoveryCard = card as PriceDiscoverySignal; 
       content = (
         <>
           <CardHeader>
@@ -32,7 +36,7 @@ const LogCardFace: React.FC<LogCardFaceProps> = ({ card, isBack, onDelete }) => 
         </>
       );
     } else if (card.type === 'price_change') {
-      const changeCard = card as PriceChangeSignal; // Renamed variable
+      const changeCard = card as PriceChangeSignal; 
       const priceDiff = changeCard.price2 - changeCard.price1;
       const absPriceDiff = Math.abs(priceDiff);
       let TrendIcon = Minus;
@@ -69,8 +73,8 @@ const LogCardFace: React.FC<LogCardFaceProps> = ({ card, isBack, onDelete }) => 
     } else {
       content = (
         <CardContent>
-          <p>Unknown card type.</p> {/* Updated text */}
-          <pre className="text-xs">{JSON.stringify(card, null, 2)}</pre> {/* Use card prop */}
+          <p>Unknown card type.</p> 
+          <pre className="text-xs">{JSON.stringify(card, null, 2)}</pre> 
         </CardContent>
       );
     }
@@ -79,15 +83,20 @@ const LogCardFace: React.FC<LogCardFaceProps> = ({ card, isBack, onDelete }) => 
       <>
         {content}
         {onDelete && !isBack && ( 
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-2 right-2 opacity-0 group-hover/logcard:opacity-100 text-muted-foreground hover:bg-destructive hover:text-destructive-foreground focus-visible:ring-destructive z-10"
-            onClick={onDelete}
-            aria-label="Delete card" // Updated aria-label
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          <div className="absolute top-2 right-2 flex items-center opacity-0 group-hover/logcard:opacity-100 z-10">
+            {isNewAndUnflipped && (
+              <Badge variant="default" className="mr-1 text-xs px-1.5 py-0.5 h-5">NEW</Badge>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:bg-destructive hover:text-destructive-foreground focus-visible:ring-destructive"
+              onClick={onDelete}
+              aria-label="Delete card" 
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         )}
       </>
     );
@@ -95,7 +104,7 @@ const LogCardFace: React.FC<LogCardFaceProps> = ({ card, isBack, onDelete }) => 
 
   const renderBackContent = () => {
     if (card.type === 'price_discovery') {
-      const discoveryCard = card as PriceDiscoverySignal; // Renamed variable
+      const discoveryCard = card as PriceDiscoverySignal; 
       const explanation = `${discoveryCard.symbol}'s stock price was $${discoveryCard.price.toFixed(2)} at ${format(new Date(discoveryCard.timestamp), "p 'on' PP")}. This price point was logged on ${format(new Date(discoveryCard.discoveredAt), "PP 'at' p")}.`;
       return (
         <>
@@ -108,7 +117,7 @@ const LogCardFace: React.FC<LogCardFaceProps> = ({ card, isBack, onDelete }) => 
         </>
       );
     } else if (card.type === 'price_change') {
-      const changeCard = card as PriceChangeSignal; // Renamed variable
+      const changeCard = card as PriceChangeSignal; 
       const priceDiff = changeCard.price2 - changeCard.price1;
       const absPriceDiff = Math.abs(priceDiff);
       let trendText = 'remained flat';
@@ -129,8 +138,8 @@ const LogCardFace: React.FC<LogCardFaceProps> = ({ card, isBack, onDelete }) => 
     }
     return (
       <CardContent>
-        <p>Unknown card type (back).</p> {/* Updated text */}
-        <pre className="text-xs">{JSON.stringify(card, null, 2)}</pre> {/* Use card prop */}
+        <p>Unknown card type (back).</p> 
+        <pre className="text-xs">{JSON.stringify(card, null, 2)}</pre> 
       </CardContent>
     );
   };
