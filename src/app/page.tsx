@@ -11,7 +11,7 @@ import useLocalStorage from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
-const FADE_DURATION_MINUTES = 10; // Default: 10-15 minutes. Using 10 for demo.
+const FADE_DURATION_MINUTES = 4; // Default: 4 minutes.
 const FADE_DURATION_MS = FADE_DURATION_MINUTES * 60 * 1000;
 // const FADE_DURATION_MS = 30 * 1000; // For testing: 30 seconds
 

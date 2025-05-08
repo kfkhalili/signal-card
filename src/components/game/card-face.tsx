@@ -8,9 +8,10 @@ interface CardFaceProps {
   card: ActiveGameCard;
   isBack: boolean;
   onExamine?: (card: PriceGameCard) => void;
+  remainingTime?: string | null;
 }
 
-const CardFace: React.FC<CardFaceProps> = ({ card, isBack, onExamine }) => {
+const CardFace: React.FC<CardFaceProps> = ({ card, isBack, onExamine, remainingTime }) => {
   const renderContent = () => {
     if (card.type === 'price') {
       const priceCard = card as PriceGameCard;
@@ -44,6 +45,11 @@ const CardFace: React.FC<CardFaceProps> = ({ card, isBack, onExamine }) => {
               <p className="text-xs text-muted-foreground mt-1">
                 {format(new Date(priceCard.faceData.timestamp), 'PP p')}
               </p>
+              {remainingTime && !priceCard.isSecured && (
+                <p className="text-sm text-accent font-medium mt-2 animate-pulse">
+                  Expires in: {remainingTime}
+                </p>
+              )}
             </CardContent>
           </>
         );
