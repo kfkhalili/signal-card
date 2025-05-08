@@ -96,7 +96,7 @@ const LogCardFace: React.FC<LogCardFaceProps> = ({ signal, isBack, onDelete }) =
   const renderBackContent = () => {
     if (signal.type === 'price_discovery') {
       const discoverySignal = signal as PriceDiscoverySignal;
-      const explanation = `${discoverySignal.symbol}'s stock price was $${discoverySignal.price.toFixed(2)} at ${format(new Date(discoverySignal.timestamp), 'p on PP')}. This price point was logged on ${format(new Date(discoverySignal.discoveredAt), 'PP p')}.`;
+      const explanation = `${discoverySignal.symbol}'s stock price was $${discoverySignal.price.toFixed(2)} at ${format(new Date(discoverySignal.timestamp), 'p \'on\' PP')}. This price point was logged on ${format(new Date(discoverySignal.discoveredAt), 'PP p')}.`;
       return (
         <>
           <CardHeader>
