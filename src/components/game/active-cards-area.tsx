@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import type { ActiveGameCard, PriceGameCard } from './types';
 import GameCard from './game-card';
@@ -12,6 +13,7 @@ interface ActiveCardsAreaProps {
   onSelectCardForCombine: (cardId: string) => void;
   onCombineCards: () => void;
   onToggleFlipCard: (cardId: string) => void;
+  newCardCountdownSeconds: number | null;
 }
 
 const ActiveCardsArea: React.FC<ActiveCardsAreaProps> = ({
@@ -23,6 +25,7 @@ const ActiveCardsArea: React.FC<ActiveCardsAreaProps> = ({
   onSelectCardForCombine,
   onCombineCards,
   onToggleFlipCard,
+  newCardCountdownSeconds,
 }) => {
   const [hasMounted, setHasMounted] = useState(false);
 
@@ -37,7 +40,10 @@ const ActiveCardsArea: React.FC<ActiveCardsAreaProps> = ({
     return (
       <div className="flex-grow p-4 bg-secondary/30 rounded-lg shadow-inner min-h-[400px]">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-semibold text-foreground">Active Cards</h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-2xl font-semibold text-foreground">Active Cards</h2>
+             {/* Placeholder for countdown during initial server render if needed, or hide */}
+          </div>
           <Button onClick={onCombineCards} disabled={!canCombine}>
             Combine Selected ({selectedCardsForCombine.length}/2)
           </Button>
@@ -52,7 +58,14 @@ const ActiveCardsArea: React.FC<ActiveCardsAreaProps> = ({
   return (
     <div className="flex-grow p-4 bg-secondary/30 rounded-lg shadow-inner min-h-[400px]">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-semibold text-foreground">Active Cards</h2>
+        <div className="flex items-center gap-4">
+          <h2 className="text-2xl font-semibold text-foreground">Active Cards</h2>
+          {newCardCountdownSeconds !== null && newCardCountdownSeconds >= 0 && (
+            <span className="text-sm text-muted-foreground tabular-nums">
+              New Card in {newCardCountdownSeconds}s
+            </span>
+          )}
+        </div>
         <Button onClick={onCombineCards} disabled={!canCombine}>
           Combine Selected ({selectedCardsForCombine.length}/2)
         </Button>
@@ -83,3 +96,4 @@ const ActiveCardsArea: React.FC<ActiveCardsAreaProps> = ({
 };
 
 export default ActiveCardsArea;
+

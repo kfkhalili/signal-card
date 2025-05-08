@@ -25,7 +25,7 @@ export default function FinSignalGamePage() {
   const [selectedCardsForCombine, setSelectedCardsForCombine] = useState<string[]>([]);
   
   const { toast } = useToast();
-  const { latestPriceData, priceHistory } = useMockPriceFeed();
+  const { latestPriceData, priceHistory, nextUpdateInSeconds } = useMockPriceFeed();
 
   useEffect(() => {
     if (latestPriceData) {
@@ -85,23 +85,24 @@ export default function FinSignalGamePage() {
 
     if (cardBeingSecured && !cardBeingSecured.isSecured) {
       const newDiscoveryCard: PriceDiscoverySignal = {
-        id: uuidv4(),
+        id: uuidv4(), // Use a new ID for the discovered card
         type: 'price_discovery',
         symbol: cardBeingSecured.faceData.symbol,
         price: cardBeingSecured.faceData.price,
         timestamp: new Date(cardBeingSecured.faceData.timestamp), 
         discoveredAt: new Date(),
-        isFlipped: false,
+        isFlipped: false, // Discovered cards start unflipped
       };
       
-      const cardExists = discoveredCards.some(card => 
+      // Check if this specific discovery (price point at specific time) already exists in discovered list
+      const cardExistsInDiscovered = discoveredCards.some(card => 
         card.type === 'price_discovery' &&
         (card as PriceDiscoverySignal).symbol === newDiscoveryCard.symbol &&
         (card as PriceDiscoverySignal).price === newDiscoveryCard.price &&
         new Date((card as PriceDiscoverySignal).timestamp).getTime() === newDiscoveryCard.timestamp.getTime()
       );
 
-      if (!cardExists) {
+      if (!cardExistsInDiscovered) {
         setDiscoveredCards(prevCards => [newDiscoveryCard, ...prevCards].sort((a, b) => new Date(b.discoveredAt || b.generatedAt).getTime() - new Date(a.discoveredAt || a.generatedAt).getTime()));
         toast({ 
           title: "Price Card Secured & Discovered!", 
@@ -110,14 +111,15 @@ export default function FinSignalGamePage() {
       } else {
          toast({ 
           title: "Price Card Secured", 
-          description: `This price point was already discovered. Card is now secured.`
+          description: `This price point was already discovered. Card is now secured in active area.`
         });
       }
 
+      // Secure the active card
       setActiveCards(prevCards =>
         prevCards.map(card =>
           card.id === cardId && card.type === 'price'
-            ? { ...card, isSecured: true, isFlipped: true, appearedAt: Date.now() } 
+            ? { ...card, isSecured: true, isFlipped: true, appearedAt: Date.now() } // Flip to back when secured
             : card
         )
       );
@@ -139,13 +141,16 @@ export default function FinSignalGamePage() {
     const cardTimestamp = new Date(priceCard.faceData.timestamp).getTime(); 
     let previousPriceDataPoint: PriceData | undefined;
     
+    // Find the price point immediately preceding the examined card's timestamp in history
+    // History is sorted with most recent first
     for (let i = 0; i < priceHistory.length; i++) {
         const p = priceHistory[i];
         const pTimestamp = new Date(p.timestamp).getTime();
-        if (pTimestamp < cardTimestamp) {
+        if (pTimestamp < cardTimestamp) { // Found a point strictly before
             previousPriceDataPoint = p;
             break; 
         } else if (pTimestamp === cardTimestamp && i + 1 < priceHistory.length) {
+            // If current history point matches card's exact time, use the one before that
             previousPriceDataPoint = priceHistory[i+1];
             break;
         }
@@ -171,6 +176,7 @@ export default function FinSignalGamePage() {
     };
 
     setActiveCards(prevActiveCards => {
+      // Check for duplicate Trend card
       const isDuplicate = prevActiveCards.some(card =>
         card.type === 'trend' &&
         (card as TrendGameCard).faceData.symbol === newTrendCardFaceData.symbol &&
@@ -187,7 +193,7 @@ export default function FinSignalGamePage() {
           backData: {
             explanation: `AAPL price went ${trend.toLowerCase()} in the interval between ${format(newTrendCardFaceData.referenceTimeStart, 'p')} (Price: $${prevPrice.toFixed(2)}) and ${format(newTrendCardFaceData.referenceTimeEnd, 'p')} (Price: $${currentPrice.toFixed(2)}).`,
           },
-          isFlipped: false,
+          isFlipped: false, // Trend cards start unflipped
         };
         toast({ title: "Trend Card Generated!", description: `AAPL price trend: ${trend}` });
         return [...prevActiveCards, newTrendCard];
@@ -197,34 +203,39 @@ export default function FinSignalGamePage() {
 
   }, [priceHistory, setActiveCards, toast]);
 
+
   const handleSelectCardForCombine = useCallback((cardId: string) => {
     const card = activeCards.find(c => c.id === cardId);
     
-    if (card && (card.type === 'trend' || (card.type === 'price' && !(card as PriceGameCard).isSecured))) {
-      handleToggleFlipCard(cardId);
-      if (card.type === 'trend' || (card.type === 'price' && !(card as PriceGameCard).isSecured)) {
-        return;
-      }
-    }
-    
+    // Prevent selection of non-price cards or unsecured price cards
     if (!card || card.type !== 'price' || !(card as PriceGameCard).isSecured) {
-      toast({ title: "Selection Info", description: "Only secured Price Cards can be selected for combination.", variant: "default" });
+      // If it's a trend card or an unsecured price card, just flip it if clicked.
+      if (card && (card.type === 'trend' || (card.type === 'price' && !(card as PriceGameCard).isSecured))) {
+        handleToggleFlipCard(cardId);
+      } else {
+        toast({ title: "Selection Info", description: "Only secured Price Cards can be selected for combination.", variant: "default" });
+      }
       return; 
     }
 
+    // Handle selection logic for secured price cards
     setSelectedCardsForCombine(prev => {
       if (prev.includes(cardId)) {
+        // Deselect if already selected
         return prev.filter(id => id !== cardId);
       }
       if (prev.length < 2) {
+        // Select if less than 2 are selected
         return [...prev, cardId];
       }
+      // If 2 are already selected and trying to select a third, show a message.
+      // The card itself won't be added to selection.
       if (prev.length >= 2 && !prev.includes(cardId)) {
-        toast({ title: "Selection Limit", description: "Maximum of 2 cards can be selected for combination.", variant: "destructive" });
+        toast({ title: "Selection Limit", description: "Maximum of 2 cards can be selected. Deselect one first.", variant: "destructive" });
       }
-      return prev; 
+      return prev; // Return previous state if limit reached
     });
-  }, [activeCards, toast, handleToggleFlipCard, setSelectedCardsForCombine]);
+  }, [activeCards, toast, handleToggleFlipCard]);
 
 
   const handleCombineCards = useCallback(() => {
@@ -255,7 +266,7 @@ export default function FinSignalGamePage() {
       price2: laterCard.faceData.price,
       timestamp2: new Date(laterCard.faceData.timestamp),
       generatedAt: new Date(),
-      isFlipped: false, 
+      isFlipped: false, // Combined cards start unflipped
     };
 
     setDiscoveredCards(prev => [newPriceChangeCard, ...prev].sort((a, b) => new Date(b.discoveredAt || b.generatedAt).getTime() - new Date(a.discoveredAt || a.generatedAt).getTime()));
@@ -287,15 +298,17 @@ export default function FinSignalGamePage() {
 
     if (cardToDelete.type === 'price_discovery') {
       const deletedDiscoverySignal = cardToDelete as PriceDiscoverySignal;
+      // Find the corresponding active card and unsecure it / restart timer
       setActiveCards(prevActiveCards => 
         prevActiveCards.map(activeCard => {
           if (activeCard.type === 'price') {
             const priceGameCard = activeCard as PriceGameCard;
+            // Match by symbol, price, and original timestamp
             if (
               priceGameCard.faceData.symbol === deletedDiscoverySignal.symbol &&
               priceGameCard.faceData.price === deletedDiscoverySignal.price &&
               new Date(priceGameCard.faceData.timestamp).getTime() === new Date(deletedDiscoverySignal.timestamp).getTime() &&
-              priceGameCard.isSecured // Only unsecure if it was secured
+              priceGameCard.isSecured // Only act if it was the one that was secured
             ) {
               toastMessage = `Card deleted. Corresponding active card unsecured and timer restarted.`;
               return {
@@ -324,7 +337,8 @@ export default function FinSignalGamePage() {
         selectedCardsForCombine={selectedCardsForCombine}
         onSelectCardForCombine={handleSelectCardForCombine}
         onCombineCards={handleCombineCards}
-        onToggleFlipCard={handleToggleFlipCard} 
+        onToggleFlipCard={handleToggleFlipCard}
+        newCardCountdownSeconds={nextUpdateInSeconds}
       />
       <DiscoveredCards 
         cards={discoveredCards} 
