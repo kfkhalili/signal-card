@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { ActiveGameCard, PriceGameCard } from './types';
 import CardFace from './card-face';
 import { cn } from '@/lib/utils';
@@ -14,6 +14,7 @@ interface GameCardProps {
   onFadedOut: (cardId: string) => void;
   onSelectForCombine: (cardId: string) => void;
   isSelectedForCombine: boolean;
+  onToggleFlip: (cardId: string) => void;
 }
 
 const GameCard: React.FC<GameCardProps> = ({
@@ -23,16 +24,12 @@ const GameCard: React.FC<GameCardProps> = ({
   onFadedOut,
   onSelectForCombine,
   isSelectedForCombine,
+  onToggleFlip,
 }) => {
   const [currentOpacity, setCurrentOpacity] = useState(1);
-  const [isFlipped, setIsFlipped] = useState(card.isFlipped);
 
   const isPriceCard = card.type === 'price';
   const priceCardData = isPriceCard ? (card as PriceGameCard) : null;
-
-  useEffect(() => {
-    setIsFlipped(card.isFlipped);
-  }, [card.isFlipped]);
   
   useEffect(() => {
     if (priceCardData && !priceCardData.isSecured) {
@@ -59,24 +56,24 @@ const GameCard: React.FC<GameCardProps> = ({
 
 
   const handleCardClick = () => {
-    if (priceCardData && !priceCardData.isSecured) {
-      onSecureCard(card.id); // Secures and flips
-    } else if (priceCardData && priceCardData.isSecured) {
-       // If it's a secured price card, allow selection for combining
-       onSelectForCombine(card.id);
-       // Optionally, flip if not already flipped and not about to examine
-       if (!isFlipped && !priceCardData.backData.explanation.includes("Examine")) {
-         setIsFlipped(true); // Flip if clicked and secured
-       }
+    if (isPriceCard && priceCardData && !priceCardData.isSecured) {
+      // Unsecured Price Card: Secure it (this also flips it to back via onSecureCard in page.tsx)
+      onSecureCard(card.id);
+    } else if (isPriceCard && priceCardData && priceCardData.isSecured) {
+      // Secured Price Card:
+      // 1. Handle selection for combination
+      onSelectForCombine(card.id);
+      // 2. Toggle flip state via parent
+      onToggleFlip(card.id);
     } else if (card.type === 'trend') {
-      // Trend cards can be flipped
-      setIsFlipped(!isFlipped);
+      // Trend Card: Toggle flip state via parent
+      onToggleFlip(card.id);
     }
   };
   
   const cardContainerClasses = cn(
     'card-container w-64 h-80 cursor-pointer transition-opacity duration-200 ease-linear',
-    { 'is-flipped': isFlipped },
+    { 'is-flipped': card.isFlipped }, // Use card.isFlipped from props
     isSelectedForCombine && priceCardData?.isSecured ? 'ring-4 ring-primary ring-offset-2 shadow-2xl' : 'shadow-md hover:shadow-xl',
   );
 
@@ -88,7 +85,7 @@ const GameCard: React.FC<GameCardProps> = ({
       role="button"
       tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && handleCardClick()}
-      aria-label={`Card ${card.id}, type ${card.type}. ${isSelectedForCombine ? "Selected for combine." : ""} ${isFlipped ? "Showing back." : "Showing front."}`}
+      aria-label={`Card ${card.id}, type ${card.type}. ${isSelectedForCombine ? "Selected for combine." : ""} ${card.isFlipped ? "Showing back." : "Showing front."}`}
     >
       <div className="card-inner">
         <CardFace card={card} isBack={false} onExamine={card.type === 'price' ? onExamineCard : undefined} />

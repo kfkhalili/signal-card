@@ -11,6 +11,7 @@ interface ActiveCardsAreaProps {
   selectedCardsForCombine: string[];
   onSelectCardForCombine: (cardId: string) => void;
   onCombineCards: () => void;
+  onToggleFlipCard: (cardId: string) => void;
 }
 
 const ActiveCardsArea: React.FC<ActiveCardsAreaProps> = ({
@@ -21,6 +22,7 @@ const ActiveCardsArea: React.FC<ActiveCardsAreaProps> = ({
   selectedCardsForCombine,
   onSelectCardForCombine,
   onCombineCards,
+  onToggleFlipCard,
 }) => {
   const [hasMounted, setHasMounted] = useState(false);
 
@@ -30,43 +32,49 @@ const ActiveCardsArea: React.FC<ActiveCardsAreaProps> = ({
 
   const canCombine = selectedCardsForCombine.length === 2;
 
+  // This structure prevents mismatched content between server and client initial render
+  if (!hasMounted) {
+    return (
+      <div className="flex-grow p-4 bg-secondary/30 rounded-lg shadow-inner min-h-[400px]">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-semibold text-foreground">Active Cards Area</h2>
+          <Button onClick={onCombineCards} disabled={!canCombine}>
+            Combine Selected ({selectedCardsForCombine.length}/2)
+          </Button>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          <p className="col-span-full text-muted-foreground text-center py-10">Loading cards...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-grow p-4 bg-secondary/30 rounded-lg shadow-inner min-h-[400px]">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-2xl font-semibold text-foreground">Active Cards Area</h2>
-        <Button onClick={onCombineCards} disabled={!canCombine || !hasMounted}>
+        <Button onClick={onCombineCards} disabled={!canCombine}>
           Combine Selected ({selectedCardsForCombine.length}/2)
         </Button>
       </div>
-
-      {!hasMounted ? (
-        // Server Render / Initial Client Render before useEffect:
-        // Show a consistent placeholder to prevent hydration mismatch.
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          <p className="col-span-full text-muted-foreground text-center py-10">Loading cards...</p>
-        </div>
+      
+      {cards.length === 0 ? (
+        <p className="text-muted-foreground text-center py-10">No active cards. New cards will appear automatically.</p>
       ) : (
-        // Client Render After Mount: Show actual content based on cards state.
-        <>
-          {cards.length === 0 && (
-            <p className="text-muted-foreground text-center py-10">No active cards. New cards will appear automatically.</p>
-          )}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {cards.map((card) => (
-              <GameCard
-                key={card.id}
-                card={card}
-                onSecureCard={onSecureCard}
-                onExamineCard={onExamineCard}
-                onFadedOut={onFadedOut}
-                onSelectForCombine={onSelectCardForCombine}
-                isSelectedForCombine={selectedCardsForCombine.includes(card.id)}
-              />
-            ))}
-            {/* If cards.length is 0 and mounted, the <p> above handles the message,
-                so this div will be empty, which is fine. */}
-          </div>
-        </>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {cards.map((card) => (
+            <GameCard
+              key={card.id}
+              card={card}
+              onSecureCard={onSecureCard}
+              onExamineCard={onExamineCard}
+              onFadedOut={onFadedOut}
+              onSelectForCombine={onSelectCardForCombine}
+              isSelectedForCombine={selectedCardsForCombine.includes(card.id)}
+              onToggleFlip={onToggleFlipCard}
+            />
+          ))}
+        </div>
       )}
     </div>
   );
