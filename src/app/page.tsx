@@ -1,19 +1,11 @@
-
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { v4 as uuidv4 } from 'uuid';
-import ActiveCards from '@/components/game/active-cards';
-import DiscoveredCards from '@/components/game/discovered-cards';
-import type { ActiveGameCard, PriceGameCard, TrendGameCard, PriceChangeSignal, PriceCardFaceData, TrendCardFaceData, DiscoveredCard, PriceDiscoverySignal } from '@/components/game/types';
-// import { useMockPriceFeed, type PriceData } from '@/hooks/use-mock-price-feed'; // PriceData only used in handleExamineCard
-import { useMockPriceFeed } from '@/hooks/use-mock-price-feed'; // Removed PriceData as it's no longer used
+import React from 'react'; 
 import useLocalStorage from '@/hooks/use-local-storage';
-import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import type { ActiveGameCard, DiscoveredCard } from '@/components/game/types';
 
-const FADE_DURATION_MINUTES = 4; 
-const FADE_DURATION_MS = FADE_DURATION_MINUTES * 60 * 1000;
+import ActiveCardsSection from '@/components/game/active-cards-section';
+import DiscoveredCardsSection from '@/components/game/discovered-cards-section';
 
 const INITIAL_ACTIVE_CARDS: ActiveGameCard[] = [];
 const INITIAL_DISCOVERED_CARDS: DiscoveredCard[] = [];
@@ -21,265 +13,20 @@ const INITIAL_DISCOVERED_CARDS: DiscoveredCard[] = [];
 export default function FinSignalGamePage() {
   const [activeCards, setActiveCards] = useLocalStorage<ActiveGameCard[]>('finSignal-activeCards', INITIAL_ACTIVE_CARDS);
   const [discoveredCards, setDiscoveredCards] = useLocalStorage<DiscoveredCard[]>('finSignal-discoveredCards', INITIAL_DISCOVERED_CARDS);
-  const [selectedCardsForCombine, setSelectedCardsForCombine] = useState<string[]>([]);
-  
-  const { toast } = useToast();
-  // const { latestPriceData, priceHistory, nextUpdateInSeconds } = useMockPriceFeed(); // priceHistory only used in handleExamineCard
-  const { latestPriceData, nextUpdateInSeconds } = useMockPriceFeed(); // Removed priceHistory as it's no longer used
-
-
-  useEffect(() => {
-    if (latestPriceData) {
-      const newPriceCardData: PriceCardFaceData = {
-        symbol: 'AAPL',
-        price: latestPriceData.price,
-        timestamp: new Date(latestPriceData.timestamp),
-      };
-
-      setActiveCards(prevActiveCards => {
-        const newCardTimestamp = newPriceCardData.timestamp;
-        const isDuplicateByHHMM = prevActiveCards.some(card => {
-          if (card.type === 'price') {
-            const existingCardTimestamp = new Date((card as PriceGameCard).faceData.timestamp);
-            return (
-              (card as PriceGameCard).faceData.symbol === newPriceCardData.symbol &&
-              existingCardTimestamp.getHours() === newCardTimestamp.getHours() &&
-              existingCardTimestamp.getMinutes() === newCardTimestamp.getMinutes()
-            );
-          }
-          return false;
-        });
-
-        if (!isDuplicateByHHMM) {
-          const newPriceCard: PriceGameCard = {
-            id: uuidv4(),
-            type: 'price',
-            faceData: newPriceCardData,
-            backData: {
-              explanation: `Apple Inc.'s stock price at ${format(newPriceCardData.timestamp, 'PP p')}.`,
-            },
-            isFlipped: false,
-            isSecured: false,
-            appearedAt: Date.now(),
-            initialFadeDurationMs: FADE_DURATION_MS,
-          };
-          toast({ title: "New Price Card Appeared!", description: `AAPL: $${latestPriceData.price.toFixed(2)} at ${format(newPriceCardData.timestamp, 'p')}` });
-          return [...prevActiveCards, newPriceCard];
-        }
-        return prevActiveCards;
-      });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [latestPriceData, toast]); 
-
-  const handleSecureCard = useCallback((cardId: string, fromFlip: boolean = false) => {
-    const cardBeingSecured = activeCards.find(c => c.id === cardId && c.type === 'price') as PriceGameCard | undefined;
-
-    if (cardBeingSecured && (!cardBeingSecured.isSecured || fromFlip)) {
-      const newDiscoveryCard: PriceDiscoverySignal = {
-        id: uuidv4(), 
-        type: 'price_discovery',
-        symbol: cardBeingSecured.faceData.symbol,
-        price: cardBeingSecured.faceData.price,
-        timestamp: new Date(cardBeingSecured.faceData.timestamp), 
-        discoveredAt: new Date(),
-        isFlipped: false, 
-        hasBeenFlippedAtLeastOnce: false,
-      };
-      
-      const cardExistsInDiscovered = discoveredCards.some(card => 
-        card.type === 'price_discovery' &&
-        (card as PriceDiscoverySignal).symbol === newDiscoveryCard.symbol &&
-        (card as PriceDiscoverySignal).price === newDiscoveryCard.price &&
-        new Date((card as PriceDiscoverySignal).timestamp).getTime() === newDiscoveryCard.timestamp.getTime()
-      );
-
-      if (!cardExistsInDiscovered) {
-        setDiscoveredCards(prevCards => [newDiscoveryCard, ...prevCards].sort((a, b) => new Date(b.discoveredAt || b.generatedAt).getTime() - new Date(a.discoveredAt || a.generatedAt).getTime()));
-        toast({ 
-          title: "Price Card Secured & Discovered!", 
-          description: `Details of ${cardBeingSecured.faceData.symbol} at $${cardBeingSecured.faceData.price.toFixed(2)} logged.` 
-        });
-      } else if (!cardBeingSecured.isSecured) { 
-         toast({ 
-          title: "Price Card Secured", 
-          description: `This price point was already discovered. Card is now secured in active area.`
-        });
-      }
-
-      setActiveCards(prevCards =>
-        prevCards.map(card =>
-          card.id === cardId && card.type === 'price'
-            ? { ...card, isSecured: true, isFlipped: true, appearedAt: Date.now() } 
-            : card
-        )
-      );
-
-      setSelectedCardsForCombine(prevSelected => {
-        if (prevSelected.length < 2 && !prevSelected.includes(cardId)) {
-          return [...prevSelected, cardId];
-        }
-        if (prevSelected.length >= 2 && !prevSelected.includes(cardId)) {
-           toast({ title: "Selection Limit Reached", description: "Card secured, but cannot auto-select. Deselect a card first.", variant: "default" });
-        }
-        return prevSelected;
-      });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCards, discoveredCards, toast, setSelectedCardsForCombine]); 
-
-  const handleToggleFlipCard = useCallback((cardId: string) => {
-    setActiveCards(prevCards =>
-      prevCards.map(card => {
-        if (card.id === cardId) {
-          const updatedCard = { ...card, isFlipped: !card.isFlipped };
-          if (updatedCard.type === 'price' && !updatedCard.isSecured && updatedCard.isFlipped) {
-            handleSecureCard(cardId, true); 
-            return { ...updatedCard, isSecured: true, appearedAt: Date.now() }; 
-          }
-          return updatedCard;
-        }
-        return card;
-      })
-    );
-  }, [setActiveCards, handleSecureCard]);
-
-  const handleFadedOut = useCallback((cardId: string) => {
-    setActiveCards(prevCards => prevCards.filter(card => card.id !== cardId));
-    toast({ title: "Card Faded Out", description: "A price card was removed due to inactivity." });
-  }, [setActiveCards, toast]);
-
-  // REMOVED handleExamineCard function (lines 152-212 of original)
-
-  const handleSelectCardForCombine = useCallback((cardId: string) => {
-    const card = activeCards.find(c => c.id === cardId);
-    
-    if (!card || card.type !== 'price' || !(card as PriceGameCard).isSecured) {
-      if (card && (card.type === 'trend' || (card.type === 'price' && !(card as PriceGameCard).isSecured))) {
-        handleToggleFlipCard(cardId);
-      } else {
-        toast({ title: "Selection Info", description: "Only secured Price Cards can be selected for combination.", variant: "default" });
-      }
-      return; 
-    }
-
-    setSelectedCardsForCombine(prev => {
-      if (prev.includes(cardId)) {
-        return prev.filter(id => id !== cardId);
-      }
-      if (prev.length < 2) {
-        return [...prev, cardId];
-      }
-      if (prev.length >= 2 && !prev.includes(cardId)) {
-        toast({ title: "Selection Limit", description: "Maximum of 2 cards can be selected. Deselect one first.", variant: "destructive" });
-      }
-      return prev; 
-    });
-  }, [activeCards, toast, handleToggleFlipCard]);
-
-  const handleCombineCards = useCallback(() => {
-    if (selectedCardsForCombine.length !== 2) return;
-
-    const card1FromState = activeCards.find(c => c.id === selectedCardsForCombine[0]) as PriceGameCard | undefined;
-    const card2FromState = activeCards.find(c => c.id === selectedCardsForCombine[1]) as PriceGameCard | undefined;
-
-    if (!card1FromState || !card2FromState || card1FromState.type !== 'price' || card2FromState.type !== 'price') {
-      toast({ title: "Combine Error", description: "Invalid cards selected for combination.", variant: "destructive" });
-      setSelectedCardsForCombine([]);
-      return;
-    }
-    
-    const card1Timestamp = card1FromState.faceData.timestamp instanceof Date ? card1FromState.faceData.timestamp : new Date(card1FromState.faceData.timestamp);
-    const card2Timestamp = card2FromState.faceData.timestamp instanceof Date ? card2FromState.faceData.timestamp : new Date(card2FromState.faceData.timestamp);
-
-    const [earlierCard, laterCard] = card1Timestamp.getTime() < card2Timestamp.getTime()
-      ? [card1FromState, card2FromState]
-      : [card2FromState, card1FromState];
-
-    const newPriceChangeCard: PriceChangeSignal = {
-      id: uuidv4(),
-      type: 'price_change',
-      symbol: 'AAPL',
-      price1: earlierCard.faceData.price,
-      timestamp1: new Date(earlierCard.faceData.timestamp),
-      price2: laterCard.faceData.price,
-      timestamp2: new Date(laterCard.faceData.timestamp),
-      generatedAt: new Date(),
-      isFlipped: false, 
-      hasBeenFlippedAtLeastOnce: false,
-    };
-
-    setDiscoveredCards(prev => [newPriceChangeCard, ...prev].sort((a, b) => new Date(b.discoveredAt || b.generatedAt).getTime() - new Date(a.discoveredAt || a.generatedAt).getTime()));
-    
-    setActiveCards(prevActiveCards => 
-      prevActiveCards.filter(card => card.id !== card1FromState.id && card.id !== card2FromState.id)
-    );
-
-    toast({ title: "Price Change Signal Discovered!", description: `Comparing prices from ${format(newPriceChangeCard.timestamp1, 'p')} and ${format(newPriceChangeCard.timestamp2, 'p')}. Cards removed.` });
-    setSelectedCardsForCombine([]);
-  }, [selectedCardsForCombine, activeCards, setActiveCards, setDiscoveredCards, toast]);
-
-  const handleToggleFlipDiscoveredCard = useCallback((cardId: string) => {
-    setDiscoveredCards(prevCards =>
-      prevCards.map(s =>
-        s.id === cardId ? { ...s, isFlipped: !s.isFlipped, hasBeenFlippedAtLeastOnce: true } : s
-      )
-    );
-  }, [setDiscoveredCards]);
-
-  const handleDeleteDiscoveredCard = useCallback((cardId: string) => {
-    const cardToDelete = discoveredCards.find(s => s.id === cardId);
-    if (!cardToDelete) return;
-
-    setDiscoveredCards(prevCards => prevCards.filter(s => s.id !== cardId));
-
-    let toastMessage = "Card deleted from discovered list.";
-
-    if (cardToDelete.type === 'price_discovery') {
-      const deletedDiscoverySignal = cardToDelete as PriceDiscoverySignal;
-      setActiveCards(prevActiveCards => 
-        prevActiveCards.map(activeCard => {
-          if (activeCard.type === 'price') {
-            const priceGameCard = activeCard as PriceGameCard;
-            if (
-              priceGameCard.faceData.symbol === deletedDiscoverySignal.symbol &&
-              priceGameCard.faceData.price === deletedDiscoverySignal.price &&
-              new Date(priceGameCard.faceData.timestamp).getTime() === new Date(deletedDiscoverySignal.timestamp).getTime() &&
-              priceGameCard.isSecured 
-            ) {
-              toastMessage = `Card deleted. Corresponding active card unsecured and timer restarted.`;
-              return {
-                ...priceGameCard,
-                isSecured: false,
-                isFlipped: false, 
-                appearedAt: Date.now(), 
-              };
-            }
-          }
-          return activeCard;
-        })
-      );
-    }
-    toast({ title: "Card Update", description: toastMessage });
-  }, [discoveredCards, setDiscoveredCards, setActiveCards, toast]);
 
   return (
     <div className="space-y-8">
-      <ActiveCards
-        cards={activeCards}
-        onSecureCard={(cardId) => handleSecureCard(cardId, false)}
-        // onExamineCard={handleExamineCard} // REMOVED
-        onFadedOut={handleFadedOut}
-        selectedCardsForCombine={selectedCardsForCombine}
-        onSelectCardForCombine={handleSelectCardForCombine}
-        onCombineCards={handleCombineCards}
-        onToggleFlipCard={handleToggleFlipCard}
-        newCardCountdownSeconds={nextUpdateInSeconds}
+      <ActiveCardsSection
+        activeCards={activeCards}
+        setActiveCards={setActiveCards}
+        discoveredCards={discoveredCards} 
+        setDiscoveredCards={setDiscoveredCards}
       />
-      <DiscoveredCards 
-        cards={discoveredCards} 
-        onToggleFlipCard={handleToggleFlipDiscoveredCard}
-        onDeleteCard={handleDeleteDiscoveredCard}
+      <DiscoveredCardsSection
+        discoveredCards={discoveredCards}
+        setDiscoveredCards={setDiscoveredCards}
+        activeCards={activeCards} 
+        setActiveCards={setActiveCards}
       />
     </div>
   );
