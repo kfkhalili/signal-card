@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import type { DiscoveredSignal, PriceChangeSignal, PriceDiscoverySignal } from './types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -9,6 +9,25 @@ interface DiscoveredSignalsLogProps {
 }
 
 const DiscoveredSignalsLog: React.FC<DiscoveredSignalsLogProps> = ({ signals }) => {
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  if (!hasMounted) {
+    return (
+      <Card className="mt-8 shadow-lg">
+        <CardHeader>
+          <CardTitle className="text-2xl font-semibold text-foreground">Discovered Signals Log</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground">Loading signals...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="mt-8 shadow-lg">
       <CardHeader>
@@ -68,7 +87,7 @@ const DiscoveredSignalsLog: React.FC<DiscoveredSignalsLogProps> = ({ signals }) 
                 // or unhandled types. This attempts to render it as a PriceChangeSignal if possible.
                 // For robustness, you might want to add more specific checks or a generic display.
                 const changeSignal = signal as PriceChangeSignal; 
-                if (changeSignal.price1 !== undefined && changeSignal.price2 !== undefined) {
+                if (changeSignal.price1 !== undefined && changeSignal.price2 !== undefined && changeSignal.timestamp1 && changeSignal.timestamp2 && changeSignal.generatedAt) {
                    const priceDiff = changeSignal.price2 - changeSignal.price1;
                     const changeType = priceDiff > 0 ? "Increased" : priceDiff < 0 ? "Decreased" : "Remained Flat";
                     const amount = Math.abs(priceDiff).toFixed(2);
@@ -97,6 +116,7 @@ const DiscoveredSignalsLog: React.FC<DiscoveredSignalsLogProps> = ({ signals }) 
                             Unknown Signal Type
                         </p>
                         <p className="text-xs text-muted-foreground">ID: {signal.id}</p>
+                        <pre className="text-xs text-muted-foreground whitespace-pre-wrap">{JSON.stringify(signal, null, 2)}</pre>
                     </li>
                 );
               })}
