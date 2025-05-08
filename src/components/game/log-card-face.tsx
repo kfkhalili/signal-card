@@ -83,26 +83,29 @@ const LogCardFace: React.FC<LogCardFaceProps> = ({ card, isBack, onDelete }) => 
       <>
         {content}
         
-        {/* NEW Badge: always visible if new and unflipped, on the front, top-left */}
-        {isNewAndUnflipped && !isBack && (
-          <div className="absolute top-2 left-2 z-10">
-            <Badge variant="default" className="text-xs px-1.5 py-0.5 h-5">
-              NEW
-            </Badge>
-          </div>
-        )}
+        {/* Container for X button and NEW badge in top-right */}
+        {(!isBack && (onDelete || isNewAndUnflipped)) && (
+          <div className="absolute top-2 right-2 z-10 flex items-center space-x-1">
+            {/* Delete Button: appears on hover */}
+            {onDelete && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:bg-destructive hover:text-destructive-foreground focus-visible:ring-destructive opacity-0 group-hover/logcard:opacity-100 transition-opacity"
+                onClick={onDelete}
+                aria-label="Delete card" 
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
 
-        {/* Delete Button: appears on hover, on the front, top-right */}
-        {onDelete && !isBack && ( 
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-2 right-2 z-10 h-7 w-7 text-muted-foreground hover:bg-destructive hover:text-destructive-foreground focus-visible:ring-destructive opacity-0 group-hover/logcard:opacity-100 transition-opacity"
-              onClick={onDelete}
-              aria-label="Delete card" 
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            {/* NEW Badge: visible if new and unflipped */}
+            {isNewAndUnflipped && (
+              <Badge variant="default" className="text-xs px-1.5 py-0.5 h-5">
+                NEW
+              </Badge>
+            )}
+          </div>
         )}
       </>
     );
@@ -160,3 +163,4 @@ const LogCardFace: React.FC<LogCardFaceProps> = ({ card, isBack, onDelete }) => 
 };
 
 export default LogCardFace;
+
