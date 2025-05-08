@@ -2,11 +2,11 @@
 
 import React from 'react';
 import type { DiscoveredCard } from './types';
-import LogCardFace from './log-card-face'; // Refactored version
-import BaseDisplayCard from './base-display-card'; // New import
-import { Button } from '@/components/ui/button'; // For Delete button
-import { Badge } from '@/components/ui/badge';   // For NEW badge
-import { X } from 'lucide-react';               // For Delete icon
+import LogCardFace from './log-card-face'; 
+import BaseDisplayCard from './base-display-card'; 
+import { Button } from '@/components/ui/button'; 
+import { Badge } from '@/components/ui/badge';   
+import { X } from 'lucide-react';               
 import { cn } from '@/lib/utils';
 
 interface LogCardProps {
@@ -45,22 +45,26 @@ const LogCard: React.FC<LogCardProps> = ({ card, onToggleFlip, onDeleteCard }) =
         backContent={backFace}
         className="w-full h-full"
       >
-        <>
-          {isNewAndUnflipped && (
-            <Badge variant="default" className="absolute top-2 right-2 text-xs px-1.5 py-0.5 h-5 z-20 pointer-events-none">
-              NEW
-            </Badge>
-          )}
-          {!card.isFlipped && ( 
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-1 right-1 h-7 w-7 text-muted-foreground hover:bg-destructive hover:text-destructive-foreground focus-visible:ring-destructive opacity-0 group-hover/logcard:opacity-100 transition-opacity z-20 pointer-events-auto"
-              onClick={handleDeleteClick}
-              aria-label="Delete card"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+        {/* Children: NEW badge and Delete button container */}
+        <> 
+          {/* Show container if card is not flipped AND (it's new OR the delete button is always potentially visible on hover) */}
+          {!card.isFlipped && (isNewAndUnflipped || true) && (
+            <div className="absolute top-1 right-1 z-20 flex items-center space-x-1">
+              {isNewAndUnflipped && (
+                <Badge variant="default" className="text-xs px-1.5 py-0.5 h-5 pointer-events-none">
+                  NEW
+                </Badge>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:bg-destructive hover:text-destructive-foreground focus-visible:ring-destructive opacity-0 group-hover/logcard:opacity-100 transition-opacity pointer-events-auto"
+                onClick={handleDeleteClick}
+                aria-label="Delete card"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           )}
         </>
       </BaseDisplayCard>

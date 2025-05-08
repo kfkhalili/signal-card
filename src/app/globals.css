@@ -105,6 +105,9 @@ body {
 .rotate-y-180 {
   transform: rotateY(180deg);
 }
+.rotate-y-minus-180 {
+  transform: rotateY(-180deg);
+}
 
 /* The comment about old styles and the styles themselves have been removed. */
 

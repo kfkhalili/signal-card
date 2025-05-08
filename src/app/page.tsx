@@ -6,18 +6,17 @@ import { v4 as uuidv4 } from 'uuid';
 import ActiveCards from '@/components/game/active-cards';
 import DiscoveredCards from '@/components/game/discovered-cards';
 import type { ActiveGameCard, PriceGameCard, TrendGameCard, PriceChangeSignal, PriceCardFaceData, TrendCardFaceData, DiscoveredCard, PriceDiscoverySignal } from '@/components/game/types';
-import { useMockPriceFeed, type PriceData } from '@/hooks/use-mock-price-feed';
+// import { useMockPriceFeed, type PriceData } from '@/hooks/use-mock-price-feed'; // PriceData only used in handleExamineCard
+import { useMockPriceFeed } from '@/hooks/use-mock-price-feed'; // Removed PriceData as it's no longer used
 import useLocalStorage from '@/hooks/use-local-storage';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
-const FADE_DURATION_MINUTES = 4; // Default: 4 minutes.
+const FADE_DURATION_MINUTES = 4; 
 const FADE_DURATION_MS = FADE_DURATION_MINUTES * 60 * 1000;
-// const FADE_DURATION_MS = 30 * 1000; // For testing: 30 seconds
 
 const INITIAL_ACTIVE_CARDS: ActiveGameCard[] = [];
 const INITIAL_DISCOVERED_CARDS: DiscoveredCard[] = [];
-
 
 export default function FinSignalGamePage() {
   const [activeCards, setActiveCards] = useLocalStorage<ActiveGameCard[]>('finSignal-activeCards', INITIAL_ACTIVE_CARDS);
@@ -25,7 +24,9 @@ export default function FinSignalGamePage() {
   const [selectedCardsForCombine, setSelectedCardsForCombine] = useState<string[]>([]);
   
   const { toast } = useToast();
-  const { latestPriceData, priceHistory, nextUpdateInSeconds } = useMockPriceFeed();
+  // const { latestPriceData, priceHistory, nextUpdateInSeconds } = useMockPriceFeed(); // priceHistory only used in handleExamineCard
+  const { latestPriceData, nextUpdateInSeconds } = useMockPriceFeed(); // Removed priceHistory as it's no longer used
+
 
   useEffect(() => {
     if (latestPriceData) {
@@ -69,8 +70,7 @@ export default function FinSignalGamePage() {
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [latestPriceData, toast]); // setActiveCards is stable from useLocalStorage
-
+  }, [latestPriceData, toast]); 
 
   const handleSecureCard = useCallback((cardId: string, fromFlip: boolean = false) => {
     const cardBeingSecured = activeCards.find(c => c.id === cardId && c.type === 'price') as PriceGameCard | undefined;
@@ -144,79 +144,12 @@ export default function FinSignalGamePage() {
     );
   }, [setActiveCards, handleSecureCard]);
 
-
   const handleFadedOut = useCallback((cardId: string) => {
     setActiveCards(prevCards => prevCards.filter(card => card.id !== cardId));
     toast({ title: "Card Faded Out", description: "A price card was removed due to inactivity." });
   }, [setActiveCards, toast]);
 
-  const handleExamineCard = useCallback((priceCard: PriceGameCard) => {
-    if (priceHistory.length < 2) {
-      toast({ title: "Not enough data", description: "Need at least two price points to determine trend.", variant: "destructive" });
-      return;
-    }
-
-    const cardTimestamp = new Date(priceCard.faceData.timestamp).getTime(); 
-    let previousPriceDataPoint: PriceData | undefined;
-    
-    for (let i = 0; i < priceHistory.length; i++) {
-        const p = priceHistory[i];
-        const pTimestamp = new Date(p.timestamp).getTime();
-        if (pTimestamp < cardTimestamp) { 
-            previousPriceDataPoint = p;
-            break; 
-        } else if (pTimestamp === cardTimestamp && i + 1 < priceHistory.length) {
-            previousPriceDataPoint = priceHistory[i+1];
-            break;
-        }
-    }
-
-    if (!previousPriceDataPoint) {
-      toast({ title: "Trend Unavailable", description: "Could not find a preceding price point in recent history to compare.", variant: "destructive" });
-      return;
-    }
-    
-    const currentPrice = priceCard.faceData.price;
-    const prevPrice = previousPriceDataPoint.price;
-    let trend: TrendCardFaceData['trend'];
-    if (currentPrice > prevPrice) trend = 'UP';
-    else if (currentPrice < prevPrice) trend = 'DOWN';
-    else trend = 'FLAT';
-
-    const newTrendCardFaceData: TrendCardFaceData = {
-      symbol: 'AAPL',
-      trend,
-      referenceTimeStart: new Date(previousPriceDataPoint.timestamp),
-      referenceTimeEnd: new Date(priceCard.faceData.timestamp),
-    };
-
-    setActiveCards(prevActiveCards => {
-      const isDuplicate = prevActiveCards.some(card =>
-        card.type === 'trend' &&
-        (card as TrendGameCard).faceData.symbol === newTrendCardFaceData.symbol &&
-        (card as TrendGameCard).faceData.trend === newTrendCardFaceData.trend &&
-        new Date((card as TrendGameCard).faceData.referenceTimeStart).getTime() === newTrendCardFaceData.referenceTimeStart.getTime() &&
-        new Date((card as TrendGameCard).faceData.referenceTimeEnd).getTime() === newTrendCardFaceData.referenceTimeEnd.getTime()
-      );
-
-      if (!isDuplicate) {
-        const newTrendCard: TrendGameCard = {
-          id: uuidv4(),
-          type: 'trend',
-          faceData: newTrendCardFaceData,
-          backData: {
-            explanation: `AAPL price went ${trend.toLowerCase()} in the interval between ${format(newTrendCardFaceData.referenceTimeStart, 'p')} (Price: $${prevPrice.toFixed(2)}) and ${format(newTrendCardFaceData.referenceTimeEnd, 'p')} (Price: $${currentPrice.toFixed(2)}).`,
-          },
-          isFlipped: false, 
-        };
-        toast({ title: "Trend Card Generated!", description: `AAPL price trend: ${trend}` });
-        return [...prevActiveCards, newTrendCard];
-      }
-      return prevActiveCards;
-    });
-
-  }, [priceHistory, setActiveCards, toast]);
-
+  // REMOVED handleExamineCard function (lines 152-212 of original)
 
   const handleSelectCardForCombine = useCallback((cardId: string) => {
     const card = activeCards.find(c => c.id === cardId);
@@ -243,7 +176,6 @@ export default function FinSignalGamePage() {
       return prev; 
     });
   }, [activeCards, toast, handleToggleFlipCard]);
-
 
   const handleCombineCards = useCallback(() => {
     if (selectedCardsForCombine.length !== 2) return;
@@ -286,7 +218,6 @@ export default function FinSignalGamePage() {
     toast({ title: "Price Change Signal Discovered!", description: `Comparing prices from ${format(newPriceChangeCard.timestamp1, 'p')} and ${format(newPriceChangeCard.timestamp2, 'p')}. Cards removed.` });
     setSelectedCardsForCombine([]);
   }, [selectedCardsForCombine, activeCards, setActiveCards, setDiscoveredCards, toast]);
-
 
   const handleToggleFlipDiscoveredCard = useCallback((cardId: string) => {
     setDiscoveredCards(prevCards =>
@@ -332,13 +263,12 @@ export default function FinSignalGamePage() {
     toast({ title: "Card Update", description: toastMessage });
   }, [discoveredCards, setDiscoveredCards, setActiveCards, toast]);
 
-
   return (
     <div className="space-y-8">
       <ActiveCards
         cards={activeCards}
         onSecureCard={(cardId) => handleSecureCard(cardId, false)}
-        onExamineCard={handleExamineCard}
+        // onExamineCard={handleExamineCard} // REMOVED
         onFadedOut={handleFadedOut}
         selectedCardsForCombine={selectedCardsForCombine}
         onSelectCardForCombine={handleSelectCardForCombine}

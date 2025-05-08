@@ -26,24 +26,22 @@ const BaseDisplayCard: React.FC<BaseDisplayCardProps> = ({
       className={cn('relative w-full h-full cursor-pointer group perspective', className)}
       onClick={onCardClick}
     >
-      <ShadCard
+      <ShadCard // Front Face
         className={cn(
-          'absolute w-full h-full transition-transform duration-1000 ease-in-out transform-style-preserve-3d backface-hidden',
-          !isFlipped ? 'rotate-y-0' : 'rotate-y-180',
+          'absolute w-full h-full transition-transform duration-700 ease-in-out origin-center transform-style-preserve-3d backface-hidden',
+          !isFlipped ? 'rotate-y-0' : 'rotate-y-minus-180', // Changed to -180deg for flipped state
           innerCardClassName
         )}
       >
-        {/* Front of the card - visible when not flipped */}
         {faceContent}
       </ShadCard>
-      <ShadCard
+      <ShadCard // Back Face
         className={cn(
-          'absolute w-full h-full transition-transform duration-1000 ease-in-out transform-style-preserve-3d backface-hidden',
-          isFlipped ? 'rotate-y-0' : 'rotate-y-180',
+          'absolute w-full h-full transition-transform duration-700 ease-in-out origin-center transform-style-preserve-3d backface-hidden',
+          isFlipped ? 'rotate-y-0' : 'rotate-y-180',  // Stays as is: 180deg to 0deg when isFlipped is true
           innerCardClassName
         )}
       >
-        {/* Back of the card - visible when flipped */}
         {backContent}
       </ShadCard>
       {/* Children are rendered outside the flipping mechanism, can be overlays or controls */}

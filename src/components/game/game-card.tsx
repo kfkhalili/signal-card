@@ -3,16 +3,16 @@
 import React, { useState, useEffect } from 'react';
 import type { ActiveGameCard, PriceGameCard } from './types';
 import CardFace from './card-face';
-import BaseDisplayCard from './base-display-card'; // Updated import
-import { Button } from '@/components/ui/button'; // Added for Examine button
+import BaseDisplayCard from './base-display-card'; 
+// import { Button } from '@/components/ui/button'; // REMOVED for Examine button
 import { cn } from '@/lib/utils';
 
-const FADE_UPDATE_INTERVAL_MS = 100; // Smoothness of fade animation
+const FADE_UPDATE_INTERVAL_MS = 100;
 
 interface GameCardProps {
   card: ActiveGameCard;
   onSecureCard: (cardId: string) => void;
-  onExamineCard: (card: PriceGameCard) => void;
+  // onExamineCard: (card: PriceGameCard) => void; // REMOVED
   onFadedOut: (cardId: string) => void;
   onSelectForCombine: (cardId: string) => void;
   isSelectedForCombine: boolean;
@@ -22,7 +22,7 @@ interface GameCardProps {
 const GameCard: React.FC<GameCardProps> = ({
   card,
   onSecureCard,
-  onExamineCard,
+  // onExamineCard, // REMOVED
   onFadedOut,
   onSelectForCombine,
   isSelectedForCombine,
@@ -70,15 +70,10 @@ const GameCard: React.FC<GameCardProps> = ({
   }, [priceCardData, onFadedOut, card.id]);
 
   const handleCardClick = () => {
-    // This click is now on BaseDisplayCard, which covers the whole card area.
-    // Specific button clicks (like a potential Examine button child) will need their own onClick handlers.
     if (isPriceCard && priceCardData) {
       if (!priceCardData.isSecured) {
         onSecureCard(card.id);
       } else {
-        // For secured price cards, the primary click action might be to select/deselect or flip.
-        // If an "Examine" button is present and clicked, its own onClick will handle that.
-        // Otherwise, the click on the card itself can toggle selection or flip.
         onSelectForCombine(card.id);
         onToggleFlip(card.id); 
       }
@@ -90,13 +85,7 @@ const GameCard: React.FC<GameCardProps> = ({
   const frontFace = <CardFace card={card} isBack={false} />;
   const backFace = <CardFace card={card} isBack={true} />;
 
-  // Handler for the examine button, stop propagation to prevent BaseDisplayCard's onCardClick.
-  const handleExamineClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent flipping or selecting when clicking the button
-    if (priceCardData) {
-      onExamineCard(priceCardData);
-    }
-  };
+  // REMOVED handleExamineClick function
 
   return (
     <div
@@ -107,11 +96,8 @@ const GameCard: React.FC<GameCardProps> = ({
       )}
       role="button"
       tabIndex={0}
-      // onKeyDown for the wrapper might be redundant if BaseDisplayCard handles keyboard interaction for flipping.
-      // However, keeping it if other wrapper-level actions are intended.
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') { 
-            // If the main card area is focused, treat Enter/Space as a click on the card itself.
             handleCardClick();
         }
       }}
@@ -124,20 +110,14 @@ const GameCard: React.FC<GameCardProps> = ({
         backContent={backFace}
         className="w-full h-full"
       >
-        {/* Children for overlays: Timer and "Examine" button */}
-        <> {/* Use a fragment to group children if needed */}
+        {/* Children for overlays: Timer */}
+        <> 
           {priceCardData && !priceCardData.isSecured && remainingTimeFormatted && (
             <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm p-1 px-2 rounded text-xs font-semibold text-accent animate-pulse z-20 pointer-events-none">
               {remainingTimeFormatted}
             </div>
           )}
-          {priceCardData && priceCardData.isSecured && card.isFlipped && (
-            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-[calc(100%-1rem)] z-20 pointer-events-auto">
-                 <Button onClick={handleExamineClick} className="w-full text-xs h-8">
-                    Examine Trend
-                 </Button>
-            </div>
-          )}
+          {/* REMOVED Examine Trend Button rendering */}
         </>
       </BaseDisplayCard>
     </div>
