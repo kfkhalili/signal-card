@@ -45,6 +45,7 @@ export type ActiveGameCard = PriceGameCard | TrendGameCard;
 
 export interface PriceChangeSignal {
   id: string;
+  type: 'price_change';
   symbol: string;
   price1: number;
   price2: number;
@@ -52,3 +53,14 @@ export interface PriceChangeSignal {
   timestamp2: Date;
   generatedAt: Date;
 }
+
+export interface PriceDiscoverySignal {
+  id: string;
+  type: 'price_discovery';
+  symbol: string;
+  price: number;
+  timestamp: Date; // Price data timestamp
+  discoveredAt: Date; // When card was revealed/secured
+}
+
+export type DiscoveredSignal = PriceChangeSignal | PriceDiscoverySignal;
