@@ -52,6 +52,7 @@ export interface PriceChangeSignal {
   timestamp1: Date;
   timestamp2: Date;
   generatedAt: Date;
+  isFlipped: boolean; // Added for log card flipping
 }
 
 export interface PriceDiscoverySignal {
@@ -61,6 +62,8 @@ export interface PriceDiscoverySignal {
   price: number;
   timestamp: Date; // Price data timestamp
   discoveredAt: Date; // When card was revealed/secured
+  isFlipped: boolean; // Added for log card flipping
 }
 
 export type DiscoveredSignal = PriceChangeSignal | PriceDiscoverySignal;
+

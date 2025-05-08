@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -28,14 +29,14 @@ export default function FinSignalGamePage() {
       const newPriceCardData: PriceCardFaceData = {
         symbol: 'AAPL',
         price: latestPriceData.price,
-        timestamp: latestPriceData.timestamp,
+        timestamp: new Date(latestPriceData.timestamp), // Ensure it's a Date object
       };
 
       setActiveCards(prevActiveCards => {
         const isDuplicate = prevActiveCards.some(card =>
           card.type === 'price' &&
           (card as PriceGameCard).faceData.symbol === newPriceCardData.symbol &&
-          new Date((card as PriceGameCard).faceData.timestamp).getTime() === new Date(newPriceCardData.timestamp).getTime()
+          new Date((card as PriceGameCard).faceData.timestamp).getTime() === newPriceCardData.timestamp.getTime()
         );
 
         if (!isDuplicate) {
@@ -44,21 +45,30 @@ export default function FinSignalGamePage() {
             type: 'price',
             faceData: newPriceCardData,
             backData: {
-              explanation: `Apple Inc.'s stock price at ${format(latestPriceData.timestamp, 'PP p')}.`,
+              explanation: `Apple Inc.'s stock price at ${format(newPriceCardData.timestamp, 'PP p')}.`,
             },
             isFlipped: false,
             isSecured: false,
             appearedAt: Date.now(),
             initialFadeDurationMs: FADE_DURATION_MS,
           };
-          toast({ title: "New Price Card Appeared!", description: `AAPL: $${latestPriceData.price.toFixed(2)} at ${format(latestPriceData.timestamp, 'p')}` });
+          toast({ title: "New Price Card Appeared!", description: `AAPL: $${latestPriceData.price.toFixed(2)} at ${format(newPriceCardData.timestamp, 'p')}` });
           return [...prevActiveCards, newPriceCard];
         }
         return prevActiveCards;
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [latestPriceData]); 
+  }, [latestPriceData, toast]); // Removed setActiveCards from dependency array as it's stable from useLocalStorage
+
+
+  const handleToggleFlipCard = useCallback((cardId: string) => {
+    setActiveCards(prevCards =>
+      prevCards.map(card =>
+        card.id === cardId ? { ...card, isFlipped: !card.isFlipped } : card
+      )
+    );
+  }, [setActiveCards]);
 
   const handleSecureCard = useCallback((cardId: string) => {
     const cardBeingSecured = activeCards.find(c => c.id === cardId && c.type === 'price') as PriceGameCard | undefined;
@@ -70,8 +80,9 @@ export default function FinSignalGamePage() {
         type: 'price_discovery',
         symbol: cardBeingSecured.faceData.symbol,
         price: cardBeingSecured.faceData.price,
-        timestamp: new Date(cardBeingSecured.faceData.timestamp), // Ensure it's a Date object
+        timestamp: new Date(cardBeingSecured.faceData.timestamp), 
         discoveredAt: new Date(),
+        isFlipped: false, // Initialize isFlipped for log card
       };
       setDiscoveredSignals(prevSignals => [...prevSignals, newDiscoverySignal]);
 
@@ -79,7 +90,7 @@ export default function FinSignalGamePage() {
       setActiveCards(prevCards =>
         prevCards.map(card =>
           card.id === cardId && card.type === 'price'
-            ? { ...card, isSecured: true, isFlipped: true, appearedAt: Date.now() } // Reset appearedAt to stop fade, flip to back
+            ? { ...card, isSecured: true, isFlipped: true, appearedAt: Date.now() } 
             : card
         )
       );
@@ -89,14 +100,12 @@ export default function FinSignalGamePage() {
         description: `Details of ${cardBeingSecured.faceData.symbol} at $${cardBeingSecured.faceData.price.toFixed(2)} logged.` 
       });
     } else if (cardBeingSecured && cardBeingSecured.isSecured) {
-      // This case should ideally not be hit if GameCard calls onSecureCard only for unsecured cards.
-      // If it is, it means we are trying to "secure" an already secured card.
-      // We might just want to flip it, which is handled by onToggleFlipCard.
-      // For now, let's assume GameCard prevents this call for already secured cards.
-      // If not, this toast is a fallback.
-      toast({ title: "Card Already Secured", description: "This card was already secured and its details logged." });
+      // This case now handles flipping an already secured card.
+      // The selection for combine is handled by onSelectCardForCombine.
+      handleToggleFlipCard(cardId);
     }
-  }, [activeCards, setActiveCards, setDiscoveredSignals, toast]);
+  }, [activeCards, setActiveCards, setDiscoveredSignals, toast, handleToggleFlipCard]);
+
 
   const handleFadedOut = useCallback((cardId: string) => {
     setActiveCards(prevCards => prevCards.filter(card => card.id !== cardId));
@@ -110,41 +119,36 @@ export default function FinSignalGamePage() {
     }
 
     const cardTimestamp = new Date(priceCard.faceData.timestamp).getTime(); 
-    let previousPriceData: PriceData | undefined;
+    let previousPriceDataPoint: PriceData | undefined;
     
-    // Find the price data point immediately preceding the card's timestamp from history
-    // Price history is sorted descending by time (newest first)
-    for (let i = 0; i < priceHistory.length; i++) {
-      const historyTimestamp = new Date(priceHistory[i].timestamp).getTime();
-      if (historyTimestamp < cardTimestamp) {
-        previousPriceData = priceHistory[i];
-        break; 
+    // priceHistory is sorted newest first. Find the entry right before the card's timestamp.
+    for (const p of priceHistory) {
+      if (new Date(p.timestamp).getTime() < cardTimestamp) {
+        previousPriceDataPoint = p;
+        break;
       }
     }
    
     // Fallback: if card is the newest, compare with the one right before it in history
-    if (!previousPriceData && priceHistory.length > 1) {
+    if (!previousPriceDataPoint && priceHistory.length > 0) {
         const cardIndexInHistory = priceHistory.findIndex(p => new Date(p.timestamp).getTime() === cardTimestamp);
-        if (cardIndexInHistory === 0 && priceHistory.length > 1) { // Card is the newest in history
-             previousPriceData = priceHistory[1];
-        } else if (cardIndexInHistory > 0) { // Card is in history but not the newest
-            previousPriceData = priceHistory[cardIndexInHistory +1]; // This might be off, should be cardIndexInHistory -1 if history is [newest, older, oldest]
-                                                                    // Let's assume priceHistory is [newest, older, ..., oldest]
-                                                                    // If card is at index `i`, previous is `i+1`
-           if(priceHistory[cardIndexInHistory + 1]) {
-             previousPriceData = priceHistory[cardIndexInHistory + 1];
-           }
+        // If card is the newest (index 0) and there's at least one older price
+        if (cardIndexInHistory === 0 && priceHistory.length > 1) { 
+             previousPriceDataPoint = priceHistory[1];
+        } else if (cardIndexInHistory > 0 && priceHistory[cardIndexInHistory + 1]) { 
+            // If card is in history (not newest) and there's an older price
+            previousPriceDataPoint = priceHistory[cardIndexInHistory + 1]; // +1 because history is newest first
         }
     }
 
 
-    if (!previousPriceData) {
+    if (!previousPriceDataPoint) {
       toast({ title: "Trend Unavailable", description: "Could not find a preceding price point in recent history to compare.", variant: "destructive" });
       return;
     }
     
     const currentPrice = priceCard.faceData.price;
-    const prevPrice = previousPriceData.price;
+    const prevPrice = previousPriceDataPoint.price;
     let trend: TrendCardFaceData['trend'];
     if (currentPrice > prevPrice) trend = 'UP';
     else if (currentPrice < prevPrice) trend = 'DOWN';
@@ -153,7 +157,7 @@ export default function FinSignalGamePage() {
     const newTrendCardFaceData: TrendCardFaceData = {
       symbol: 'AAPL',
       trend,
-      referenceTimeStart: new Date(previousPriceData.timestamp),
+      referenceTimeStart: new Date(previousPriceDataPoint.timestamp),
       referenceTimeEnd: new Date(priceCard.faceData.timestamp),
     };
 
@@ -198,7 +202,6 @@ export default function FinSignalGamePage() {
       if (prev.length < 2) {
         return [...prev, cardId]; // Select
       }
-      // If 2 cards already selected and trying to select a 3rd, show a toast and don't change selection
       if (prev.length >= 2 && !prev.includes(cardId)) {
         toast({ title: "Selection Limit", description: "Maximum of 2 cards can be selected for combination.", variant: "destructive" });
       }
@@ -217,9 +220,11 @@ export default function FinSignalGamePage() {
       setSelectedCardsForCombine([]);
       return;
     }
+    
+    // Ensure timestamps are Date objects before calling getTime()
+    const card1Timestamp = card1.faceData.timestamp instanceof Date ? card1.faceData.timestamp : new Date(card1.faceData.timestamp);
+    const card2Timestamp = card2.faceData.timestamp instanceof Date ? card2.faceData.timestamp : new Date(card2.faceData.timestamp);
 
-    const card1Timestamp = new Date(card1.faceData.timestamp);
-    const card2Timestamp = new Date(card2.faceData.timestamp);
 
     const [earlierCard, laterCard] = card1Timestamp.getTime() < card2Timestamp.getTime()
       ? [card1, card2]
@@ -234,6 +239,7 @@ export default function FinSignalGamePage() {
       price2: laterCard.faceData.price,
       timestamp2: new Date(laterCard.faceData.timestamp),
       generatedAt: new Date(),
+      isFlipped: false, // Initialize isFlipped for log card
     };
 
     setDiscoveredSignals(prev => [...prev, newSignal]);
@@ -246,13 +252,15 @@ export default function FinSignalGamePage() {
     setSelectedCardsForCombine([]);
   }, [selectedCardsForCombine, activeCards, setDiscoveredSignals, setActiveCards, toast]);
 
-  const handleToggleFlipCard = useCallback((cardId: string) => {
-    setActiveCards(prevCards =>
-      prevCards.map(card =>
-        card.id === cardId ? { ...card, isFlipped: !card.isFlipped } : card
+
+  const handleToggleFlipSignal = useCallback((signalId: string) => {
+    setDiscoveredSignals(prevSignals =>
+      prevSignals.map(s =>
+        s.id === signalId ? { ...s, isFlipped: !s.isFlipped } : s
       )
     );
-  }, [setActiveCards]);
+  }, [setDiscoveredSignals]);
+
 
   return (
     <div className="space-y-8">
@@ -266,7 +274,11 @@ export default function FinSignalGamePage() {
         onCombineCards={handleCombineCards}
         onToggleFlipCard={handleToggleFlipCard}
       />
-      <DiscoveredSignalsLog signals={discoveredSignals} />
+      <DiscoveredSignalsLog 
+        signals={discoveredSignals} 
+        onToggleFlipSignal={handleToggleFlipSignal}
+      />
     </div>
   );
 }
+
