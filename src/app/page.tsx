@@ -94,7 +94,7 @@ export default function FinSignalGamePage() {
         price: cardBeingSecured.faceData.price,
         timestamp: new Date(cardBeingSecured.faceData.timestamp), 
         discoveredAt: new Date(),
-        isFlipped: false, 
+        isFlipped: false, // Discovered signals start unflipped
       };
       
       const signalExists = discoveredSignals.some(signal => 
@@ -120,7 +120,7 @@ export default function FinSignalGamePage() {
       setActiveCards(prevCards =>
         prevCards.map(card =>
           card.id === cardId && card.type === 'price'
-            ? { ...card, isSecured: true, isFlipped: true, appearedAt: Date.now() } 
+            ? { ...card, isSecured: true, isFlipped: true, appearedAt: Date.now() } // Secure and flip the card, reset fade timer
             : card
         )
       );
@@ -206,14 +206,20 @@ export default function FinSignalGamePage() {
     
     // Allow flipping for any card type first.
     // If it's a Trend card, or an unsecured Price card, its primary action on click is to flip.
+    // For secured Price cards, flipping is handled by GameCard's onClick directly calling onToggleFlip.
     if (card && (card.type === 'trend' || (card.type === 'price' && !(card as PriceGameCard).isSecured))) {
       handleToggleFlipCard(cardId);
-      return; // No selection logic for these card types/states.
+      // Do not proceed to selection logic for Trend cards or unsecured Price cards.
+      // Selection logic is only for secured Price cards.
+      if (card.type === 'trend' || (card.type === 'price' && !(card as PriceGameCard).isSecured)) {
+        return;
+      }
     }
-
-    // For secured Price cards, proceed with selection logic.
-    // Flipping for secured price cards is handled by GameCard's onClick directly calling onToggleFlip.
+    
+    // Only proceed with selection for secured Price cards.
     if (!card || card.type !== 'price' || !(card as PriceGameCard).isSecured) {
+      // This toast might be redundant if the above flip logic handles the click for non-selectable cards.
+      // However, it can serve as a fallback or for direct calls if needed.
       toast({ title: "Selection Info", description: "Only secured Price Cards can be selected for combination.", variant: "default" });
       return; 
     }
@@ -285,31 +291,11 @@ export default function FinSignalGamePage() {
   }, [setDiscoveredSignals]);
 
   const handleDeleteSignal = useCallback((signalId: string) => {
-    const deletedSignal = discoveredSignals.find(s => s.id === signalId);
-    
     setDiscoveredSignals(prevSignals => prevSignals.filter(s => s.id !== signalId));
     toast({ title: "Signal Deleted", description: "The signal has been removed from the log." });
-
-    // If a PriceDiscoverySignal is deleted, make the corresponding active card unsecured and unflipped
-    if (deletedSignal && deletedSignal.type === 'price_discovery') {
-      const { symbol, price, timestamp } = deletedSignal as PriceDiscoverySignal;
-      setActiveCards(prevActiveCards =>
-        prevActiveCards.map(card => {
-          if (
-            card.type === 'price' &&
-            (card as PriceGameCard).isSecured && 
-            (card as PriceGameCard).faceData.symbol === symbol &&
-            (card as PriceGameCard).faceData.price === price &&
-            new Date((card as PriceGameCard).faceData.timestamp).getTime() === new Date(timestamp).getTime()
-          ) {
-            // Make card unsecured, unflipped, and reset its fade timer
-            return { ...card, isSecured: false, isFlipped: false, appearedAt: Date.now() }; 
-          }
-          return card;
-        })
-      );
-    }
-  }, [discoveredSignals, setDiscoveredSignals, setActiveCards, toast]);
+    // No longer need to interact with activeCards here.
+    // Active cards and discovered signals are independent after the signal is created.
+  }, [setDiscoveredSignals, toast]);
 
 
   return (
