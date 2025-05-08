@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import type { DiscoveredSignal } from './types';
 import { Card as ShadCard, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; // Renamed to avoid conflict
@@ -7,9 +8,10 @@ import LogCard from './log-card'; // Import the new LogCard component
 interface DiscoveredSignalsLogProps {
   signals: DiscoveredSignal[];
   onToggleFlipSignal: (signalId: string) => void;
+  onDeleteSignal: (signalId: string) => void;
 }
 
-const DiscoveredSignalsLog: React.FC<DiscoveredSignalsLogProps> = ({ signals, onToggleFlipSignal }) => {
+const DiscoveredSignalsLog: React.FC<DiscoveredSignalsLogProps> = ({ signals, onToggleFlipSignal, onDeleteSignal }) => {
   const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
@@ -38,13 +40,14 @@ const DiscoveredSignalsLog: React.FC<DiscoveredSignalsLogProps> = ({ signals, on
         {signals.length === 0 ? (
           <p className="text-muted-foreground text-center py-10">No signals discovered yet. Secure Price Cards or combine them to generate signals.</p>
         ) : (
-          <ScrollArea className="h-[350px] lg:h-[400px] pr-4"> {/* Adjusted height for cards */}
+          <ScrollArea className="h-[400px] lg:h-[450px] pr-4"> {/* Adjusted height for cards + potential footer */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 py-4">
               {signals.slice().reverse().map((signal) => (
                 <LogCard
                   key={signal.id}
                   signal={signal}
                   onToggleFlip={onToggleFlipSignal}
+                  onDeleteSignal={onDeleteSignal}
                 />
               ))}
             </div>

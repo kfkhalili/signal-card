@@ -82,9 +82,9 @@ export default function FinSignalGamePage() {
         price: cardBeingSecured.faceData.price,
         timestamp: new Date(cardBeingSecured.faceData.timestamp), 
         discoveredAt: new Date(),
-        isFlipped: false, // Initialize isFlipped for log card
+        isFlipped: true, // Initialize isFlipped to true for log card when secured (shows back initially)
       };
-      setDiscoveredSignals(prevSignals => [...prevSignals, newDiscoverySignal]);
+      setDiscoveredSignals(prevSignals => [newDiscoverySignal, ...prevSignals]);
 
       // Update active cards state
       setActiveCards(prevCards =>
@@ -102,9 +102,12 @@ export default function FinSignalGamePage() {
     } else if (cardBeingSecured && cardBeingSecured.isSecured) {
       // This case now handles flipping an already secured card.
       // The selection for combine is handled by onSelectCardForCombine.
-      handleToggleFlipCard(cardId);
+      // For secured cards, the main click action is selection for combine or flipping.
+      // We let onSelectCardForCombine handle the selection logic,
+      // and then explicitly call handleToggleFlipCard if needed based on GameCard's logic.
+      // This specific call to handleToggleFlipCard for secured cards is now done from GameCard
     }
-  }, [activeCards, setActiveCards, setDiscoveredSignals, toast, handleToggleFlipCard]);
+  }, [activeCards, setActiveCards, setDiscoveredSignals, toast]);
 
 
   const handleFadedOut = useCallback((cardId: string) => {
@@ -135,9 +138,8 @@ export default function FinSignalGamePage() {
         // If card is the newest (index 0) and there's at least one older price
         if (cardIndexInHistory === 0 && priceHistory.length > 1) { 
              previousPriceDataPoint = priceHistory[1];
-        } else if (cardIndexInHistory > 0 && priceHistory[cardIndexInHistory + 1]) { 
-            // If card is in history (not newest) and there's an older price
-            previousPriceDataPoint = priceHistory[cardIndexInHistory + 1]; // +1 because history is newest first
+        } else if (cardIndexInHistory > 0 && priceHistory[cardIndexInHistory -1]) { // -1 because history is newest first
+            previousPriceDataPoint = priceHistory[cardIndexInHistory -1 ]; 
         }
     }
 
@@ -242,7 +244,7 @@ export default function FinSignalGamePage() {
       isFlipped: false, // Initialize isFlipped for log card
     };
 
-    setDiscoveredSignals(prev => [...prev, newSignal]);
+    setDiscoveredSignals(prev => [newSignal, ...prev]);
     
     setActiveCards(prevActiveCards => 
       prevActiveCards.filter(card => card.id !== card1.id && card.id !== card2.id)
@@ -261,6 +263,11 @@ export default function FinSignalGamePage() {
     );
   }, [setDiscoveredSignals]);
 
+  const handleDeleteSignal = useCallback((signalId: string) => {
+    setDiscoveredSignals(prevSignals => prevSignals.filter(s => s.id !== signalId));
+    toast({ title: "Signal Deleted", description: "The signal has been removed from the log." });
+  }, [setDiscoveredSignals, toast]);
+
 
   return (
     <div className="space-y-8">
@@ -277,6 +284,7 @@ export default function FinSignalGamePage() {
       <DiscoveredSignalsLog 
         signals={discoveredSignals} 
         onToggleFlipSignal={handleToggleFlipSignal}
+        onDeleteSignal={handleDeleteSignal}
       />
     </div>
   );

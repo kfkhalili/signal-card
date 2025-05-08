@@ -9,11 +9,17 @@ import { cn } from '@/lib/utils';
 interface LogCardProps {
   signal: DiscoveredSignal;
   onToggleFlip: (signalId: string) => void;
+  onDeleteSignal: (signalId: string) => void;
 }
 
-const LogCard: React.FC<LogCardProps> = ({ signal, onToggleFlip }) => {
+const LogCard: React.FC<LogCardProps> = ({ signal, onToggleFlip, onDeleteSignal }) => {
   const handleCardClick = () => {
     onToggleFlip(signal.id);
+  };
+
+  const handleDeleteClick = (event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent card flip when delete button is clicked
+    onDeleteSignal(signal.id);
   };
 
   const cardContainerClasses = cn(
@@ -33,7 +39,7 @@ const LogCard: React.FC<LogCardProps> = ({ signal, onToggleFlip }) => {
     >
       <div className="card-inner">
         <LogCardFace signal={signal} isBack={false} />
-        <LogCardFace signal={signal} isBack={true} />
+        <LogCardFace signal={signal} isBack={true} onDelete={handleDeleteClick} />
       </div>
     </div>
   );
