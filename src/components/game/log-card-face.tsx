@@ -83,9 +83,15 @@ const LogCardFace: React.FC<LogCardFaceProps> = ({ card, isBack, onDelete }) => 
       <>
         {content}
         
-        {/* Container for X button and NEW badge in top-right */}
+        {/* Container for NEW badge and X button in top-right */}
         {(!isBack && (onDelete || isNewAndUnflipped)) && (
           <div className="absolute top-2 right-2 z-10 flex items-center space-x-1">
+            {/* NEW Badge: visible if new and unflipped */}
+            {isNewAndUnflipped && (
+              <Badge variant="default" className="text-xs px-1.5 py-0.5 h-5">
+                NEW
+              </Badge>
+            )}
             {/* Delete Button: appears on hover */}
             {onDelete && (
               <Button
@@ -97,13 +103,6 @@ const LogCardFace: React.FC<LogCardFaceProps> = ({ card, isBack, onDelete }) => 
               >
                 <X className="h-4 w-4" />
               </Button>
-            )}
-
-            {/* NEW Badge: visible if new and unflipped */}
-            {isNewAndUnflipped && (
-              <Badge variant="default" className="text-xs px-1.5 py-0.5 h-5">
-                NEW
-              </Badge>
             )}
           </div>
         )}
