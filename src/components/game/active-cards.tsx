@@ -45,7 +45,7 @@ const ActiveCards: React.FC<ActiveCardsProps> = ({
              {/* Placeholder for countdown during initial server render if needed, or hide */}
           </div>
           <Button onClick={onCombineCards} disabled={!canCombine}>
-            Combine Selected ({selectedCardsForCombine.length}/2)
+            Combine
           </Button>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
@@ -67,7 +67,7 @@ const ActiveCards: React.FC<ActiveCardsProps> = ({
           )}
         </div>
         <Button onClick={onCombineCards} disabled={!canCombine}>
-          Combine Selected ({selectedCardsForCombine.length}/2)
+          Combine
         </Button>
       </div>
       
@@ -96,3 +96,4 @@ const ActiveCards: React.FC<ActiveCardsProps> = ({
 };
 
 export default ActiveCards;
+
