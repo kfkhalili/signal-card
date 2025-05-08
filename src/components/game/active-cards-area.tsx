@@ -37,7 +37,7 @@ const ActiveCardsArea: React.FC<ActiveCardsAreaProps> = ({
     return (
       <div className="flex-grow p-4 bg-secondary/30 rounded-lg shadow-inner min-h-[400px]">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-semibold text-foreground">Active Cards Area</h2>
+          <h2 className="text-2xl font-semibold text-foreground">Active Cards</h2>
           <Button onClick={onCombineCards} disabled={!canCombine}>
             Combine Selected ({selectedCardsForCombine.length}/2)
           </Button>
@@ -52,14 +52,16 @@ const ActiveCardsArea: React.FC<ActiveCardsAreaProps> = ({
   return (
     <div className="flex-grow p-4 bg-secondary/30 rounded-lg shadow-inner min-h-[400px]">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-semibold text-foreground">Active Cards Area</h2>
+        <h2 className="text-2xl font-semibold text-foreground">Active Cards</h2>
         <Button onClick={onCombineCards} disabled={!canCombine}>
           Combine Selected ({selectedCardsForCombine.length}/2)
         </Button>
       </div>
       
       {cards.length === 0 ? (
-        <p className="text-muted-foreground text-center py-10">No active cards. New cards will appear automatically.</p>
+         <div className="flex items-center justify-center h-[300px]"> {/* Adjust height as needed */}
+          <p className="text-muted-foreground text-center py-10">No active cards. New cards will appear automatically.</p>
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {cards.map((card) => (
