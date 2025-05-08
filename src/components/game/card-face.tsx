@@ -45,11 +45,13 @@ const CardFace: React.FC<CardFaceProps> = ({ card, isBack, onExamine, remainingT
               <p className="text-xs text-muted-foreground mt-1">
                 {format(new Date(priceCard.faceData.timestamp), 'PP p')}
               </p>
-              {remainingTime && !priceCard.isSecured && (
-                <p className="text-sm text-accent font-medium mt-2 animate-pulse">
-                  Expires in: {remainingTime}
-                </p>
-              )}
+              <div className="mt-2 h-5"> {/* Container for timer or placeholder */}
+                {remainingTime && !priceCard.isSecured ? (
+                  <p className="text-sm text-accent font-medium animate-pulse">
+                    Expires in: {remainingTime}
+                  </p>
+                ) : null } {/* Content is empty if timer not active, div reserves space */}
+              </div>
             </CardContent>
           </>
         );
