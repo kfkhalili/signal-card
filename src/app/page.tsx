@@ -33,13 +33,18 @@ export default function FinSignalGamePage() {
       };
 
       setActiveCards(prevActiveCards => {
-        const isDuplicate = prevActiveCards.some(card =>
-          card.type === 'price' &&
-          (card as PriceGameCard).faceData.symbol === newPriceCardData.symbol &&
-          new Date((card as PriceGameCard).faceData.timestamp).getTime() === newPriceCardData.timestamp.getTime()
-        );
+        const newCardTimestamp = newPriceCardData.timestamp;
+        const isDuplicateByHHMM = prevActiveCards.some(card => {
+          if (card.type === 'price') {
+            const existingCardTimestamp = new Date((card as PriceGameCard).faceData.timestamp);
+            return existingCardTimestamp.getHours() === newCardTimestamp.getHours() &&
+                   existingCardTimestamp.getMinutes() === newCardTimestamp.getMinutes() &&
+                   (card as PriceGameCard).faceData.symbol === newPriceCardData.symbol;
+          }
+          return false;
+        });
 
-        if (!isDuplicate) {
+        if (!isDuplicateByHHMM) {
           const newPriceCard: PriceGameCard = {
             id: uuidv4(),
             type: 'price',
@@ -55,6 +60,8 @@ export default function FinSignalGamePage() {
           toast({ title: "New Price Card Appeared!", description: `AAPL: $${latestPriceData.price.toFixed(2)} at ${format(newPriceCardData.timestamp, 'p')}` });
           return [...prevActiveCards, newPriceCard];
         }
+        // If duplicate by HH:MM, do not add the card and optionally inform the user (currently no toast for this)
+        // console.log(`Skipping duplicate card for ${newPriceCardData.symbol} at ${format(newCardTimestamp, 'HH:mm')}`);
         return prevActiveCards;
       });
     }
@@ -84,7 +91,28 @@ export default function FinSignalGamePage() {
         discoveredAt: new Date(),
         isFlipped: true, // Initialize isFlipped to true for log card when secured (shows back initially)
       };
-      setDiscoveredSignals(prevSignals => [newDiscoverySignal, ...prevSignals]);
+      
+      // Check if a similar signal already exists (same symbol, price, and timestamp)
+      const signalExists = discoveredSignals.some(signal => 
+        signal.type === 'price_discovery' &&
+        (signal as PriceDiscoverySignal).symbol === newDiscoverySignal.symbol &&
+        (signal as PriceDiscoverySignal).price === newDiscoverySignal.price &&
+        new Date((signal as PriceDiscoverySignal).timestamp).getTime() === newDiscoverySignal.timestamp.getTime()
+      );
+
+      if (!signalExists) {
+        setDiscoveredSignals(prevSignals => [newDiscoverySignal, ...prevSignals]);
+        toast({ 
+          title: "Price Card Secured & Discovered!", 
+          description: `Details of ${cardBeingSecured.faceData.symbol} at $${cardBeingSecured.faceData.price.toFixed(2)} logged.` 
+        });
+      } else {
+         toast({ 
+          title: "Price Card Secured", 
+          description: `This price point was already discovered. Card is now secured.`
+        });
+      }
+
 
       // Update active cards state
       setActiveCards(prevCards =>
@@ -95,10 +123,6 @@ export default function FinSignalGamePage() {
         )
       );
       
-      toast({ 
-        title: "Price Card Secured & Discovered!", 
-        description: `Details of ${cardBeingSecured.faceData.symbol} at $${cardBeingSecured.faceData.price.toFixed(2)} logged.` 
-      });
     } else if (cardBeingSecured && cardBeingSecured.isSecured) {
       // This case now handles flipping an already secured card.
       // The selection for combine is handled by onSelectCardForCombine.
@@ -107,7 +131,7 @@ export default function FinSignalGamePage() {
       // and then explicitly call handleToggleFlipCard if needed based on GameCard's logic.
       // This specific call to handleToggleFlipCard for secured cards is now done from GameCard
     }
-  }, [activeCards, setActiveCards, setDiscoveredSignals, toast]);
+  }, [activeCards, setActiveCards, setDiscoveredSignals, discoveredSignals, toast]);
 
 
   const handleFadedOut = useCallback((cardId: string) => {
@@ -193,9 +217,16 @@ export default function FinSignalGamePage() {
   const handleSelectCardForCombine = useCallback((cardId: string) => {
     const card = activeCards.find(c => c.id === cardId);
     if (!card || card.type !== 'price' || !(card as PriceGameCard).isSecured) {
-      toast({ title: "Selection Error", description: "Only secured Price Cards can be combined.", variant: "destructive" });
+      // If card is not securable (e.g. Trend card), or not secured, just toggle flip.
+      const targetCard = activeCards.find(c => c.id === cardId);
+      if (targetCard && (targetCard.type === 'trend' || (targetCard.type === 'price' && !(targetCard as PriceGameCard).isSecured))) {
+         handleToggleFlipCard(cardId);
+      } else {
+        toast({ title: "Selection Error", description: "Only secured Price Cards can be selected for combination.", variant: "destructive" });
+      }
       return;
     }
+
 
     setSelectedCardsForCombine(prev => {
       if (prev.includes(cardId)) {
@@ -209,7 +240,7 @@ export default function FinSignalGamePage() {
       }
       return prev;
     });
-  }, [activeCards, toast]);
+  }, [activeCards, toast, handleToggleFlipCard]);
 
   const handleCombineCards = useCallback(() => {
     if (selectedCardsForCombine.length !== 2) return;
