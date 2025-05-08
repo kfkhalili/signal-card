@@ -73,7 +73,7 @@ const ActiveCards: React.FC<ActiveCardsProps> = ({
       
       {cards.length === 0 ? (
          <div className="flex items-center justify-center h-[300px]"> {/* Adjust height as needed */}
-          <p className="text-muted-foreground text-center py-10">No active cards. New cards will appear automatically.</p>
+          <p className="text-muted-foreground text-center py-10">No active cards.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
