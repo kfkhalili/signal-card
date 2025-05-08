@@ -4,7 +4,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Button } from '@/components/ui/button';
 import type { DiscoveredSignal, PriceDiscoverySignal, PriceChangeSignal } from './types';
 import { format } from 'date-fns';
-import { ArrowDownRight, ArrowUpRight, Minus, Trash2 } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, Minus, X } from 'lucide-react';
 
 interface LogCardFaceProps {
   signal: DiscoveredSignal;
@@ -14,9 +14,10 @@ interface LogCardFaceProps {
 
 const LogCardFace: React.FC<LogCardFaceProps> = ({ signal, isBack, onDelete }) => {
   const renderFrontContent = () => {
+    let content;
     if (signal.type === 'price_discovery') {
       const discoverySignal = signal as PriceDiscoverySignal;
-      return (
+      content = (
         <>
           <CardHeader>
             <CardTitle className="text-xl">{discoverySignal.symbol}</CardTitle>
@@ -35,19 +36,19 @@ const LogCardFace: React.FC<LogCardFaceProps> = ({ signal, isBack, onDelete }) =
       const priceDiff = changeSignal.price2 - changeSignal.price1;
       const absPriceDiff = Math.abs(priceDiff);
       let TrendIcon = Minus;
-      let trendColor = 'text-foreground';
+      let trendColor = 'text-foreground'; // Default, will be overridden by theme
       let trendText = 'FLAT';
 
       if (priceDiff > 0) {
         TrendIcon = ArrowUpRight;
-        trendColor = 'text-green-600'; // Ensure this class exists or use theme-based colors
+        trendColor = 'text-green-600'; // Using specific colors for up/down trend indication
         trendText = 'INCREASE';
       } else if (priceDiff < 0) {
         TrendIcon = ArrowDownRight;
-        trendColor = 'text-red-600'; // Ensure this class exists or use theme-based colors
+        trendColor = 'text-red-600'; // Using specific colors for up/down trend indication
         trendText = 'DECREASE';
       }
-      return (
+      content = (
         <>
           <CardHeader>
             <CardTitle className="text-xl">{changeSignal.symbol}</CardTitle>
@@ -65,12 +66,30 @@ const LogCardFace: React.FC<LogCardFaceProps> = ({ signal, isBack, onDelete }) =
           </CardContent>
         </>
       );
+    } else {
+      content = (
+        <CardContent>
+          <p>Unknown signal type.</p>
+          <pre className="text-xs">{JSON.stringify(signal, null, 2)}</pre>
+        </CardContent>
+      );
     }
+
     return (
-      <CardContent>
-        <p>Unknown signal type.</p>
-        <pre className="text-xs">{JSON.stringify(signal, null, 2)}</pre>
-      </CardContent>
+      <>
+        {content}
+        {onDelete && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-2 right-2 opacity-0 group-hover/logcard:opacity-100 text-muted-foreground hover:bg-destructive hover:text-destructive-foreground focus-visible:ring-destructive z-10"
+            onClick={onDelete}
+            aria-label="Delete signal"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
+      </>
     );
   };
 
@@ -132,17 +151,11 @@ const LogCardFace: React.FC<LogCardFaceProps> = ({ signal, isBack, onDelete }) =
   };
 
   return (
-    <Card className={`card-face ${isBack ? 'card-back' : 'card-front'} h-full flex flex-col shadow-lg`}>
-      <div className="flex-grow overflow-y-auto"> {/* Make content scrollable if it overflows */}
+    <Card className={`card-face ${isBack ? 'card-back' : 'card-front'} h-full flex flex-col shadow-lg relative`}>
+      <div className="flex-grow overflow-y-auto">
         {isBack ? renderBackContent() : renderFrontContent()}
       </div>
-      {isBack && onDelete && (
-        <CardFooter className="pt-3 pb-3 border-t mt-auto">
-          <Button variant="destructive" size="sm" onClick={onDelete} className="w-full">
-            <Trash2 className="mr-2 h-4 w-4" /> Delete Signal
-          </Button>
-        </CardFooter>
-      )}
+      {/* Footer removed from back as delete button moved to front */}
     </Card>
   );
 };
