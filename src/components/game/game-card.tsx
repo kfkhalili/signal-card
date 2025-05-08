@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -71,22 +70,20 @@ const GameCard: React.FC<GameCardProps> = ({
 
 
   const handleCardClick = () => {
-    if (isPriceCard && priceCardData && !priceCardData.isSecured) {
-      // Unsecured Price Card: Secure it (this also flips it to back via onSecureCard in page.tsx)
-      onSecureCard(card.id);
-    } else if (isPriceCard && priceCardData && priceCardData.isSecured) {
-      // Secured Price Card:
-      // 1. Handle selection for combination
-      onSelectForCombine(card.id);
-      // 2. Toggle flip state via parent
-      // Only flip if it's already on its back, or if it's the primary interaction (not selection)
-      // The selection logic in page.tsx handles flipping for selected cards.
-      // If a card is already selected, clicking it again (and it's secured) should flip it.
-      // If it's not selected, and selection happens, page.tsx flips it.
-      // This logic becomes simpler: if selected, it can be flipped. If not, selection handles first flip.
-      onToggleFlip(card.id);
-
-
+    if (isPriceCard && priceCardData) {
+      if (!priceCardData.isSecured) {
+        // Unsecured Price Card: Secure it.
+        // The onSecureCard in page.tsx handles flipping and potential auto-selection.
+        onSecureCard(card.id);
+      } else {
+        // Secured Price Card:
+        // 1. Toggle selection state (handled by onSelectForCombine in page.tsx)
+        onSelectForCombine(card.id);
+        // 2. Toggle flip state if it's already selected, or if it's being deselected.
+        // If it's not selected and becomes selected, it's typically already flipped by onSecureCard.
+        // If it *is* selected (or becomes selected), clicking it should flip it.
+        onToggleFlip(card.id);
+      }
     } else if (card.type === 'trend') {
       // Trend Card: Toggle flip state via parent
       onToggleFlip(card.id);
@@ -118,4 +115,3 @@ const GameCard: React.FC<GameCardProps> = ({
 };
 
 export default GameCard;
-

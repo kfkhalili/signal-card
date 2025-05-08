@@ -4,7 +4,7 @@ import type { ActiveGameCard, PriceGameCard } from './types';
 import GameCard from './game-card';
 import { Button } from '@/components/ui/button';
 
-interface ActiveCardsAreaProps {
+interface ActiveCardsProps {
   cards: ActiveGameCard[];
   onSecureCard: (cardId: string) => void;
   onExamineCard: (card: PriceGameCard) => void;
@@ -16,7 +16,7 @@ interface ActiveCardsAreaProps {
   newCardCountdownSeconds: number | null;
 }
 
-const ActiveCardsArea: React.FC<ActiveCardsAreaProps> = ({
+const ActiveCards: React.FC<ActiveCardsProps> = ({
   cards,
   onSecureCard,
   onExamineCard,
@@ -95,5 +95,4 @@ const ActiveCardsArea: React.FC<ActiveCardsAreaProps> = ({
   );
 };
 
-export default ActiveCardsArea;
-
+export default ActiveCards;
