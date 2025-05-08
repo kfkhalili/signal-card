@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -25,27 +26,40 @@ export default function FinSignalGamePage() {
   // Add new price card when latestPriceData changes
   useEffect(() => {
     if (latestPriceData) {
-      const newPriceCard: PriceGameCard = {
-        id: uuidv4(),
-        type: 'price',
-        faceData: {
-          symbol: 'AAPL',
-          price: latestPriceData.price,
-          timestamp: latestPriceData.timestamp,
-        },
-        backData: {
-          explanation: `Apple Inc.'s stock price at ${format(latestPriceData.timestamp, 'PP p')}.`,
-        },
-        isFlipped: false,
-        isSecured: false,
-        appearedAt: Date.now(),
-        initialFadeDurationMs: FADE_DURATION_MS,
+      const newPriceCardData: PriceCardFaceData = {
+        symbol: 'AAPL',
+        price: latestPriceData.price,
+        timestamp: latestPriceData.timestamp,
       };
-      setActiveCards(prev => [...prev, newPriceCard]);
-      toast({ title: "New Price Card Appeared!", description: `AAPL: $${latestPriceData.price.toFixed(2)} at ${format(latestPriceData.timestamp, 'p')}` });
+
+      setActiveCards(prevActiveCards => {
+        const isDuplicate = prevActiveCards.some(card =>
+          card.type === 'price' &&
+          (card as PriceGameCard).faceData.symbol === newPriceCardData.symbol &&
+          (card as PriceGameCard).faceData.timestamp.getTime() === newPriceCardData.timestamp.getTime()
+        );
+
+        if (!isDuplicate) {
+          const newPriceCard: PriceGameCard = {
+            id: uuidv4(),
+            type: 'price',
+            faceData: newPriceCardData,
+            backData: {
+              explanation: `Apple Inc.'s stock price at ${format(latestPriceData.timestamp, 'PP p')}.`,
+            },
+            isFlipped: false,
+            isSecured: false,
+            appearedAt: Date.now(),
+            initialFadeDurationMs: FADE_DURATION_MS,
+          };
+          toast({ title: "New Price Card Appeared!", description: `AAPL: $${latestPriceData.price.toFixed(2)} at ${format(latestPriceData.timestamp, 'p')}` });
+          return [...prevActiveCards, newPriceCard];
+        }
+        return prevActiveCards;
+      });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [latestPriceData]); // Only re-run when latestPriceData itself changes, not setActiveCards
+  }, [latestPriceData]); // Only re-run when latestPriceData itself changes for new card generation logic. setActiveCards and toast are stable or used with functional updates.
 
   const handleSecureCard = useCallback((cardId: string) => {
     setActiveCards(prevCards =>
@@ -69,29 +83,17 @@ export default function FinSignalGamePage() {
       return;
     }
 
-    // The current card's data is priceHistory[0] if it's the absolute latest, or find it
-    // For simplicity, assume priceHistory[0] is the *newest* and priceHistory[1] is *previous* to that.
-    // Find the price point immediately preceding the examined card.
     const cardTimestamp = priceCard.faceData.timestamp.getTime();
     let previousPriceData: PriceData | undefined;
     
-    // priceHistory is sorted newest to oldest. We need to find the price entry *just before* the card's timestamp.
     for (let i = 0; i < priceHistory.length; i++) {
       if (priceHistory[i].timestamp.getTime() < cardTimestamp) {
         previousPriceData = priceHistory[i];
         break;
       }
     }
-    // If the card is the OLDEST in history, we might not have a "previous" in our limited cache.
-    // Or if it's newer than all but the latest, its direct previous is the 2nd item in history.
-    // The current logic of `useMockPriceFeed` updates `latestPriceData` and then `priceHistory`
-    // so `priceHistory[0]` is `latestPriceData`, `priceHistory[1]` is the one before that.
-    // If the examined card is `priceHistory[0]`, its previous is `priceHistory[1]`.
-    // If the examined card is `priceHistory[k]`, its previous is `priceHistory[k+1]`.
-
+   
     if (!previousPriceData && priceHistory.length > 1) {
-        // This handles the case where the card being examined is the latest one
-        // and its direct predecessor is the second element in the history
         const cardIndexInHistory = priceHistory.findIndex(p => p.timestamp.getTime() === cardTimestamp);
         if (cardIndexInHistory !== -1 && cardIndexInHistory < priceHistory.length -1) {
             previousPriceData = priceHistory[cardIndexInHistory + 1];
@@ -99,7 +101,6 @@ export default function FinSignalGamePage() {
              previousPriceData = priceHistory[1];
         }
     }
-
 
     if (!previousPriceData) {
       toast({ title: "Trend Unavailable", description: "Could not find a preceding price point in recent history.", variant: "destructive" });
@@ -113,22 +114,40 @@ export default function FinSignalGamePage() {
     else if (currentPrice < prevPrice) trend = 'DOWN';
     else trend = 'FLAT';
 
-    const newTrendCard: TrendGameCard = {
-      id: uuidv4(),
-      type: 'trend',
-      faceData: {
-        symbol: 'AAPL',
-        trend,
-        referenceTimeStart: previousPriceData.timestamp,
-        referenceTimeEnd: priceCard.faceData.timestamp,
-      },
-      backData: {
-        explanation: `AAPL price went ${trend.toLowerCase()} in the interval between ${format(previousPriceData.timestamp, 'p')} (Price: $${prevPrice.toFixed(2)}) and ${format(priceCard.faceData.timestamp, 'p')} (Price: $${currentPrice.toFixed(2)}).`,
-      },
-      isFlipped: false,
+    const newTrendCardFaceData: TrendCardFaceData = {
+      symbol: 'AAPL',
+      trend,
+      referenceTimeStart: previousPriceData.timestamp,
+      referenceTimeEnd: priceCard.faceData.timestamp,
     };
-    setActiveCards(prev => [...prev, newTrendCard]);
-    toast({ title: "Trend Card Generated!", description: `AAPL price trend: ${trend}` });
+
+    setActiveCards(prevActiveCards => {
+      const isDuplicate = prevActiveCards.some(card =>
+        card.type === 'trend' &&
+        (card as TrendGameCard).faceData.symbol === newTrendCardFaceData.symbol &&
+        (card as TrendGameCard).faceData.trend === newTrendCardFaceData.trend &&
+        (card as TrendGameCard).faceData.referenceTimeStart.getTime() === newTrendCardFaceData.referenceTimeStart.getTime() &&
+        (card as TrendGameCard).faceData.referenceTimeEnd.getTime() === newTrendCardFaceData.referenceTimeEnd.getTime()
+      );
+
+      if (!isDuplicate) {
+        const newTrendCard: TrendGameCard = {
+          id: uuidv4(),
+          type: 'trend',
+          faceData: newTrendCardFaceData,
+          backData: {
+            explanation: `AAPL price went ${trend.toLowerCase()} in the interval between ${format(previousPriceData!.timestamp, 'p')} (Price: $${prevPrice.toFixed(2)}) and ${format(priceCard.faceData.timestamp, 'p')} (Price: $${currentPrice.toFixed(2)}).`,
+          },
+          isFlipped: false,
+        };
+        toast({ title: "Trend Card Generated!", description: `AAPL price trend: ${trend}` });
+        return [...prevActiveCards, newTrendCard];
+      }
+      // Optionally, provide feedback if the trend card already exists
+      // toast({ title: "Trend Already Identified", description: "This specific trend card already exists.", variant: "default" });
+      return prevActiveCards;
+    });
+
   }, [priceHistory, setActiveCards, toast]);
 
   const handleSelectCardForCombine = useCallback((cardId: string) => {
@@ -196,3 +215,4 @@ export default function FinSignalGamePage() {
     </div>
   );
 }
+
