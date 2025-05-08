@@ -60,13 +60,11 @@ export default function FinSignalGamePage() {
           toast({ title: "New Price Card Appeared!", description: `AAPL: $${latestPriceData.price.toFixed(2)} at ${format(newPriceCardData.timestamp, 'p')}` });
           return [...prevActiveCards, newPriceCard];
         }
-        // If duplicate by HH:MM, do not add the card and optionally inform the user (currently no toast for this)
-        // console.log(`Skipping duplicate card for ${newPriceCardData.symbol} at ${format(newCardTimestamp, 'HH:mm')}`);
         return prevActiveCards;
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [latestPriceData, toast]); // Removed setActiveCards from dependency array as it's stable from useLocalStorage
+  }, [latestPriceData, toast]); // Removed setActiveCards from dependency array as it's stable from useLocalStorage if initialValue/key are stable. It is actually not stable.
 
 
   const handleToggleFlipCard = useCallback((cardId: string) => {
@@ -101,7 +99,7 @@ export default function FinSignalGamePage() {
       );
 
       if (!signalExists) {
-        setDiscoveredSignals(prevSignals => [newDiscoverySignal, ...prevSignals]);
+        setDiscoveredSignals(prevSignals => [newDiscoverySignal, ...prevSignals].sort((a, b) => new Date(b.discoveredAt || b.generatedAt).getTime() - new Date(a.discoveredAt || a.generatedAt).getTime()));
         toast({ 
           title: "Price Card Secured & Discovered!", 
           description: `Details of ${cardBeingSecured.faceData.symbol} at $${cardBeingSecured.faceData.price.toFixed(2)} logged.` 
@@ -124,12 +122,10 @@ export default function FinSignalGamePage() {
       );
       
     } else if (cardBeingSecured && cardBeingSecured.isSecured) {
-      // This case now handles flipping an already secured card.
-      // The selection for combine is handled by onSelectCardForCombine.
-      // For secured cards, the main click action is selection for combine or flipping.
-      // We let onSelectCardForCombine handle the selection logic,
-      // and then explicitly call handleToggleFlipCard if needed based on GameCard's logic.
-      // This specific call to handleToggleFlipCard for secured cards is now done from GameCard
+      // This case is now primarily handled by onSelectCardForCombine and onToggleFlip in GameCard.
+      // If specific logic for "re-securing" or re-logging an already secured card is needed here,
+      // it would go here. However, the current flow for already secured cards is selection/flipping.
+      // "Rediscovery" after deletion is handled by handleDeleteSignal making the card unsecured again.
     }
   }, [activeCards, setActiveCards, setDiscoveredSignals, discoveredSignals, toast]);
 
@@ -148,7 +144,6 @@ export default function FinSignalGamePage() {
     const cardTimestamp = new Date(priceCard.faceData.timestamp).getTime(); 
     let previousPriceDataPoint: PriceData | undefined;
     
-    // priceHistory is sorted newest first. Find the entry right before the card's timestamp.
     for (const p of priceHistory) {
       if (new Date(p.timestamp).getTime() < cardTimestamp) {
         previousPriceDataPoint = p;
@@ -156,13 +151,11 @@ export default function FinSignalGamePage() {
       }
     }
    
-    // Fallback: if card is the newest, compare with the one right before it in history
     if (!previousPriceDataPoint && priceHistory.length > 0) {
         const cardIndexInHistory = priceHistory.findIndex(p => new Date(p.timestamp).getTime() === cardTimestamp);
-        // If card is the newest (index 0) and there's at least one older price
         if (cardIndexInHistory === 0 && priceHistory.length > 1) { 
              previousPriceDataPoint = priceHistory[1];
-        } else if (cardIndexInHistory > 0 && priceHistory[cardIndexInHistory -1]) { // -1 because history is newest first
+        } else if (cardIndexInHistory > 0 && priceHistory[cardIndexInHistory -1]) {
             previousPriceDataPoint = priceHistory[cardIndexInHistory -1 ]; 
         }
     }
@@ -218,13 +211,23 @@ export default function FinSignalGamePage() {
     const card = activeCards.find(c => c.id === cardId);
     if (!card || card.type !== 'price' || !(card as PriceGameCard).isSecured) {
       // If card is not securable (e.g. Trend card), or not secured, just toggle flip.
+      // This path is usually taken for Trend cards or unsecured Price cards that might be directly flipped.
       const targetCard = activeCards.find(c => c.id === cardId);
-      if (targetCard && (targetCard.type === 'trend' || (targetCard.type === 'price' && !(targetCard as PriceGameCard).isSecured))) {
-         handleToggleFlipCard(cardId);
+       if (targetCard && (targetCard.type === 'trend' || (targetCard.type === 'price' && !(targetCard as PriceGameCard).isSecured))) {
+         handleToggleFlipCard(cardId); // Allow flipping for non-combinable or unsecured cards.
+      } else if (targetCard && targetCard.type === 'price' && (targetCard as PriceGameCard).isSecured) {
+        // If it's a secured price card, it means GameCard's logic already called onSelectForCombine
+        // and potentially onToggleFlip. We just need to update selection state here.
+        // No toast error here, just manage selection.
       } else {
-        toast({ title: "Selection Error", description: "Only secured Price Cards can be selected for combination.", variant: "destructive" });
+        toast({ title: "Selection Info", description: "This card cannot be selected for combination. Only secured Price Cards can.", variant: "default" });
       }
-      return;
+       // This early return might prevent selection logic for secured cards if not careful.
+      // The intention of this block is primarily to handle clicks on cards that AREN'T eligible for combine selection.
+      // For secured cards, we want the selection logic below to run.
+      if (!(card && card.type === 'price' && (card as PriceGameCard).isSecured)) {
+        return; // Explicitly stop if not a secured price card.
+      }
     }
 
 
@@ -254,7 +257,6 @@ export default function FinSignalGamePage() {
       return;
     }
     
-    // Ensure timestamps are Date objects before calling getTime()
     const card1Timestamp = card1.faceData.timestamp instanceof Date ? card1.faceData.timestamp : new Date(card1.faceData.timestamp);
     const card2Timestamp = card2.faceData.timestamp instanceof Date ? card2.faceData.timestamp : new Date(card2.faceData.timestamp);
 
@@ -272,10 +274,10 @@ export default function FinSignalGamePage() {
       price2: laterCard.faceData.price,
       timestamp2: new Date(laterCard.faceData.timestamp),
       generatedAt: new Date(),
-      isFlipped: false, // Initialize isFlipped for log card
+      isFlipped: false, 
     };
 
-    setDiscoveredSignals(prev => [newSignal, ...prev]);
+    setDiscoveredSignals(prev => [newSignal, ...prev].sort((a, b) => new Date(b.discoveredAt || b.generatedAt).getTime() - new Date(a.discoveredAt || a.generatedAt).getTime()));
     
     setActiveCards(prevActiveCards => 
       prevActiveCards.filter(card => card.id !== card1.id && card.id !== card2.id)
@@ -295,9 +297,30 @@ export default function FinSignalGamePage() {
   }, [setDiscoveredSignals]);
 
   const handleDeleteSignal = useCallback((signalId: string) => {
+    const deletedSignal = discoveredSignals.find(s => s.id === signalId);
+    
     setDiscoveredSignals(prevSignals => prevSignals.filter(s => s.id !== signalId));
     toast({ title: "Signal Deleted", description: "The signal has been removed from the log." });
-  }, [setDiscoveredSignals, toast]);
+
+    if (deletedSignal && deletedSignal.type === 'price_discovery') {
+      const { symbol, price, timestamp } = deletedSignal as PriceDiscoverySignal;
+      setActiveCards(prevActiveCards =>
+        prevActiveCards.map(card => {
+          if (
+            card.type === 'price' &&
+            (card as PriceGameCard).isSecured && // Only consider secured cards
+            (card as PriceGameCard).faceData.symbol === symbol &&
+            (card as PriceGameCard).faceData.price === price &&
+            new Date((card as PriceGameCard).faceData.timestamp).getTime() === new Date(timestamp).getTime()
+          ) {
+            // Revert the card to an unsecured, face-up state
+            return { ...card, isSecured: false, isFlipped: false }; 
+          }
+          return card;
+        })
+      );
+    }
+  }, [discoveredSignals, setDiscoveredSignals, setActiveCards, toast]);
 
 
   return (
