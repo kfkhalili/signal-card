@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from "react";
 
 type SetValue<T> = (value: T | ((val: T) => T)) => void;
 
@@ -9,7 +8,7 @@ type SetValue<T> = (value: T | ((val: T) => T)) => void;
 const dateReviver = (key: string, value: any): any => {
   // Regular expression to check if the string is in ISO 8601 format
   const isoDatePattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/;
-  if (typeof value === 'string' && isoDatePattern.test(value)) {
+  if (typeof value === "string" && isoDatePattern.test(value)) {
     return new Date(value);
   }
   return value;
@@ -20,7 +19,7 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, SetValue<T>] {
   // parse stored json or return initialValue
   const readValue = useCallback((): T => {
     // Prevent build errors from localStorage access
-    if (typeof window === 'undefined') {
+    if (typeof window === "undefined") {
       return initialValue;
     }
 
@@ -43,7 +42,7 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, SetValue<T>] {
   const setValue: SetValue<T> = useCallback(
     (value) => {
       // Prevent build errors from localStorage access
-      if (typeof window === 'undefined') {
+      if (typeof window === "undefined") {
         console.warn(
           `Tried setting localStorage key “${key}” even though environment is not a client`
         );
@@ -64,12 +63,10 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, SetValue<T>] {
     },
     [key, storedValue]
   );
-  
+
   useEffect(() => {
     setStoredValue(readValue());
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); //readValue should be stable if initialValue and key are stable.
-
+  }, []);
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent | CustomEvent) => {
       // Check if the event is a StorageEvent and if the key matches
@@ -82,17 +79,12 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, SetValue<T>] {
     };
 
     // Listen for storage changes from other tabs/windows
-    window.addEventListener('storage', handleStorageChange);
-    // Listen for local-storage changes from the current tab/window (custom event)
-    window.addEventListener('local-storage', handleStorageChange);
+    window.addEventListener("storage", handleStorageChange);
 
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('local-storage', handleStorageChange);
+      window.removeEventListener("storage", handleStorageChange);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, readValue]); // Re-run if key or readValue changes.
-
+  }, [key, readValue]);
 
   return [storedValue, setValue];
 }
