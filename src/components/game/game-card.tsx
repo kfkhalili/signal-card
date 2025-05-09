@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import type { ActiveGameCard, PriceGameCard, PriceCardFaceData } from './types';
+import type { ActiveGameCard, PriceGameCard, PriceCardFaceData } from './types'; 
 import CardFace from './card-face';
-import BaseDisplayCard from './base-display-card';
+import BaseDisplayCard from './base-display-card'; 
 import { cn } from '@/lib/utils';
 
 const FADE_UPDATE_INTERVAL_MS = 100;
@@ -12,11 +12,12 @@ interface GameCardProps {
   card: ActiveGameCard;
   onSecureCard: (cardId: string) => void;
   onFadedOut: (cardId: string) => void;
-  onSelectForCombine: (cardId: string) => void;
+  onSelectForCombine: (cardId: string) => void; 
   isSelectedForCombine: boolean;
   onToggleFlip: (cardId: string) => void;
-  onGenerateDailyPerformanceSignal?: (priceCardData: PriceCardFaceData) => void;
-  onGeneratePriceVsSmaSignal?: (faceData: PriceCardFaceData, smaPeriod: 50 | 200, smaValue: number) => void;
+  onGenerateDailyPerformanceSignal?: (priceCardData: PriceCardFaceData) => void; 
+  onGeneratePriceVsSmaSignal?: (faceData: PriceCardFaceData, smaPeriod: 50 | 200, smaValue: number) => void; 
+  onGeneratePriceRangeContextSignal?: (faceData: PriceCardFaceData, levelType: 'High' | 'Low', levelValue: number) => void; // NEW PROP
 }
 
 const GameCard: React.FC<GameCardProps> = ({
@@ -28,6 +29,7 @@ const GameCard: React.FC<GameCardProps> = ({
   onToggleFlip,
   onGenerateDailyPerformanceSignal,
   onGeneratePriceVsSmaSignal,
+  onGeneratePriceRangeContextSignal, // Destructure new prop
 }) => {
   const [currentOpacity, setCurrentOpacity] = useState(1);
   const [remainingTimeFormatted, setRemainingTimeFormatted] = useState<string | null>(null);
@@ -36,7 +38,7 @@ const GameCard: React.FC<GameCardProps> = ({
   const isPriceCard = card.type === 'price';
   const priceCard = isPriceCard ? (card as PriceGameCard) : null;
   const priceCardFaceData = priceCard ? priceCard.faceData as PriceCardFaceData : null;
-
+  
   useEffect(() => {
     if (priceCard && !priceCard.isSecured && priceCard.initialFadeDurationMs) {
       const startTime = priceCard.appearedAt;
@@ -63,11 +65,10 @@ const GameCard: React.FC<GameCardProps> = ({
       setCurrentOpacity(1);
       setRemainingTimeFormatted(null);
     }
-  }, [priceCard, onFadedOut, card.id]);
+  }, [priceCard, onFadedOut, card.id]); 
 
   const handleCardClick = (/* event?: React.MouseEvent<HTMLDivElement> */) => {
     console.log("GameCard: BaseDisplayCard face clicked. Attempting flip/action.");
-    
     if (isPriceCard && priceCard) {
       if (!priceCard.isSecured) {
         console.log("GameCard: Unsecured price card clicked, securing...");
@@ -91,7 +92,15 @@ const GameCard: React.FC<GameCardProps> = ({
     }
   };
 
-  const frontFace = <CardFace card={card} isBack={false} />;
+  // New wrapper for range context clicks
+  const handleRangeContextClickForCardFace = (levelType: 'High' | 'Low', levelValue: number, receivedFaceData: PriceCardFaceData) => {
+    console.log(`GameCard: Range context click received from CardFace for ${levelType}`);
+    if (onGeneratePriceRangeContextSignal) {
+      onGeneratePriceRangeContextSignal(receivedFaceData, levelType, levelValue);
+    }
+  };
+
+  const frontFace = <CardFace card={card} isBack={false} onRangeContextClick={handleRangeContextClickForCardFace} />;
   const backFace = <CardFace card={card} isBack={true} onSmaClick={handleSmaClickForCardFace} />;
 
   return (
@@ -118,7 +127,7 @@ const GameCard: React.FC<GameCardProps> = ({
           {isPriceCard && priceCardFaceData && !card.isFlipped && onGenerateDailyPerformanceSignal && (
             <div
               ref={interactiveSignalAreaRef}
-              className="absolute top-[30%] left-[5%] w-[90%] h-[30%] z-30 cursor-pointer group/interactive rounded-md pointer-events-auto" // ADDED pointer-events-auto
+              className="absolute top-[30%] left-[5%] w-[90%] h-[30%] z-30 cursor-pointer group/interactive rounded-md pointer-events-auto"
               onClick={(e) => {
                 console.log("GameCard: Front-face interactive overlay onClick triggered.");
                 e.stopPropagation(); 

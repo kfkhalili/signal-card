@@ -3,20 +3,20 @@ export interface PriceCardFaceData {
   symbol: string;
   price: number; // This will be current_price
   timestamp: Date; // This will be api_timestamp (converted)
-  changePercentage?: number | null; // Optional, from quote
-  dayChange?: number | null;        // Optional, from quote
-  dayLow?: number | null;           // Optional, from quote
-  dayHigh?: number | null;          // Optional, from quote
-  volume?: number | null;           // Optional, from quote
-  dayOpen?: number | null;          // Optional, from quote
-  previousClose?: number | null;    // Optional, from quote
+  changePercentage?: number | null; 
+  dayChange?: number | null;        
+  dayLow?: number | null;           
+  dayHigh?: number | null;          
+  volume?: number | null;           
+  dayOpen?: number | null;          
+  previousClose?: number | null;    
 }
 
 export interface PriceCardBackData {
   explanation: string;
-  marketCap?: number | null;        // Optional, from quote
-  sma50d?: number | null;           // Optional, from quote
-  sma200d?: number | null;          // Optional, from quote
+  marketCap?: number | null;        
+  sma50d?: number | null;           
+  sma200d?: number | null;          
 }
 
 export interface TrendCardFaceData {
@@ -32,21 +32,30 @@ export interface TrendCardBackData {
 export interface DailyPerformanceSignalData {
   currentPrice: number;
   previousClose: number;
-  change: number;         // Absolute change
-  changePercentage: number; // Percentage change
-  quoteTimestamp: Date;   // Timestamp of the quote this signal is based on
+  change: number;        
+  changePercentage: number; 
+  quoteTimestamp: Date;   
 }
 
-// New Signal Type for Price vs. SMA
 export interface PriceVsSmaSignalData {
   currentPrice: number;
   smaValue: number;
-  smaPeriod: 50 | 200; // Or number if you plan more SMAs
+  smaPeriod: 50 | 200; 
   priceAboveSma: boolean;
-  quoteTimestamp: Date; // Timestamp of the quote this signal is based on
+  quoteTimestamp: Date; 
 }
 
-export type CardType = 'price' | 'trend' | 'daily_performance' | 'price_vs_sma'; // Added new types
+// New Signal Type for Price vs. Day High/Low Context
+export interface PriceRangeContextSignalData {
+  currentPrice: number;
+  levelType: 'High' | 'Low'; // Indicates if it's against Day High or Day Low
+  levelValue: number;        // The value of the Day High or Day Low
+  quoteTimestamp: Date;      // Timestamp of the quote this signal is based on
+  difference?: number;        // Optional: Absolute difference from the level
+  percentageFromLevel?: number; // Optional: Price as a percentage of the level or % difference
+}
+
+export type CardType = 'price' | 'trend' | 'daily_performance' | 'price_vs_sma' | 'price_range_context'; // Added new type
 
 export interface BaseGameCard {
   id: string;
@@ -113,5 +122,19 @@ export interface PriceVsSmaSignal extends BaseGameCard {
   hasBeenFlippedAtLeastOnce?: boolean;
 }
 
+export interface PriceRangeContextSignal extends BaseGameCard { 
+  type: 'price_range_context';
+  symbol: string;
+  data: PriceRangeContextSignalData;
+  generatedAt: Date;        
+  hasBeenFlippedAtLeastOnce?: boolean;
+}
+
+
 // Updated DiscoveredCard union type
-export type DiscoveredCard = PriceChangeSignal | PriceDiscoverySignal | DailyPerformanceSignal | PriceVsSmaSignal;
+export type DiscoveredCard = 
+  PriceChangeSignal | 
+  PriceDiscoverySignal | 
+  DailyPerformanceSignal | 
+  PriceVsSmaSignal |
+  PriceRangeContextSignal; // Added new signal type
