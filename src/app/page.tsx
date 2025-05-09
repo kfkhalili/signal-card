@@ -399,7 +399,7 @@ export default function FinSignalGamePage() {
           lastApiTimestampRef.current &&
           !isNaN(new Date(lastApiTimestampRef.current * 1000).getTime()) && ( // Check if timestamp is valid
             <span className="text-xs block">
-              Last FMP Data:{" "}
+              Last FMP Data:
               {format(new Date(lastApiTimestampRef.current * 1000), "PP p")}
             </span>
           )}
