@@ -3,6 +3,8 @@ import { CardHeader, CardTitle, CardDescription, CardContent } from '@/component
 import type { PriceGameCard, TrendGameCard, ActiveGameCard, PriceCardFaceData, PriceCardBackData } from './types';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+// Import an icon for daily performance if desired, e.g., Info, BarChart2
+// import { Info } from 'lucide-react'; 
 
 interface CardFaceProps {
   card: ActiveGameCard;
@@ -10,6 +12,7 @@ interface CardFaceProps {
   onSmaClick?: (smaPeriod: 50 | 200, smaValue: number, faceData: PriceCardFaceData) => void;
   onRangeContextClick?: (levelType: 'High' | 'Low', levelValue: number, faceData: PriceCardFaceData) => void;
   onOpenPriceClick?: (faceData: PriceCardFaceData) => void; 
+  onGenerateDailyPerformanceSignal?: (faceData: PriceCardFaceData) => void; // NEW PROP
 }
 
 const formatMarketCap = (cap: number | null | undefined): string => {
@@ -20,8 +23,22 @@ const formatMarketCap = (cap: number | null | undefined): string => {
   return cap.toString();
 };
 
-const CardFace: React.FC<CardFaceProps> = ({ card, isBack, onSmaClick, onRangeContextClick, onOpenPriceClick }) => {
-  // ... (console logs for props) ...
+const CardFace: React.FC<CardFaceProps> = ({ 
+  card, 
+  isBack, 
+  onSmaClick, 
+  onRangeContextClick, 
+  onOpenPriceClick,
+  onGenerateDailyPerformanceSignal // Destructure new prop
+}) => {
+
+  // Logging props (can be removed after debugging)
+  if (isBack && card.type === 'price') {
+    console.log("CardFace (Back): onSmaClick type:", typeof onSmaClick, ", onOpenPriceClick type:", typeof onOpenPriceClick);
+  }
+  if (!isBack && card.type === 'price') {
+    console.log("CardFace (Front): onRangeContextClick type:", typeof onRangeContextClick, ", onGenerateDailyPerformanceSignal type:", typeof onGenerateDailyPerformanceSignal);
+  }
 
   const handleBackFaceSmaInteraction = (
     e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>,
@@ -30,11 +47,9 @@ const CardFace: React.FC<CardFaceProps> = ({ card, isBack, onSmaClick, onRangeCo
     faceDataForSma: PriceCardFaceData 
   ) => {
     if (onSmaClick && smaValue !== null && smaValue !== undefined) {
-      console.log(`CardFace: SMA ${smaPeriod}D area clicked/keyed. Stopping propagation and calling onSmaClick.`);
+      console.log(`CardFace: SMA ${smaPeriod}D clicked. Stopping prop.`);
       e.stopPropagation(); 
       onSmaClick(smaPeriod, smaValue, faceDataForSma);
-    } else {
-      console.log("CardFace: Click/key on back, but not a valid SMA or onSmaClick missing.");
     }
   };
 
@@ -45,11 +60,9 @@ const CardFace: React.FC<CardFaceProps> = ({ card, isBack, onSmaClick, onRangeCo
     faceDataForRange: PriceCardFaceData
   ) => {
     if (onRangeContextClick && levelValue !== null && levelValue !== undefined) {
-      console.log(`CardFace: Day ${levelType} area clicked/keyed. Stopping propagation and calling onRangeContextClick.`);
+      console.log(`CardFace: Day ${levelType} clicked. Stopping prop.`);
       e.stopPropagation();
       onRangeContextClick(levelType, levelValue, faceDataForRange);
-    } else {
-      console.log("CardFace: Click/key on front range, but not valid or onRangeContextClick missing.");
     }
   };
 
@@ -58,12 +71,21 @@ const CardFace: React.FC<CardFaceProps> = ({ card, isBack, onSmaClick, onRangeCo
     faceDataForOpen: PriceCardFaceData
   ) => {
     if (onOpenPriceClick && faceDataForOpen.dayOpen != null) {
-      console.log(`CardFace: Open Price area clicked/keyed. Stopping propagation and calling onOpenPriceClick.`);
+      console.log(`CardFace: Open Price clicked. Stopping prop.`);
       e.stopPropagation();
       onOpenPriceClick(faceDataForOpen);
-    } else {
-      console.log("CardFace: Click/key on Open Price, but data invalid or onOpenPriceClick missing.");
     }
+  };
+
+  const handleDailyPerformanceInteraction = (
+    e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>,
+    faceDataForSignal: PriceCardFaceData
+  ) => {
+    if (onGenerateDailyPerformanceSignal) {
+      console.log(`CardFace: Daily Performance area clicked. Stopping prop.`);
+      e.stopPropagation();
+      onGenerateDailyPerformanceSignal(faceDataForSignal);
+    } 
   };
 
   const renderContent = () => {
@@ -73,19 +95,13 @@ const CardFace: React.FC<CardFaceProps> = ({ card, isBack, onSmaClick, onRangeCo
       const backData = priceCard.backData as PriceCardBackData;
 
       if (isBack) {
+        // ... (Back face rendering - Open Price and SMAs are clickable)
         return (
           <>
             <CardHeader><CardTitle className="text-lg">{faceData.symbol} - Details</CardTitle><CardDescription>{backData.explanation || 'Market Data & Technicals'}</CardDescription></CardHeader>
             <CardContent className="space-y-2 text-sm">
               <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                {/* Clickable Open Price */}
-                <div 
-                  className={cn("p-0.5 rounded-sm transition-colors relative z-10 pointer-events-auto", onOpenPriceClick && faceData.dayOpen != null ? "cursor-pointer hover:bg-muted/30 hover:text-primary" : "")}
-                  onClick={(e) => { if (onOpenPriceClick && faceData.dayOpen != null) handleBackFaceOpenPriceInteraction(e, faceData); }}
-                  onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && onOpenPriceClick && faceData.dayOpen != null) { handleBackFaceOpenPriceInteraction(e, faceData); } }}
-                  role={onOpenPriceClick && faceData.dayOpen != null ? "button" : undefined}
-                  tabIndex={onOpenPriceClick && faceData.dayOpen != null ? 0 : undefined}
-                >
+                <div className={cn("p-0.5 rounded-sm transition-colors relative z-10 pointer-events-auto", onOpenPriceClick && faceData.dayOpen != null ? "cursor-pointer hover:bg-muted/30 hover:text-primary" : "")} onClick={(e) => { if (onOpenPriceClick && faceData.dayOpen != null) handleBackFaceOpenPriceInteraction(e, faceData); }} onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && onOpenPriceClick && faceData.dayOpen != null) { handleBackFaceOpenPriceInteraction(e, faceData); } }} role={onOpenPriceClick && faceData.dayOpen != null ? "button" : undefined} tabIndex={onOpenPriceClick && faceData.dayOpen != null ? 0 : undefined}>
                   <span className="font-semibold">Open:</span> ${faceData.dayOpen?.toFixed(2) ?? 'N/A'}
                 </div>
                 <p><span className="font-semibold">Prev Close:</span> ${faceData.previousClose?.toFixed(2) ?? 'N/A'}</p>
@@ -93,33 +109,16 @@ const CardFace: React.FC<CardFaceProps> = ({ card, isBack, onSmaClick, onRangeCo
                 <p><span className="font-semibold">Day Low:</span> ${faceData.dayLow?.toFixed(2) ?? 'N/A'}</p>
                 <p><span className="font-semibold">Volume:</span> {faceData.volume?.toLocaleString() ?? 'N/A'}</p>
                 <p><span className="font-semibold">Market Cap:</span> {formatMarketCap(backData.marketCap)}</p>
-                {/* Clickable SMA 50D */}
-                <div 
-                  className={cn("mt-1 p-1 rounded-md transition-colors relative z-10 pointer-events-auto", onSmaClick && backData.sma50d != null ? "cursor-pointer hover:bg-muted/30 hover:text-primary" : "")}
-                  onClick={(e) => { if (onSmaClick && backData.sma50d != null) handleBackFaceSmaInteraction(e, 50, backData.sma50d, faceData); }}
-                  onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && onSmaClick && backData.sma50d != null) { handleBackFaceSmaInteraction(e, 50, backData.sma50d, faceData); } }}
-                  role={onSmaClick && backData.sma50d != null ? "button" : undefined}
-                  tabIndex={onSmaClick && backData.sma50d != null ? 0 : undefined}
-                >
-                  <span className="font-semibold">50D SMA:</span> {backData.sma50d?.toFixed(2) ?? 'N/A'}
-                </div>
-                {/* Clickable SMA 200D */}
-                <div 
-                  className={cn("mt-1 p-1 rounded-md transition-colors relative z-10 pointer-events-auto", onSmaClick && backData.sma200d != null ? "cursor-pointer hover:bg-muted/30 hover:text-primary" : "")}
-                  onClick={(e) => { if (onSmaClick && backData.sma200d != null) handleBackFaceSmaInteraction(e, 200, backData.sma200d, faceData); }}
-                  onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && onSmaClick && backData.sma200d != null) { handleBackFaceSmaInteraction(e, 200, backData.sma200d, faceData); } }}
-                  role={onSmaClick && backData.sma200d != null ? "button" : undefined}
-                  tabIndex={onSmaClick && backData.sma200d != null ? 0 : undefined}
-                >
-                  <span className="font-semibold">200D SMA:</span> {backData.sma200d?.toFixed(2) ?? 'N/A'}
-                </div>
+                <div className={cn("mt-1 p-1 rounded-md transition-colors relative z-10 pointer-events-auto", onSmaClick && backData.sma50d != null ? "cursor-pointer hover:bg-muted/30 hover:text-primary" : "")} onClick={(e) => { if (onSmaClick && backData.sma50d != null) handleBackFaceSmaInteraction(e, 50, backData.sma50d, faceData); }} onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && onSmaClick && backData.sma50d != null) { handleBackFaceSmaInteraction(e, 50, backData.sma50d, faceData); } }} role={onSmaClick && backData.sma50d != null ? "button" : undefined} tabIndex={onSmaClick && backData.sma50d != null ? 0 : undefined}><span className="font-semibold">50D SMA:</span> {backData.sma50d?.toFixed(2) ?? 'N/A'}</div>
+                <div className={cn("mt-1 p-1 rounded-md transition-colors relative z-10 pointer-events-auto", onSmaClick && backData.sma200d != null ? "cursor-pointer hover:bg-muted/30 hover:text-primary" : "")} onClick={(e) => { if (onSmaClick && backData.sma200d != null) handleBackFaceSmaInteraction(e, 200, backData.sma200d, faceData); }} onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && onSmaClick && backData.sma200d != null) { handleBackFaceSmaInteraction(e, 200, backData.sma200d, faceData); } }} role={onSmaClick && backData.sma200d != null ? "button" : undefined} tabIndex={onSmaClick && backData.sma200d != null ? 0 : undefined}><span className="font-semibold">200D SMA:</span> {backData.sma200d?.toFixed(2) ?? 'N/A'}</div>
               </div>
             </CardContent>
           </>
         );
       } else { // Front of Price Card
         const changePositive = faceData.dayChange !== null && faceData.dayChange !== undefined && faceData.dayChange >= 0;
-        const changeColor = faceData.dayChange === 0 ? 'text-muted-foreground' : changePositive ? 'text-green-600' : 'text-red-600';
+        const baseChangeColor = faceData.dayChange === 0 ? 'text-muted-foreground' : changePositive ? 'text-green-600' : 'text-red-600';
+
         return (
           <>
             <CardHeader>
@@ -129,30 +128,50 @@ const CardFace: React.FC<CardFaceProps> = ({ card, isBack, onSmaClick, onRangeCo
               </div>
             </CardHeader>
             <CardContent>
-              <p className="text-4xl font-bold mb-1">${faceData.price !== null && faceData.price !== undefined ? faceData.price.toFixed(2) : 'N/A'}</p>
-              <div className={cn("flex items-baseline space-x-2", changeColor)}><p className="text-lg font-semibold">{faceData.dayChange !== null && faceData.dayChange !== undefined ? `${changePositive ? '+' : ''}${faceData.dayChange.toFixed(2)}` : 'N/A'}</p><p className="text-lg font-semibold">({faceData.changePercentage !== null && faceData.changePercentage !== undefined ? `${changePositive ? '+' : ''}${(faceData.changePercentage * 100).toFixed(2)}%` : 'N/A'})</p></div>
+              {/* Clickable area for Daily Performance Signal */}
+              <div 
+                className={cn(
+                  "group/dps rounded-md p-2 -mx-2 -my-1 mb-1", // Adjust padding/margin to define clickable area
+                  onGenerateDailyPerformanceSignal ? "cursor-pointer hover:bg-muted/30 transition-colors pointer-events-auto relative z-10" : ""
+                )}
+                onClick={(e) => { if (onGenerateDailyPerformanceSignal) handleDailyPerformanceInteraction(e, faceData); }}
+                onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && onGenerateDailyPerformanceSignal) { handleDailyPerformanceInteraction(e, faceData); } }}
+                role={onGenerateDailyPerformanceSignal ? "button" : undefined}
+                tabIndex={onGenerateDailyPerformanceSignal ? 0 : undefined}
+                aria-label={onGenerateDailyPerformanceSignal ? "Generate Daily Performance Signal" : undefined}
+                title={onGenerateDailyPerformanceSignal ? "View Daily Performance Signal Details" : undefined}
+              >
+                <p className={cn(
+                    "text-4xl font-bold",
+                    onGenerateDailyPerformanceSignal && "group-hover/dps:text-primary" 
+                )}>
+                  ${faceData.price !== null && faceData.price !== undefined ? faceData.price.toFixed(2) : 'N/A'}
+                </p>
+                <div className={cn(
+                    "flex items-baseline space-x-2", 
+                    baseChangeColor, 
+                    onGenerateDailyPerformanceSignal && "group-hover/dps:text-primary" 
+                  )}>
+                  <p className="text-lg font-semibold">
+                    {faceData.dayChange !== null && faceData.dayChange !== undefined ? `${changePositive ? '+' : ''}${faceData.dayChange.toFixed(2)}` : 'N/A'}
+                  </p>
+                  <p className="text-lg font-semibold">
+                    ({faceData.changePercentage !== null && faceData.changePercentage !== undefined ? `${changePositive ? '+' : ''}${(faceData.changePercentage * 100).toFixed(2)}%` : 'N/A'})
+                  </p>
+                </div>
+              </div>
+
               <p className="text-xs text-muted-foreground mt-2"> Data as of: {faceData.timestamp ? format(new Date(faceData.timestamp), 'PP p') : 'N/A'}</p>
-              {faceData.dayLow !== null && faceData.dayLow !== undefined && faceData.dayHigh !== null && faceData.dayHigh !== undefined && faceData.price !== null && faceData.price !== undefined && faceData.dayHigh > faceData.dayLow && (
+              
+              {/* Day Low/High bar with clickable L and H values */}
+              {faceData.dayLow !== null && faceData.dayLow !== undefined && 
+               faceData.dayHigh !== null && faceData.dayHigh !== undefined && 
+               faceData.price !== null && faceData.price !== undefined && 
+               faceData.dayHigh > faceData.dayLow && (
                 <div className="mt-3">
                   <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                    <span 
-                      className={cn("p-0.5 rounded-sm pointer-events-auto relative z-10", onRangeContextClick ? "cursor-pointer hover:bg-muted/30 hover:text-primary transition-colors" : "")}
-                      onClick={(e) => { if (onRangeContextClick && faceData.dayLow != null) handleFrontFaceRangeInteraction(e, 'Low', faceData.dayLow, faceData); }}
-                      onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && onRangeContextClick && faceData.dayLow != null) handleFrontFaceRangeInteraction(e, 'Low', faceData.dayLow, faceData); }}
-                      role={onRangeContextClick && faceData.dayLow != null ? "button" : undefined}
-                      tabIndex={onRangeContextClick && faceData.dayLow != null ? 0 : undefined}
-                    >
-                      L: ${faceData.dayLow.toFixed(2)}
-                    </span>
-                    <span 
-                      className={cn("p-0.5 rounded-sm pointer-events-auto relative z-10", onRangeContextClick ? "cursor-pointer hover:bg-muted/30 hover:text-primary transition-colors" : "")}
-                      onClick={(e) => { if (onRangeContextClick && faceData.dayHigh != null) handleFrontFaceRangeInteraction(e, 'High', faceData.dayHigh, faceData); }}
-                      onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && onRangeContextClick && faceData.dayHigh != null) handleFrontFaceRangeInteraction(e, 'High', faceData.dayHigh, faceData); }}
-                      role={onRangeContextClick && faceData.dayHigh != null ? "button" : undefined}
-                      tabIndex={onRangeContextClick && faceData.dayHigh != null ? 0 : undefined}
-                    >
-                      H: ${faceData.dayHigh.toFixed(2)}
-                    </span>
+                    <span className={cn("p-0.5 rounded-sm pointer-events-auto relative z-10", onRangeContextClick ? "cursor-pointer hover:bg-muted/30 hover:text-primary transition-colors" : "")} onClick={(e) => { if (onRangeContextClick && faceData.dayLow != null) handleFrontFaceRangeInteraction(e, 'Low', faceData.dayLow, faceData); }} onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && onRangeContextClick && faceData.dayLow != null) handleFrontFaceRangeInteraction(e, 'Low', faceData.dayLow, faceData); }} role={onRangeContextClick && faceData.dayLow != null ? "button" : undefined} tabIndex={onRangeContextClick && faceData.dayLow != null ? 0 : undefined}> L: ${faceData.dayLow.toFixed(2)} </span>
+                    <span className={cn("p-0.5 rounded-sm pointer-events-auto relative z-10", onRangeContextClick ? "cursor-pointer hover:bg-muted/30 hover:text-primary transition-colors" : "")} onClick={(e) => { if (onRangeContextClick && faceData.dayHigh != null) handleFrontFaceRangeInteraction(e, 'High', faceData.dayHigh, faceData); }} onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && onRangeContextClick && faceData.dayHigh != null) handleFrontFaceRangeInteraction(e, 'High', faceData.dayHigh, faceData); }} role={onRangeContextClick && faceData.dayHigh != null ? "button" : undefined} tabIndex={onRangeContextClick && faceData.dayHigh != null ? 0 : undefined}> H: ${faceData.dayHigh.toFixed(2)} </span>
                   </div>
                   <div className="w-full bg-muted rounded-full h-1.5 pointer-events-none"><div className={cn("h-1.5 rounded-full", changePositive ? 'bg-green-500' : 'bg-red-500')} style={{ width: `${Math.max(0, Math.min(100, ((faceData.price - faceData.dayLow) / (faceData.dayHigh - faceData.dayLow)) * 100))}%`, }} /></div>
                 </div>
