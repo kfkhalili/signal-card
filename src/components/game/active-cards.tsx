@@ -15,7 +15,8 @@ interface ActiveCardsProps {
   onGenerateDailyPerformanceSignal: (priceCardData: PriceCardFaceData) => void;
   onGeneratePriceVsSmaSignal: (faceData: PriceCardFaceData, smaPeriod: 50 | 200, smaValue: number) => void; 
   onGeneratePriceRangeContextSignal: (faceData: PriceCardFaceData, levelType: 'High' | 'Low', levelValue: number) => void;
-  onGenerateIntradayTrendSignal: (faceData: PriceCardFaceData) => void; // NEW PROP
+  onGenerateIntradayTrendSignal: (faceData: PriceCardFaceData) => void; 
+  onTakeSnapshot: (priceCard: PriceGameCard) => void; // NEW PROP
 }
 
 const ActiveCards: React.FC<ActiveCardsProps> = ({
@@ -29,7 +30,8 @@ const ActiveCards: React.FC<ActiveCardsProps> = ({
   onGenerateDailyPerformanceSignal,
   onGeneratePriceVsSmaSignal,
   onGeneratePriceRangeContextSignal,
-  onGenerateIntradayTrendSignal, // Destructure new prop
+  onGenerateIntradayTrendSignal,
+  onTakeSnapshot, // Destructure new prop
 }) => {
   const [hasMounted, setHasMounted] = useState(false);
 
@@ -75,7 +77,8 @@ const ActiveCards: React.FC<ActiveCardsProps> = ({
               onGenerateDailyPerformanceSignal={onGenerateDailyPerformanceSignal}
               onGeneratePriceVsSmaSignal={onGeneratePriceVsSmaSignal}
               onGeneratePriceRangeContextSignal={onGeneratePriceRangeContextSignal}
-              onGenerateIntradayTrendSignal={onGenerateIntradayTrendSignal} // Pass down new prop
+              onGenerateIntradayTrendSignal={onGenerateIntradayTrendSignal}
+              onTakeSnapshot={onTakeSnapshot} // Pass down new prop
             />
           ))}
         </div>

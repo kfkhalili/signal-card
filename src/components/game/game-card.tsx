@@ -1,10 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import type { ActiveGameCard, PriceGameCard, PriceCardFaceData } from './types'; 
+import type { ActiveGameCard, PriceGameCard, PriceCardFaceData } from './types';
 import CardFace from './card-face';
-import BaseDisplayCard from './base-display-card'; 
+import BaseDisplayCard from './base-display-card';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Camera } from 'lucide-react';
 
 const FADE_UPDATE_INTERVAL_MS = 100;
 
@@ -12,13 +14,14 @@ interface GameCardProps {
   card: ActiveGameCard;
   onSecureCard: (cardId: string) => void;
   onFadedOut: (cardId: string) => void;
-  onSelectForCombine: (cardId: string) => void; 
+  onSelectForCombine: (cardId: string) => void;
   isSelectedForCombine: boolean;
   onToggleFlip: (cardId: string) => void;
-  onGenerateDailyPerformanceSignal?: (priceCardData: PriceCardFaceData) => void; 
-  onGeneratePriceVsSmaSignal?: (faceData: PriceCardFaceData, smaPeriod: 50 | 200, smaValue: number) => void; 
-  onGeneratePriceRangeContextSignal?: (faceData: PriceCardFaceData, levelType: 'High' | 'Low', levelValue: number) => void; 
-  onGenerateIntradayTrendSignal?: (faceData: PriceCardFaceData) => void; // NEW PROP
+  onGenerateDailyPerformanceSignal?: (priceCardData: PriceCardFaceData) => void;
+  onGeneratePriceVsSmaSignal?: (faceData: PriceCardFaceData, smaPeriod: 50 | 200, smaValue: number) => void;
+  onGeneratePriceRangeContextSignal?: (faceData: PriceCardFaceData, levelType: 'High' | 'Low', levelValue: number) => void;
+  onGenerateIntradayTrendSignal?: (faceData: PriceCardFaceData) => void;
+  onTakeSnapshot?: (card: PriceGameCard) => void;
 }
 
 const GameCard: React.FC<GameCardProps> = ({
@@ -31,19 +34,21 @@ const GameCard: React.FC<GameCardProps> = ({
   onGenerateDailyPerformanceSignal,
   onGeneratePriceVsSmaSignal,
   onGeneratePriceRangeContextSignal,
-  onGenerateIntradayTrendSignal, // Destructure new prop
+  onGenerateIntradayTrendSignal,
+  onTakeSnapshot,
 }) => {
   const [currentOpacity, setCurrentOpacity] = useState(1);
   const [remainingTimeFormatted, setRemainingTimeFormatted] = useState<string | null>(null);
-  const interactiveSignalAreaRef = useRef<HTMLDivElement>(null); 
+  const gameCardWrapperRef = useRef<HTMLDivElement>(null);
+  const frontFaceInteractiveOverlayRef = useRef<HTMLDivElement>(null);
+  const snapshotButtonRef = useRef<HTMLButtonElement>(null);
 
   const isPriceCard = card.type === 'price';
   const priceCard = isPriceCard ? (card as PriceGameCard) : null;
   const priceCardFaceData = priceCard ? priceCard.faceData as PriceCardFaceData : null;
-  
+
   useEffect(() => {
     if (priceCard && !priceCard.isSecured && priceCard.initialFadeDurationMs) {
-      // ... fade logic ...
       const startTime = priceCard.appearedAt;
       const duration = priceCard.initialFadeDurationMs;
       const updateFadeAndTime = () => {
@@ -68,24 +73,34 @@ const GameCard: React.FC<GameCardProps> = ({
       setCurrentOpacity(1);
       setRemainingTimeFormatted(null);
     }
-  }, [priceCard, onFadedOut, card.id]); 
+  }, [priceCard, onFadedOut, card.id]);
 
-  const handleCardClick = (/* event?: React.MouseEvent<HTMLDivElement> */) => {
-    // ... flip logic ...
-    console.log("GameCard: BaseDisplayCard face clicked. Attempting flip/action.");
+  const handleCardClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as Node;
+
+    if (frontFaceInteractiveOverlayRef.current && frontFaceInteractiveOverlayRef.current.contains(target)) {
+      console.log("GameCard: Click on front-face interactive overlay. Its handler should stop propagation.");
+      return; 
+    }
+    if (snapshotButtonRef.current && snapshotButtonRef.current.contains(target)) {
+      console.log("GameCard: Click on snapshot button. Its handler should stop propagation.");
+      return; 
+    }
+    
+    console.log("GameCard: General click on card wrapper. Attempting flip/action. Target:", target);
     if (isPriceCard && priceCard) {
       if (!priceCard.isSecured) {
-        console.log("GameCard: Unsecured price card clicked, securing...");
+        console.log("GameCard: Unsecured price card, securing...");
         onSecureCard(card.id);
       } else {
-        console.log("GameCard: Secured price card clicked, toggling flip...");
+        console.log("GameCard: Secured price card, toggling flip...");
         onToggleFlip(card.id);
       }
     } else if (card.type === 'trend') {
-      console.log("GameCard: Trend card clicked, toggling flip...");
+      console.log("GameCard: Trend card, toggling flip...");
       onToggleFlip(card.id);
     } else {
-      console.log("GameCard: Clicked on card of unknown active type or non-price/non-trend. Card type:", card.type);
+      console.log("GameCard: Clicked on card of unknown type. Type:", card.type);
     }
   };
   
@@ -103,11 +118,18 @@ const GameCard: React.FC<GameCardProps> = ({
     }
   };
 
-  // New wrapper for Open Price clicks
   const handleOpenPriceClickForCardFace = (receivedFaceData: PriceCardFaceData) => {
     console.log(`GameCard: Open price click received from CardFace`);
     if (onGenerateIntradayTrendSignal) {
       onGenerateIntradayTrendSignal(receivedFaceData);
+    }
+  };
+
+  const handleSnapshotButtonClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation(); 
+    if (priceCard && onTakeSnapshot) {
+      console.log("GameCard: Snapshot button clicked.");
+      onTakeSnapshot(priceCard);
     }
   };
 
@@ -116,21 +138,38 @@ const GameCard: React.FC<GameCardProps> = ({
                       card={card} 
                       isBack={true} 
                       onSmaClick={handleSmaClickForCardFace} 
-                      onOpenPriceClick={handleOpenPriceClickForCardFace} // Pass new handler
+                      onOpenPriceClick={handleOpenPriceClickForCardFace} 
                     />;
+  
+  console.log(`GameCard ${card.id} rendering. isFlipped prop: ${card.isFlipped}`); // LOG 5
 
   return (
-    // ... main div and BaseDisplayCard ...
     <div
+      ref={gameCardWrapperRef} 
+      onClick={handleCardClick} 
       style={{ opacity: currentOpacity }}
       className={cn(
-        'game-card-wrapper w-64 h-80 relative rounded-lg',
+        'game-card-wrapper w-64 h-80 relative rounded-lg cursor-pointer',
         isSelectedForCombine && priceCard?.isSecured ? 'ring-4 ring-primary ring-offset-2 shadow-2xl' : 'shadow-md hover:shadow-xl',
       )}
+      role="button" 
+      tabIndex={0}  
+      onKeyDown={(e) => { 
+          if (e.key === 'Enter' || e.key === ' ') {
+            const activeElement = document.activeElement;
+            if (frontFaceInteractiveOverlayRef.current?.contains(activeElement) || 
+                snapshotButtonRef.current?.contains(activeElement) ||
+                (gameCardWrapperRef.current?.contains(activeElement) && (activeElement as HTMLElement).dataset.interactiveChild === 'true') // Check for data-attribute from CardFace interactive elements
+            ) {
+                return; 
+            }
+            handleCardClick(e as any);
+          }
+      }}
+      aria-label={`Card ${card.id}, type ${card.type}. Click to interact or flip.`}
     >
       <BaseDisplayCard
         isFlipped={card.isFlipped}
-        onCardClick={handleCardClick} 
         faceContent={frontFace}
         backContent={backFace}
         className="w-full h-full"
@@ -143,7 +182,7 @@ const GameCard: React.FC<GameCardProps> = ({
           )}
           {isPriceCard && priceCardFaceData && !card.isFlipped && onGenerateDailyPerformanceSignal && (
             <div
-              ref={interactiveSignalAreaRef}
+              ref={frontFaceInteractiveOverlayRef}
               className="absolute top-[30%] left-[5%] w-[90%] h-[30%] z-30 cursor-pointer group/interactive rounded-md pointer-events-auto"
               onClick={(e) => {
                 console.log("GameCard: Front-face interactive overlay onClick triggered.");
@@ -153,6 +192,7 @@ const GameCard: React.FC<GameCardProps> = ({
                 }
               }}
               role="button" tabIndex={0}
+              data-interactive-child="true" // Add data attribute
               onKeyDown={(e) => { 
                 if ((e.key === 'Enter' || e.key === ' ') && priceCardFaceData) {
                   e.preventDefault(); 
@@ -165,6 +205,20 @@ const GameCard: React.FC<GameCardProps> = ({
             >
               <div className="hidden group-hover/interactive:group-focus/interactive:block absolute inset-0 border-2 border-primary/70 opacity-50 rounded-md"></div>
             </div>
+          )}
+          {isPriceCard && onTakeSnapshot && (
+            <Button
+              ref={snapshotButtonRef}
+              variant="ghost"
+              size="icon"
+              className="absolute top-1 left-1 h-7 w-7 text-muted-foreground hover:bg-muted/30 hover:text-primary rounded-sm p-0.5 z-40 pointer-events-auto"
+              onClick={handleSnapshotButtonClick}
+              title="Take Snapshot"
+              aria-label="Take Snapshot of this card"
+              data-interactive-child="true" // Add data attribute
+            >
+              <Camera className="h-4 w-4" />
+            </Button>
           )}
         </>
       </BaseDisplayCard>

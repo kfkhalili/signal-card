@@ -1,14 +1,14 @@
 
 export interface PriceCardFaceData {
   symbol: string;
-  price: number; // This will be current_price
-  timestamp: Date; // This will be api_timestamp (converted)
+  price: number; 
+  timestamp: Date; 
   changePercentage?: number | null; 
   dayChange?: number | null;        
   dayLow?: number | null;           
   dayHigh?: number | null;          
   volume?: number | null;           
-  dayOpen?: number | null;          // Optional, from quote
+  dayOpen?: number | null;          
   previousClose?: number | null;    
 }
 
@@ -54,15 +54,21 @@ export interface PriceRangeContextSignalData {
   percentageFromLevel?: number; 
 }
 
-// New Signal Type for Price vs. Open (Intraday Trend)
 export interface IntradayTrendSignalData {
   currentPrice: number;
   openPrice: number;
-  relationToOpen: 'Above' | 'Below' | 'At'; // Or use a more descriptive enum/type
+  relationToOpen: 'Above' | 'Below' | 'At';
   quoteTimestamp: Date;
 }
 
-export type CardType = 'price' | 'trend' | 'daily_performance' | 'price_vs_sma' | 'price_range_context' | 'intraday_trend'; // Added new type
+// New Signal Type for Price Snapshot
+export interface PriceSnapshotSignalData {
+  faceData: PriceCardFaceData; // Snapshot of the front of the card
+  backData: PriceCardBackData; // Snapshot of the back of the card
+  quoteTimestamp: Date; // Explicit timestamp of the snapshot event (from original card's faceData.timestamp)
+}
+
+export type CardType = 'price' | 'trend' | 'daily_performance' | 'price_vs_sma' | 'price_range_context' | 'intraday_trend' | 'price_snapshot'; // Added new type
 
 export interface BaseGameCard {
   id: string;
@@ -145,6 +151,15 @@ export interface IntradayTrendSignal extends BaseGameCard {
   hasBeenFlippedAtLeastOnce?: boolean;
 }
 
+export interface PriceSnapshotSignal extends BaseGameCard { 
+  type: 'price_snapshot';
+  symbol: string;
+  data: PriceSnapshotSignalData;
+  generatedAt: Date;       
+  hasBeenFlippedAtLeastOnce?: boolean;
+}
+
+
 // Updated DiscoveredCard union type
 export type DiscoveredCard = 
   PriceChangeSignal | 
@@ -152,4 +167,5 @@ export type DiscoveredCard =
   DailyPerformanceSignal | 
   PriceVsSmaSignal |
   PriceRangeContextSignal |
-  IntradayTrendSignal; // Added new signal type
+  IntradayTrendSignal |
+  PriceSnapshotSignal; // Added new signal type
