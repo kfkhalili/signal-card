@@ -1,15 +1,15 @@
 import React from 'react';
-import { Card as ShadCard } from '@/components/ui/card'; // Using ShadCard as the base
-import { cn } from '@/lib/utils'; // For className utilities
+import { Card as ShadCard } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 interface BaseDisplayCardProps {
   isFlipped: boolean;
-  onCardClick?: () => void;
+  onCardClick?: (event?: React.MouseEvent<HTMLDivElement>) => void;
   faceContent: React.ReactNode;
   backContent: React.ReactNode;
-  children?: React.ReactNode; // For additional UI elements like buttons, timers
+  children?: React.ReactNode; // For overlays on top of everything
   className?: string;
-  innerCardClassName?: string; // To style the inner content area if needed
+  innerCardClassName?: string;
 }
 
 const BaseDisplayCard: React.FC<BaseDisplayCardProps> = ({
@@ -22,30 +22,52 @@ const BaseDisplayCard: React.FC<BaseDisplayCardProps> = ({
   innerCardClassName,
 }) => {
   return (
-    <div
-      className={cn('relative w-full h-full cursor-pointer group perspective', className)}
-      onClick={onCardClick}
-    >
-      <ShadCard // Front Face
+    <div className={cn('relative w-full h-full group perspective', className)}>
+      {/* Click Target for Front Face - Rendered BEFORE visual content */}
+      {!isFlipped && (
+        <div
+          className="absolute inset-0 w-full h-full cursor-pointer" // Removed z-index
+          onClick={onCardClick}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Click Target for Back Face - Rendered BEFORE visual content */}
+      {isFlipped && (
+        <div
+          className="absolute inset-0 w-full h-full cursor-pointer" // Removed z-index
+          onClick={onCardClick}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Front Face Content (Visual) - Rendered AFTER click targets */}
+      <ShadCard
         className={cn(
           'absolute w-full h-full transition-transform duration-700 ease-in-out origin-center transform-style-preserve-3d backface-hidden',
-          !isFlipped ? 'rotate-y-0' : 'rotate-y-minus-180', // Changed to -180deg for flipped state
-          innerCardClassName
+          !isFlipped ? 'rotate-y-0' : 'rotate-y-minus-180',
+          innerCardClassName,
+          'pointer-events-none' // Make ShadCards themselves non-interactive for clicks
         )}
       >
-        {faceContent}
+        {faceContent} {/* Content within (like CardFace) can have pointer-events-auto */}
       </ShadCard>
-      <ShadCard // Back Face
+
+      {/* Back Face Content (Visual) - Rendered AFTER click targets */}
+      <ShadCard
         className={cn(
           'absolute w-full h-full transition-transform duration-700 ease-in-out origin-center transform-style-preserve-3d backface-hidden',
-          isFlipped ? 'rotate-y-0' : 'rotate-y-180',  // Stays as is: 180deg to 0deg when isFlipped is true
-          innerCardClassName
+          isFlipped ? 'rotate-y-0' : 'rotate-y-180',
+          innerCardClassName,
+          'pointer-events-none' // Make ShadCards themselves non-interactive for clicks
         )}
       >
-        {backContent}
+        {backContent} {/* Content within (like CardFace) can have pointer-events-auto */}
       </ShadCard>
-      {/* Children are rendered outside the flipping mechanism, can be overlays or controls */}
-      {children && <div className="absolute inset-0 z-10 pointer-events-none">{children}</div>} 
+      
+      {/* Children (overlays like front-face interactive area or timer) */}
+      {/* This container already has pointer-events-none from a previous step, specific children have pointer-events-auto */}
+      {children && <div className="absolute inset-0 z-10 pointer-events-none">{children}</div>}
     </div>
   );
 };

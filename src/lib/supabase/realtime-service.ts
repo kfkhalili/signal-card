@@ -1,84 +1,87 @@
 // src/lib/supabase/realtime-service.ts
-import { createClient } from './client'; // Assuming your client setup is here
+import { createClient } from './client';
 import type { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
-// Re-define types here or import from a shared types file
-interface LivePriceRow {
+// Interface matching the NEW live_quote_indicators table
+interface LiveQuoteIndicatorRow {
   id: string;
   symbol: string;
   current_price: number;
+  change_percentage: number | null;
+  day_change: number | null;
+  volume: number | null;
+  day_low: number | null;
+  day_high: number | null;
+  market_cap: number | null;
+  day_open: number | null;
+  previous_close: number | null;
   api_timestamp: number; // raw seconds
+  sma_50d: number | null;
+  sma_200d: number | null;
   fetched_at: string;
-  // ... add other fields from your live_prices table if needed by the callback
 }
-export type LivePricePayload = RealtimePostgresChangesPayload<LivePriceRow>;
+// Updated Payload Type Name for clarity
+export type LiveQuotePayload = RealtimePostgresChangesPayload<LiveQuoteIndicatorRow>;
 
 // Type for the callback function
-export type PriceUpdateCallback = (payload: LivePricePayload) => void;
+export type QuoteUpdateCallback = (payload: LiveQuotePayload) => void;
 
 let channel: RealtimeChannel | null = null;
 let currentSymbol: string | null = null;
-let currentCallback: PriceUpdateCallback | null = null;
+let currentCallback: QuoteUpdateCallback | null = null;
 const supabase = createClient(); // Initialize client once for the service
 
+const TABLE_NAME = 'live_quote_indicators'; // Use constant for table name
+
 /**
- * Subscribes to price updates for a specific symbol.
- * Ensures only one subscription is active at a time for this service.
- * @param symbol The stock symbol to filter by.
- * @param callback Function to call when a new price update is received.
- * @returns A function to unsubscribe.
+ * Subscribes to quote updates for a specific symbol from the new table.
  */
-export function subscribeToPriceUpdates(symbol: string, callback: PriceUpdateCallback): () => void {
-  // If already subscribed for the same symbol with the same callback, do nothing
+export function subscribeToQuoteUpdates(symbol: string, callback: QuoteUpdateCallback): () => void {
+  // Construct channel name and topic prefix using the new table name
+  const channelName = `quote_indicators_updates_${symbol.toLowerCase()}`;
+  const topicFilter = `symbol=eq.${symbol}`;
+
   if (channel && currentSymbol === symbol && currentCallback === callback) {
-    console.log(`RealtimeService: Already subscribed for symbol ${symbol}.`);
-    // Still return an unsubscribe function that works
-    return unsubscribeFromPriceUpdates;
+    console.log(`RealtimeService: Already subscribed for symbol ${symbol} on ${TABLE_NAME}.`);
+    return unsubscribeFromQuoteUpdates;
   }
 
-  // If subscribed to something else, or callback changed, unsubscribe first
-  unsubscribeFromPriceUpdates();
+  unsubscribeFromQuoteUpdates();
 
-  const channelName = `live_prices_updates_${symbol.toLowerCase()}`; // Internal name for client channel instance
-  console.log(`RealtimeService: Attempting to subscribe to ${channelName} for symbol ${symbol}...`);
-  currentCallback = callback; // Store the new callback
-  currentSymbol = symbol; // Store the new symbol
+  console.log(`RealtimeService: Attempting to subscribe to ${channelName} for symbol ${symbol} on ${TABLE_NAME}...`);
+  currentCallback = callback;
+  currentSymbol = symbol;
 
   channel = supabase.channel(channelName);
 
-  channel.on<LivePriceRow>(
+  channel.on<LiveQuoteIndicatorRow>( // Use updated row type
       'postgres_changes',
       {
-        event: '*', // Listen to all (INSERT, UPDATE, DELETE)
+        event: '*', // Still listen to all changes (upsert triggers INSERT or UPDATE)
         schema: 'public',
-        table: 'live_prices',
-        filter: `symbol=eq.${symbol}`
+        table: TABLE_NAME, // TARGET THE NEW TABLE
+        filter: topicFilter // Use the symbol filter
       },
-      // Ensure the stored callback is called
       (payload) => { if (currentCallback) currentCallback(payload); }
     )
     .subscribe((status, err) => {
        if (status === 'SUBSCRIBED') {
-          // Use channel.topic for the actual subscription identifier
           console.log(`RealtimeService: Connected! Subscription topic: ${channel?.topic}`);
         } else if (status === 'CHANNEL_ERROR') {
           console.error(`RealtimeService: Channel error on topic ${channel?.topic}:`, err);
-          // Attempt to reset and resubscribe after a delay?
         } else if (status === 'TIMED_OUT') {
           console.warn(`RealtimeService: Connection timed out on topic ${channel?.topic}.`);
         }
     });
 
-  // Return the single unsubscribe function
-  return unsubscribeFromPriceUpdates;
+  return unsubscribeFromQuoteUpdates;
 }
 
 /**
- * Unsubscribes from the currently active price update channel.
+ * Unsubscribes from the currently active quote update channel.
  */
-export function unsubscribeFromPriceUpdates(): void {
+export function unsubscribeFromQuoteUpdates(): void {
   if (channel) {
-    // Use channel.topic for accurate logging
     const topic = channel.topic;
     console.log(`RealtimeService: Unsubscribing from ${topic}...`);
     channel.unsubscribe()

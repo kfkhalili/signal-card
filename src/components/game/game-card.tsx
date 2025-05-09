@@ -1,10 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import type { ActiveGameCard, PriceGameCard } from './types';
+import React, { useState, useEffect, useRef } from 'react';
+import type { ActiveGameCard, PriceGameCard, PriceCardFaceData } from './types';
 import CardFace from './card-face';
-import BaseDisplayCard from './base-display-card'; 
-// import { Button } from '@/components/ui/button'; // REMOVED for Examine button
+import BaseDisplayCard from './base-display-card';
 import { cn } from '@/lib/utils';
 
 const FADE_UPDATE_INTERVAL_MS = 100;
@@ -12,40 +11,41 @@ const FADE_UPDATE_INTERVAL_MS = 100;
 interface GameCardProps {
   card: ActiveGameCard;
   onSecureCard: (cardId: string) => void;
-  // onExamineCard: (card: PriceGameCard) => void; // REMOVED
   onFadedOut: (cardId: string) => void;
   onSelectForCombine: (cardId: string) => void;
   isSelectedForCombine: boolean;
   onToggleFlip: (cardId: string) => void;
+  onGenerateDailyPerformanceSignal?: (priceCardData: PriceCardFaceData) => void;
+  onGeneratePriceVsSmaSignal?: (faceData: PriceCardFaceData, smaPeriod: 50 | 200, smaValue: number) => void;
 }
 
 const GameCard: React.FC<GameCardProps> = ({
   card,
   onSecureCard,
-  // onExamineCard, // REMOVED
   onFadedOut,
   onSelectForCombine,
   isSelectedForCombine,
   onToggleFlip,
+  onGenerateDailyPerformanceSignal,
+  onGeneratePriceVsSmaSignal,
 }) => {
   const [currentOpacity, setCurrentOpacity] = useState(1);
   const [remainingTimeFormatted, setRemainingTimeFormatted] = useState<string | null>(null);
+  const interactiveSignalAreaRef = useRef<HTMLDivElement>(null); 
 
   const isPriceCard = card.type === 'price';
-  const priceCardData = isPriceCard ? (card as PriceGameCard) : null;
-  
-  useEffect(() => {
-    if (priceCardData && !priceCardData.isSecured) {
-      const startTime = priceCardData.appearedAt;
-      const duration = priceCardData.initialFadeDurationMs;
+  const priceCard = isPriceCard ? (card as PriceGameCard) : null;
+  const priceCardFaceData = priceCard ? priceCard.faceData as PriceCardFaceData : null;
 
+  useEffect(() => {
+    if (priceCard && !priceCard.isSecured && priceCard.initialFadeDurationMs) {
+      const startTime = priceCard.appearedAt;
+      const duration = priceCard.initialFadeDurationMs;
       const updateFadeAndTime = () => {
         const elapsed = Date.now() - startTime;
         const remainingMs = Math.max(0, duration - elapsed);
         const newOpacity = Math.max(0, 1 - elapsed / duration);
-        
         setCurrentOpacity(newOpacity);
-
         if (remainingMs > 0) {
           const totalSeconds = Math.floor(remainingMs / 1000);
           const minutes = Math.floor(totalSeconds / 60);
@@ -54,12 +54,8 @@ const GameCard: React.FC<GameCardProps> = ({
         } else {
           setRemainingTimeFormatted("00:00");
         }
-
-        if (newOpacity === 0) {
-          onFadedOut(card.id);
-        }
+        if (newOpacity === 0) onFadedOut(card.id);
       };
-
       updateFadeAndTime();
       const intervalId = setInterval(updateFadeAndTime, FADE_UPDATE_INTERVAL_MS);
       return () => clearInterval(intervalId);
@@ -67,41 +63,44 @@ const GameCard: React.FC<GameCardProps> = ({
       setCurrentOpacity(1);
       setRemainingTimeFormatted(null);
     }
-  }, [priceCardData, onFadedOut, card.id]);
+  }, [priceCard, onFadedOut, card.id]);
 
-  const handleCardClick = () => {
-    if (isPriceCard && priceCardData) {
-      if (!priceCardData.isSecured) {
+  const handleCardClick = (/* event?: React.MouseEvent<HTMLDivElement> */) => {
+    console.log("GameCard: BaseDisplayCard face clicked. Attempting flip/action.");
+    
+    if (isPriceCard && priceCard) {
+      if (!priceCard.isSecured) {
+        console.log("GameCard: Unsecured price card clicked, securing...");
         onSecureCard(card.id);
       } else {
-        onSelectForCombine(card.id);
-        onToggleFlip(card.id); 
+        console.log("GameCard: Secured price card clicked, toggling flip...");
+        onToggleFlip(card.id);
       }
     } else if (card.type === 'trend') {
+      console.log("GameCard: Trend card clicked, toggling flip...");
       onToggleFlip(card.id);
+    } else {
+      console.log("GameCard: Clicked on card of unknown active type or non-price/non-trend. Card type:", card.type);
     }
   };
   
-  const frontFace = <CardFace card={card} isBack={false} />;
-  const backFace = <CardFace card={card} isBack={true} />;
+  const handleSmaClickForCardFace = (smaPeriod: 50 | 200, smaValue: number, receivedFaceData: PriceCardFaceData) => {
+    console.log("GameCard: SMA click received from CardFace for period", smaPeriod);
+    if (onGeneratePriceVsSmaSignal) {
+      onGeneratePriceVsSmaSignal(receivedFaceData, smaPeriod, smaValue);
+    }
+  };
 
-  // REMOVED handleExamineClick function
+  const frontFace = <CardFace card={card} isBack={false} />;
+  const backFace = <CardFace card={card} isBack={true} onSmaClick={handleSmaClickForCardFace} />;
 
   return (
     <div
       style={{ opacity: currentOpacity }}
       className={cn(
         'game-card-wrapper w-64 h-80 relative rounded-lg',
-        isSelectedForCombine && priceCardData?.isSecured ? 'ring-4 ring-primary ring-offset-2 shadow-2xl' : 'shadow-md hover:shadow-xl',
+        isSelectedForCombine && priceCard?.isSecured ? 'ring-4 ring-primary ring-offset-2 shadow-2xl' : 'shadow-md hover:shadow-xl',
       )}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') { 
-            handleCardClick();
-        }
-      }}
-      aria-label={`Card ${card.id}, type ${card.type}. ${isSelectedForCombine ? "Selected for combine." : ""} ${card.isFlipped ? "Showing back." : "Showing front."}`}
     >
       <BaseDisplayCard
         isFlipped={card.isFlipped}
@@ -110,14 +109,37 @@ const GameCard: React.FC<GameCardProps> = ({
         backContent={backFace}
         className="w-full h-full"
       >
-        {/* Children for overlays: Timer */}
-        <> 
-          {priceCardData && !priceCardData.isSecured && remainingTimeFormatted && (
+        <>
+          {priceCard && !priceCard.isSecured && priceCard.initialFadeDurationMs && remainingTimeFormatted && (
             <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm p-1 px-2 rounded text-xs font-semibold text-accent animate-pulse z-20 pointer-events-none">
               {remainingTimeFormatted}
             </div>
           )}
-          {/* REMOVED Examine Trend Button rendering */}
+          {isPriceCard && priceCardFaceData && !card.isFlipped && onGenerateDailyPerformanceSignal && (
+            <div
+              ref={interactiveSignalAreaRef}
+              className="absolute top-[30%] left-[5%] w-[90%] h-[30%] z-30 cursor-pointer group/interactive rounded-md pointer-events-auto" // ADDED pointer-events-auto
+              onClick={(e) => {
+                console.log("GameCard: Front-face interactive overlay onClick triggered.");
+                e.stopPropagation(); 
+                if (priceCardFaceData) {
+                  onGenerateDailyPerformanceSignal(priceCardFaceData);
+                }
+              }}
+              role="button" tabIndex={0}
+              onKeyDown={(e) => { 
+                if ((e.key === 'Enter' || e.key === ' ') && priceCardFaceData) {
+                  e.preventDefault(); 
+                  e.stopPropagation(); 
+                  onGenerateDailyPerformanceSignal(priceCardFaceData);
+                }
+              }}
+              aria-label="Generate Daily Performance Signal"
+              title="Click to generate daily performance signal"
+            >
+              <div className="hidden group-hover/interactive:group-focus/interactive:block absolute inset-0 border-2 border-primary/70 opacity-50 rounded-md"></div>
+            </div>
+          )}
         </>
       </BaseDisplayCard>
     </div>
