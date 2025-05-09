@@ -17,7 +17,8 @@ interface GameCardProps {
   onToggleFlip: (cardId: string) => void;
   onGenerateDailyPerformanceSignal?: (priceCardData: PriceCardFaceData) => void; 
   onGeneratePriceVsSmaSignal?: (faceData: PriceCardFaceData, smaPeriod: 50 | 200, smaValue: number) => void; 
-  onGeneratePriceRangeContextSignal?: (faceData: PriceCardFaceData, levelType: 'High' | 'Low', levelValue: number) => void; // NEW PROP
+  onGeneratePriceRangeContextSignal?: (faceData: PriceCardFaceData, levelType: 'High' | 'Low', levelValue: number) => void; 
+  onGenerateIntradayTrendSignal?: (faceData: PriceCardFaceData) => void; // NEW PROP
 }
 
 const GameCard: React.FC<GameCardProps> = ({
@@ -29,7 +30,8 @@ const GameCard: React.FC<GameCardProps> = ({
   onToggleFlip,
   onGenerateDailyPerformanceSignal,
   onGeneratePriceVsSmaSignal,
-  onGeneratePriceRangeContextSignal, // Destructure new prop
+  onGeneratePriceRangeContextSignal,
+  onGenerateIntradayTrendSignal, // Destructure new prop
 }) => {
   const [currentOpacity, setCurrentOpacity] = useState(1);
   const [remainingTimeFormatted, setRemainingTimeFormatted] = useState<string | null>(null);
@@ -41,6 +43,7 @@ const GameCard: React.FC<GameCardProps> = ({
   
   useEffect(() => {
     if (priceCard && !priceCard.isSecured && priceCard.initialFadeDurationMs) {
+      // ... fade logic ...
       const startTime = priceCard.appearedAt;
       const duration = priceCard.initialFadeDurationMs;
       const updateFadeAndTime = () => {
@@ -68,6 +71,7 @@ const GameCard: React.FC<GameCardProps> = ({
   }, [priceCard, onFadedOut, card.id]); 
 
   const handleCardClick = (/* event?: React.MouseEvent<HTMLDivElement> */) => {
+    // ... flip logic ...
     console.log("GameCard: BaseDisplayCard face clicked. Attempting flip/action.");
     if (isPriceCard && priceCard) {
       if (!priceCard.isSecured) {
@@ -92,7 +96,6 @@ const GameCard: React.FC<GameCardProps> = ({
     }
   };
 
-  // New wrapper for range context clicks
   const handleRangeContextClickForCardFace = (levelType: 'High' | 'Low', levelValue: number, receivedFaceData: PriceCardFaceData) => {
     console.log(`GameCard: Range context click received from CardFace for ${levelType}`);
     if (onGeneratePriceRangeContextSignal) {
@@ -100,10 +103,24 @@ const GameCard: React.FC<GameCardProps> = ({
     }
   };
 
+  // New wrapper for Open Price clicks
+  const handleOpenPriceClickForCardFace = (receivedFaceData: PriceCardFaceData) => {
+    console.log(`GameCard: Open price click received from CardFace`);
+    if (onGenerateIntradayTrendSignal) {
+      onGenerateIntradayTrendSignal(receivedFaceData);
+    }
+  };
+
   const frontFace = <CardFace card={card} isBack={false} onRangeContextClick={handleRangeContextClickForCardFace} />;
-  const backFace = <CardFace card={card} isBack={true} onSmaClick={handleSmaClickForCardFace} />;
+  const backFace = <CardFace 
+                      card={card} 
+                      isBack={true} 
+                      onSmaClick={handleSmaClickForCardFace} 
+                      onOpenPriceClick={handleOpenPriceClickForCardFace} // Pass new handler
+                    />;
 
   return (
+    // ... main div and BaseDisplayCard ...
     <div
       style={{ opacity: currentOpacity }}
       className={cn(

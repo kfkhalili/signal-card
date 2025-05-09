@@ -2,7 +2,7 @@
 import { createClient } from './client';
 import type { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
-// Interface matching the NEW live_quote_indicators table
+// Updated Interface matching the live_quote_indicators table including new fields
 interface LiveQuoteIndicatorRow {
   id: string;
   symbol: string;
@@ -19,11 +19,12 @@ interface LiveQuoteIndicatorRow {
   sma_50d: number | null;
   sma_200d: number | null;
   fetched_at: string;
+  is_market_open: boolean | null;        // NEW
+  market_status_message: string | null; // NEW
+  market_exchange_name: string | null;  // NEW
 }
-// Updated Payload Type Name for clarity
-export type LiveQuotePayload = RealtimePostgresChangesPayload<LiveQuoteIndicatorRow>;
 
-// Type for the callback function
+export type LiveQuotePayload = RealtimePostgresChangesPayload<LiveQuoteIndicatorRow>;
 export type QuoteUpdateCallback = (payload: LiveQuotePayload) => void;
 
 let channel: RealtimeChannel | null = null;

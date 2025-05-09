@@ -14,8 +14,10 @@ import type {
   DailyPerformanceSignalData,
   PriceVsSmaSignal,
   PriceVsSmaSignalData,
-  PriceRangeContextSignal, // Import new type
-  PriceRangeContextSignalData // Import new type
+  PriceRangeContextSignal,
+  PriceRangeContextSignalData,
+  IntradayTrendSignal, 
+  IntradayTrendSignalData 
 } from './types';
 import ActiveCardsPresentational from './active-cards';
 import { useToast } from '@/hooks/use-toast';
@@ -27,14 +29,11 @@ interface ActiveCardsSectionProps {
   setDiscoveredCards: React.Dispatch<React.SetStateAction<DiscoveredCard[]>>;
 }
 
-// Helper function to get date for sorting (centralized)
 const getDiscoveredCardSortDate = (card: DiscoveredCard): Date => {
   if (card.type === 'price_discovery') return card.discoveredAt;
   if (card.type === 'price_change') return card.generatedAt;
-  // For DailyPerformanceSignal, PriceVsSmaSignal, and PriceRangeContextSignal, use generatedAt
-  return (card as DailyPerformanceSignal | PriceVsSmaSignal | PriceRangeContextSignal).generatedAt;
+  return (card as DailyPerformanceSignal | PriceVsSmaSignal | PriceRangeContextSignal | IntradayTrendSignal).generatedAt;
 };
-
 
 const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
   activeCards,
@@ -45,76 +44,54 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
   const [selectedCardsForCombine, setSelectedCardsForCombine] = useState<string[]>([]);
   const { toast } = useToast();
 
-  // --- Existing Handlers (minimized for brevity, logic unchanged) ---
+  // --- Existing Handlers (minimized for brevity, logic unchanged) --- 
   const handleSecureCard = useCallback((cardId: string, fromFlip: boolean = false) => {
-    const cardBeingSecured = activeCards.find(c => c.id === cardId && c.type === 'price') as PriceGameCard | undefined;
-    if (!cardBeingSecured) return;
+    const cardBeingSecured = activeCards.find(c => c.id === cardId && c.type === 'price') as PriceGameCard | undefined; if (!cardBeingSecured) return;
     if (!cardBeingSecured.isSecured || fromFlip) {
       const newDiscoveryCard: PriceDiscoverySignal = { id: uuidv4(), type: 'price_discovery', symbol: cardBeingSecured.faceData.symbol, price: cardBeingSecured.faceData.price, timestamp: new Date(cardBeingSecured.faceData.timestamp), discoveredAt: new Date(), isFlipped: false, hasBeenFlippedAtLeastOnce: false, };
       const cardExistsInDiscovered = discoveredCards.some(c => c.type === 'price_discovery' && (c as PriceDiscoverySignal).symbol === newDiscoveryCard.symbol && (c as PriceDiscoverySignal).price === newDiscoveryCard.price && new Date((c as PriceDiscoverySignal).timestamp).getTime() === newDiscoveryCard.timestamp.getTime());
       if (!cardExistsInDiscovered) {
         setDiscoveredCards(prev => [newDiscoveryCard, ...prev].sort((a, b) => new Date(getDiscoveredCardSortDate(b)).getTime() - new Date(getDiscoveredCardSortDate(a)).getTime()));
         toast({ title: "Price Card Secured & Discovered!", description: `Details logged.` });
-      } else if (!cardBeingSecured.isSecured) { 
-         toast({ title: "Price Card Secured", description: `Already discovered. Secured in active area.`});
-      }
+      } else if (!cardBeingSecured.isSecured) { toast({ title: "Price Card Secured", description: `Already discovered. Secured.`}); }
       setActiveCards(prev => prev.map(c => c.id === cardId && c.type === 'price' ? { ...c, isSecured: true, isFlipped: true, appearedAt: Date.now() } : c ));
       setSelectedCardsForCombine(prev => { if (prev.length < 2 && !prev.includes(cardId)) return [...prev, cardId]; if (prev.length >= 2 && !prev.includes(cardId)) toast({ title: "Selection Limit Reached"}); return prev; });
     }
   }, [activeCards, discoveredCards, setActiveCards, setDiscoveredCards, toast]);
-
-  const handleToggleFlipCard = useCallback((cardId: string) => {
-    const cardToToggle = activeCards.find(c => c.id === cardId);
-    if (!cardToToggle) return;
-    if (cardToToggle.type === 'price' && !(cardToToggle as PriceGameCard).isSecured && !cardToToggle.isFlipped) handleSecureCard(cardId, true);
-    else setActiveCards(prev => prev.map(c => c.id === cardId ? { ...c, isFlipped: !c.isFlipped } : c ));
-  }, [activeCards, setActiveCards, handleSecureCard]);
-
+  const handleToggleFlipCard = useCallback((cardId: string) => { const cardToToggle = activeCards.find(c => c.id === cardId); if (!cardToToggle) return; if (cardToToggle.type === 'price' && !(cardToToggle as PriceGameCard).isSecured && !cardToToggle.isFlipped) handleSecureCard(cardId, true); else setActiveCards(prev => prev.map(c => c.id === cardId ? { ...c, isFlipped: !c.isFlipped } : c )); }, [activeCards, setActiveCards, handleSecureCard]);
   const handleFadedOut = useCallback((cardId: string) => setActiveCards(prev => prev.filter(c => c.id !== cardId)), [setActiveCards]);
-  const handleSelectCardForCombine = useCallback((cardId: string) => { /* ... combine logic (likely deprecated) ... */ }, [activeCards, toast, handleToggleFlipCard]);
-  const handleCombineCards = useCallback(() => { /* ... combine logic (likely deprecated) ... */ }, [selectedCardsForCombine, activeCards, setActiveCards, setDiscoveredCards, toast]);
-  const handleGenerateDailyPerformanceSignal = useCallback((priceCardFaceData: PriceCardFaceData) => {
-    if (priceCardFaceData.previousClose == null || priceCardFaceData.dayChange == null || priceCardFaceData.changePercentage == null ) {
-      toast({ title: "Data Incomplete for Signal", variant: "destructive" }); return;
-    }
-    const signalData: DailyPerformanceSignalData = { currentPrice: priceCardFaceData.price, previousClose: priceCardFaceData.previousClose, change: priceCardFaceData.dayChange, changePercentage: priceCardFaceData.changePercentage, quoteTimestamp: new Date(priceCardFaceData.timestamp), };
-    const newSignalCard: DailyPerformanceSignal = { id: uuidv4(), type: 'daily_performance', symbol: priceCardFaceData.symbol, data: signalData, generatedAt: new Date(), isFlipped: false, };
-    setDiscoveredCards(prev => [newSignalCard, ...prev].sort((a, b) => new Date(getDiscoveredCardSortDate(b)).getTime() - new Date(getDiscoveredCardSortDate(a)).getTime()));
-    toast({ title: "Signal Discovered!", description: `Daily Performance for ${newSignalCard.symbol} logged.` });
-  }, [setDiscoveredCards, toast]);
+  const handleSelectCardForCombine = useCallback((cardId: string) => { /* ... */ }, [activeCards, toast, handleToggleFlipCard]);
+  const handleCombineCards = useCallback(() => { /* ... */ }, [selectedCardsForCombine, activeCards, setActiveCards, setDiscoveredCards, toast]);
+  const handleGenerateDailyPerformanceSignal = useCallback((pfData: PriceCardFaceData) => { if (pfData.previousClose == null || pfData.dayChange == null || pfData.changePercentage == null ) { toast({ title: "Data Incomplete for Signal", variant: "destructive" }); return; } const signalData: DailyPerformanceSignalData = { currentPrice: pfData.price, previousClose: pfData.previousClose, change: pfData.dayChange, changePercentage: pfData.changePercentage, quoteTimestamp: new Date(pfData.timestamp), }; const newSignalCard: DailyPerformanceSignal = { id: uuidv4(), type: 'daily_performance', symbol: pfData.symbol, data: signalData, generatedAt: new Date(), isFlipped: false, }; setDiscoveredCards(prev => [newSignalCard, ...prev].sort((a,b) => new Date(getDiscoveredCardSortDate(b)).getTime() - new Date(getDiscoveredCardSortDate(a)).getTime())); toast({ title: "Signal Discovered!", description: `Daily Performance for ${newSignalCard.symbol} logged.` }); }, [setDiscoveredCards, toast]);
+  const handleGeneratePriceVsSmaSignal = useCallback((fData: PriceCardFaceData, smaP: 50|200, smaV: number) => { if (fData.price == null) { toast({ title: "Data Incomplete", variant: "destructive" }); return; } const signalData: PriceVsSmaSignalData = { currentPrice: fData.price, smaValue: smaV, smaPeriod: smaP, priceAboveSma: fData.price > smaV, quoteTimestamp: new Date(fData.timestamp), }; const newSignalCard: PriceVsSmaSignal = { id: uuidv4(), type: 'price_vs_sma', symbol: fData.symbol, data: signalData, generatedAt: new Date(), isFlipped: false, }; setDiscoveredCards(prev => [newSignalCard, ...prev].sort((a,b) => new Date(getDiscoveredCardSortDate(b)).getTime() - new Date(getDiscoveredCardSortDate(a)).getTime())); toast({ title: "SMA Signal Discovered!", description: `${fData.symbol} price vs ${smaP}D SMA logged.` }); }, [setDiscoveredCards, toast]);
+  const handleGeneratePriceRangeContextSignal = useCallback((fData: PriceCardFaceData, lType: 'High'|'Low', lValue: number) => { if (fData.price == null || lValue == null) { toast({ title: "Data Incomplete for Range Signal", variant: "destructive" }); return; } const diff = Math.abs(fData.price - lValue); const signalData: PriceRangeContextSignalData = { currentPrice: fData.price, levelType: lType, levelValue: lValue, quoteTimestamp: new Date(fData.timestamp), difference: diff, }; const newSignalCard: PriceRangeContextSignal = { id: uuidv4(), type: 'price_range_context', symbol: fData.symbol, data: signalData, generatedAt: new Date(), isFlipped: false, }; setDiscoveredCards(prev => [newSignalCard, ...prev].sort((a,b) => new Date(getDiscoveredCardSortDate(b)).getTime() - new Date(getDiscoveredCardSortDate(a)).getTime())); toast({ title: "Range Signal Discovered!", description: `${fData.symbol} price vs Day ${lType} logged.` }); }, [setDiscoveredCards, toast]);
 
-  const handleGeneratePriceVsSmaSignal = useCallback((faceData: PriceCardFaceData, smaPeriod: 50 | 200, smaValue: number) => {
-    if (faceData.price == null) { toast({ title: "Data Incomplete", variant: "destructive" }); return; }
-    const signalData: PriceVsSmaSignalData = { currentPrice: faceData.price, smaValue: smaValue, smaPeriod: smaPeriod, priceAboveSma: faceData.price > smaValue, quoteTimestamp: new Date(faceData.timestamp), };
-    const newSignalCard: PriceVsSmaSignal = { id: uuidv4(), type: 'price_vs_sma', symbol: faceData.symbol, data: signalData, generatedAt: new Date(), isFlipped: false, };
-    setDiscoveredCards(prev => [newSignalCard, ...prev].sort((a, b) => new Date(getDiscoveredCardSortDate(b)).getTime() - new Date(getDiscoveredCardSortDate(a)).getTime()));
-    toast({ title: "SMA Signal Discovered!", description: `${faceData.symbol} price vs ${smaPeriod}D SMA logged.` });
-  }, [setDiscoveredCards, toast]);
-
-  // --- NEW HANDLER for Price Range Context Signal ---
-  const handleGeneratePriceRangeContextSignal = useCallback((faceData: PriceCardFaceData, levelType: 'High' | 'Low', levelValue: number) => {
-    if (faceData.price == null || levelValue == null) { // Ensure price and levelValue are present
-      toast({ title: "Data Incomplete for Range Signal", description: "Current price or day high/low data is missing.", variant: "destructive" });
+  // --- NEW HANDLER for Intraday Trend (Price vs. Open) Signal ---
+  const handleGenerateIntradayTrendSignal = useCallback((faceData: PriceCardFaceData) => {
+    if (faceData.price == null || faceData.dayOpen == null) {
+      toast({ title: "Data Incomplete", description: "Current price or day open data is missing for Intraday Trend signal.", variant: "destructive" });
       return;
     }
 
-    const difference = Math.abs(faceData.price - levelValue);
-    // Percentage from level: (currentPrice - levelValue) / levelValue * 100 if you want % difference
-    // Or simply if it's at the level, or how close it is.
-    // For simplicity, we'll just store the difference for now.
+    let relation: 'Above' | 'Below' | 'At';
+    if (faceData.price > faceData.dayOpen) {
+      relation = 'Above';
+    } else if (faceData.price < faceData.dayOpen) {
+      relation = 'Below';
+    } else {
+      relation = 'At';
+    }
 
-    const signalData: PriceRangeContextSignalData = {
+    const signalData: IntradayTrendSignalData = {
       currentPrice: faceData.price,
-      levelType: levelType,
-      levelValue: levelValue,
+      openPrice: faceData.dayOpen,
+      relationToOpen: relation, // Corrected field name and value
       quoteTimestamp: new Date(faceData.timestamp),
-      difference: difference,
-      // percentageFromLevel: (difference / levelValue) * 100 // Example, refine if needed
     };
 
-    const newSignalCard: PriceRangeContextSignal = {
+    const newSignalCard: IntradayTrendSignal = {
       id: uuidv4(),
-      type: 'price_range_context',
+      type: 'intraday_trend',
       symbol: faceData.symbol,
       data: signalData,
       generatedAt: new Date(),
@@ -129,8 +106,8 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
     );
 
     toast({
-      title: "Range Signal Discovered!",
-      description: `${faceData.symbol} price vs Day ${levelType} logged.`,
+      title: "Intraday Trend Signal!",
+      description: `${faceData.symbol} price vs Open logged.`,
     });
 
   }, [setDiscoveredCards, toast]);
@@ -141,13 +118,14 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
       cards={activeCards}
       onSecureCard={handleSecureCard}
       onFadedOut={handleFadedOut}
-      selectedCardsForCombine={selectedCardsForCombine}
-      onSelectCardForCombine={handleSelectCardForCombine}
-      onCombineCards={handleCombineCards}
+      selectedCardsForCombine={selectedCardsForCombine} 
+      onSelectCardForCombine={handleSelectCardForCombine} 
+      onCombineCards={handleCombineCards} 
       onToggleFlipCard={handleToggleFlipCard}
       onGenerateDailyPerformanceSignal={handleGenerateDailyPerformanceSignal}
       onGeneratePriceVsSmaSignal={handleGeneratePriceVsSmaSignal}
-      onGeneratePriceRangeContextSignal={handleGeneratePriceRangeContextSignal} // Pass new handler
+      onGeneratePriceRangeContextSignal={handleGeneratePriceRangeContextSignal}
+      onGenerateIntradayTrendSignal={handleGenerateIntradayTrendSignal} // Pass new handler
     />
   );
 };

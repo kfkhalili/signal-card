@@ -13,8 +13,9 @@ interface ActiveCardsProps {
   onCombineCards: () => void;
   onToggleFlipCard: (cardId: string) => void;
   onGenerateDailyPerformanceSignal: (priceCardData: PriceCardFaceData) => void;
-  onGeneratePriceVsSmaSignal: (faceData: PriceCardFaceData, smaPeriod: 50 | 200, smaValue: number) => void;
-  onGeneratePriceRangeContextSignal: (faceData: PriceCardFaceData, levelType: 'High' | 'Low', levelValue: number) => void; // NEW PROP
+  onGeneratePriceVsSmaSignal: (faceData: PriceCardFaceData, smaPeriod: 50 | 200, smaValue: number) => void; 
+  onGeneratePriceRangeContextSignal: (faceData: PriceCardFaceData, levelType: 'High' | 'Low', levelValue: number) => void;
+  onGenerateIntradayTrendSignal: (faceData: PriceCardFaceData) => void; // NEW PROP
 }
 
 const ActiveCards: React.FC<ActiveCardsProps> = ({
@@ -27,7 +28,8 @@ const ActiveCards: React.FC<ActiveCardsProps> = ({
   onToggleFlipCard,
   onGenerateDailyPerformanceSignal,
   onGeneratePriceVsSmaSignal,
-  onGeneratePriceRangeContextSignal, // Destructure new prop
+  onGeneratePriceRangeContextSignal,
+  onGenerateIntradayTrendSignal, // Destructure new prop
 }) => {
   const [hasMounted, setHasMounted] = useState(false);
 
@@ -72,7 +74,8 @@ const ActiveCards: React.FC<ActiveCardsProps> = ({
               onToggleFlip={onToggleFlipCard}
               onGenerateDailyPerformanceSignal={onGenerateDailyPerformanceSignal}
               onGeneratePriceVsSmaSignal={onGeneratePriceVsSmaSignal}
-              onGeneratePriceRangeContextSignal={onGeneratePriceRangeContextSignal} // Pass down new prop
+              onGeneratePriceRangeContextSignal={onGeneratePriceRangeContextSignal}
+              onGenerateIntradayTrendSignal={onGenerateIntradayTrendSignal} // Pass down new prop
             />
           ))}
         </div>
