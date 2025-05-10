@@ -1,24 +1,19 @@
-/**
- * src/app/components/game/cards/price-card/PriceCardContent.tsx
- */
+// src/app/components/game/cards/price-card/PriceCardContent.tsx
 import React from "react";
 import {
   CardHeader,
   CardTitle,
   CardDescription,
-  CardContent as ShadCardContent, // Aliased to avoid conflict
+  CardContent as ShadCardContent,
 } from "@/components/ui/card";
-// Assuming PriceCardInteractionCallbacks is defined in price-card.types.ts
 import type {
   PriceCardData,
-  PriceCardFaceData, // Still needed for typing the 'faceData' variable
-  PriceCardInteractionCallbacks,
+  PriceCardInteractionCallbacks, // This will now only contain price-specific interactions
 } from "./price-card.types";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { ClickableDataItem } from "../../../ui/ClickableDataItem"; // Adjusted path
+import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
 
-// Helper function (can be co-located or moved to a shared utils file)
 const formatMarketCap = (cap: number | null | undefined): string => {
   if (cap === null || cap === undefined) return "N/A";
   if (cap >= 1e12) return `${(cap / 1e12).toFixed(2)}T`;
@@ -27,10 +22,10 @@ const formatMarketCap = (cap: number | null | undefined): string => {
   return cap.toString();
 };
 
+// Props are now only for price-specific data interactions
 interface PriceCardContentProps {
   cardData: PriceCardData;
   isBackFace: boolean;
-  // Using the refined callback signatures from PriceCardInteractionCallbacks
   onSmaClick?: PriceCardInteractionCallbacks["onPriceCardSmaClick"];
   onRangeContextClick?: PriceCardInteractionCallbacks["onPriceCardRangeContextClick"];
   onOpenPriceClick?: PriceCardInteractionCallbacks["onPriceCardOpenPriceClick"];
@@ -46,20 +41,16 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
     onOpenPriceClick,
     onGenerateDailyPerformanceSignal,
   }) => {
-    // cardData.symbol is available directly
-    // cardData.faceData and cardData.backData are also available
     const { faceData, backData, symbol } = cardData;
 
-    // --- INTERACTION HANDLERS ---
-    // These now call the prop callbacks with the full `cardData` object
     const handleSmaInteraction = (
       e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>,
       smaPeriod: 50 | 200,
       smaValue: number | null | undefined
     ) => {
       if (onSmaClick && smaValue != null) {
-        e.stopPropagation(); // Prevent card flip if specific element is clicked
-        onSmaClick(cardData, smaPeriod, smaValue); // Pass full cardData
+        e.stopPropagation();
+        onSmaClick(cardData, smaPeriod, smaValue);
       }
     };
 
@@ -70,17 +61,16 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
     ) => {
       if (onRangeContextClick && levelValue != null) {
         e.stopPropagation();
-        onRangeContextClick(cardData, levelType, levelValue); // Pass full cardData
+        onRangeContextClick(cardData, levelType, levelValue);
       }
     };
 
     const handleOpenPriceInteraction = (
       e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>
     ) => {
-      // Condition to enable interaction still depends on specific faceData fields
       if (onOpenPriceClick && faceData.dayOpen != null) {
         e.stopPropagation();
-        onOpenPriceClick(cardData); // Pass full cardData
+        onOpenPriceClick(cardData);
       }
     };
 
@@ -89,17 +79,17 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
     ) => {
       if (onGenerateDailyPerformanceSignal) {
         e.stopPropagation();
-        onGenerateDailyPerformanceSignal(cardData); // Pass full cardData
+        onGenerateDailyPerformanceSignal(cardData);
       }
     };
 
-    // --- RENDER LOGIC ---
     if (isBackFace) {
-      // --- RENDER PRICE CARD BACK ---
       return (
+        // The p-4 is removed from here as BaseCard's content wrapper will add it.
+        // No h-full or flex flex-col needed here anymore.
         <div
           data-testid="price-card-back-content"
-          className="pointer-events-auto h-full overflow-y-auto p-4"
+          className="pointer-events-auto"
         >
           <CardHeader className="px-0 pt-0">
             <CardTitle className="text-lg">{symbol} - Details</CardTitle>
@@ -120,7 +110,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                     ? `Interact with Open Price: ${faceData.dayOpen.toFixed(2)}`
                     : undefined
                 }
-                data-interactive-child="true" // Preserving custom attribute
+                data-interactive-child="true"
               >
                 <span className="font-semibold">Open:</span> $
                 {faceData.dayOpen?.toFixed(2) ?? "N/A"}
@@ -186,7 +176,6 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
         </div>
       );
     } else {
-      // --- RENDER PRICE CARD FRONT ---
       const changePositive =
         faceData.dayChange != null && faceData.dayChange >= 0;
       const baseChangeColor =
@@ -196,9 +185,11 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
           ? "text-green-600"
           : "text-red-600";
       return (
+        // The p-4 is removed from here as BaseCard's content wrapper will add it.
+        // No h-full or flex flex-col needed here anymore.
         <div
           data-testid="price-card-front-content"
-          className="pointer-events-auto h-full overflow-y-auto p-4"
+          className="pointer-events-auto"
         >
           <CardHeader className="px-0 pt-0">
             <div className="flex justify-between items-start">

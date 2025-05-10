@@ -1,16 +1,11 @@
-/**
- * src/app/components/active-cards.tsx
- *
- * This component is responsible for displaying a list of active game cards (live quotes or signals),
- * handling user interactions like flipping cards, initiating deletion (with confirmation),
- * and taking snapshots. It passes interaction callbacks down to individual GameCard components.
- */
+// src/app/components/active-cards.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React from "react";
 import GameCard from "@/components/game/GameCard";
-import type { DisplayableCard } from "./types"; // Should resolve to src/app/components/types.ts
-import type { PriceCardInteractionCallbacks } from "./cards/price-card/price-card.types"; // Should resolve to src/app/components/cards/price-card/price-card.types.ts
+import type { DisplayableCard } from "./types";
+import type { BaseCardSocialInteractions } from "./cards/base-card/base-card.types";
+import type { PriceCardInteractionCallbacks } from "./cards/price-card/price-card.types"; // For priceSpecificInteractions
 
 import {
   AlertDialog,
@@ -21,50 +16,44 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"; // Assuming this is your UI library path
+} from "@/components/ui/alert-dialog";
+
+// Define which specific interaction callbacks PriceCardContent needs
+type PriceSpecificInteractionsForContainer = Pick<
+  PriceCardInteractionCallbacks,
+  | "onPriceCardSmaClick"
+  | "onPriceCardRangeContextClick"
+  | "onPriceCardOpenPriceClick"
+  | "onPriceCardGenerateDailyPerformanceSignal"
+>;
 
 interface ActiveCardsProps {
-  /** Array of cards to display, combining concrete card data with UI state like isFlipped. */
-  readonly cards: DisplayableCard[];
-  /** Callback to toggle the flipped state of a card. */
-  readonly onToggleFlipCard: (id: string) => void;
-  /** Callback invoked after the user confirms the deletion of a card. */
-  readonly onDeleteCard: (id: string) => void;
-  /** Callback to trigger a snapshot action, optionally with the ID of the card that initiated it. */
-  readonly onTakeSnapshot: (cardId?: string) => void;
-  /** Grouped interaction callbacks specifically for PriceCard instances. */
-  readonly priceCardInteractions?: PriceCardInteractionCallbacks;
+  cards: DisplayableCard[];
+  onToggleFlipCard: (id: string) => void;
+  onDeleteCardRequest: (id: string) => void; // To show confirmation dialog
+
+  socialInteractions?: BaseCardSocialInteractions; // For the social bar in BaseCard
+  priceSpecificInteractions?: PriceSpecificInteractionsForContainer; // For PriceCardContent
+
+  // Props for AlertDialog
+  cardIdToConfirmDelete: string | null;
+  onConfirmDeletion: () => void;
+  onCancelDeletion: () => void;
 }
 
 export const ActiveCards: React.FC<ActiveCardsProps> = ({
   cards,
   onToggleFlipCard,
-  onDeleteCard,
-  onTakeSnapshot,
-  priceCardInteractions,
+  onDeleteCardRequest,
+  socialInteractions,
+  priceSpecificInteractions,
+  cardIdToConfirmDelete,
+  onConfirmDeletion,
+  onCancelDeletion,
 }) => {
-  const [hasMounted, setHasMounted] = useState<boolean>(false);
-  const [cardIdToConfirmDelete, setCardIdToConfirmDelete] = useState<
-    string | null
-  >(null);
-
-  useEffect(() => {
+  const [hasMounted, setHasMounted] = React.useState(false);
+  React.useEffect(() => {
     setHasMounted(true);
-  }, []);
-
-  const handleDeleteRequest = useCallback((cardId: string): void => {
-    setCardIdToConfirmDelete(cardId);
-  }, []);
-
-  const confirmDeletion = useCallback((): void => {
-    if (cardIdToConfirmDelete) {
-      onDeleteCard(cardIdToConfirmDelete);
-      setCardIdToConfirmDelete(null);
-    }
-  }, [cardIdToConfirmDelete, onDeleteCard]);
-
-  const cancelDeletion = useCallback((): void => {
-    setCardIdToConfirmDelete(null);
   }, []);
 
   if (!hasMounted) {
@@ -83,31 +72,25 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
         <h2 className="text-2xl font-semibold text-foreground">
           Live Quote & Generated Signals
         </h2>
-        {/* Placeholder for global actions like "Add new card" or filters */}
       </div>
 
       {cards.length === 0 ? (
         <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
-          {" "}
-          {/* Adjusted height for empty state */}
           <p className="text-muted-foreground text-center py-10">
             No active cards or signals. Waiting for live data...
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {" "}
-          {/* Added gap for better spacing */}
           {cards.map((card) => (
             <div key={card.id} className="flex justify-center items-start">
-              {" "}
-              {/* items-start for better alignment if cards have varying heights before flipping */}
               <GameCard
                 card={card}
                 onToggleFlip={onToggleFlipCard}
-                onDeleteCardRequest={handleDeleteRequest} // GameCard calls this to show dialog
-                onTakeSnapshot={onTakeSnapshot} // GameCard can call this with its card.id
-                priceCardInteractions={priceCardInteractions} // Pass through PriceCard specific interactions
+                onDeleteCardRequest={onDeleteCardRequest}
+                // Pass down the interaction objects
+                socialInteractions={socialInteractions}
+                priceSpecificInteractions={priceSpecificInteractions}
               />
             </div>
           ))}
@@ -116,28 +99,24 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
 
       <AlertDialog
         open={!!cardIdToConfirmDelete}
-        onOpenChange={(open: boolean): void => {
-          // Explicitly type 'open'
-          if (!open) {
-            cancelDeletion();
-          }
+        onOpenChange={(open) => {
+          if (!open) onCancelDeletion();
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action will permanently delete the card. This cannot be
-              undone.
+              This action will permanently delete the card.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={cancelDeletion}>
+            <AlertDialogCancel onClick={onCancelDeletion}>
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={confirmDeletion}
-              className="bg-red-600 hover:bg-red-700 text-destructive-foreground" // Ensure text color contrasts with bg
+              onClick={onConfirmDeletion}
+              className="bg-red-600 hover:bg-red-700 text-destructive-foreground"
             >
               Delete
             </AlertDialogAction>
@@ -147,5 +126,3 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
     </div>
   );
 };
-
-ActiveCards.displayName = "ActiveCards";
