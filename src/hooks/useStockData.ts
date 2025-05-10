@@ -1,5 +1,5 @@
 // src/hooks/useStockData.ts
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client"; // Ensure this path is correct
 import {
   subscribeToQuoteUpdates,
@@ -7,7 +7,7 @@ import {
 } from "@/lib/supabase/realtime-service"; // Ensure this path is correct
 import { z } from "zod";
 
-// Define these types here or import from a shared location
+// Types (as provided by you)
 export interface LiveQuoteIndicatorDBRow {
   id: string;
   symbol: string;
@@ -56,7 +56,8 @@ export type MarketStatusDisplayHook =
   | "Delayed"
   | "Unknown"
   | "Error"
-  | "Fetching";
+  | "Fetching"
+  | "Connecting"; // Added for clarity during realtime connection attempt
 
 interface UseStockDataProps {
   symbol: string;
@@ -69,7 +70,7 @@ interface UseStockDataProps {
 interface UseStockDataReturn {
   marketStatus: MarketStatusDisplayHook;
   marketStatusMessage: string | null;
-  lastApiTimestamp: number | null; // Store as Unix timestamp (seconds)
+  lastApiTimestamp: number | null;
 }
 
 export function useStockData({
@@ -79,12 +80,25 @@ export function useStockData({
   const [marketStatus, setMarketStatus] =
     useState<MarketStatusDisplayHook>("Fetching");
   const [marketStatusMessage, setMarketStatusMessage] = useState<string | null>(
-    "Fetching initial data..."
+    "Initializing..."
   );
   const [lastApiTimestamp, setLastApiTimestamp] = useState<number | null>(null);
 
+  const unsubscribeRealtimeRef = useRef<(() => void) | null>(null);
+  const isMountedRef = useRef<boolean>(true);
+
+  // Effect to track mount status
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   const updateDisplayStatus = useCallback(
     (quote: LiveQuoteIndicatorDBRow | null) => {
+      if (!isMountedRef.current) return;
+
       if (
         !quote ||
         quote.is_market_open === null ||
@@ -98,7 +112,7 @@ export function useStockData({
         return;
       }
 
-      setLastApiTimestamp(quote.api_timestamp); // Store as seconds
+      setLastApiTimestamp(quote.api_timestamp);
       const defaultMessage = quote.is_market_open
         ? "Market is Open"
         : "Market is Closed";
@@ -112,19 +126,33 @@ export function useStockData({
         setMarketStatus("Closed");
       }
     },
-    []
-  ); // setMarketStatus, setMarketStatusMessage, setLastApiTimestamp are stable
+    [] // State setters from useState are stable
+  );
 
-  useEffect(() => {
+  // Memoize onQuoteReceived if it's passed as a prop to stabilize setupSubscription
+  const stableOnQuoteReceived = useCallback(onQuoteReceived, [onQuoteReceived]);
+
+  const setupSubscription = useCallback(async () => {
+    if (!isMountedRef.current) return;
+
+    console.log(
+      `useStockData (${symbol}): Setting up subscription and fetching initial data...`
+    );
+    // 1. Clean up any existing subscription for this hook instance
+    if (unsubscribeRealtimeRef.current) {
+      console.log(
+        `useStockData (${symbol}): Cleaning up previous subscription before new setup.`
+      );
+      unsubscribeRealtimeRef.current();
+      unsubscribeRealtimeRef.current = null;
+    }
+
+    setMarketStatus("Fetching");
+    setMarketStatusMessage(`Workspaceing data for ${symbol}...`);
     const supabase = createClient();
-    let unsubscribeRealtime: () => void = () => {};
-    let isMounted = true; // To prevent state updates on unmounted component
 
-    const fetchInitialData = async () => {
-      if (!isMounted) return;
-      setMarketStatus("Fetching");
-      setMarketStatusMessage(`Workspaceing data for ${symbol}...`);
-
+    // 2. Fetch initial data
+    try {
       const { data, error } = await supabase
         .from("live_quote_indicators")
         .select("*")
@@ -133,79 +161,127 @@ export function useStockData({
         .limit(1)
         .single();
 
-      if (!isMounted) return;
+      if (!isMountedRef.current) return;
 
       if (error && error.code !== "PGRST116") {
+        // PGRST116 means no rows found, not an error for .single()
         console.error(
-          `useStockData (${symbol}): fetchInitialData - Error:`,
+          `useStockData (${symbol}): Error fetching initial data:`,
           error
         );
+        updateDisplayStatus(null);
         setMarketStatus("Error");
-        setMarketStatusMessage("Failed to fetch initial data.");
-        updateDisplayStatus(null); // To clear timestamp if needed
+        setMarketStatusMessage("Failed to load initial data.");
       } else if (data) {
         const validationResult = LiveQuoteIndicatorDBSchema.safeParse(data);
         if (validationResult.success) {
-          onQuoteReceived(validationResult.data, "fetch");
-          updateDisplayStatus(validationResult.data); // Update status based on fetched data
+          stableOnQuoteReceived(validationResult.data, "fetch");
+          updateDisplayStatus(validationResult.data);
         } else {
           console.error(
-            `useStockData (${symbol}): fetchInitialData - Zod validation failed:`,
+            `useStockData (${symbol}): Zod validation failed for fetched data:`,
             validationResult.error.flatten()
           );
-          setMarketStatus("Error");
-          setMarketStatusMessage("Received invalid data format.");
           updateDisplayStatus(null);
+          setMarketStatus("Error");
+          setMarketStatusMessage("Received invalid data format from server.");
         }
       } else {
+        updateDisplayStatus(null); // No data found
         setMarketStatus("Unknown");
         setMarketStatusMessage(`No initial data found for ${symbol}.`);
-        updateDisplayStatus(null);
       }
-    };
-
-    const handleRealtimeUpdate = (payload: LiveQuotePayload) => {
-      if (
-        !isMounted ||
-        payload.eventType === "DELETE" ||
-        !payload.new ||
-        payload.new.symbol !== symbol
-      ) {
-        return;
-      }
-      const validationResult = LiveQuoteIndicatorDBSchema.safeParse(
-        payload.new
+    } catch (fetchError) {
+      if (!isMountedRef.current) return;
+      console.error(
+        `useStockData (${symbol}): Exception during initial data fetch:`,
+        fetchError
       );
-      if (validationResult.success) {
-        onQuoteReceived(validationResult.data, "realtime");
-        updateDisplayStatus(validationResult.data); // Update status based on realtime data
-      } else {
-        console.error(
-          `useStockData (${symbol}): handleRealtimeUpdate - Zod validation failed:`,
-          validationResult.error.flatten(),
-          "Payload:",
+      setMarketStatus("Error");
+      setMarketStatusMessage(
+        "A network error occurred while fetching initial data."
+      );
+    }
+
+    if (!isMountedRef.current) return; // Check again before subscribing
+
+    // 3. Establish new Realtime Subscription
+    console.log(
+      `useStockData (${symbol}): Attempting to establish new realtime subscription.`
+    );
+    setMarketStatus("Connecting");
+    setMarketStatusMessage("Connecting to real-time updates...");
+
+    unsubscribeRealtimeRef.current = subscribeToQuoteUpdates(
+      symbol,
+      (payload) => {
+        if (!isMountedRef.current) return; // Check before processing payload
+
+        if (
+          payload.eventType === "DELETE" ||
+          !payload.new ||
+          (payload.new as LiveQuoteIndicatorDBRow).symbol !== symbol
+        ) {
+          return;
+        }
+        const validationResult = LiveQuoteIndicatorDBSchema.safeParse(
           payload.new
         );
+        if (validationResult.success) {
+          stableOnQuoteReceived(validationResult.data, "realtime");
+          updateDisplayStatus(validationResult.data); // Update market status based on new realtime data
+        } else {
+          console.error(
+            `useStockData (${symbol}): Realtime Zod validation failed:`,
+            validationResult.error.flatten(),
+            "Payload:",
+            payload.new
+          );
+        }
+      }
+    );
+  }, [symbol, stableOnQuoteReceived, updateDisplayStatus]);
+
+  useEffect(() => {
+    setupSubscription(); // Initial setup when component mounts or symbol/callbacks change
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && isMountedRef.current) {
+        console.log(
+          `useStockData (${symbol}): Page became visible. Re-initiating subscription setup.`
+        );
+        // This will clean up the old (if any) and set up a fresh one.
+        setupSubscription();
       }
     };
 
-    const setupSubscription = async () => {
-      await fetchInitialData();
-      if (isMounted) {
-        const sub = subscribeToQuoteUpdates(symbol, handleRealtimeUpdate);
-        unsubscribeRealtime = sub; // Assuming sub is the unsubscribe function
+    const handleOnlineStatus = () => {
+      if (isMountedRef.current) {
+        console.log(
+          `useStockData (${symbol}): Network came online. Re-initiating subscription setup.`
+        );
+        // This will clean up the old (if any) and set up a fresh one.
+        setupSubscription();
       }
     };
 
-    setupSubscription();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("online", handleOnlineStatus);
 
+    // Cleanup function for the main effect
     return () => {
-      isMounted = false;
-      if (typeof unsubscribeRealtime === "function") {
-        unsubscribeRealtime();
+      // isMountedRef will be set to false by its own useEffect cleanup
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("online", handleOnlineStatus);
+      if (unsubscribeRealtimeRef.current) {
+        console.log(
+          `useStockData (${symbol}): Cleaning up subscription on unmount or dependency change.`
+        );
+        unsubscribeRealtimeRef.current();
+        unsubscribeRealtimeRef.current = null;
       }
     };
-  }, [symbol, onQuoteReceived, updateDisplayStatus]);
+  }, [symbol, setupSubscription]); // setupSubscription is now a dependency
 
   return { marketStatus, marketStatusMessage, lastApiTimestamp };
 }
