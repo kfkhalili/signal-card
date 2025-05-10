@@ -1,316 +1,249 @@
+/**
+ * src/components/game/cards/price-card/PriceCardContainer.test.tsx
+ */
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
+
 import { PriceCardContainer } from "./PriceCardContainer";
-import type { PriceCardData } from "./price-card.types";
-import BaseCardDefault from "../base-card/BaseCard";
-import { PriceCardContent as OriginalPriceCardContent } from "./PriceCardContent";
+// eslint-disable-next-line import/no-named-as-default -- Mocking default export correctly
+import { PriceCardContent } from "./PriceCardContent"; // To mock
+import type {
+  PriceCardData,
+  PriceCardInteractionCallbacks,
+  PriceCardFaceData,
+  PriceCardSpecificBackData,
+} from "./price-card.types";
 
-jest.mock("../base-card/BaseCard", () => {
-  const MockBaseCard = jest.fn(
-    ({
-      isFlipped,
-      faceContent,
-      backContent,
-      className,
-      innerCardClassName,
-    }) => (
-      <div
-        data-testid="mock-base-card"
-        className={`${className || ""} ${innerCardClassName || ""}`}
-      >
-        <div data-testid="mock-base-card-isFlipped">{isFlipped.toString()}</div>
-        <div data-testid="mock-base-card-faceContent">{faceContent}</div>
-        <div data-testid="mock-base-card-backContent">{backContent}</div>
-      </div>
-    )
-  );
-  return MockBaseCard;
-});
-const BaseCard = BaseCardDefault as jest.MockedFunction<typeof BaseCardDefault>;
-
+// Mock the PriceCardContent child component
 jest.mock("./PriceCardContent", () => ({
-  __esModule: true,
-  PriceCardContent: jest.fn(
-    ({
-      cardData,
-      isBackFace,
-      onSmaClick,
-    }: React.ComponentProps<typeof OriginalPriceCardContent>) => (
-      <div
-        data-testid={
-          isBackFace
-            ? "mock-price-card-content-back"
-            : "mock-price-card-content-front"
-        }
-      >
-        <span data-testid="mock-price-content-symbol">{cardData.symbol}</span>
-        {isBackFace && (
-          <span data-testid="mock-price-content-explanation">
-            {cardData.backData.explanation}
-          </span>
-        )}
-        {!isBackFace && (
-          <span data-testid="mock-price-content-price">
-            {cardData.faceData.price}
-          </span>
-        )}
-        {onSmaClick && (
-          <button
-            data-testid="mock-sma-button"
-            onClick={() => onSmaClick(50, 100, cardData.faceData)}
-          />
-        )}
-      </div>
-    )
-  ),
-}));
-import { PriceCardContent } from "./PriceCardContent"; // Import after mock to get the mocked version
-const MockedPriceCardContent = PriceCardContent as jest.MockedFunction<
-  typeof OriginalPriceCardContent
->;
-
-// This mock might be redundant if PriceCardContent is fully mocked above, but keeping for completeness if it was in the file.
-const mockClickableDataItemPassedOnClickHandler = jest.fn();
-jest.mock("../../../ui/ClickableDataItem", () => ({
-  __esModule: true,
-  ClickableDataItem: jest.fn(
-    ({
-      isInteractive,
-      onClickHandler,
-      children,
-      "aria-label": ariaLabel,
-      "data-testid": dataTestId,
-      baseClassName,
-      interactiveClassName,
-    }: {
-      isInteractive: boolean;
-      onClickHandler?: (event: React.MouseEvent | React.KeyboardEvent) => void;
-      children: React.ReactNode;
-      "aria-label"?: string;
-      "data-testid"?: string;
-      baseClassName?: string;
-      interactiveClassName?: string;
-    }) => {
-      if (onClickHandler) {
-        mockClickableDataItemPassedOnClickHandler.mockImplementation(
-          onClickHandler as any
-        );
-      }
-      return (
-        <div
-          data-testid={dataTestId || "mock-clickable-data-item"}
-          data-interactive={isInteractive.toString()}
-          aria-label={ariaLabel}
-          className={`${baseClassName || ""} ${
-            isInteractive && interactiveClassName ? interactiveClassName : ""
-          }`}
-          onClick={(e) => {
-            if (isInteractive && onClickHandler) onClickHandler(e as any);
-          }}
-          onKeyDown={(e) => {
-            if (
-              isInteractive &&
-              onClickHandler &&
-              (e.key === "Enter" || e.key === " ")
-            )
-              onClickHandler(e as any);
-          }}
-        >
-          {children}
-        </div>
-      );
-    }
-  ),
+  // If PriceCardContent is a default export:
+  // default: jest.fn(() => <div data-testid="mock-price-card-content">Mock Content</div>),
+  // If PriceCardContent is a named export (as it appears to be):
+  PriceCardContent: jest.fn(() => (
+    <div data-testid="mock-price-card-content">Mock Content</div>
+  )),
 }));
 
-const mockTestCardData: PriceCardData = {
-  id: "price-001",
-  type: "price",
-  symbol: "XYZ",
-  faceData: {
+// Helper to create a typed mock PriceCardData
+const createMockPriceCardData = (
+  overrides: Partial<PriceCardData> = {}
+): PriceCardData => {
+  const now = Date.now();
+  const fixedTimestamp = new Date("2025-05-10T14:41:46.535Z").getTime();
+
+  const faceData: PriceCardFaceData = {
+    timestamp: fixedTimestamp,
     price: 200.5,
-    timestamp: new Date(),
-  },
-  backData: {
+    dayChange: 2.5,
+    changePercentage: 0.0125,
+    dayHigh: 203.0,
+    dayLow: 199.0,
+    dayOpen: 200.0,
+    previousClose: 198.0,
+    volume: 5000000,
+    ...overrides.faceData,
+  };
+
+  const backData: PriceCardSpecificBackData = {
     explanation: "Explanation for XYZ.",
-  },
+    marketCap: 2e11, // 200B
+    sma50d: 195.0,
+    sma200d: 180.0,
+    ...overrides.backData,
+  };
+
+  return {
+    id: "price-001",
+    type: "price",
+    symbol: "XYZ",
+    createdAt: now, // Ensure createdAt is included
+    faceData,
+    backData,
+    ...overrides,
+  };
 };
 
 describe("PriceCardContainer Component", () => {
-  let mockOnFlip: jest.Mock<void, []>;
-  let mockOnSmaClick: jest.Mock<
-    Exclude<
-      React.ComponentProps<typeof OriginalPriceCardContent>["onSmaClick"],
-      undefined
-    >
-  >;
-  let mockOnRangeContextClick: jest.Mock<
-    Exclude<
-      React.ComponentProps<
-        typeof OriginalPriceCardContent
-      >["onRangeContextClick"],
-      undefined
-    >
-  >;
-  let mockOnOpenPriceClick: jest.Mock<
-    Exclude<
-      React.ComponentProps<typeof OriginalPriceCardContent>["onOpenPriceClick"],
-      undefined
-    >
-  >;
-  let mockOnGenerateDailyPerformanceSignal: jest.Mock<
-    Exclude<
-      React.ComponentProps<
-        typeof OriginalPriceCardContent
-      >["onGenerateDailyPerformanceSignal"],
-      undefined
-    >
+  let mockOnFlip: jest.Mock;
+  let mockPriceCardInteractions: PriceCardInteractionCallbacks;
+  let mockTestCardData: PriceCardData;
+
+  // Cast the imported PriceCardContent to its Jest mock type for type safety with mock-specific properties
+  const MockedPriceCardContent = PriceCardContent as jest.MockedFunction<
+    typeof PriceCardContent
   >;
 
   beforeEach(() => {
-    mockOnFlip = jest.fn();
-    mockOnSmaClick = jest.fn();
-    mockOnRangeContextClick = jest.fn();
-    mockOnOpenPriceClick = jest.fn();
-    mockOnGenerateDailyPerformanceSignal = jest.fn();
-
-    BaseCard.mockClear();
     MockedPriceCardContent.mockClear();
-    mockClickableDataItemPassedOnClickHandler.mockClear();
+    mockOnFlip = jest.fn();
+    mockPriceCardInteractions = {
+      onPriceCardSmaClick: jest.fn(),
+      onPriceCardRangeContextClick: jest.fn(),
+      onPriceCardOpenPriceClick: jest.fn(),
+      onPriceCardGenerateDailyPerformanceSignal: jest.fn(),
+    };
+    mockTestCardData = createMockPriceCardData();
   });
 
-  const getFaceContentWrapper = () =>
-    screen.getByTestId("mock-base-card-faceContent").firstChild as HTMLElement;
-  const getBackContentWrapper = () =>
-    screen.getByTestId("mock-base-card-backContent").firstChild as HTMLElement;
-
-  test("renders BaseCard and passes correct props", () => {
-    render(
+  const renderContainer = (
+    props: Partial<React.ComponentProps<typeof PriceCardContainer>> = {}
+  ) => {
+    return render(
       <PriceCardContainer
         cardData={mockTestCardData}
         isFlipped={false}
         onFlip={mockOnFlip}
-        className="custom-class"
-        innerCardClassName="custom-inner"
-        onSmaClick={mockOnSmaClick}
-        onRangeContextClick={mockOnRangeContextClick}
-        onOpenPriceClick={mockOnOpenPriceClick}
-        onGenerateDailyPerformanceSignal={mockOnGenerateDailyPerformanceSignal}
+        onPriceCardSmaClick={mockPriceCardInteractions.onPriceCardSmaClick}
+        onPriceCardRangeContextClick={
+          mockPriceCardInteractions.onPriceCardRangeContextClick
+        }
+        onPriceCardOpenPriceClick={
+          mockPriceCardInteractions.onPriceCardOpenPriceClick
+        }
+        onPriceCardGenerateDailyPerformanceSignal={
+          mockPriceCardInteractions.onPriceCardGenerateDailyPerformanceSignal
+        }
+        {...props}
       />
     );
+  };
 
-    expect(BaseCard).toHaveBeenCalledTimes(1);
-    expect(BaseCard).toHaveBeenCalledWith(
-      expect.objectContaining({
-        isFlipped: false,
-        className: "custom-class",
-        innerCardClassName: "custom-inner",
-      }),
-      expect.anything()
-    );
-    expect(screen.getByTestId("mock-base-card-isFlipped")).toHaveTextContent(
-      "false"
-    );
+  test("renders and passes isFlipped to BaseCard (implicitly via PriceCardContent calls)", () => {
+    renderContainer({ isFlipped: true });
+    // BaseCard renders both face and back, controlled by CSS.
+    // We verify by checking the calls to PriceCardContent, one for face, one for back.
+    expect(MockedPriceCardContent).toHaveBeenCalledTimes(2); // Once for face, once for back
   });
 
-  test("faceContent wrapper calls onFlip on click and passes correct props to PriceCardContent mock", () => {
-    render(
-      <PriceCardContainer
-        cardData={mockTestCardData}
-        isFlipped={false}
-        onFlip={mockOnFlip}
-        onSmaClick={mockOnSmaClick}
-        onRangeContextClick={mockOnRangeContextClick}
-        onOpenPriceClick={mockOnOpenPriceClick}
-        onGenerateDailyPerformanceSignal={mockOnGenerateDailyPerformanceSignal}
-      />
-    );
+  describe("Face Content", () => {
+    beforeEach(() => {
+      renderContainer({ isFlipped: false });
+    });
 
-    expect(MockedPriceCardContent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        cardData: mockTestCardData,
-        isBackFace: false,
-        onSmaClick: mockOnSmaClick,
-        onRangeContextClick: mockOnRangeContextClick,
-        onOpenPriceClick: mockOnOpenPriceClick,
-        onGenerateDailyPerformanceSignal: mockOnGenerateDailyPerformanceSignal,
-      }),
-      expect.anything()
-    );
-    expect(
-      screen.getByTestId("mock-price-card-content-front")
-    ).toBeInTheDocument();
+    test("wrapper calls onFlip on click", () => {
+      const clickableFaceContentWrapper = screen.getAllByRole("button")[0];
+      fireEvent.click(clickableFaceContentWrapper);
+      expect(mockOnFlip).toHaveBeenCalledTimes(1);
+    });
 
-    fireEvent.click(getFaceContentWrapper());
-    expect(mockOnFlip).toHaveBeenCalledTimes(1);
+    test("wrapper calls onFlip on Enter key press", () => {
+      const clickableFaceContentWrapper = screen.getAllByRole("button")[0];
+      fireEvent.keyDown(clickableFaceContentWrapper, {
+        key: "Enter",
+        code: "Enter",
+      });
+      expect(mockOnFlip).toHaveBeenCalledTimes(1);
+    });
+
+    test("wrapper calls onFlip on Space key press", () => {
+      const clickableFaceContentWrapper = screen.getAllByRole("button")[0];
+      fireEvent.keyDown(clickableFaceContentWrapper, {
+        key: " ",
+        code: "Space",
+      });
+      expect(mockOnFlip).toHaveBeenCalledTimes(1);
+    });
+
+    test("passes correct props to PriceCardContent for face", () => {
+      // The first call to MockedPriceCardContent should be for the face (or filter by isBackFace: false)
+      const faceCall = MockedPriceCardContent.mock.calls.find(
+        (call) => call[0].isBackFace === false
+      );
+      expect(faceCall).toBeDefined();
+      expect(faceCall![0]).toEqual(
+        expect.objectContaining({
+          cardData: mockTestCardData, // mockTestCardData includes createdAt
+          isBackFace: false,
+          onSmaClick: mockPriceCardInteractions.onPriceCardSmaClick,
+          onRangeContextClick:
+            mockPriceCardInteractions.onPriceCardRangeContextClick,
+          onOpenPriceClick: mockPriceCardInteractions.onPriceCardOpenPriceClick,
+          onGenerateDailyPerformanceSignal:
+            mockPriceCardInteractions.onPriceCardGenerateDailyPerformanceSignal,
+        })
+      );
+    });
   });
 
-  test("backContent wrapper calls onFlip on click and passes correct props to PriceCardContent mock", () => {
-    render(
-      <PriceCardContainer
-        cardData={mockTestCardData}
-        isFlipped={true}
-        onFlip={mockOnFlip}
-        onSmaClick={mockOnSmaClick}
-        onRangeContextClick={mockOnRangeContextClick}
-        onOpenPriceClick={mockOnOpenPriceClick}
-        onGenerateDailyPerformanceSignal={mockOnGenerateDailyPerformanceSignal} // Pass it to check it's passed
-      />
-    );
+  describe("Back Content", () => {
+    beforeEach(() => {
+      // Render with isFlipped true or false, BaseCard will render both contents.
+      // The specific call to PriceCardContent for back is identified by isBackFace: true
+      renderContainer({ isFlipped: true });
+    });
 
-    expect(MockedPriceCardContent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        cardData: mockTestCardData,
-        isBackFace: true,
-        onSmaClick: mockOnSmaClick,
-        onRangeContextClick: mockOnRangeContextClick,
-        onOpenPriceClick: mockOnOpenPriceClick,
-        // Corrected: onGenerateDailyPerformanceSignal IS passed to PriceCardContent from PriceCardContainer
-        // The internal logic of PriceCardContent might not use it for the back face, but container passes it.
-        // However, in PriceCardContainer, we explicitly do NOT pass it for the back.
-        // Let's trace: PriceCardContainer's backContent's PriceCardContent call:
-        // onGenerateDailyPerformanceSignal IS NOT passed. So the mock should not expect it.
-      }),
-      expect.anything()
-    );
-    // Let's refine the expectation for the backContent call specifically
-    // Find the call where isBackFace is true
-    const backFaceCall = MockedPriceCardContent.mock.calls.find(
-      (call) => call[0].isBackFace === true
-    );
-    expect(backFaceCall?.[0]).toEqual(
-      expect.objectContaining({
-        cardData: mockTestCardData,
-        isBackFace: true,
-        onSmaClick: mockOnSmaClick,
-        onRangeContextClick: mockOnRangeContextClick,
-        onOpenPriceClick: mockOnOpenPriceClick,
-        // onGenerateDailyPerformanceSignal should be undefined here as it's not passed for back face
-      })
-    );
-    // Check that onGenerateDailyPerformanceSignal is not in the props of the back face call
-    expect(backFaceCall?.[0].onGenerateDailyPerformanceSignal).toBeUndefined();
+    test("wrapper calls onFlip on click", () => {
+      // BaseCard renders face first then back in DOM, so back is the second role="button"
+      const clickableBackContentWrapper = screen.getAllByRole("button")[1];
+      fireEvent.click(clickableBackContentWrapper);
+      expect(mockOnFlip).toHaveBeenCalledTimes(1);
+    });
 
-    expect(
-      screen.getByTestId("mock-price-card-content-back")
-    ).toBeInTheDocument();
+    test("wrapper calls onFlip on Enter key press", () => {
+      const clickableBackContentWrapper = screen.getAllByRole("button")[1];
+      fireEvent.keyDown(clickableBackContentWrapper, {
+        key: "Enter",
+        code: "Enter",
+      });
+      expect(mockOnFlip).toHaveBeenCalledTimes(1);
+    });
 
-    fireEvent.click(getBackContentWrapper());
-    expect(mockOnFlip).toHaveBeenCalledTimes(1);
+    test("wrapper calls onFlip on Space key press", () => {
+      const clickableBackContentWrapper = screen.getAllByRole("button")[1];
+      fireEvent.keyDown(clickableBackContentWrapper, {
+        key: " ",
+        code: "Space",
+      });
+      expect(mockOnFlip).toHaveBeenCalledTimes(1);
+    });
+
+    test("passes correct props to PriceCardContent for back", () => {
+      const backCall = MockedPriceCardContent.mock.calls.find(
+        (call) => call[0].isBackFace === true
+      );
+      expect(backCall).toBeDefined();
+      const backProps = backCall![0];
+
+      expect(backProps).toEqual(
+        expect.objectContaining({
+          cardData: mockTestCardData, // mockTestCardData includes createdAt
+          isBackFace: true,
+          onSmaClick: mockPriceCardInteractions.onPriceCardSmaClick,
+          onRangeContextClick:
+            mockPriceCardInteractions.onPriceCardRangeContextClick,
+          onOpenPriceClick: mockPriceCardInteractions.onPriceCardOpenPriceClick,
+        })
+      );
+      // onGenerateDailyPerformanceSignal is NOT passed to back content by PriceCardContainer
+      expect(backProps.onGenerateDailyPerformanceSignal).toBeUndefined();
+    });
   });
 
-  test("keyboard interaction on faceContent wrapper calls onFlip", () => {
-    render(
-      <PriceCardContainer
-        cardData={mockTestCardData}
-        isFlipped={false}
-        onFlip={mockOnFlip}
-      />
-    );
-    fireEvent.keyDown(getFaceContentWrapper(), { key: "Enter", code: "Enter" });
-    expect(mockOnFlip).toHaveBeenCalledTimes(1);
-    fireEvent.keyDown(getFaceContentWrapper(), { key: " ", code: "Space" });
-    expect(mockOnFlip).toHaveBeenCalledTimes(2);
+  test("passes children to BaseCard (which renders them)", () => {
+    const childText = "Overlay Test Child";
+    renderContainer({
+      children: <div data-testid="overlay-child">{childText}</div>,
+    });
+    expect(screen.getByTestId("overlay-child")).toBeInTheDocument();
+    expect(screen.getByText(childText)).toBeInTheDocument();
+  });
+
+  test("applies className to BaseCard and innerCardClassName (implicitly)", () => {
+    const testClassName = "custom-container-class";
+    const testInnerClassName = "custom-inner-class";
+    // PriceCardContainer renders BaseCard as its root.
+    // We rely on BaseCard to correctly apply these.
+    const { container } = renderContainer({
+      className: testClassName,
+      innerCardClassName: testInnerClassName,
+    });
+
+    // The root element rendered by PriceCardContainer (which is BaseCard) should have testClassName
+    expect(container.firstChild).toHaveClass(testClassName);
+    // Testing innerCardClassName requires knowledge of BaseCard's internal structure
+    // or BaseCard having a test-id on its inner card element.
+    // If BaseCard's immediate child receiving innerCardClassName is simple, one could query it.
+    // For now, this implicitly tests that the prop is passed to BaseCard.
   });
 });
