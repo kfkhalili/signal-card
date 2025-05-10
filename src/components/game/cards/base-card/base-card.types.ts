@@ -1,22 +1,19 @@
 /**
  * src/app/components/game/cards/base-card/base-card.types.ts
- * This file contains the base types and interfaces for the cards used in the game.
- * It defines the structure and common properties that all cards should have,
- * ensuring consistency across different card types.
  */
 
 // Defines the possible literal types for any card in the game.
 export type CardType =
-  | "price" // For the main live price card
+  | "price"
   | "daily_performance"
   | "price_vs_sma"
   | "price_range_context"
   | "intraday_trend"
   | "price_snapshot"
-  | "trend"; // For a generic trend card, if used
+  | "trend"
+  | "base"; // Added for the generic BaseCardData example
 
 // Base interface for the data shown on the back of any card.
-// At a minimum, every card's back face should have an explanation.
 export interface CardBackData {
   explanation: string;
 }
@@ -25,6 +22,32 @@ export interface CardBackData {
 export interface BaseCardData {
   id: string;
   type: CardType;
-  symbol: string; // All cards will display a symbol.
-  backData: CardBackData; // All cards have back data with at least an explanation.
+  symbol: string;
+  backData: CardBackData;
 }
+
+// --- Generic Card Interaction Types ---
+export interface DataPoint<TDetails = unknown> {
+  elementType: string; // e.g., 'symbol', 'cardType', 'explanationLink', 'smaValue'
+  value?: any; // The primary value of the clicked element, if any
+  details?: TDetails; // More structured data specific to this element type
+}
+
+export interface CardInteractionEvent<
+  TCardData extends BaseCardData = BaseCardData,
+  TDetails = unknown
+> {
+  cardData: TCardData;
+  clickedDataPoint: DataPoint<TDetails>;
+  originalUIEvent?: React.MouseEvent | React.KeyboardEvent;
+}
+
+export type OnCardInteraction<
+  TCardData extends BaseCardData = BaseCardData,
+  TDetails = unknown
+> = (event: CardInteractionEvent<TCardData, TDetails>) => void;
+
+// --- Details for BaseCardContainer's own simple interactions ---
+export type BaseCardContainerDataPointDetails = {
+  kind: "symbol" | "type" | "explanation";
+};

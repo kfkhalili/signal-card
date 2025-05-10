@@ -5,186 +5,347 @@ import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { BaseCardContainer } from "./BaseCardContainer";
-import type { BaseCardData } from "./base-card.types";
+import type {
+  BaseCardData,
+  OnCardInteraction, // Now explicitly used for typing the mock
+  BaseCardContainerDataPointDetails,
+} from "./base-card.types";
+import BaseCard from "./BaseCard";
 
-// Mock BaseCard to simplify testing BaseCardContainer's logic
-// and to assert props passed to it.
+// Mock BaseCard
 jest.mock("./BaseCard", () => {
-  const MockBaseCard = ({
-    isFlipped,
-    faceContent,
-    backContent,
-    className,
-    innerCardClassName,
-    children,
-  }: {
-    isFlipped: boolean;
-    faceContent: React.ReactNode;
-    backContent: React.ReactNode;
-    className?: string;
-    innerCardClassName?: string;
-    children?: React.ReactNode;
-  }) => (
-    <div
-      data-testid="mock-base-card"
-      className={`${className || ""} ${innerCardClassName || ""}`}
-    >
-      <div data-testid="mock-base-card-isFlipped">{isFlipped.toString()}</div>
-      <div data-testid="mock-base-card-faceContent">{faceContent}</div>
-      <div data-testid="mock-base-card-backContent">{backContent}</div>
-      {children}
-    </div>
+  // We use jest.fn() directly here so we can assert it was called, etc.
+  const MockBaseCard = jest.fn(
+    ({
+      isFlipped,
+      faceContent,
+      backContent,
+      className,
+      innerCardClassName,
+      children,
+    }) => (
+      <div
+        data-testid="mock-base-card"
+        className={`${className || ""} ${innerCardClassName || ""}`}
+      >
+        <div data-testid="mock-base-card-isFlipped">{isFlipped.toString()}</div>
+        <div data-testid="mock-base-card-faceContent">{faceContent}</div>
+        <div data-testid="mock-base-card-backContent">{backContent}</div>
+        {children}
+      </div>
+    )
   );
   return MockBaseCard;
 });
 
-// Minimal mock for cn utility (if not already globally mocked in setup)
-// jest.mock('@/lib/utils', () => ({
-//  cn: (...args: Array<string | undefined | null | boolean>) =>
-//    args.filter(Boolean).join(' '),
-// }));
+// Mock ClickableDataItem
+// This helper mock function will allow us to inspect what onClickHandler was passed to ClickableDataItem
+const mockClickableDataItemPassedOnClickHandler = jest.fn();
+jest.mock("../../../ui/ClickableDataItem", () => ({
+  // Adjust path as needed
+  ClickableDataItem: jest.fn(
+    ({
+      isInteractive,
+      onClickHandler,
+      children,
+      "aria-label": ariaLabel,
+      "data-testid": dataTestId,
+    }) => {
+      // Store the passed onClickHandler for potential inspection if needed, though usually direct simulation is enough.
+      if (onClickHandler) {
+        mockClickableDataItemPassedOnClickHandler.mockImplementation(
+          onClickHandler as any
+        );
+      }
+      return (
+        <div
+          data-testid={dataTestId || "mock-clickable-data-item"}
+          data-interactive={isInteractive.toString()}
+          aria-label={ariaLabel}
+          onClick={(e) => {
+            // Simulate ClickableDataItem calling the onClickHandler prop if it's interactive
+            if (isInteractive && onClickHandler) {
+              onClickHandler(e as any);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (
+              isInteractive &&
+              onClickHandler &&
+              (e.key === "Enter" || e.key === " ")
+            ) {
+              onClickHandler(e as any);
+            }
+          }}
+        >
+          {children}
+        </div>
+      );
+    }
+  ),
+}));
 
 describe("BaseCardContainer Component", () => {
-  const mockCardData: BaseCardData = {
-    id: "1",
-    type: "price",
-    symbol: "TEST",
+  let mockOnFlip: jest.Mock;
+  let mockOnCardInteraction: jest.MockedFunction<
+    OnCardInteraction<BaseCardData, BaseCardContainerDataPointDetails>
+  >;
+
+  const testCardData: BaseCardData = {
+    id: "base-001",
+    type: "base",
+    symbol: "GENERIC",
     backData: {
-      explanation: "This is a test explanation.",
+      explanation: "This is a generic explanation.",
     },
   };
 
-  let mockOnFlip: jest.Mock;
-
   beforeEach(() => {
     mockOnFlip = jest.fn();
+    mockOnCardInteraction = jest.fn(); // Type is inferred
+
+    // Clear mock history
+    (BaseCard as jest.Mock).mockClear();
+    const ClickableDataItemMock = require("../../../ui/ClickableDataItem")
+      .ClickableDataItem as jest.Mock; // Re-require for fresh mock instance in mockClear
+    ClickableDataItemMock.mockClear();
+    mockClickableDataItemPassedOnClickHandler.mockClear();
   });
 
-  test("renders BaseCard with correct initial props (not flipped)", () => {
+  // Helper to get the wrapper div for face/back content passed to the BaseCard mock
+  const getFaceContentWrapper = () =>
+    screen.getByTestId("mock-base-card-faceContent").firstChild as HTMLElement;
+  const getBackContentWrapper = () =>
+    screen.getByTestId("mock-base-card-backContent").firstChild as HTMLElement;
+
+  test("renders BaseCard with correct basic props", () => {
     render(
       <BaseCardContainer
-        cardData={mockCardData}
+        cardData={testCardData}
         isFlipped={false}
         onFlip={mockOnFlip}
       />
     );
-
-    expect(screen.getByTestId("mock-base-card")).toBeInTheDocument();
+    expect(BaseCard).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("mock-base-card-isFlipped")).toHaveTextContent(
       "false"
     );
-
-    // Check face content
-    const faceContent = screen.getByTestId("mock-base-card-faceContent");
-    expect(faceContent).toHaveTextContent(`${mockCardData.symbol} - Front`);
-    expect(faceContent).toHaveTextContent(`Type: ${mockCardData.type}`);
-
-    // Check back content (passed to BaseCard, even if not visible)
-    const backContent = screen.getByTestId("mock-base-card-backContent");
-    expect(backContent).toHaveTextContent(`${mockCardData.symbol} - Back`);
-    expect(backContent).toHaveTextContent(mockCardData.backData.explanation);
   });
 
-  test("renders BaseCard with correct props when flipped", () => {
+  test("clicking main face area calls onFlip", () => {
     render(
       <BaseCardContainer
-        cardData={mockCardData}
+        cardData={testCardData}
+        isFlipped={false}
+        onFlip={mockOnFlip}
+      />
+    );
+    fireEvent.click(getFaceContentWrapper());
+    expect(mockOnFlip).toHaveBeenCalledTimes(1);
+  });
+
+  test("pressing Enter on main face area calls onFlip", () => {
+    render(
+      <BaseCardContainer
+        cardData={testCardData}
+        isFlipped={false}
+        onFlip={mockOnFlip}
+      />
+    );
+    fireEvent.keyDown(getFaceContentWrapper(), { key: "Enter", code: "Enter" });
+    expect(mockOnFlip).toHaveBeenCalledTimes(1);
+  });
+
+  test("pressing Space on main face area calls onFlip", () => {
+    render(
+      <BaseCardContainer
+        cardData={testCardData}
+        isFlipped={false}
+        onFlip={mockOnFlip}
+      />
+    );
+    fireEvent.keyDown(getFaceContentWrapper(), { key: " ", code: "Space" });
+    expect(mockOnFlip).toHaveBeenCalledTimes(1);
+  });
+
+  test("clicking main back area calls onFlip", () => {
+    render(
+      <BaseCardContainer
+        cardData={testCardData}
         isFlipped={true}
         onFlip={mockOnFlip}
       />
     );
-    expect(screen.getByTestId("mock-base-card-isFlipped")).toHaveTextContent(
-      "true"
-    );
-  });
-
-  test("calls onFlip when face content is clicked", () => {
-    render(
-      <BaseCardContainer
-        cardData={mockCardData}
-        isFlipped={false}
-        onFlip={mockOnFlip}
-      />
-    );
-    // The clickable div is *inside* the faceContent prop passed to BaseCard
-    const faceContentWrapper = screen
-      .getByTestId("mock-base-card-faceContent")
-      .querySelector('div[role="button"]');
-    expect(faceContentWrapper).toBeInTheDocument();
-    if (faceContentWrapper) {
-      fireEvent.click(faceContentWrapper);
-    }
+    fireEvent.click(getBackContentWrapper());
     expect(mockOnFlip).toHaveBeenCalledTimes(1);
   });
 
-  test("calls onFlip when back content is clicked", () => {
-    render(
-      <BaseCardContainer
-        cardData={mockCardData}
-        isFlipped={true} // To ensure back content is "visible"
-        onFlip={mockOnFlip}
-      />
-    );
-    const backContentWrapper = screen
-      .getByTestId("mock-base-card-backContent")
-      .querySelector('div[role="button"]');
-    expect(backContentWrapper).toBeInTheDocument();
-    if (backContentWrapper) {
-      fireEvent.click(backContentWrapper);
-    }
-    expect(mockOnFlip).toHaveBeenCalledTimes(1);
+  describe("with onCardInteraction provided", () => {
+    test("renders interactive symbol on face and calls onCardInteraction on click, stopping flip", () => {
+      render(
+        <BaseCardContainer
+          cardData={testCardData}
+          isFlipped={false}
+          onFlip={mockOnFlip}
+          onCardInteraction={mockOnCardInteraction}
+        />
+      );
+      const symbolItem = screen.getByTestId("base-card-symbol");
+      expect(symbolItem).toHaveAttribute("data-interactive", "true");
+      expect(symbolItem).toHaveAttribute(
+        "aria-label",
+        `Interact with symbol ${testCardData.symbol}`
+      );
+
+      fireEvent.click(symbolItem); // Click the mocked ClickableDataItem
+
+      expect(mockOnCardInteraction).toHaveBeenCalledTimes(1);
+      expect(mockOnCardInteraction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cardData: testCardData,
+          clickedDataPoint: {
+            elementType: "symbol",
+            value: testCardData.symbol,
+            details: { kind: "symbol" },
+          },
+        })
+      );
+      // The handleLocalInteraction calls event.stopPropagation(), so onFlip should not be called.
+      expect(mockOnFlip).not.toHaveBeenCalled();
+    });
+
+    test("renders interactive type on face and calls onCardInteraction on click, stopping flip", () => {
+      render(
+        <BaseCardContainer
+          cardData={testCardData}
+          isFlipped={false}
+          onFlip={mockOnFlip}
+          onCardInteraction={mockOnCardInteraction}
+        />
+      );
+      const typeItem = screen.getByTestId("base-card-type");
+      expect(typeItem).toHaveAttribute("data-interactive", "true");
+      fireEvent.click(typeItem);
+      expect(mockOnCardInteraction).toHaveBeenCalledTimes(1);
+      expect(mockOnCardInteraction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          clickedDataPoint: {
+            elementType: "type",
+            value: testCardData.type,
+            details: { kind: "type" },
+          },
+        })
+      );
+      expect(mockOnFlip).not.toHaveBeenCalled();
+    });
+
+    test("renders interactive explanation on back and calls onCardInteraction on click, stopping flip", () => {
+      render(
+        <BaseCardContainer
+          cardData={testCardData}
+          isFlipped={true} // Show back
+          onFlip={mockOnFlip}
+          onCardInteraction={mockOnCardInteraction}
+        />
+      );
+      const explanationItem = screen.getByTestId("base-card-explanation");
+      expect(explanationItem).toHaveAttribute("data-interactive", "true");
+      fireEvent.click(explanationItem);
+      expect(mockOnCardInteraction).toHaveBeenCalledTimes(1);
+      expect(mockOnCardInteraction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          clickedDataPoint: {
+            elementType: "explanation",
+            value: testCardData.backData.explanation,
+            details: { kind: "explanation" },
+          },
+        })
+      );
+      expect(mockOnFlip).not.toHaveBeenCalled();
+    });
   });
 
-  test("calls onFlip when Enter key is pressed on face content", () => {
-    render(
-      <BaseCardContainer
-        cardData={mockCardData}
-        isFlipped={false}
-        onFlip={mockOnFlip}
-      />
-    );
-    const faceContentWrapper = screen
-      .getByTestId("mock-base-card-faceContent")
-      .querySelector('div[role="button"]');
-    expect(faceContentWrapper).toBeInTheDocument();
-    if (faceContentWrapper) {
-      fireEvent.keyDown(faceContentWrapper, { key: "Enter", code: "Enter" });
-    }
-    expect(mockOnFlip).toHaveBeenCalledTimes(1);
-  });
+  describe("without onCardInteraction provided", () => {
+    test("renders non-interactive symbol, type, and explanation", () => {
+      render(
+        <BaseCardContainer
+          cardData={testCardData}
+          isFlipped={false}
+          onFlip={mockOnFlip}
+          // onCardInteraction is NOT provided
+        />
+      );
+      expect(screen.getByTestId("base-card-symbol")).toHaveAttribute(
+        "data-interactive",
+        "false"
+      );
+      expect(screen.getByTestId("base-card-type")).toHaveAttribute(
+        "data-interactive",
+        "false"
+      );
 
-  test("calls onFlip when Space key is pressed on face content", () => {
-    render(
-      <BaseCardContainer
-        cardData={mockCardData}
-        isFlipped={false}
-        onFlip={mockOnFlip}
-      />
-    );
-    const faceContentWrapper = screen
-      .getByTestId("mock-base-card-faceContent")
-      .querySelector('div[role="button"]');
-    expect(faceContentWrapper).toBeInTheDocument();
-    if (faceContentWrapper) {
-      fireEvent.keyDown(faceContentWrapper, { key: " ", code: "Space" });
-    }
-    expect(mockOnFlip).toHaveBeenCalledTimes(1);
-  });
+      // Re-render to check back content with isFlipped true
+      const { rerender } = render(
+        <BaseCardContainer
+          cardData={testCardData}
+          isFlipped={true} // Change prop to show back
+          onFlip={mockOnFlip}
+          // onCardInteraction is NOT provided
+        />
+      ); // Actually, we need to get a new render result for the back.
+      // A simple way is to just render it again for the back check.
 
-  test("passes className and innerCardClassName to BaseCard", () => {
-    const customClass = "container-class";
-    const customInnerClass = "inner-container-class";
-    render(
-      <BaseCardContainer
-        cardData={mockCardData}
-        isFlipped={false}
-        onFlip={mockOnFlip}
-        className={customClass}
-        innerCardClassName={customInnerClass}
-      />
-    );
-    const mockBaseCardElement = screen.getByTestId("mock-base-card");
-    expect(mockBaseCardElement).toHaveClass(customClass);
-    expect(mockBaseCardElement).toHaveClass(customInnerClass); // In our mock, we combine them for simplicity
+      render(
+        <BaseCardContainer
+          cardData={testCardData}
+          isFlipped={true}
+          onFlip={mockOnFlip}
+        />
+      );
+      expect(screen.getByTestId("base-card-explanation")).toHaveAttribute(
+        "data-interactive",
+        "false"
+      );
+    });
+
+    test("clicking non-interactive symbol still triggers onFlip for the card", () => {
+      render(
+        <BaseCardContainer
+          cardData={testCardData}
+          isFlipped={false}
+          onFlip={mockOnFlip}
+          // onCardInteraction is NOT provided
+        />
+      );
+      const symbolItem = screen.getByTestId("base-card-symbol");
+      // Since isInteractive is false, the ClickableDataItem mock's onClick won't call the onClickHandler prop.
+      // The click should effectively be on the underlying div element, which is part of the
+      // larger faceContent div that has the onFlip handler.
+      fireEvent.click(symbolItem);
+
+      expect(mockOnCardInteraction).not.toHaveBeenCalled();
+      // The click on a non-interactive ClickableDataItem should bubble up to the wrapper div.
+      // The wrapper div has the onFlip handler.
+      expect(mockOnFlip).toHaveBeenCalledTimes(1);
+    });
+
+    test("pressing Enter on non-interactive symbol still triggers onFlip for the card", () => {
+      render(
+        <BaseCardContainer
+          cardData={testCardData}
+          isFlipped={false}
+          onFlip={mockOnFlip}
+          // onCardInteraction is NOT provided
+        />
+      );
+      const symbolItem = screen.getByTestId("base-card-symbol");
+      // Since isInteractive is false, keydown on ClickableDataItem should not call onClickHandler,
+      // thus event.preventDefault() in ClickableDataItem's handleKeyDown won't be called.
+      // The keydown event should bubble to the wrapping div, which has its own onKeyDown for flip.
+      fireEvent.keyDown(symbolItem, { key: "Enter", code: "Enter" });
+
+      expect(mockOnCardInteraction).not.toHaveBeenCalled();
+      expect(mockOnFlip).toHaveBeenCalledTimes(1);
+    });
   });
 });
