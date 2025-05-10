@@ -83,8 +83,6 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
     };
 
     if (isBackFace) {
-      // --- RENDER PRICE CARD BACK ---
-      // This content is now rendered within a div with p-3 by BaseCard
       return (
         <div
           data-testid="price-card-back-content-data"
@@ -186,15 +184,12 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
           data-testid="price-card-front-content-data"
           className="pointer-events-auto"
         >
-          {/* The universal header is now rendered by BaseCard.tsx */}
-          {/* This ShadCardContent is for the main price display area */}
           <ShadCardContent className="px-0 pt-2 pb-0">
-            {" "}
-            {/* pt-2 for space from universal header */}
+            {/* Outer ClickableDataItem for the action, still has padding */}
             <ClickableDataItem
               isInteractive={!!onGenerateDailyPerformanceSignal}
               onClickHandler={handleDailyPerformanceInteraction}
-              baseClassName="group/dps rounded-md p-2 -mx-2 -my-1 mb-2" // Added mb-2 for spacing
+              baseClassName="rounded-md p-2 -mx-2 -my-1 mb-2" // Padding here defines overall click area
               interactiveClassName="cursor-pointer transition-colors relative"
               data-testid="daily-performance-interactive-area"
               aria-label={
@@ -206,54 +201,55 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
               }
               data-interactive-child="true"
             >
-              <p
-                className={cn(
-                  "text-4xl font-bold",
-                  onGenerateDailyPerformanceSignal &&
-                    "group-hover/dps:text-primary"
-                )}
-              >
-                ${faceData.price != null ? faceData.price.toFixed(2) : "N/A"}
-              </p>
+              {/* Inner div for grouping text hover and making it tight */}
               <div
                 className={cn(
-                  "flex items-baseline space-x-2",
-                  baseChangeColor,
-                  onGenerateDailyPerformanceSignal &&
-                    "group-hover/dps:text-primary"
+                  "w-fit",
+                  onGenerateDailyPerformanceSignal && "group/textgroup"
                 )}
               >
-                <p className="text-lg font-semibold">
-                  {faceData.dayChange != null
-                    ? `${
-                        faceData.dayChange >= 0 ? "+" : ""
-                      }${faceData.dayChange.toFixed(2)}`
-                    : "N/A"}
+                <p
+                  className={cn(
+                    "text-4xl font-bold", // Left-aligned by default
+                    onGenerateDailyPerformanceSignal &&
+                      "group-hover/textgroup:text-primary"
+                  )}
+                >
+                  ${faceData.price != null ? faceData.price.toFixed(2) : "N/A"}
                 </p>
-                <p className="text-lg font-semibold">
-                  (
-                  {faceData.changePercentage != null
-                    ? `${faceData.changePercentage >= 0 ? "+" : ""}${(
-                        faceData.changePercentage * 100
-                      ).toFixed(2)}%`
-                    : "N/A"}
-                  )
-                </p>
+                <div
+                  className={cn(
+                    "flex items-baseline space-x-2", // Left-aligned by default
+                    baseChangeColor,
+                    onGenerateDailyPerformanceSignal &&
+                      "group-hover/textgroup:text-primary"
+                  )}
+                >
+                  <p className="text-lg font-semibold">
+                    {faceData.dayChange != null
+                      ? `${
+                          faceData.dayChange >= 0 ? "+" : ""
+                        }${faceData.dayChange.toFixed(2)}`
+                      : "N/A"}
+                  </p>
+                  <p className="text-lg font-semibold">
+                    (
+                    {faceData.changePercentage != null
+                      ? `${faceData.changePercentage >= 0 ? "+" : ""}${(
+                          faceData.changePercentage * 100
+                        ).toFixed(2)}%`
+                      : "N/A"}
+                    )
+                  </p>
+                </div>
               </div>
             </ClickableDataItem>
-            {/* REMOVED "Data as of:" line */}
-            {/* <p className="text-xs text-muted-foreground mt-2">
-              Data as of:{" "}
-              {faceData.timestamp ? format(new Date(faceData.timestamp), "PP p") : "N/A"}
-            </p> 
-            */}
+
             {faceData.dayLow != null &&
               faceData.dayHigh != null &&
               faceData.price != null &&
               faceData.dayHigh > faceData.dayLow && (
                 <div className="mt-3">
-                  {" "}
-                  {/* This mt-3 might need adjustment after removing the line above */}
                   <div className="flex justify-between text-xs text-muted-foreground mb-1">
                     <ClickableDataItem
                       isInteractive={
