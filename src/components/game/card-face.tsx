@@ -6,17 +6,16 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import type {
-  PriceGameCard,
-  PriceCardFaceData,
-  PriceCardBackData,
-  DiscoveredCard,
-  DailyPerformanceSignal,
+  PriceCardSnapshot,
+  DailyPerformanceCard,
   PriceVsSmaSignal,
   PriceRangeContextSignal,
-  IntradayTrendSignal,
-  PriceSnapshotSignal,
-  DisplayableCard,
-} from "./types";
+  IntradayTrendCard,
+  PriceCard,
+  PriceCardFaceData,
+  PriceCardBackData,
+} from "./cards/";
+import type { DiscoveredCard, DisplayableCard } from "./types";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import {
@@ -117,7 +116,7 @@ const CardFace: React.FC<CardFaceProps> = ({
     }
   };
 
-  const renderLivePriceCardFront = (priceCard: PriceGameCard) => {
+  const renderLivePriceCardFront = (priceCard: PriceCard) => {
     const faceData = priceCard.faceData as PriceCardFaceData;
     const changePositive =
       faceData.dayChange !== null &&
@@ -137,7 +136,8 @@ const CardFace: React.FC<CardFaceProps> = ({
         <CardHeader>
           <div className="flex justify-between items-start">
             <div>
-              <CardTitle className="text-2xl">{faceData.symbol}</CardTitle>
+              {/* card.symbol is from DisplayableCard, which PriceGameCard extends */}
+              <CardTitle className="text-2xl">{card.symbol}</CardTitle>
               <CardDescription>Live Quote</CardDescription>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -310,23 +310,27 @@ const CardFace: React.FC<CardFaceProps> = ({
                   </span>
                 </div>
                 <div className="w-full bg-muted rounded-full h-1.5 pointer-events-none">
-                  <div
-                    className={cn(
-                      "h-1.5 rounded-full",
-                      changePositive ? "bg-green-500" : "bg-red-500"
-                    )}
-                    style={{
-                      width: `${Math.max(
-                        0,
-                        Math.min(
-                          100,
-                          ((faceData.price - faceData.dayLow) /
-                            (faceData.dayHigh - faceData.dayLow)) *
-                            100
-                        )
-                      )}%`,
-                    }}
-                  />
+                  {/* Calculate width percentage for Tailwind arbitrary value */}
+                  {(() => {
+                    const percentage = Math.max(
+                      0,
+                      Math.min(
+                        100,
+                        ((faceData.price - faceData.dayLow) /
+                          (faceData.dayHigh - faceData.dayLow)) *
+                          100
+                      )
+                    );
+                    return (
+                      <div
+                        className={cn(
+                          "h-1.5 rounded-full",
+                          changePositive ? "bg-green-500" : "bg-red-500",
+                          `w-[${percentage}%]`
+                        )}
+                      />
+                    );
+                  })()}
                 </div>
               </div>
             )}
@@ -335,13 +339,14 @@ const CardFace: React.FC<CardFaceProps> = ({
     );
   };
 
-  const renderLivePriceCardBack = (priceCard: PriceGameCard) => {
+  const renderLivePriceCardBack = (priceCard: PriceCard) => {
     const faceData = priceCard.faceData as PriceCardFaceData;
     const backData = priceCard.backData as PriceCardBackData;
     return (
       <div data-testid="card-face-back-content" className="pointer-events-auto">
         <CardHeader>
-          <CardTitle className="text-lg">{faceData.symbol} - Details</CardTitle>
+          {/* card.symbol is from DisplayableCard, which PriceGameCard extends */}
+          <CardTitle className="text-lg">{card.symbol} - Details</CardTitle>
           <CardDescription>
             {backData.explanation || "Market Data & Technicals"}
           </CardDescription>
@@ -491,7 +496,7 @@ const CardFace: React.FC<CardFaceProps> = ({
     // If they were still needed, they'd require specific handling here.
 
     if (discoveredCard.type === "daily_performance") {
-      const p = discoveredCard as DailyPerformanceSignal;
+      const p = discoveredCard as DailyPerformanceCard;
       const iP = p.dayChange >= 0;
       const cC =
         p.dayChange === 0
@@ -505,8 +510,9 @@ const CardFace: React.FC<CardFaceProps> = ({
       content = (
         <>
           <CardHeader>
-            <CardTitle className="text-xl">Daily Performance</CardTitle>
-            <CardDescription>Daily Performance</CardDescription>
+            {/* Display symbol from card.symbol */}
+            <CardTitle className="text-xl">{discoveredCard.symbol}</CardTitle>
+            <CardDescription>Daily Performance Signal</CardDescription>
           </CardHeader>
           <CardContent className="space-y-1">
             <p>
@@ -573,9 +579,11 @@ const CardFace: React.FC<CardFaceProps> = ({
       content = (
         <>
           <CardHeader>
-            <CardTitle className="text-xl">Price vs SMA</CardTitle>
-            {/* Symbol is contextual */}
-            <CardDescription>vs {s.smaPeriod}D SMA</CardDescription>
+            {/* Display symbol from card.symbol */}
+            <CardTitle className="text-xl">{discoveredCard.symbol}</CardTitle>
+            <CardDescription>
+              Price vs {s.smaPeriod}D SMA Signal
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-1">
             <div className={cn("flex items-center mb-1", rC)}>
@@ -643,9 +651,9 @@ const CardFace: React.FC<CardFaceProps> = ({
       content = (
         <>
           <CardHeader>
-            <CardTitle className="text-xl">Price Range</CardTitle>
-            {/* Symbol is contextual */}
-            <CardDescription>vs Day {levelType}</CardDescription>
+            {/* Display symbol from card.symbol */}
+            <CardTitle className="text-xl">{discoveredCard.symbol}</CardTitle>
+            <CardDescription>Price vs Day {levelType} Signal</CardDescription>
           </CardHeader>
           <CardContent className="space-y-1">
             <div className={cn("flex items-center mb-1", cC)}>
@@ -686,7 +694,7 @@ const CardFace: React.FC<CardFaceProps> = ({
         </>
       );
     } else if (discoveredCard.type === "intraday_trend") {
-      const tS = discoveredCard as IntradayTrendSignal;
+      const tS = discoveredCard as IntradayTrendCard;
       // Logic for icon and text based on tS.observedTrendDescription
       // This is a simplified example; you'll need to parse observedTrendDescription or add specific fields to IntradayTrendSignal
       let TI = LineChart;
@@ -702,9 +710,9 @@ const CardFace: React.FC<CardFaceProps> = ({
       content = (
         <>
           <CardHeader>
-            <CardTitle className="text-xl">Intraday Trend</CardTitle>
-            {/* Symbol is contextual */}
-            <CardDescription>Intraday Trend</CardDescription>
+            {/* Display symbol from card.symbol */}
+            <CardTitle className="text-xl">{discoveredCard.symbol}</CardTitle>
+            <CardDescription>Intraday Trend Signal</CardDescription>
           </CardHeader>
           <CardContent className="space-y-1">
             <div className={cn("flex items-center mb-1", tc)}>
@@ -725,7 +733,7 @@ const CardFace: React.FC<CardFaceProps> = ({
         </>
       );
     } else if (discoveredCard.type === "price_snapshot") {
-      const snap = discoveredCard as PriceSnapshotSignal;
+      const snap = discoveredCard as PriceCardSnapshot;
       const face = snap.snapshotFaceData;
       // const back = snap.snapshotBackData; // back data is for the back of the snapshot card
 
@@ -740,7 +748,8 @@ const CardFace: React.FC<CardFaceProps> = ({
         <>
           <CardHeader>
             <div className="flex justify-between items-start">
-              <CardTitle className="text-xl">{face.symbol} Snapshot</CardTitle>
+              {/* Display symbol from card.symbol (which should match face.symbol for snapshots) */}
+              <CardTitle className="text-xl">{snap.symbol} Snapshot</CardTitle>
               <Camera className="h-5 w-5 text-muted-foreground" />
             </div>
             <CardDescription>
@@ -812,11 +821,12 @@ const CardFace: React.FC<CardFaceProps> = ({
     const generatedAt = discoveredCard.discoveredAt;
 
     if (discoveredCard.type === "daily_performance") {
-      const p = discoveredCard as DailyPerformanceSignal;
+      const p = discoveredCard as DailyPerformanceCard;
       content = (
         <>
           <CardHeader>
-            <CardTitle>Perf. Context</CardTitle> {/* Symbol is contextual */}
+            {/* Display symbol from card.symbol */}
+            <CardTitle>{p.symbol} - Perf. Context</CardTitle>
           </CardHeader>
           <CardContent className="text-sm space-y-1">
             <p>{explanation}</p>
@@ -844,7 +854,8 @@ const CardFace: React.FC<CardFaceProps> = ({
         <>
           <CardHeader>
             <CardTitle className="text-lg">
-              vs. {s.smaPeriod}D SMA {/* Symbol is contextual */}
+              {/* Display symbol from card.symbol */}
+              {s.symbol} vs. {s.smaPeriod}D SMA
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm space-y-1">
@@ -863,8 +874,8 @@ const CardFace: React.FC<CardFaceProps> = ({
       content = (
         <>
           <CardHeader>
-            <CardTitle>Day Range Context</CardTitle>
-            {/* Symbol is contextual */}
+            {/* Display symbol from card.symbol */}
+            <CardTitle>{r.symbol} - Day Range Context</CardTitle>
           </CardHeader>
           <CardContent>
             <p>{explanation}</p>
@@ -878,12 +889,14 @@ const CardFace: React.FC<CardFaceProps> = ({
         </>
       );
     } else if (discoveredCard.type === "intraday_trend") {
-      const tS = discoveredCard as IntradayTrendSignal;
+      const tS = discoveredCard as IntradayTrendCard;
       content = (
         <>
           <CardHeader>
-            <CardTitle className="text-lg">Intraday Trend</CardTitle>
-            {/* Symbol is contextual */}
+            {/* Display symbol from card.symbol */}
+            <CardTitle className="text-lg">
+              {tS.symbol} - Intraday Trend
+            </CardTitle>
           </CardHeader>
           <CardContent className="text-sm space-y-1">
             <p>{explanation}</p>
@@ -898,14 +911,15 @@ const CardFace: React.FC<CardFaceProps> = ({
         </>
       );
     } else if (discoveredCard.type === "price_snapshot") {
-      const snap = discoveredCard as PriceSnapshotSignal;
+      const snap = discoveredCard as PriceCardSnapshot;
       const face = snap.snapshotFaceData; // This is the data of the card that was snapshotted
       const back = snap.snapshotBackData; // This is the data of the card that was snapshotted
       content = (
         <>
           <CardHeader>
             <CardTitle className="text-lg">
-              {face.symbol} - Snapshot Details
+              {/* Display symbol from card.symbol (which is snap.symbol) */}
+              {snap.symbol} - Snapshot Details
             </CardTitle>
             <CardDescription>
               Data at
@@ -963,7 +977,7 @@ const CardFace: React.FC<CardFaceProps> = ({
   // Main rendering logic for CardFace
   if (isBack) {
     if (card.type === "price") {
-      return renderLivePriceCardBack(card as PriceGameCard); // Specific renderer for live card back
+      return renderLivePriceCardBack(card as PriceCard); // Specific renderer for live card back
     } else {
       // All other card types (DiscoveredCard types) use this for their back face
       return renderDiscoveredCardBackContent(card as DiscoveredCard);
@@ -971,7 +985,7 @@ const CardFace: React.FC<CardFaceProps> = ({
   } else {
     // Front faces for ALL card types (live or discovered)
     if (card.type === "price") {
-      return renderLivePriceCardFront(card as PriceGameCard);
+      return renderLivePriceCardFront(card as PriceCard);
     } else {
       // Front faces of discovered cards
       return renderDiscoveredCardFront(card as DiscoveredCard);

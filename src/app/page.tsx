@@ -2,15 +2,14 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import useLocalStorage from "@/hooks/use-local-storage";
-import type {
-  PriceGameCard,
-  PriceCardFaceData,
-  PriceCardBackData,
-  DisplayableCard,
-  DiscoveredCard,
-} from "@/components/game/types";
+import type { DisplayableCard, DiscoveredCard } from "@/components/game/types";
 import { format } from "date-fns";
 import { z } from "zod";
+import {
+  PriceCard,
+  PriceCardFaceData,
+  PriceCardBackData,
+} from "@/components/game/cards/PriceCard/types";
 
 import ActiveCardsSection from "@/components/game/active-cards-section";
 
@@ -22,7 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/lib/supabase/client";
 
 const INITIAL_ACTIVE_CARDS: DisplayableCard[] = [];
-const SYMBOL_TO_SUBSCRIBE = "AAPL";
+const SYMBOL_TO_SUBSCRIBE: string = "AAPL";
 
 interface LiveQuoteIndicatorDBRow {
   id: string;
@@ -81,7 +80,7 @@ export default function FinSignalGamePage() {
     const card = { ...cardFromStorage }; // Create a shallow copy
 
     if (card.type === "price") {
-      const priceCard = card as PriceGameCard;
+      const priceCard = card as PriceCard;
       if (
         priceCard.faceData &&
         typeof priceCard.faceData.timestamp === "string"
@@ -242,10 +241,10 @@ export default function FinSignalGamePage() {
         const existingCardIndex = currentCards.findIndex(
           (c) =>
             c.type === "price" &&
-            (c as PriceGameCard).faceData.symbol === SYMBOL_TO_SUBSCRIBE
+            (c as PriceCard).faceData.symbol === SYMBOL_TO_SUBSCRIBE
         );
         if (existingCardIndex !== -1) {
-          const existingCard = currentCards[existingCardIndex] as PriceGameCard;
+          const existingCard = currentCards[existingCardIndex] as PriceCard;
 
           // Validate existing card's timestamp before comparison
           const existingTimestamp = new Date(existingCard.faceData.timestamp);
@@ -266,7 +265,7 @@ export default function FinSignalGamePage() {
             );
             return prevActiveCards;
           }
-          const updatedCard: PriceGameCard = {
+          const updatedCard: PriceCard = {
             ...existingCard,
             faceData: newPriceCardFaceData,
             backData: newPriceCardBackData,
@@ -286,15 +285,14 @@ export default function FinSignalGamePage() {
           console.log("Page: processQuoteData - Updated existing card.");
           return newCards;
         } else {
-          const newPriceCard: PriceGameCard = {
+          const newPriceCard: PriceCard = {
             id: `${SYMBOL_TO_SUBSCRIBE}-live-card`,
+            symbol: quoteData.symbol,
             type: "price",
             faceData: newPriceCardFaceData,
             backData: newPriceCardBackData,
             isFlipped: false,
-            isSecured: true,
             appearedAt: Date.now(),
-            initialFadeDurationMs: null,
           };
           if (quoteData.current_price != null) {
             // Check current_price for toFixed

@@ -2,11 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import GameCard from "./game-card";
-import type {
-  DisplayableCard,
-  PriceCardFaceData,
-  PriceGameCard,
-} from "./types";
+import type { DisplayableCard } from "./types";
+import { PriceCardFaceData } from "./cards/PriceCard/types";
 
 import {
   AlertDialog,
@@ -23,7 +20,6 @@ interface ActiveCardsProps {
   cards: DisplayableCard[];
   onToggleFlipCard: (id: string) => void;
   onDeleteCard: (id: string) => void;
-  onFadedOut: (id: string) => void;
   onGenerateDailyPerformanceSignal?: (priceCardData: PriceCardFaceData) => void;
   onGeneratePriceVsSmaSignal?: (
     faceData: PriceCardFaceData,
@@ -36,14 +32,13 @@ interface ActiveCardsProps {
     levelValue: number
   ) => void;
   onGenerateIntradayTrendSignal?: (faceData: PriceCardFaceData) => void;
-  onTakeSnapshot?: (card: PriceGameCard) => void;
+  onTakeSnapshot?: () => void; // Changed signature
 }
 
 export const ActiveCards: React.FC<ActiveCardsProps> = ({
   cards,
   onToggleFlipCard,
   onDeleteCard,
-  onFadedOut,
   onGenerateDailyPerformanceSignal,
   onGeneratePriceVsSmaSignal,
   onGeneratePriceRangeContextSignal,
@@ -93,25 +88,30 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-10">
+        // Removed gap from grid, will rely on margin from card wrappers.
+        // The grid will lay out the wrapper divs.
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {cards.map((card) => (
-            <GameCard
-              key={card.id}
-              card={card}
-              onFadedOut={onFadedOut}
-              onToggleFlip={onToggleFlipCard}
-              onDeleteCard={onDeleteCard}
-              // Pass down the new signal generation props to GameCard
-              onGenerateDailyPerformanceSignal={
-                onGenerateDailyPerformanceSignal
-              }
-              onGeneratePriceVsSmaSignal={onGeneratePriceVsSmaSignal}
-              onGeneratePriceRangeContextSignal={
-                onGeneratePriceRangeContextSignal
-              }
-              onGenerateIntradayTrendSignal={onGenerateIntradayTrendSignal}
-              onTakeSnapshot={onTakeSnapshot}
-            />
+            // Added a wrapper div around GameCard to apply margin for spacing.
+            // m-2 provides 0.5rem margin on all sides.
+            // This means 0.5rem from one card + 0.5rem from the next = 1rem space between them.
+            // flex justify-center items-center ensures the GameCard is centered within this wrapper.
+            <div key={card.id} className="flex justify-center items-center m-2">
+              <GameCard
+                card={card}
+                onToggleFlip={onToggleFlipCard}
+                onDeleteCard={onDeleteCard}
+                onGenerateDailyPerformanceSignal={
+                  onGenerateDailyPerformanceSignal
+                }
+                onGeneratePriceVsSmaSignal={onGeneratePriceVsSmaSignal}
+                onGeneratePriceRangeContextSignal={
+                  onGeneratePriceRangeContextSignal
+                }
+                onGenerateIntradayTrendSignal={onGenerateIntradayTrendSignal}
+                onTakeSnapshot={onTakeSnapshot} // Pass onTakeSnapshot prop
+              />
+            </div>
           ))}
         </div>
       )}
