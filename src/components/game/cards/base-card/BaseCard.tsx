@@ -2,6 +2,7 @@
 import React from "react";
 import { Card as ShadCard } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { XIcon } from "lucide-react"; // Using XIcon for delete
 import type {
   CardActionContext,
   BaseCardSocialInteractions,
@@ -14,9 +15,10 @@ interface BaseCardProps {
   backContent: React.ReactNode;
   cardContext: CardActionContext;
   socialInteractions?: BaseCardSocialInteractions;
+  onDeleteRequest?: (context: CardActionContext) => void;
   className?: string;
   innerCardClassName?: string;
-  children?: React.ReactNode; // Overlays like delete button
+  children?: React.ReactNode;
 }
 
 const BaseCard: React.FC<BaseCardProps> = ({
@@ -25,6 +27,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
   backContent,
   cardContext,
   socialInteractions,
+  onDeleteRequest,
   className,
   innerCardClassName,
   children,
@@ -60,13 +63,32 @@ const BaseCard: React.FC<BaseCardProps> = ({
     transform: "rotateY(180deg)",
   };
 
-  // Conditionally render SocialBar if interactions are provided
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDeleteRequest?.(cardContext);
+  };
+
+  const deleteButton = onDeleteRequest ? (
+    <button
+      onClick={handleDeleteClick}
+      title="Delete Card"
+      aria-label={`Delete ${cardContext.symbol} card`}
+      className={cn(
+        "absolute top-1.5 right-1.5 z-20 p-1.5 flex items-center justify-center transition-colors",
+        "text-muted-foreground/70 hover:text-primary rounded-sm", // Removed hover:bg-muted/50
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+      )}
+    >
+      <XIcon size={16} strokeWidth={2.5} />
+    </button>
+  ) : null;
+
   const socialBarElement = socialInteractions ? (
     <div
       className={cn(
         "transition-all duration-300 ease-in-out",
-        "opacity-0 group-hover:opacity-100", // Hidden by default, visible on group hover
-        "translate-y-4 group-hover:translate-y-0" // Optional: Slide in effect
+        "opacity-0 group-hover:opacity-100",
+        "translate-y-4 group-hover:translate-y-0"
       )}
     >
       <SocialBar interactions={socialInteractions} cardContext={cardContext} />
@@ -75,8 +97,6 @@ const BaseCard: React.FC<BaseCardProps> = ({
 
   return (
     <div style={outerStyle} className={cn("group", className)}>
-      {" "}
-      {/* 'group' class is key */}
       <div
         style={innerCardStyles}
         className={cn(innerCardClassName)}
@@ -88,10 +108,14 @@ const BaseCard: React.FC<BaseCardProps> = ({
             "card-face-wrapper",
             "overflow-hidden",
             "rounded-2xl",
-            "shadow-lg"
+            "shadow-lg",
+            "relative"
           )}
         >
-          <div className="flex-grow overflow-y-auto p-4">{faceContent}</div>
+          {deleteButton}
+          <div className="flex-grow overflow-y-auto p-4 pt-7">
+            {faceContent}
+          </div>
           {socialBarElement}
         </ShadCard>
 
@@ -101,10 +125,14 @@ const BaseCard: React.FC<BaseCardProps> = ({
             "card-back-wrapper",
             "overflow-hidden",
             "rounded-2xl",
-            "shadow-lg"
+            "shadow-lg",
+            "relative"
           )}
         >
-          <div className="flex-grow overflow-y-auto p-4">{backContent}</div>
+          {deleteButton}
+          <div className="flex-grow overflow-y-auto p-4 pt-7">
+            {backContent}
+          </div>
           {socialBarElement}
         </ShadCard>
       </div>

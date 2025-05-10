@@ -4,17 +4,16 @@ import BaseCard from "../base-card/BaseCard";
 import type {
   CardActionContext,
   BaseCardSocialInteractions,
-} from "../base-card/base-card.types"; // For BaseCard props
+} from "../base-card/base-card.types";
 import type {
   PriceCardData,
-  PriceCardInteractionCallbacks, // This type might need adjustment if it previously held social callbacks
+  PriceCardInteractionCallbacks,
 } from "./price-card.types";
 import { PriceCardContent } from "./PriceCardContent";
+import { cn } from "@/lib/utils";
 
-// Define which specific interaction callbacks PriceCardContent needs
-// These are data-point specific interactions for the PriceCard.
 type PriceSpecificInteractions = Pick<
-  PriceCardInteractionCallbacks, // Assuming this type now ONLY contains these specific callbacks
+  PriceCardInteractionCallbacks,
   | "onPriceCardSmaClick"
   | "onPriceCardRangeContextClick"
   | "onPriceCardOpenPriceClick"
@@ -24,18 +23,17 @@ type PriceSpecificInteractions = Pick<
 interface PriceCardContainerProps {
   cardData: PriceCardData;
   isFlipped: boolean;
-  onFlip: () => void; // Callback to toggle flip state in parent
+  onFlip: () => void;
 
-  // Props for BaseCard's social bar
   cardContext: CardActionContext;
   socialInteractions?: BaseCardSocialInteractions;
+  onDeleteRequest?: (context: CardActionContext) => void; // New prop for delete
 
-  // Callbacks specific to PriceCardContent's data points
   priceSpecificInteractions?: PriceSpecificInteractions;
 
   className?: string;
   innerCardClassName?: string;
-  children?: React.ReactNode; // Overlays from GameCard (e.g., delete button)
+  children?: React.ReactNode; // This children is for BaseCard's top-level overlays
 }
 
 export const PriceCardContainer = React.memo<PriceCardContainerProps>(
@@ -45,12 +43,12 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
     onFlip,
     cardContext,
     socialInteractions,
+    onDeleteRequest, // Receive delete request handler
     priceSpecificInteractions,
     className,
     innerCardClassName,
-    children, // Overlays like delete button
+    children,
   }) => {
-    // Content for the face (no social bar here, BaseCard adds it)
     const faceContentForBaseCard = (
       <PriceCardContent
         cardData={cardData}
@@ -66,7 +64,6 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
       />
     );
 
-    // Content for the back (no social bar here, BaseCard adds it)
     const backContentForBaseCard = (
       <PriceCardContent
         cardData={cardData}
@@ -76,14 +73,13 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
           priceSpecificInteractions?.onPriceCardRangeContextClick
         }
         onOpenPriceClick={priceSpecificInteractions?.onPriceCardOpenPriceClick}
-        // onGenerateDailyPerformanceSignal is typically front-face only
       />
     );
 
-    // These divs handle the click-to-flip for the entire card area
+    // Clickable wrappers for the entire card face/back to trigger flip
     const wrappedFaceContent = (
       <div
-        className="h-full w-full cursor-pointer" // Ensure full coverage for click
+        className="h-full w-full cursor-pointer"
         onClick={onFlip}
         role="button"
         aria-label={`Flip ${cardData.symbol} card to see details`}
@@ -98,7 +94,7 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
 
     const wrappedBackContent = (
       <div
-        className="h-full w-full cursor-pointer" // Ensure full coverage for click
+        className="h-full w-full cursor-pointer"
         onClick={onFlip}
         role="button"
         aria-label={`Flip ${cardData.symbol} card to see quote`}
@@ -118,10 +114,11 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
         backContent={wrappedBackContent}
         cardContext={cardContext}
         socialInteractions={socialInteractions}
+        onDeleteRequest={onDeleteRequest} // Pass delete request handler to BaseCard
         className={className}
         innerCardClassName={innerCardClassName}
       >
-        {children} {/* Overlays like delete button from GameCard */}
+        {children} {/* Pass through overlays */}
       </BaseCard>
     );
   }

@@ -28,7 +28,22 @@ export interface BaseCardData {
   readonly createdAt: number; // Timestamp (milliseconds since epoch)
 }
 
-// --- Generic Card Interaction Types (existing) ---
+// --- Context for Actions ---
+export interface CardActionContext {
+  readonly id: string;
+  readonly symbol: string;
+  readonly type: CardType;
+}
+
+// --- Social Interactions ---
+export interface BaseCardSocialInteractions {
+  readonly onLike?: (context: CardActionContext) => void;
+  readonly onComment?: (context: CardActionContext) => void;
+  readonly onSave?: (context: CardActionContext) => void;
+  readonly onShare?: (context: CardActionContext) => void;
+}
+
+// --- Generic Card Data Point Interactions (existing) ---
 export interface DataPoint<TDetails = unknown> {
   readonly elementType: string;
   readonly value?: any;
@@ -54,21 +69,3 @@ export type OnCardInteraction<
 export type BaseCardContainerDataPointDetails = {
   readonly kind: "symbol" | "type" | "explanation";
 };
-
-// --- NEW: Types for Social Interactions on BaseCard ---
-export interface CardActionContext {
-  readonly id: string;
-  readonly symbol: string;
-  readonly type: CardType;
-}
-
-export interface BaseCardSocialInteractions {
-  readonly onLike?: (context: CardActionContext) => void;
-  readonly onComment?: (context: CardActionContext) => void;
-  readonly onSave?: (context: CardActionContext) => void; // Will trigger snapshot logic
-  readonly onShare?: (context: CardActionContext) => void;
-  // Optional: You could add counts here if the bar needs to display them
-  // readonly likeCount?: number;
-  // readonly commentCount?: number;
-  // readonly isSaved?: boolean;
-}
