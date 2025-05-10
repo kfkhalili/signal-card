@@ -1,7 +1,7 @@
 // src/app/components/ui/social-bar.tsx
 import React from "react";
 import { ThumbsUp, MessageCircle, Bookmark, Share2 } from "lucide-react";
-import { cn } from "@/lib/utils"; // Assuming you have a cn utility
+import { cn } from "@/lib/utils";
 import type {
   CardActionContext,
   BaseCardSocialInteractions,
@@ -19,29 +19,29 @@ export const SocialBar: React.FC<SocialBarProps> = ({
   className,
 }) => {
   if (!interactions) {
-    return null; // Don't render if no interaction callbacks are provided
+    return null;
   }
 
-  const iconSize = 18; // Consistent icon size
+  const iconSize = 18;
+  // Removed hover:bg-muted/60 from here
   const buttonBaseClass =
-    "flex items-center space-x-1 p-1.5 text-xs hover:text-primary rounded-md hover:bg-muted/60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
+    "flex items-center space-x-1.5 p-1.5 text-xs hover:text-primary rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
-  // Stop event propagation to prevent card flip if social bar is clicked
   const handleInteraction = (
     e: React.MouseEvent,
     action?: (context: CardActionContext) => void
   ) => {
-    e.stopPropagation(); // Prevent card flip
+    e.stopPropagation();
     action?.(cardContext);
   };
 
   return (
     <div
       className={cn(
-        "mt-auto shrink-0 border-t p-1 flex justify-around items-center text-muted-foreground",
+        "shrink-0 border-t p-1 flex justify-around items-center text-muted-foreground",
         className
       )}
-      onClick={(e) => e.stopPropagation()} // Prevent clicks on the bar itself from flipping the card
+      onClick={(e) => e.stopPropagation()}
       role="toolbar"
       aria-label="Social actions"
     >
@@ -53,6 +53,7 @@ export const SocialBar: React.FC<SocialBarProps> = ({
           aria-label={`Like ${cardContext.symbol} card`}
         >
           <ThumbsUp size={iconSize} aria-hidden="true" />
+          <span>Like</span>
         </button>
       )}
       {interactions.onComment && (
@@ -63,6 +64,7 @@ export const SocialBar: React.FC<SocialBarProps> = ({
           aria-label={`Comment on ${cardContext.symbol} card`}
         >
           <MessageCircle size={iconSize} aria-hidden="true" />
+          <span>Comment</span>
         </button>
       )}
       {interactions.onSave && (
@@ -73,6 +75,7 @@ export const SocialBar: React.FC<SocialBarProps> = ({
           aria-label={`Save ${cardContext.symbol} card`}
         >
           <Bookmark size={iconSize} aria-hidden="true" />
+          <span>Save</span>
         </button>
       )}
       {interactions.onShare && (
@@ -83,6 +86,7 @@ export const SocialBar: React.FC<SocialBarProps> = ({
           aria-label={`Share ${cardContext.symbol} card`}
         >
           <Share2 size={iconSize} aria-hidden="true" />
+          <span>Share</span>
         </button>
       )}
     </div>

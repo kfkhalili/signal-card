@@ -8,11 +8,11 @@ import {
 } from "@/components/ui/card";
 import type {
   PriceCardData,
-  PriceCardInteractionCallbacks, // This will now only contain price-specific interactions
+  PriceCardInteractionCallbacks,
 } from "./price-card.types";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
+import { ClickableDataItem } from "../../../ui/ClickableDataItem"; // Adjusted path
 
 const formatMarketCap = (cap: number | null | undefined): string => {
   if (cap === null || cap === undefined) return "N/A";
@@ -22,7 +22,6 @@ const formatMarketCap = (cap: number | null | undefined): string => {
   return cap.toString();
 };
 
-// Props are now only for price-specific data interactions
 interface PriceCardContentProps {
   cardData: PriceCardData;
   isBackFace: boolean;
@@ -85,8 +84,6 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
 
     if (isBackFace) {
       return (
-        // The p-4 is removed from here as BaseCard's content wrapper will add it.
-        // No h-full or flex flex-col needed here anymore.
         <div
           data-testid="price-card-back-content"
           className="pointer-events-auto"
@@ -103,7 +100,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                 isInteractive={!!(onOpenPriceClick && faceData.dayOpen != null)}
                 onClickHandler={handleOpenPriceInteraction}
                 baseClassName="p-0.5 rounded-sm transition-colors relative"
-                interactiveClassName="cursor-pointer hover:bg-muted/30 hover:text-primary"
+                interactiveClassName="cursor-pointer hover:text-primary"
                 data-testid="open-price-interactive-area"
                 aria-label={
                   onOpenPriceClick && faceData.dayOpen != null
@@ -141,7 +138,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                   handleSmaInteraction(e, 50, backData.sma50d)
                 }
                 baseClassName="mt-1 p-1 rounded-md transition-colors relative"
-                interactiveClassName="cursor-pointer hover:bg-muted/30 hover:text-primary"
+                interactiveClassName="cursor-pointer hover:text-primary"
                 data-testid="sma-50d-interactive-area"
                 aria-label={
                   onSmaClick && backData.sma50d != null
@@ -159,7 +156,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                   handleSmaInteraction(e, 200, backData.sma200d)
                 }
                 baseClassName="mt-1 p-1 rounded-md transition-colors relative"
-                interactiveClassName="cursor-pointer hover:bg-muted/30 hover:text-primary"
+                interactiveClassName="cursor-pointer hover:text-primary"
                 data-testid="sma-200d-interactive-area"
                 aria-label={
                   onSmaClick && backData.sma200d != null
@@ -176,6 +173,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
         </div>
       );
     } else {
+      // Front Face
       const changePositive =
         faceData.dayChange != null && faceData.dayChange >= 0;
       const baseChangeColor =
@@ -185,8 +183,6 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
           ? "text-green-600"
           : "text-red-600";
       return (
-        // The p-4 is removed from here as BaseCard's content wrapper will add it.
-        // No h-full or flex flex-col needed here anymore.
         <div
           data-testid="price-card-front-content"
           className="pointer-events-auto"
@@ -209,7 +205,8 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
               isInteractive={!!onGenerateDailyPerformanceSignal}
               onClickHandler={handleDailyPerformanceInteraction}
               baseClassName="group/dps rounded-md p-2 -mx-2 -my-1 mb-1"
-              interactiveClassName="cursor-pointer hover:bg-muted/30 transition-colors relative"
+              // MODIFIED HERE: Removed hover:bg-muted/30
+              interactiveClassName="cursor-pointer transition-colors relative"
               data-testid="daily-performance-interactive-area"
               aria-label={
                 onGenerateDailyPerformanceSignal
@@ -275,7 +272,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                         handleRangeInteraction(e, "Low", faceData.dayLow)
                       }
                       baseClassName="p-0.5 rounded-sm relative"
-                      interactiveClassName="cursor-pointer hover:bg-muted/30 hover:text-primary transition-colors"
+                      interactiveClassName="cursor-pointer hover:text-primary transition-colors"
                       data-testid="day-low-interactive-area"
                       aria-label={
                         onRangeContextClick && faceData.dayLow != null
@@ -296,7 +293,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                         handleRangeInteraction(e, "High", faceData.dayHigh)
                       }
                       baseClassName="p-0.5 rounded-sm relative"
-                      interactiveClassName="cursor-pointer hover:bg-muted/30 hover:text-primary transition-colors"
+                      interactiveClassName="cursor-pointer hover:text-primary transition-colors"
                       data-testid="day-high-interactive-area"
                       aria-label={
                         onRangeContextClick && faceData.dayHigh != null
