@@ -61,7 +61,7 @@ const GameCard: React.FC<GameCardProps> = ({
     </div>
   );
 
-  const cardWrapperClassName = "w-[280px] h-[420px] shadow-lg relative"; // Define consistent card dimensions
+  const cardWrapperClassName = "w-[280px] aspect-[63/88] shadow-lg relative"; // Define consistent card dimensions
 
   // Handle live price card
   if (card.type === "price") {
@@ -131,6 +131,7 @@ const GameCard: React.FC<GameCardProps> = ({
       symbol: snapshotCard.symbol,
       faceData: faceDataForSnapshotDisplay,
       backData: backDataForSnapshotDisplay,
+      createdAt: snapshotCard.createdAt,
     };
 
     return (
