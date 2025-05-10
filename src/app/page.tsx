@@ -1,34 +1,37 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import useLocalStorage from "@/hooks/use-local-storage";
-import type { DisplayableCard, DiscoveredCard } from "@/components/game/types";
 import { format } from "date-fns";
 import { z } from "zod";
-import {
-  PriceCard,
+
+// --- Type Imports ---
+import type { DisplayableCard } from "@/components/game/types"; // Corrected path
+import type {
+  PriceCardData,
   PriceCardFaceData,
-  PriceCardBackData,
-} from "@/components/game/cards/PriceCard/types";
+  PriceCardSpecificBackData,
+  PriceCardSnapshotSpecificBackData, // Added for rehydration logic
+} from "@/components/game/cards/price-card/price-card.types";
 
 import ActiveCardsSection from "@/components/game/active-cards-section";
-
+import { useToast } from "@/hooks/use-toast";
+import { createClient } from "@/lib/supabase/client";
 import {
   subscribeToQuoteUpdates,
   type LiveQuotePayload,
 } from "@/lib/supabase/realtime-service";
-import { useToast } from "@/hooks/use-toast";
-import { createClient } from "@/lib/supabase/client";
 
 const INITIAL_ACTIVE_CARDS: DisplayableCard[] = [];
-const SYMBOL_TO_SUBSCRIBE: string = "AAPL";
+const SYMBOL_TO_SUBSCRIBE: string = "AAPL"; // Example symbol
 
+// Represents the raw data structure from the database/API
 interface LiveQuoteIndicatorDBRow {
   id: string;
   symbol: string;
   current_price: number;
-  api_timestamp: number;
-  fetched_at: string;
+  api_timestamp: number; // Unix timestamp (seconds from API)
+  fetched_at: string; // ISO string date (when DB row was last updated)
   change_percentage?: number | null;
   day_change?: number | null;
   day_low?: number | null;
@@ -44,13 +47,13 @@ interface LiveQuoteIndicatorDBRow {
   market_exchange_name?: string | null;
 }
 
-// Zod schema for runtime validation, mirroring LiveQuoteIndicatorDBRow
+// Zod schema for runtime validation of data from DB/API
 const LiveQuoteIndicatorDBSchema = z.object({
   id: z.string(),
   symbol: z.string(),
   current_price: z.number(),
-  api_timestamp: z.number(), // Unix timestamp (seconds)
-  fetched_at: z.string(), // ISO string date
+  api_timestamp: z.number(),
+  fetched_at: z.string(),
   change_percentage: z.number().nullable().optional(),
   day_change: z.number().nullable().optional(),
   day_low: z.number().nullable().optional(),
@@ -74,43 +77,161 @@ export type MarketStatusDisplay =
   | "Error";
 
 export default function FinSignalGamePage() {
-  // Helper function to rehydrate cards, specifically for dates
-  // Ensures that date strings from localStorage are converted to Date objects
-  const rehydrateCard = (cardFromStorage: any): DisplayableCard => {
-    const card = { ...cardFromStorage }; // Create a shallow copy
-
-    if (card.type === "price") {
-      const priceCard = card as PriceCard;
-      if (
-        priceCard.faceData &&
-        typeof priceCard.faceData.timestamp === "string"
-      ) {
-        priceCard.faceData = {
-          ...priceCard.faceData,
-          timestamp: new Date(priceCard.faceData.timestamp),
-        };
-      }
-    } else {
-      // This branch handles DiscoveredCard types
-      const discoveredCard = card as DiscoveredCard;
-      if (typeof discoveredCard.discoveredAt === "string") {
-        discoveredCard.discoveredAt = new Date(discoveredCard.discoveredAt);
-      }
+  const rehydrateCard = (cardFromStorage: any): DisplayableCard | null => {
+    if (
+      !cardFromStorage ||
+      typeof cardFromStorage.id !== "string" ||
+      !cardFromStorage.type ||
+      !cardFromStorage.symbol
+    ) {
+      console.warn(
+        "Invalid card structure from storage, skipping:",
+        cardFromStorage
+      );
+      return null;
     }
-    // Add more validation/defaulting for other fields if necessary
-    return card as DisplayableCard;
+
+    let finalCreatedAt: number;
+    if (typeof cardFromStorage.createdAt === "string") {
+      finalCreatedAt = new Date(cardFromStorage.createdAt).getTime();
+    } else if (typeof cardFromStorage.createdAt === "number") {
+      finalCreatedAt = cardFromStorage.createdAt;
+    } else {
+      finalCreatedAt = Date.now(); // Default if missing or invalid
+    }
+
+    const commonProps = {
+      id: cardFromStorage.id as string,
+      symbol: cardFromStorage.symbol as string,
+      isFlipped:
+        typeof cardFromStorage.isFlipped === "boolean"
+          ? cardFromStorage.isFlipped
+          : false,
+      createdAt: finalCreatedAt,
+    };
+
+    if (cardFromStorage.type === "price") {
+      const originalFaceData = cardFromStorage.faceData || {};
+      let timestamp = originalFaceData.timestamp;
+      if (typeof timestamp === "string") {
+        timestamp = new Date(timestamp).getTime();
+      } else if (typeof timestamp !== "number" || isNaN(timestamp)) {
+        // Check for NaN as well
+        timestamp = null;
+      }
+
+      const rehydratedFaceData: PriceCardFaceData = {
+        timestamp: timestamp,
+        price:
+          typeof originalFaceData.price === "number"
+            ? originalFaceData.price
+            : null,
+        dayChange:
+          typeof originalFaceData.dayChange === "number"
+            ? originalFaceData.dayChange
+            : null,
+        changePercentage:
+          typeof originalFaceData.changePercentage === "number"
+            ? originalFaceData.changePercentage
+            : null,
+        dayHigh:
+          typeof originalFaceData.dayHigh === "number"
+            ? originalFaceData.dayHigh
+            : null,
+        dayLow:
+          typeof originalFaceData.dayLow === "number"
+            ? originalFaceData.dayLow
+            : null,
+        dayOpen:
+          typeof originalFaceData.dayOpen === "number"
+            ? originalFaceData.dayOpen
+            : null,
+        previousClose:
+          typeof originalFaceData.previousClose === "number"
+            ? originalFaceData.previousClose
+            : null,
+        volume:
+          typeof originalFaceData.volume === "number"
+            ? originalFaceData.volume
+            : null,
+      };
+
+      const originalBackData = cardFromStorage.backData || {};
+      const rehydratedBackData: PriceCardSpecificBackData = {
+        explanation:
+          typeof originalBackData.explanation === "string"
+            ? originalBackData.explanation
+            : "",
+        marketCap:
+          typeof originalBackData.marketCap === "number"
+            ? originalBackData.marketCap
+            : null,
+        sma50d:
+          typeof originalBackData.sma50d === "number"
+            ? originalBackData.sma50d
+            : null,
+        sma200d:
+          typeof originalBackData.sma200d === "number"
+            ? originalBackData.sma200d
+            : null,
+      };
+
+      return {
+        ...commonProps,
+        type: "price",
+        faceData: rehydratedFaceData,
+        backData: rehydratedBackData,
+      };
+    } else if (cardFromStorage.type === "price_snapshot") {
+      let snapshotTime = cardFromStorage.snapshotTime;
+      if (typeof snapshotTime === "string") {
+        snapshotTime = new Date(snapshotTime).getTime();
+      } else if (typeof snapshotTime !== "number" || isNaN(snapshotTime)) {
+        // Check for NaN
+        snapshotTime = Date.now();
+      }
+
+      const originalSnapshotBackData = cardFromStorage.backData || {};
+      const rehydratedSnapshotBackData: PriceCardSnapshotSpecificBackData = {
+        explanation:
+          typeof originalSnapshotBackData.explanation === "string"
+            ? originalSnapshotBackData.explanation
+            : "",
+        discoveredReason:
+          typeof originalSnapshotBackData.discoveredReason === "string"
+            ? originalSnapshotBackData.discoveredReason
+            : undefined,
+      };
+
+      return {
+        ...commonProps,
+        type: "price_snapshot",
+        capturedPrice:
+          typeof cardFromStorage.capturedPrice === "number"
+            ? cardFromStorage.capturedPrice
+            : 0,
+        snapshotTime: snapshotTime,
+        backData: rehydratedSnapshotBackData,
+      };
+    }
+    console.warn("Unknown card type during rehydration:", cardFromStorage.type);
+    return null;
   };
 
   const [initialCardsFromStorage, setCardsInLocalStorage] = useLocalStorage<
     DisplayableCard[]
-  >("finSignal-activeCards", INITIAL_ACTIVE_CARDS);
+  >(
+    "finSignal-activeCards-v2", // Versioned key
+    INITIAL_ACTIVE_CARDS
+  );
 
-  // Initialize activeCards state by rehydrating data from localStorage
   const [activeCards, setActiveCards] = useState<DisplayableCard[]>(() => {
     if (Array.isArray(initialCardsFromStorage)) {
-      return initialCardsFromStorage.map(rehydrateCard);
+      return initialCardsFromStorage
+        .map(rehydrateCard)
+        .filter(Boolean) as DisplayableCard[];
     }
-    return INITIAL_ACTIVE_CARDS; // Fallback if localStorage data is not an array
+    return INITIAL_ACTIVE_CARDS;
   });
 
   const [marketStatusDisplay, setMarketStatusDisplay] =
@@ -121,32 +242,22 @@ export default function FinSignalGamePage() {
   const lastApiTimestampRef = useRef<number | null>(null);
   const { toast } = useToast();
 
-  // Effect to persist activeCards to localStorage whenever they change
   useEffect(() => {
     setCardsInLocalStorage(activeCards);
   }, [activeCards, setCardsInLocalStorage]);
 
-  // Ref to hold the latest setActiveCards function
   const setActiveCardsRef = useRef(setActiveCards);
   useEffect(() => {
     setActiveCardsRef.current = setActiveCards;
   }, [setActiveCards]);
 
-  useEffect(() => {
-    const supabase = createClient();
-
-    const updateDisplayStatus = (quote: LiveQuoteIndicatorDBRow | null) => {
-      console.log(
-        "Page: updateDisplayStatus called with quote:",
-        JSON.stringify(quote)
-      );
+  const updateDisplayStatus = useCallback(
+    (quote: LiveQuoteIndicatorDBRow | null) => {
       if (
         !quote ||
-        quote.is_market_open == null // Handles both null and undefined
+        quote.is_market_open === null ||
+        quote.is_market_open === undefined
       ) {
-        console.log(
-          "Page: updateDisplayStatus - quote or is_market_open is null/undefined. Setting to Unknown."
-        );
         setMarketStatusDisplay("Unknown");
         setMarketStatusMessage(
           quote?.market_status_message || "Market status currently unavailable."
@@ -154,174 +265,137 @@ export default function FinSignalGamePage() {
         lastApiTimestampRef.current = quote?.api_timestamp ?? null;
         return;
       }
-
       lastApiTimestampRef.current = quote.api_timestamp;
-      setMarketStatusMessage(
-        quote.market_status_message ||
-          (quote.is_market_open ? "Market is Open" : "Market is Closed")
-      );
-      console.log(
-        `Page: updateDisplayStatus - is_market_open: ${quote.is_market_open}, message: ${quote.market_status_message}`
-      );
-
+      const defaultMessage = quote.is_market_open
+        ? "Market is Open"
+        : "Market is Closed";
+      setMarketStatusMessage(quote.market_status_message || defaultMessage);
       if (quote.is_market_open) {
-        console.log(
-          "Page: updateDisplayStatus - Market IS OPEN according to data."
-        );
-        // Ensure api_timestamp is valid for calculation
-        const now = Date.now();
         const apiTimeMillis = quote.api_timestamp * 1000;
-        const diffMinutes = (now - apiTimeMillis) / (1000 * 60);
-        if (diffMinutes > 15) {
-          console.log(
-            "Page: updateDisplayStatus - Data is stale (>15min), setting to Delayed."
-          );
-          setMarketStatusDisplay("Delayed");
-        } else {
-          console.log(
-            "Page: updateDisplayStatus - Data is fresh, setting to Open."
-          );
-          setMarketStatusDisplay("Open");
-        }
+        const diffMinutes = (Date.now() - apiTimeMillis) / (1000 * 60);
+        setMarketStatusDisplay(diffMinutes > 15 ? "Delayed" : "Open");
       } else {
-        console.log(
-          "Page: updateDisplayStatus - Market IS CLOSED according to data."
-        );
         setMarketStatusDisplay("Closed");
       }
-    };
+    },
+    []
+  ); // setMarketStatusDisplay, setMarketStatusMessage are stable
 
-    const processQuoteData = (
-      quoteData: LiveQuoteIndicatorDBRow, // Now expects validated data
-      source: "fetch" | "realtime"
-    ) => {
+  const processQuoteData = useCallback(
+    (quoteData: LiveQuoteIndicatorDBRow, source: "fetch" | "realtime") => {
       if (!quoteData) return;
-      console.log(
-        `Page: processQuoteData (source: ${source}) called with:`,
-        JSON.stringify(quoteData)
-      );
-
-      // api_timestamp is guaranteed by Zod schema to be a number
-      const priceTimestamp = new Date(quoteData.api_timestamp * 1000);
-      if (isNaN(priceTimestamp.getTime())) {
+      const apiTimestampMillis = quoteData.api_timestamp * 1000;
+      if (isNaN(apiTimestampMillis)) {
         console.error(
-          "Page: processQuoteData - Invalid priceTimestamp from api_timestamp. Skipping update.",
+          "Page: processQuoteData - Invalid api_timestamp. Skipping update.",
           quoteData
         );
         return;
       }
-
       updateDisplayStatus(quoteData);
 
-      const newPriceCardFaceData: PriceCardFaceData = {
-        symbol: quoteData.symbol,
+      const newFaceData: PriceCardFaceData = {
+        timestamp: apiTimestampMillis,
         price: quoteData.current_price,
-        timestamp: priceTimestamp,
-        changePercentage: quoteData.change_percentage,
-        dayChange: quoteData.day_change,
-        dayLow: quoteData.day_low,
-        dayHigh: quoteData.day_high,
-        volume: quoteData.volume,
-        dayOpen: quoteData.day_open,
-        previousClose: quoteData.previous_close,
+        changePercentage: quoteData.change_percentage ?? null,
+        dayChange: quoteData.day_change ?? null,
+        dayLow: quoteData.day_low ?? null,
+        dayHigh: quoteData.day_high ?? null,
+        volume: quoteData.volume ?? null,
+        dayOpen: quoteData.day_open ?? null,
+        previousClose: quoteData.previous_close ?? null,
       };
-      const newPriceCardBackData: PriceCardBackData = {
-        explanation: `${quoteData.symbol} - Details`,
-        marketCap: quoteData.market_cap,
-        sma50d: quoteData.sma_50d,
-        sma200d: quoteData.sma_200d,
+      const newBackData: PriceCardSpecificBackData = {
+        explanation: `${quoteData.symbol} financial data. Updated: ${new Date(
+          apiTimestampMillis
+        ).toLocaleString()}`,
+        marketCap: quoteData.market_cap ?? null,
+        sma50d: quoteData.sma_50d ?? null,
+        sma200d: quoteData.sma_200d ?? null,
       };
 
       setActiveCardsRef.current((prevActiveCards) => {
-        // Ensure prevActiveCards is an array before processing
         const currentCards = Array.isArray(prevActiveCards)
           ? prevActiveCards
           : [];
-
         const existingCardIndex = currentCards.findIndex(
-          (c) =>
-            c.type === "price" &&
-            (c as PriceCard).faceData.symbol === SYMBOL_TO_SUBSCRIBE
+          (c) => c.type === "price" && c.symbol === quoteData.symbol
         );
-        if (existingCardIndex !== -1) {
-          const existingCard = currentCards[existingCardIndex] as PriceCard;
 
-          // Validate existing card's timestamp before comparison
-          const existingTimestamp = new Date(existingCard.faceData.timestamp);
-          if (isNaN(existingTimestamp.getTime())) {
-            console.warn(
-              "Page: processQuoteData - Existing card has invalid timestamp. Overwriting.",
-              existingCard
-            );
-          }
+        if (existingCardIndex !== -1) {
+          const existingPriceCard = currentCards[
+            existingCardIndex
+          ] as PriceCardData & { isFlipped: boolean };
           if (
             source === "realtime" &&
-            !isNaN(existingTimestamp.getTime()) && // Only compare if existing timestamp is valid
-            priceTimestamp.getTime() <= existingTimestamp.getTime() &&
-            quoteData.current_price === existingCard.faceData.price // Assumes current_price is valid number
+            existingPriceCard.faceData.timestamp &&
+            apiTimestampMillis <= existingPriceCard.faceData.timestamp &&
+            quoteData.current_price === existingPriceCard.faceData.price
           ) {
-            console.log(
-              "Page: processQuoteData - Stale/unchanged realtime data, returning prevActiveCards."
-            );
             return prevActiveCards;
           }
-          const updatedCard: PriceCard = {
-            ...existingCard,
-            faceData: newPriceCardFaceData,
-            backData: newPriceCardBackData,
-            appearedAt: Date.now(),
+          const updatedCard: PriceCardData & { isFlipped: boolean } = {
+            id: existingPriceCard.id,
+            type: existingPriceCard.type,
+            symbol: existingPriceCard.symbol,
+            createdAt: existingPriceCard.createdAt,
+            isFlipped: existingPriceCard.isFlipped,
+            faceData: newFaceData,
+            backData: newBackData,
           };
           const newCards = [...currentCards];
           newCards[existingCardIndex] = updatedCard;
+
           if (source === "realtime" && quoteData.current_price != null) {
-            // Check current_price for toFixed
-            toast({
-              title: "Live Card Updated!",
-              description: `${
-                quoteData.symbol
-              }: $${quoteData.current_price.toFixed(2)}`, // Assumes symbol is valid string
-            });
+            setTimeout(() => {
+              // Defer toast call
+              toast({
+                title: "Live Card Updated!",
+                description: `${
+                  quoteData.symbol
+                }: $${quoteData.current_price.toFixed(2)}`,
+              });
+            }, 0);
           }
-          console.log("Page: processQuoteData - Updated existing card.");
           return newCards;
         } else {
-          const newPriceCard: PriceCard = {
-            id: `${SYMBOL_TO_SUBSCRIBE}-live-card`,
-            symbol: quoteData.symbol,
+          const newPriceCard: DisplayableCard = {
+            id: `${quoteData.symbol}-live-price-${Date.now()}`,
             type: "price",
-            faceData: newPriceCardFaceData,
-            backData: newPriceCardBackData,
+            symbol: quoteData.symbol,
+            createdAt: Date.now(),
+            faceData: newFaceData,
+            backData: newBackData,
             isFlipped: false,
-            appearedAt: Date.now(),
           };
           if (quoteData.current_price != null) {
-            // Check current_price for toFixed
-            toast({
-              title: "Live Card Loaded!",
-              description: `${
-                quoteData.symbol
-              }: $${quoteData.current_price.toFixed(2)}`, // Assumes symbol is valid string
-            });
+            setTimeout(() => {
+              // Defer toast call
+              toast({
+                title: "Live Card Loaded!",
+                description: `${
+                  quoteData.symbol
+                }: $${quoteData.current_price.toFixed(2)}`,
+              });
+            }, 0);
           }
-          console.log("Page: processQuoteData - Created new card.");
           return [
             newPriceCard,
-            ...currentCards.filter((c) => c.type !== "price"),
+            ...currentCards.filter(
+              (c) => !(c.type === "price" && c.symbol === quoteData.symbol)
+            ),
           ];
         }
       });
-    };
+    },
+    [updateDisplayStatus, toast]
+  );
 
-    let unsubscribeFromRealtime = () => {};
-    const setupSubscription = async () => {
-      await fetchInitialData();
-      unsubscribeFromRealtime = subscribeToQuoteUpdates(
-        SYMBOL_TO_SUBSCRIBE,
-        handleRealtimeUpdate
-      );
-    };
+  useEffect(() => {
+    const supabase = createClient();
+    let unsubscribeRealtime: () => void = () => {};
+
     const fetchInitialData = async () => {
-      console.log("Page: fetchInitialData - Attempting fetch...");
       const { data, error } = await supabase
         .from("live_quote_indicators")
         .select("*")
@@ -333,11 +407,6 @@ export default function FinSignalGamePage() {
         console.error("Page: fetchInitialData - Error:", error);
         updateDisplayStatus(null);
       } else if (data) {
-        console.log(
-          "Page: fetchInitialData - Data received:",
-          JSON.stringify(data)
-        );
-        // Validate fetched data
         const validationResult = LiveQuoteIndicatorDBSchema.safeParse(data);
         if (validationResult.success) {
           processQuoteData(validationResult.data, "fetch");
@@ -349,21 +418,21 @@ export default function FinSignalGamePage() {
           updateDisplayStatus(null);
         }
       } else {
-        console.log("Page: fetchInitialData - No data found.");
-        // updateDisplayStatus(null) might not be needed if no data means no status to update
-        // or set to a specific "No Data" status
         setMarketStatusDisplay("Unknown");
-        setMarketStatusMessage("No initial data found for symbol.");
+        setMarketStatusMessage(
+          `No initial data found for ${SYMBOL_TO_SUBSCRIBE}.`
+        );
       }
     };
-    const handleRealtimeUpdate = (payload: LiveQuotePayload) => {
-      console.log(
-        "Page: handleRealtimeUpdate - Payload received:",
-        JSON.stringify(payload)
-      ); // LOG Y - Entry to handleRealtimeUpdate
-      if (payload.eventType === "DELETE" || !payload.new) return;
 
-      // Validate realtime data
+    const handleRealtimeUpdate = (payload: LiveQuotePayload) => {
+      if (
+        payload.eventType === "DELETE" ||
+        !payload.new ||
+        payload.new.symbol !== SYMBOL_TO_SUBSCRIBE
+      ) {
+        return;
+      }
       const validationResult = LiveQuoteIndicatorDBSchema.safeParse(
         payload.new
       );
@@ -371,7 +440,7 @@ export default function FinSignalGamePage() {
         processQuoteData(validationResult.data, "realtime");
       } else {
         console.error(
-          "Page: handleRealtimeUpdate - Zod validation failed for payload.new:",
+          "Page: handleRealtimeUpdate - Zod validation failed:",
           validationResult.error.flatten(),
           "Payload:",
           payload.new
@@ -379,29 +448,46 @@ export default function FinSignalGamePage() {
       }
     };
 
-    setupSubscription();
-    return () => {
-      unsubscribeFromRealtime();
+    const setupSubscription = async () => {
+      await fetchInitialData();
+      const sub = subscribeToQuoteUpdates(
+        SYMBOL_TO_SUBSCRIBE,
+        handleRealtimeUpdate
+      );
+      unsubscribeRealtime = sub; // Corrected: sub is the unsubscribe function
     };
-  }, []);
+
+    setupSubscription();
+
+    return () => {
+      if (typeof unsubscribeRealtime === "function") {
+        unsubscribeRealtime();
+      }
+    };
+  }, [processQuoteData, updateDisplayStatus]); // Dependencies for the main effect
 
   return (
-    <div className="space-y-8">
-      <div className="text-center p-2 bg-muted text-muted-foreground rounded-md text-sm">
-        Status: <span className="font-semibold">{marketStatusDisplay}</span>
-        {marketStatusMessage && (
-          <span className="text-xs block">({String(marketStatusMessage)})</span>
-        )}
+    <div className="container mx-auto p-4 space-y-8">
+      <div className="text-center p-2 bg-muted text-muted-foreground rounded-md text-sm shadow">
+        <p>
+          Status: <span className="font-semibold">{marketStatusDisplay}</span>
+          {marketStatusMessage && (
+            <span className="text-xs block italic">
+              ({String(marketStatusMessage)})
+            </span>
+          )}
+        </p>
         {(marketStatusDisplay === "Closed" ||
           marketStatusDisplay === "Delayed") &&
           lastApiTimestampRef.current &&
-          !isNaN(new Date(lastApiTimestampRef.current * 1000).getTime()) && ( // Check if timestamp is valid
-            <span className="text-xs block">
-              Last FMP Data:
+          !isNaN(new Date(lastApiTimestampRef.current * 1000).getTime()) && (
+            <p className="text-xs block mt-1">
+              Last API Data:{" "}
               {format(new Date(lastApiTimestampRef.current * 1000), "PP p")}
-            </span>
+            </p>
           )}
       </div>
+
       <ActiveCardsSection
         activeCards={activeCards}
         setActiveCards={setActiveCards}
