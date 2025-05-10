@@ -1,55 +1,16 @@
 // src/hooks/useStockData.ts
 import { useState, useEffect, useCallback, useRef } from "react";
-import { createClient } from "@/lib/supabase/client"; // Ensure this path is correct
+import { createClient } from "@/lib/supabase/client"; // Used for initial fetch
 import {
   subscribeToQuoteUpdates,
   type LiveQuotePayload,
-} from "@/lib/supabase/realtime-service"; // Ensure this path is correct
-import { z } from "zod";
+  type SubscriptionStatus,
+  type LiveQuoteIndicatorDBRow, // Now imported
+  LiveQuoteIndicatorDBSchema, // Now imported
+} from "@/lib/supabase/realtime-service"; // Adjust path as needed
+// Zod is used by LiveQuoteIndicatorDBSchema which is imported, so no direct z import needed here unless used otherwise.
 
-// Types (as provided by you)
-export interface LiveQuoteIndicatorDBRow {
-  id: string;
-  symbol: string;
-  current_price: number;
-  api_timestamp: number;
-  fetched_at: string;
-  change_percentage?: number | null;
-  day_change?: number | null;
-  day_low?: number | null;
-  day_high?: number | null;
-  market_cap?: number | null;
-  day_open?: number | null;
-  previous_close?: number | null;
-  sma_50d?: number | null;
-  sma_200d?: number | null;
-  volume?: number | null;
-  is_market_open?: boolean | null;
-  market_status_message?: string | null;
-  market_exchange_name?: string | null;
-}
-
-export const LiveQuoteIndicatorDBSchema = z.object({
-  id: z.string(),
-  symbol: z.string(),
-  current_price: z.number(),
-  api_timestamp: z.number(),
-  fetched_at: z.string(),
-  change_percentage: z.number().nullable().optional(),
-  day_change: z.number().nullable().optional(),
-  day_low: z.number().nullable().optional(),
-  day_high: z.number().nullable().optional(),
-  market_cap: z.number().nullable().optional(),
-  day_open: z.number().nullable().optional(),
-  previous_close: z.number().nullable().optional(),
-  sma_50d: z.number().nullable().optional(),
-  sma_200d: z.number().nullable().optional(),
-  volume: z.number().nullable().optional(),
-  is_market_open: z.boolean().nullable().optional(),
-  market_status_message: z.string().nullable().optional(),
-  market_exchange_name: z.string().nullable().optional(),
-});
-
+// This type is for UI display states managed by the hook
 export type MarketStatusDisplayHook =
   | "Open"
   | "Closed"
@@ -57,12 +18,13 @@ export type MarketStatusDisplayHook =
   | "Unknown"
   | "Error"
   | "Fetching"
-  | "Connecting"; // Added for clarity during realtime connection attempt
+  | "Connecting"
+  | "Live";
 
 interface UseStockDataProps {
   symbol: string;
   onQuoteReceived: (
-    quoteData: LiveQuoteIndicatorDBRow,
+    quoteData: LiveQuoteIndicatorDBRow, // Uses imported type
     source: "fetch" | "realtime"
   ) => void;
 }
@@ -83,11 +45,11 @@ export function useStockData({
     "Initializing..."
   );
   const [lastApiTimestamp, setLastApiTimestamp] = useState<number | null>(null);
+  const lastGoodQuoteRef = useRef<LiveQuoteIndicatorDBRow | null>(null);
 
   const unsubscribeRealtimeRef = useRef<(() => void) | null>(null);
   const isMountedRef = useRef<boolean>(true);
 
-  // Effect to track mount status
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -96,41 +58,119 @@ export function useStockData({
   }, []);
 
   const updateDisplayStatus = useCallback(
-    (quote: LiveQuoteIndicatorDBRow | null) => {
+    (
+      quote: LiveQuoteIndicatorDBRow | null,
+      context?: "fetch" | "realtime" | "status_update"
+    ) => {
       if (!isMountedRef.current) return;
 
-      if (
-        !quote ||
-        quote.is_market_open === null ||
-        quote.is_market_open === undefined
-      ) {
+      if (quote) {
+        lastGoodQuoteRef.current = quote;
+        setLastApiTimestamp(quote.api_timestamp);
+        const defaultMessageBase = quote.is_market_open
+          ? "Market is Open"
+          : "Market is Closed";
+        let currentMarketStatus: MarketStatusDisplayHook = "Unknown";
+
+        if (quote.is_market_open) {
+          const apiTimeMillis = quote.api_timestamp * 1000;
+          const diffMinutes = (Date.now() - apiTimeMillis) / (1000 * 60);
+          currentMarketStatus = diffMinutes > 15 ? "Delayed" : "Open";
+          setMarketStatusMessage(
+            quote.market_status_message ||
+              (diffMinutes > 15 ? "Data is delayed." : defaultMessageBase)
+          );
+        } else {
+          currentMarketStatus = "Closed";
+          setMarketStatusMessage(
+            quote.market_status_message || defaultMessageBase
+          );
+        }
+
+        if (
+          marketStatusRef.current === "Fetching" ||
+          marketStatusRef.current === "Connecting" ||
+          marketStatusRef.current === "Error" ||
+          context === "realtime" ||
+          context === "fetch"
+        ) {
+          setMarketStatus(currentMarketStatus);
+        }
+      } else {
+        lastGoodQuoteRef.current = null;
         setMarketStatus("Unknown");
         setMarketStatusMessage(
-          quote?.market_status_message || "Market status currently unavailable."
+          context === "fetch" && symbol
+            ? `No initial data found for ${symbol}.`
+            : "Market status currently unavailable."
         );
-        setLastApiTimestamp(quote?.api_timestamp ?? null);
-        return;
-      }
-
-      setLastApiTimestamp(quote.api_timestamp);
-      const defaultMessage = quote.is_market_open
-        ? "Market is Open"
-        : "Market is Closed";
-      setMarketStatusMessage(quote.market_status_message || defaultMessage);
-
-      if (quote.is_market_open) {
-        const apiTimeMillis = quote.api_timestamp * 1000;
-        const diffMinutes = (Date.now() - apiTimeMillis) / (1000 * 60);
-        setMarketStatus(diffMinutes > 15 ? "Delayed" : "Open");
-      } else {
-        setMarketStatus("Closed");
+        setLastApiTimestamp(null);
       }
     },
-    [] // State setters from useState are stable
+    [symbol]
   );
 
-  // Memoize onQuoteReceived if it's passed as a prop to stabilize setupSubscription
   const stableOnQuoteReceived = useCallback(onQuoteReceived, [onQuoteReceived]);
+
+  const handleSubscriptionStatusChange = useCallback(
+    (status: SubscriptionStatus, err?: Error) => {
+      if (!isMountedRef.current) return;
+      console.log(
+        `useStockData (${symbol}): Realtime Channel Status Received: ${status}`,
+        err || ""
+      );
+
+      switch (status) {
+        case "SUBSCRIBED":
+          if (lastGoodQuoteRef.current) {
+            updateDisplayStatus(lastGoodQuoteRef.current, "status_update");
+            setMarketStatusMessage((prev) => {
+              const baseStatus =
+                marketStatusRef.current === "Delayed"
+                  ? "Data is delayed"
+                  : marketStatusRef.current === "Open"
+                  ? "Market is Open"
+                  : marketStatusRef.current === "Closed"
+                  ? "Market is Closed"
+                  : "Status based on data";
+              return `${baseStatus} (Real-time active)`;
+            });
+            if (marketStatusRef.current === "Connecting") {
+              // If it was connecting and now subscribed, ensure status reflects data.
+              // updateDisplayStatus should have already set it based on lastGoodQuoteRef
+            }
+          } else {
+            setMarketStatus("Live");
+            setMarketStatusMessage("Real-time connected, waiting for data...");
+          }
+          break;
+        case "CHANNEL_ERROR":
+          setMarketStatus("Error");
+          setMarketStatusMessage(
+            `Real-time connection error. ${err?.message || "Retrying..."}`
+          );
+          break;
+        case "TIMED_OUT":
+          setMarketStatus("Error");
+          setMarketStatusMessage(
+            "Real-time connection timed out. Will attempt to reconnect."
+          );
+          break;
+        case "CLOSED":
+          setMarketStatus("Error");
+          setMarketStatusMessage(
+            "Real-time connection closed. Will attempt to reconnect on interaction."
+          );
+          break;
+      }
+    },
+    [symbol, updateDisplayStatus]
+  );
+
+  const marketStatusRef = useRef(marketStatus);
+  useEffect(() => {
+    marketStatusRef.current = marketStatus;
+  }, [marketStatus]);
 
   const setupSubscription = useCallback(async () => {
     if (!isMountedRef.current) return;
@@ -138,20 +178,15 @@ export function useStockData({
     console.log(
       `useStockData (${symbol}): Setting up subscription and fetching initial data...`
     );
-    // 1. Clean up any existing subscription for this hook instance
     if (unsubscribeRealtimeRef.current) {
-      console.log(
-        `useStockData (${symbol}): Cleaning up previous subscription before new setup.`
-      );
       unsubscribeRealtimeRef.current();
       unsubscribeRealtimeRef.current = null;
     }
 
     setMarketStatus("Fetching");
-    setMarketStatusMessage(`Workspaceing data for ${symbol}...`);
+    setMarketStatusMessage(`Workspaceing initial data for ${symbol}...`);
     const supabase = createClient();
 
-    // 2. Fetch initial data
     try {
       const { data, error } = await supabase
         .from("live_quote_indicators")
@@ -164,60 +199,45 @@ export function useStockData({
       if (!isMountedRef.current) return;
 
       if (error && error.code !== "PGRST116") {
-        // PGRST116 means no rows found, not an error for .single()
-        console.error(
-          `useStockData (${symbol}): Error fetching initial data:`,
-          error
-        );
-        updateDisplayStatus(null);
+        updateDisplayStatus(null, "fetch");
         setMarketStatus("Error");
         setMarketStatusMessage("Failed to load initial data.");
       } else if (data) {
         const validationResult = LiveQuoteIndicatorDBSchema.safeParse(data);
         if (validationResult.success) {
           stableOnQuoteReceived(validationResult.data, "fetch");
-          updateDisplayStatus(validationResult.data);
+          updateDisplayStatus(validationResult.data, "fetch");
         } else {
-          console.error(
-            `useStockData (${symbol}): Zod validation failed for fetched data:`,
-            validationResult.error.flatten()
-          );
-          updateDisplayStatus(null);
+          updateDisplayStatus(null, "fetch");
           setMarketStatus("Error");
-          setMarketStatusMessage("Received invalid data format from server.");
+          setMarketStatusMessage("Invalid data format received.");
         }
       } else {
-        updateDisplayStatus(null); // No data found
-        setMarketStatus("Unknown");
-        setMarketStatusMessage(`No initial data found for ${symbol}.`);
+        updateDisplayStatus(null, "fetch");
       }
     } catch (fetchError) {
       if (!isMountedRef.current) return;
-      console.error(
-        `useStockData (${symbol}): Exception during initial data fetch:`,
-        fetchError
-      );
+      updateDisplayStatus(null, "fetch");
       setMarketStatus("Error");
-      setMarketStatusMessage(
-        "A network error occurred while fetching initial data."
-      );
+      setMarketStatusMessage("Network error during initial data fetch.");
     }
 
-    if (!isMountedRef.current) return; // Check again before subscribing
+    if (!isMountedRef.current) return;
 
-    // 3. Establish new Realtime Subscription
-    console.log(
-      `useStockData (${symbol}): Attempting to establish new realtime subscription.`
-    );
-    setMarketStatus("Connecting");
-    setMarketStatusMessage("Connecting to real-time updates...");
+    // After fetch attempt, if not in an Error state, try connecting to realtime.
+    // The current marketStatus reflects the outcome of the fetch.
+    if (marketStatusRef.current !== "Error") {
+      setMarketStatus("Connecting"); // Explicitly set to Connecting before subscribe
+      setMarketStatusMessage("Connecting to real-time updates...");
+    } else {
+      // If fetch resulted in error, don't say "Connecting", keep error message.
+    }
 
     unsubscribeRealtimeRef.current = subscribeToQuoteUpdates(
       symbol,
       (payload) => {
-        if (!isMountedRef.current) return; // Check before processing payload
-
         if (
+          !isMountedRef.current ||
           payload.eventType === "DELETE" ||
           !payload.new ||
           (payload.new as LiveQuoteIndicatorDBRow).symbol !== symbol
@@ -229,7 +249,7 @@ export function useStockData({
         );
         if (validationResult.success) {
           stableOnQuoteReceived(validationResult.data, "realtime");
-          updateDisplayStatus(validationResult.data); // Update market status based on new realtime data
+          updateDisplayStatus(validationResult.data, "realtime");
         } else {
           console.error(
             `useStockData (${symbol}): Realtime Zod validation failed:`,
@@ -238,50 +258,52 @@ export function useStockData({
             payload.new
           );
         }
-      }
+      },
+      handleSubscriptionStatusChange
     );
-  }, [symbol, stableOnQuoteReceived, updateDisplayStatus]);
+  }, [
+    symbol,
+    stableOnQuoteReceived,
+    updateDisplayStatus,
+    handleSubscriptionStatusChange,
+  ]);
 
   useEffect(() => {
-    setupSubscription(); // Initial setup when component mounts or symbol/callbacks change
+    setupSubscription();
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible" && isMountedRef.current) {
         console.log(
-          `useStockData (${symbol}): Page became visible. Re-initiating subscription setup.`
+          `useStockData (${symbol}): Page became visible. Re-running setupSubscription.`
         );
-        // This will clean up the old (if any) and set up a fresh one.
-        setupSubscription();
+        setTimeout(() => {
+          if (isMountedRef.current) setupSubscription();
+        }, 500);
       }
     };
-
     const handleOnlineStatus = () => {
-      if (isMountedRef.current) {
+      if (isMountedRef.current && navigator.onLine) {
         console.log(
-          `useStockData (${symbol}): Network came online. Re-initiating subscription setup.`
+          `useStockData (${symbol}): Network came online. Re-running setupSubscription.`
         );
-        // This will clean up the old (if any) and set up a fresh one.
-        setupSubscription();
+        setTimeout(() => {
+          if (isMountedRef.current) setupSubscription();
+        }, 500);
       }
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("online", handleOnlineStatus);
 
-    // Cleanup function for the main effect
     return () => {
-      // isMountedRef will be set to false by its own useEffect cleanup
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("online", handleOnlineStatus);
       if (unsubscribeRealtimeRef.current) {
-        console.log(
-          `useStockData (${symbol}): Cleaning up subscription on unmount or dependency change.`
-        );
         unsubscribeRealtimeRef.current();
         unsubscribeRealtimeRef.current = null;
       }
     };
-  }, [symbol, setupSubscription]); // setupSubscription is now a dependency
+  }, [symbol, setupSubscription]);
 
   return { marketStatus, marketStatusMessage, lastApiTimestamp };
 }
