@@ -1,11 +1,8 @@
 // src/app/components/game/cards/price-card/price-card.types.ts
-
-// Assuming BaseCardData is imported or defined elsewhere if PriceCardData extends it.
-// For this example, let's assume PriceCardData includes all necessary base fields.
-import type { CardType } from "../base-card/base-card.types"; // if needed
+import type { CardType } from "../base-card/base-card.types";
 
 export interface PriceCardFaceData {
-  readonly timestamp: number | null; // Milliseconds since epoch
+  readonly timestamp: number | null;
   readonly price: number | null;
   readonly dayChange: number | null;
   readonly changePercentage: number | null;
@@ -17,31 +14,25 @@ export interface PriceCardFaceData {
 }
 
 export interface PriceCardSpecificBackData {
-  readonly explanation: string;
+  readonly description?: string | null; // Renamed from explanation, kept optional
   readonly marketCap: number | null;
   readonly sma50d: number | null;
   readonly sma200d: number | null;
 }
 
 export interface PriceCardData {
-  // Assuming common fields from a BaseCardData structure are here
   readonly id: string;
-  readonly type: "price"; // Literal type for PriceCard
+  readonly type: "price";
   readonly symbol: string;
-  readonly createdAt: number; // Milliseconds since epoch
-
-  // New fields for profile information
+  readonly createdAt: number;
   readonly companyName?: string | null;
   readonly logoUrl?: string | null;
-
   readonly faceData: PriceCardFaceData;
-  readonly backData: PriceCardSpecificBackData;
+  readonly backData: PriceCardSpecificBackData; // Uses the updated type
 }
 
-// For PriceCardSnapshotData, you might also want to add companyName and logoUrl
-// if snapshots should also display this information.
 export interface PriceCardSnapshotSpecificBackData {
-  readonly explanation: string;
+  readonly description?: string | null; // Renamed from explanation, kept optional
   readonly discoveredReason?: string;
 }
 
@@ -50,17 +41,13 @@ export interface PriceCardSnapshotData {
   readonly type: "price_snapshot";
   readonly symbol: string;
   readonly createdAt: number;
-
-  // New fields for profile information
   readonly companyName?: string | null;
   readonly logoUrl?: string | null;
-
   readonly capturedPrice: number;
-  readonly snapshotTime: number; // Milliseconds since epoch
-  readonly backData: PriceCardSnapshotSpecificBackData;
+  readonly snapshotTime: number;
+  readonly backData: PriceCardSnapshotSpecificBackData; // Uses the updated type
 }
 
-// Callbacks specific to data points within PriceCardContent
 export interface PriceCardInteractionCallbacks {
   readonly onPriceCardSmaClick?: (
     cardData: PriceCardData,

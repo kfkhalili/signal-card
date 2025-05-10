@@ -9,9 +9,9 @@ import type { DisplayableCard } from "@/components/game/types";
 import type {
   PriceCardData,
   PriceCardFaceData,
-  PriceCardSpecificBackData,
+  PriceCardSpecificBackData, // description is now optional here
   PriceCardSnapshotData,
-  PriceCardSnapshotSpecificBackData,
+  PriceCardSnapshotSpecificBackData, // description is now optional here
 } from "@/components/game/cards/price-card/price-card.types";
 
 import {
@@ -39,10 +39,6 @@ export default function FinSignalGamePage() {
         !cardFromStorage.type ||
         !cardFromStorage.symbol
       ) {
-        console.warn(
-          "Invalid card structure from storage, skipping:",
-          cardFromStorage
-        );
         return null;
       }
       let finalCreatedAt: number;
@@ -86,7 +82,7 @@ export default function FinSignalGamePage() {
         };
         const originalBackData = cardFromStorage.backData || {};
         const rehydratedBackData: PriceCardSpecificBackData = {
-          explanation: originalBackData.explanation || "",
+          description: originalBackData.description, // Changed from explanation
           marketCap: originalBackData.marketCap ?? null,
           sma50d: originalBackData.sma50d ?? null,
           sma200d: originalBackData.sma200d ?? null,
@@ -105,7 +101,7 @@ export default function FinSignalGamePage() {
           snapshotTime = Date.now();
         const originalSnapshotBackData = cardFromStorage.backData || {};
         const rehydratedSnapshotBackData: PriceCardSnapshotSpecificBackData = {
-          explanation: originalSnapshotBackData.explanation || "",
+          description: originalSnapshotBackData.description, // Changed from explanation
           discoveredReason: originalSnapshotBackData.discoveredReason,
         };
         return {
@@ -116,10 +112,6 @@ export default function FinSignalGamePage() {
           backData: rehydratedSnapshotBackData,
         };
       }
-      console.warn(
-        "Unknown card type during rehydration:",
-        cardFromStorage.type
-      );
       return null;
     },
     []
@@ -144,10 +136,6 @@ export default function FinSignalGamePage() {
     (quoteData: CombinedQuoteData, source: "fetch" | "realtime") => {
       const apiTimestampMillis = quoteData.api_timestamp * 1000;
       if (isNaN(apiTimestampMillis)) {
-        console.error(
-          "Page: processQuoteData - Invalid api_timestamp. Skipping update.",
-          quoteData
-        );
         return;
       }
 
@@ -162,10 +150,12 @@ export default function FinSignalGamePage() {
         dayOpen: quoteData.day_open ?? null,
         previousClose: quoteData.previous_close ?? null,
       };
+
+      // The static description is now in PriceCardContent.
+      // The `description` field in `newBackData` can be omitted if not used,
+      // or used for a dynamic description if ever needed.
       const newBackData: PriceCardSpecificBackData = {
-        explanation: `${quoteData.symbol} financial data. Updated: ${new Date(
-          apiTimestampMillis
-        ).toLocaleString()}`,
+        // description: "Some dynamic description if needed", // Or omit if always static
         marketCap: quoteData.market_cap ?? null,
         sma50d: quoteData.sma_50d ?? null,
         sma200d: quoteData.sma_200d ?? null,
@@ -196,7 +186,11 @@ export default function FinSignalGamePage() {
             companyName: quoteData.companyName ?? existingPriceCard.companyName,
             logoUrl: quoteData.logoUrl ?? existingPriceCard.logoUrl,
             faceData: newFaceData,
-            backData: newBackData,
+            backData: {
+              // Ensure backData is updated, respecting optional description
+              ...existingPriceCard.backData, // Preserve existing backData fields
+              ...newBackData, // Overlay with new marketCap, SMAs (description might be undefined)
+            },
           };
           const newCards = [...currentCards];
           newCards[existingCardIndex] = updatedCard;
@@ -247,7 +241,7 @@ export default function FinSignalGamePage() {
       });
     },
     [toast, setActiveCards]
-  ); // setActiveCards from useState is stable
+  );
 
   const { marketStatus, marketStatusMessage, lastApiTimestamp, profileData } =
     useStockData({
@@ -255,21 +249,17 @@ export default function FinSignalGamePage() {
       onQuoteReceived: processQuoteData,
     });
 
-  // Corrected useEffect for profileData updates
   useEffect(() => {
     if (profileData) {
-      // Only run if profileData is available
       setActiveCards((prevActiveCards) => {
         let hasChanged = false;
         const updatedCards = prevActiveCards.map((card) => {
           if (card.type === "price" && card.symbol === profileData.symbol) {
-            // Ensure we are working with PriceCardData structure for type safety
             const priceCard = card as PriceCardData & { isFlipped: boolean };
             const currentCompanyName = priceCard.companyName ?? null;
             const currentLogoUrl = priceCard.logoUrl ?? null;
             const newCompanyName = profileData.company_name ?? null;
             const newLogoUrl = profileData.image ?? null;
-
             if (
               currentCompanyName !== newCompanyName ||
               currentLogoUrl !== newLogoUrl
@@ -284,15 +274,11 @@ export default function FinSignalGamePage() {
           }
           return card;
         });
-
-        // Only call setActiveCards if an actual update was made
-        if (hasChanged) {
-          return updatedCards;
-        }
-        return prevActiveCards; // Return the original array if no changes
+        if (hasChanged) return updatedCards;
+        return prevActiveCards;
       });
     }
-  }, [profileData, setActiveCards]); // setActiveCards from useState is stable and can be in deps
+  }, [profileData, setActiveCards]);
 
   const handleTakeSnapshot = useCallback(
     (cardId?: string) => {
@@ -313,10 +299,12 @@ export default function FinSignalGamePage() {
             capturedPrice: livePriceCard.faceData.price!,
             snapshotTime: livePriceCard.faceData.timestamp!,
             backData: {
-              explanation: `Snapshot of ${livePriceCard.symbol} from ${new Date(
+              // description is now optional and handled statically by PriceCardContent for snapshots too
+              discoveredReason: `Snapshot of ${
+                livePriceCard.symbol
+              } from ${new Date(
                 livePriceCard.faceData.timestamp!
               ).toLocaleString()}`,
-              discoveredReason: "User initiated",
             },
             isFlipped: false,
           };
@@ -365,7 +353,6 @@ export default function FinSignalGamePage() {
             </p>
           )}
       </div>
-
       <ActiveCardsSection
         activeCards={activeCards}
         setActiveCards={setActiveCards}

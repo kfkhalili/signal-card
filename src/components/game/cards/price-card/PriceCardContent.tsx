@@ -12,7 +12,7 @@ import type {
 } from "./price-card.types";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { ClickableDataItem } from "../../../ui/ClickableDataItem";
+import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
 
 const formatMarketCap = (cap: number | null | undefined): string => {
   if (cap === null || cap === undefined) return "N/A";
@@ -21,6 +21,9 @@ const formatMarketCap = (cap: number | null | undefined): string => {
   if (cap >= 1e6) return `${(cap / 1e6).toFixed(2)}M`;
   return cap.toString();
 };
+
+const STATIC_BACK_FACE_EXPLANATION =
+  "The current market value of a single share of this company's stock.";
 
 interface PriceCardContentProps {
   cardData: PriceCardData;
@@ -88,9 +91,12 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
           data-testid="price-card-back-content-data"
           className="pointer-events-auto"
         >
-          <h3 className="text-sm font-semibold text-muted-foreground mb-2">
-            {backData.explanation || "Market Data & Technicals"}
-          </h3>
+          <CardHeader className="px-0 pt-0 pb-2">
+            <CardDescription className="text-xs">
+              {STATIC_BACK_FACE_EXPLANATION}
+            </CardDescription>
+          </CardHeader>
+
           <ShadCardContent className="space-y-2 text-sm px-0 pb-0">
             <div className="grid grid-cols-2 gap-x-4 gap-y-1">
               <ClickableDataItem
@@ -113,14 +119,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                 <span className="font-semibold">Prev Close:</span> $
                 {faceData.previousClose?.toFixed(2) ?? "N/A"}
               </p>
-              <p>
-                <span className="font-semibold">Day High:</span> $
-                {faceData.dayHigh?.toFixed(2) ?? "N/A"}
-              </p>
-              <p>
-                <span className="font-semibold">Day Low:</span> $
-                {faceData.dayLow?.toFixed(2) ?? "N/A"}
-              </p>
+              {/* Day High and Day Low REMOVED from here */}
               <p>
                 <span className="font-semibold">Volume:</span>
                 {faceData.volume?.toLocaleString() ?? "N/A"}
@@ -179,71 +178,84 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
           : changePositive
           ? "text-green-600"
           : "text-red-600";
+
+      const PriceDisplayBlock = (
+        <div
+          className={cn(
+            "w-fit",
+            onGenerateDailyPerformanceSignal && "group/textgroup cursor-pointer"
+          )}
+          onClick={
+            onGenerateDailyPerformanceSignal
+              ? handleDailyPerformanceInteraction
+              : undefined
+          }
+          onKeyDown={
+            onGenerateDailyPerformanceSignal
+              ? (e) =>
+                  (e.key === "Enter" || e.key === " ") &&
+                  handleDailyPerformanceInteraction(e)
+              : undefined
+          }
+          role={onGenerateDailyPerformanceSignal ? "button" : undefined}
+          tabIndex={onGenerateDailyPerformanceSignal ? 0 : undefined}
+          aria-label={
+            onGenerateDailyPerformanceSignal
+              ? `Interact with daily performance: Price ${faceData.price?.toFixed(
+                  2
+                )}`
+              : undefined
+          }
+        >
+          <p
+            className={cn(
+              "text-4xl font-bold",
+              onGenerateDailyPerformanceSignal &&
+                "group-hover/textgroup:text-primary"
+            )}
+          >
+            ${faceData.price != null ? faceData.price.toFixed(2) : "N/A"}
+          </p>
+          <div
+            className={cn(
+              "flex items-baseline space-x-2",
+              baseChangeColor,
+              onGenerateDailyPerformanceSignal &&
+                "group-hover/textgroup:text-primary"
+            )}
+          >
+            <p className="text-lg font-semibold">
+              {faceData.dayChange != null
+                ? `${
+                    faceData.dayChange >= 0 ? "+" : ""
+                  }${faceData.dayChange.toFixed(2)}`
+                : "N/A"}
+            </p>
+            <p className="text-lg font-semibold">
+              (
+              {faceData.changePercentage != null
+                ? `${faceData.changePercentage >= 0 ? "+" : ""}${(
+                    faceData.changePercentage * 100
+                  ).toFixed(2)}%`
+                : "N/A"}
+              )
+            </p>
+          </div>
+        </div>
+      );
+
       return (
         <div
           data-testid="price-card-front-content-data"
           className="pointer-events-auto"
         >
           <ShadCardContent className="px-0 pt-2 pb-0">
-            {/* Outer ClickableDataItem for the action, still has padding */}
-            <ClickableDataItem
-              isInteractive={!!onGenerateDailyPerformanceSignal}
-              onClickHandler={handleDailyPerformanceInteraction}
-              baseClassName="rounded-md p-2 -mx-2 -my-1 mb-2" // Padding here defines overall click area
-              interactiveClassName="cursor-pointer transition-colors relative"
-              data-testid="daily-performance-interactive-area"
-              aria-label={
-                onGenerateDailyPerformanceSignal
-                  ? `Interact with daily performance: Price ${faceData.price?.toFixed(
-                      2
-                    )}`
-                  : undefined
-              }
-              data-interactive-child="true"
+            <div
+              className="rounded-md p-2 -mx-2 -my-1 mb-2"
+              data-testid="daily-performance-layout-area"
             >
-              {/* Inner div for grouping text hover and making it tight */}
-              <div
-                className={cn(
-                  "w-fit",
-                  onGenerateDailyPerformanceSignal && "group/textgroup"
-                )}
-              >
-                <p
-                  className={cn(
-                    "text-4xl font-bold", // Left-aligned by default
-                    onGenerateDailyPerformanceSignal &&
-                      "group-hover/textgroup:text-primary"
-                  )}
-                >
-                  ${faceData.price != null ? faceData.price.toFixed(2) : "N/A"}
-                </p>
-                <div
-                  className={cn(
-                    "flex items-baseline space-x-2", // Left-aligned by default
-                    baseChangeColor,
-                    onGenerateDailyPerformanceSignal &&
-                      "group-hover/textgroup:text-primary"
-                  )}
-                >
-                  <p className="text-lg font-semibold">
-                    {faceData.dayChange != null
-                      ? `${
-                          faceData.dayChange >= 0 ? "+" : ""
-                        }${faceData.dayChange.toFixed(2)}`
-                      : "N/A"}
-                  </p>
-                  <p className="text-lg font-semibold">
-                    (
-                    {faceData.changePercentage != null
-                      ? `${faceData.changePercentage >= 0 ? "+" : ""}${(
-                          faceData.changePercentage * 100
-                        ).toFixed(2)}%`
-                      : "N/A"}
-                    )
-                  </p>
-                </div>
-              </div>
-            </ClickableDataItem>
+              {PriceDisplayBlock}
+            </div>
 
             {faceData.dayLow != null &&
               faceData.dayHigh != null &&
@@ -270,7 +282,8 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                       }
                       data-interactive-child="true"
                     >
-                      L: ${faceData.dayLow.toFixed(2)}
+                      {" "}
+                      L: ${faceData.dayLow.toFixed(2)}{" "}
                     </ClickableDataItem>
                     <ClickableDataItem
                       isInteractive={
@@ -291,10 +304,12 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                       }
                       data-interactive-child="true"
                     >
-                      H: ${faceData.dayHigh.toFixed(2)}
+                      {" "}
+                      H: ${faceData.dayHigh.toFixed(2)}{" "}
                     </ClickableDataItem>
                   </div>
                   <div className="w-full bg-muted rounded-full h-1.5 pointer-events-none">
+                    {" "}
                     {(() => {
                       const range = faceData.dayHigh! - faceData.dayLow!;
                       const position = faceData.price! - faceData.dayLow!;
@@ -311,7 +326,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                           style={{ width: `${percentage}%` }}
                         />
                       );
-                    })()}
+                    })()}{" "}
                   </div>
                 </div>
               )}

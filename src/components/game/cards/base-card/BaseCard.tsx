@@ -13,16 +13,16 @@ import { SocialBar } from "@/components/ui/social-bar";
 
 interface BaseCardProps {
   isFlipped: boolean;
-  faceContent: React.ReactNode; // Content for the face (e.g., PriceCardContent)
-  backContent: React.ReactNode; // Content for the back (e.g., PriceCardContent)
+  faceContent: React.ReactNode;
+  backContent: React.ReactNode;
   cardContext: CardActionContext;
   socialInteractions?: BaseCardSocialInteractions;
   onDeleteRequest?: (context: CardActionContext) => void;
-  onFlip: () => void; // BaseCard now receives onFlip directly
+  onFlip: () => void; // Added onFlip back to props
 
   className?: string;
   innerCardClassName?: string;
-  children?: React.ReactNode; // For top-level overlays, if any, independent of flip
+  children?: React.ReactNode;
 }
 
 const BaseCard: React.FC<BaseCardProps> = ({
@@ -32,7 +32,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
   cardContext,
   socialInteractions,
   onDeleteRequest,
-  onFlip, // New: BaseCard handles its own flip click
+  onFlip, // Destructure onFlip
   className,
   innerCardClassName,
   children,
@@ -71,7 +71,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
   };
 
   const handleDeleteClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent card flip when delete is clicked
+    e.stopPropagation();
     onDeleteRequest?.(cardContext);
   };
 
@@ -81,7 +81,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
       title="Delete Card"
       aria-label={`Delete ${symbol} card`}
       className={cn(
-        "absolute top-1 right-1 z-30 p-1 flex items-center justify-center",
+        "absolute top-0.5 right-0.5 z-30 p-0.5 flex items-center justify-center transition-colors",
         "text-muted-foreground/70 hover:text-primary rounded-sm",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
         "opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-in-out"
@@ -92,16 +92,14 @@ const BaseCard: React.FC<BaseCardProps> = ({
   ) : null;
 
   const universalHeaderElement = (
-    // Clicks on the header will bubble up to ShadCard and trigger onFlip,
-    // unless a specific interactive element within the header stops propagation.
-    <div className="flex justify-between items-center px-3 pb-3 pt-7 shrink-0 min-h-[60px]">
-      <div className="flex items-center space-x-2 flex-shrink-0 mr-2">
+    <div className="flex justify-between items-center px-2 pb-2 pt-6 shrink-0 min-h-[52px]">
+      <div className="flex items-center space-x-1.5 flex-shrink-0 mr-1.5">
         {logoUrl && (
           <Image
             src={logoUrl}
             alt={`${companyName || symbol} logo`}
-            width={32}
-            height={32}
+            width={28}
+            height={28}
             className={cn("object-contain rounded", "drop-shadow-sm")}
             unoptimized={!logoUrl.startsWith("/")}
           />
@@ -133,30 +131,25 @@ const BaseCard: React.FC<BaseCardProps> = ({
         "opacity-0 group-hover:opacity-100",
         "translate-y-full group-hover:translate-y-0"
       )}
-      // onClick for the wrapper of SocialBar should also stop propagation if it's not meant to flip
-      onClick={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()} // Prevent social bar background clicks from flipping
     >
       <SocialBar interactions={socialInteractions} cardContext={cardContext} />
     </div>
   ) : null;
 
-  // Helper to render the content of each face
   const renderCardFaceInternal = (
     contentNode: React.ReactNode,
     isFront: boolean
   ) => (
     <>
-      {deleteButtonElement}{" "}
-      {/* Absolutely positioned, click handled by itself */}
+      {deleteButtonElement}
       {isFront && universalHeaderElement}
       <div
         className={cn(
           "flex-grow overflow-y-auto relative",
-          isFront ? "px-3 pb-3 pt-0" : "px-3 pb-3 pt-7"
+          isFront ? "px-2 pb-2 pt-0" : "px-2 pb-2 pt-6"
         )}
       >
-        {/* The contentNode (e.g., PriceCardContent) will have its own interactive elements
-            that should use e.stopPropagation() if they don't intend to flip the card. */}
         {contentNode}
       </div>
       {socialBarElement}
@@ -170,7 +163,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
         className={cn(innerCardClassName)}
         data-testid="base-card-inner"
       >
-        {/* Front Face - Now directly handles onFlip */}
+        {/* Front Face - Re-added onFlip and accessibility props */}
         <ShadCard
           style={cardSurfaceStyles}
           className={cn(
@@ -179,9 +172,9 @@ const BaseCard: React.FC<BaseCardProps> = ({
             "rounded-2xl",
             "shadow-lg"
           )}
-          onClick={onFlip} // Apply onFlip to the entire card surface
-          role="button" // Make it announce as a button for accessibility
-          tabIndex={0} // Make it focusable
+          onClick={onFlip}
+          role="button"
+          tabIndex={0}
           onKeyDown={(e) =>
             e.key === "Enter" || e.key === " " ? onFlip() : undefined
           }
@@ -192,7 +185,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
           {renderCardFaceInternal(faceContent, true)}
         </ShadCard>
 
-        {/* Back Face - Now directly handles onFlip */}
+        {/* Back Face - Re-added onFlip and accessibility props */}
         <ShadCard
           style={{ ...cardSurfaceStyles, ...backFaceTransformStyle }}
           className={cn(
@@ -201,7 +194,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
             "rounded-2xl",
             "shadow-lg"
           )}
-          onClick={onFlip} // Apply onFlip to the entire card surface
+          onClick={onFlip}
           role="button"
           tabIndex={0}
           onKeyDown={(e) =>
