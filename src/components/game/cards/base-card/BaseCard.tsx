@@ -61,13 +61,23 @@ const BaseCard: React.FC<BaseCardProps> = ({
         {/* ShadCard now receives the styles that include backfaceVisibility */}
         <ShadCard
           style={faceAndBackSharedStyles}
-          className={cn("card-face-wrapper", "overflow-hidden")}
+          className={cn(
+            "card-face-wrapper",
+            "overflow-hidden",
+            "rounded-2xl",
+            "shadow-lg"
+          )}
         >
           {faceContent}
         </ShadCard>
         <ShadCard
           style={backFaceSpecificStyles}
-          className={cn("card-back-wrapper", "overflow-hidden")}
+          className={cn(
+            "card-back-wrapper",
+            "overflow-hidden",
+            "rounded-2xl",
+            "shadow-lg"
+          )}
         >
           {backContent}
         </ShadCard>
