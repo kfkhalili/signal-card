@@ -1,19 +1,18 @@
 // src/lib/supabase/realtime-service.ts
-import { createClient } from "./client"; // Your Supabase client instance
+import { createClient } from "./client";
 import type {
   RealtimeChannel,
   RealtimePostgresChangesPayload,
   SupabaseClient,
 } from "@supabase/supabase-js";
-import { z } from "zod"; // Make sure Zod is imported here
+import { z } from "zod";
 
-// Define and EXPORT the interface for the raw data from your 'live_quote_indicators' table
 export interface LiveQuoteIndicatorDBRow {
   id: string;
   symbol: string;
   current_price: number;
-  api_timestamp: number; // Unix timestamp (seconds) from the API/source
-  fetched_at: string; // ISO string timestamp of when the DB row was last updated/fetched
+  api_timestamp: number;
+  fetched_at: string;
   change_percentage?: number | null;
   day_change?: number | null;
   volume?: number | null;
@@ -29,13 +28,12 @@ export interface LiveQuoteIndicatorDBRow {
   market_exchange_name?: string | null;
 }
 
-// Define and EXPORT the Zod schema
 export const LiveQuoteIndicatorDBSchema = z.object({
   id: z.string(),
   symbol: z.string(),
   current_price: z.number(),
   api_timestamp: z.number(),
-  fetched_at: z.string(), // Assuming this is always present as per your previous definition
+  fetched_at: z.string(),
   change_percentage: z.number().nullable().optional(),
   day_change: z.number().nullable().optional(),
   day_low: z.number().nullable().optional(),
@@ -51,15 +49,11 @@ export const LiveQuoteIndicatorDBSchema = z.object({
   market_exchange_name: z.string().nullable().optional(),
 });
 
-// Type for the payload received from Supabase realtime
-// This now uses the exported LiveQuoteIndicatorDBRow
 export type LiveQuotePayload =
   RealtimePostgresChangesPayload<LiveQuoteIndicatorDBRow>;
 
-// Callback type for when new data is received
 export type QuoteUpdateCallback = (payload: LiveQuotePayload) => void;
 
-// Callback type for subscription status changes
 export type SubscriptionStatus =
   | "SUBSCRIBED"
   | "TIMED_OUT"
@@ -83,7 +77,7 @@ function getSupabaseClient(): SupabaseClient {
 export function subscribeToQuoteUpdates(
   symbol: string,
   onData: QuoteUpdateCallback,
-  onStatusChange: SubscriptionStatusCallback
+  onStatusChange: SubscriptionStatusCallback // Parameter that might be causing issues
 ): () => void {
   const supabase = getSupabaseClient();
   const channelName = `realtime:stock-quote-${symbol.toLowerCase()}-${Math.random()
@@ -100,16 +94,29 @@ export function subscribeToQuoteUpdates(
   });
 
   channel
-    .on<LiveQuoteIndicatorDBRow>( // Use the exported LiveQuoteIndicatorDBRow
+    .on<LiveQuoteIndicatorDBRow>(
       "postgres_changes",
       { event: "*", schema: "public", table: TABLE_NAME, filter: topicFilter },
       (payload) => {
-        onData(payload as LiveQuotePayload);
+        if (typeof onData === "function") {
+          // Guard for onData as well, just in case
+          onData(payload as LiveQuotePayload);
+        }
       }
     )
     .subscribe((status, err) => {
-      onStatusChange(status as SubscriptionStatus, err);
-      // ... (console logs for status as before) ...
+      // CRITICAL GUARD: Ensure onStatusChange is still a function before calling it.
+      // This handles cases where an old channel might fire an event after its associated
+      // callback from the hook has been "cleaned up" or its closure became invalid.
+      if (typeof onStatusChange === "function") {
+        onStatusChange(status as SubscriptionStatus, err);
+      } else {
+        console.warn(
+          `RealtimeService (${symbol}): onStatusChange was not a function for channel ${channel.topic} when status event "${status}" occurred. This might be an old channel event firing after unsubscription.`
+        );
+      }
+
+      // Existing logging for debug purposes (can be kept or removed if too noisy)
       switch (status) {
         case "SUBSCRIBED":
           console.log(

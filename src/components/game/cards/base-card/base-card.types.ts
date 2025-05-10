@@ -3,7 +3,6 @@
  * Defines foundational types and interfaces for all game cards.
  */
 
-// Defines the possible literal string values for card types.
 export type CardType =
   | "price"
   | "daily_performance"
@@ -14,25 +13,30 @@ export type CardType =
   | "trend"
   | "base";
 
-// Base interface for data commonly found on the back of any card.
 export interface BaseCardBackData {
   readonly explanation: string;
 }
 
-// The core interface that all specific card data structures MUST extend.
+// BaseCardData itself doesn't need companyName/logoUrl if specific card types
+// (like PriceCardData) will hold them and provide them to BaseCard via props.
+// However, CardActionContext will carry them for actions.
 export interface BaseCardData {
   readonly id: string;
   readonly type: CardType;
   readonly symbol: string;
   readonly backData: BaseCardBackData;
-  readonly createdAt: number; // Timestamp (milliseconds since epoch)
+  readonly createdAt: number;
 }
 
 // --- Context for Actions ---
+// This context is passed to interaction handlers (e.g., social bar, delete)
 export interface CardActionContext {
   readonly id: string;
   readonly symbol: string;
   readonly type: CardType;
+  // Add company info here if actions need it directly without full cardData
+  readonly companyName?: string | null;
+  readonly logoUrl?: string | null;
 }
 
 // --- Social Interactions ---
@@ -51,7 +55,7 @@ export interface DataPoint<TDetails = unknown> {
 }
 
 export interface CardInteractionEvent<
-  TCardData extends BaseCardData = BaseCardData,
+  TCardData extends BaseCardData = BaseCardData, // TCardData might be PriceCardData which has company info
   TDetails = unknown
 > {
   readonly cardData: TCardData;

@@ -1,18 +1,20 @@
 // src/app/components/game/cards/base-card/BaseCard.tsx
 import React from "react";
-import { Card as ShadCard } from "@/components/ui/card";
+import { Card as ShadCard, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { XIcon } from "lucide-react"; // Using XIcon for delete
+import { XIcon } from "lucide-react";
+import Image from "next/image";
 import type {
   CardActionContext,
   BaseCardSocialInteractions,
+  CardType,
 } from "./base-card.types";
 import { SocialBar } from "@/components/ui/social-bar";
 
 interface BaseCardProps {
   isFlipped: boolean;
-  faceContent: React.ReactNode;
-  backContent: React.ReactNode;
+  faceContent: React.ReactNode; // This will be the clickable wrapper from PriceCardContainer
+  backContent: React.ReactNode; // This will be the clickable wrapper from PriceCardContainer
   cardContext: CardActionContext;
   socialInteractions?: BaseCardSocialInteractions;
   onDeleteRequest?: (context: CardActionContext) => void;
@@ -23,8 +25,8 @@ interface BaseCardProps {
 
 const BaseCard: React.FC<BaseCardProps> = ({
   isFlipped,
-  faceContent,
-  backContent,
+  faceContent, // This IS the clickable div from PriceCardContainer
+  backContent, // This IS the clickable div from PriceCardContainer
   cardContext,
   socialInteractions,
   onDeleteRequest,
@@ -32,6 +34,8 @@ const BaseCard: React.FC<BaseCardProps> = ({
   innerCardClassName,
   children,
 }) => {
+  const { symbol, companyName, logoUrl } = cardContext;
+
   const outerStyle: React.CSSProperties = {
     perspective: "1000px",
     position: "relative",
@@ -46,7 +50,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
     transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
   };
 
-  const faceAndBackSharedStyles: React.CSSProperties = {
+  const cardSurfaceStyles: React.CSSProperties = {
     position: "absolute",
     top: 0,
     left: 0,
@@ -58,8 +62,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
     flexDirection: "column",
   };
 
-  const backFaceSpecificStyles: React.CSSProperties = {
-    ...faceAndBackSharedStyles,
+  const backFaceTransformStyle: React.CSSProperties = {
     transform: "rotateY(180deg)",
   };
 
@@ -68,32 +71,88 @@ const BaseCard: React.FC<BaseCardProps> = ({
     onDeleteRequest?.(cardContext);
   };
 
-  const deleteButton = onDeleteRequest ? (
+  const deleteButtonElement = onDeleteRequest ? (
     <button
       onClick={handleDeleteClick}
       title="Delete Card"
-      aria-label={`Delete ${cardContext.symbol} card`}
+      aria-label={`Delete ${symbol} card`}
       className={cn(
-        "absolute top-1.5 right-1.5 z-20 p-1.5 flex items-center justify-center transition-colors",
-        "text-muted-foreground/70 hover:text-primary rounded-sm", // Removed hover:bg-muted/50
-        "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+        "absolute top-1 right-1 z-30 p-1 flex items-center justify-center",
+        "text-muted-foreground/70 hover:text-primary rounded-sm",
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+        "opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-in-out"
       )}
     >
-      <XIcon size={16} strokeWidth={2.5} />
+      <XIcon size={14} strokeWidth={2.5} />
     </button>
   ) : null;
+
+  const universalHeaderElement = (
+    <div className="flex justify-between items-center px-3 pb-3 pt-7 shrink-0 min-h-[60px]">
+      <div className="flex items-center space-x-2 flex-shrink-0 mr-2">
+        {logoUrl && (
+          <Image
+            src={logoUrl}
+            alt={`${companyName || symbol} logo`}
+            width={32}
+            height={32}
+            className={cn("object-contain rounded", "drop-shadow-sm")}
+            unoptimized={!logoUrl.startsWith("/")}
+          />
+        )}
+      </div>
+      <div className="text-right overflow-hidden">
+        <CardTitle
+          className="text-sm font-semibold leading-tight truncate"
+          title={companyName || symbol}
+        >
+          {companyName || symbol}
+        </CardTitle>
+        {companyName && (
+          <p className="text-xs text-muted-foreground truncate" title={symbol}>
+            ({symbol})
+          </p>
+        )}
+        {!companyName && (
+          <p className="text-xs text-muted-foreground">Stock Quote</p>
+        )}
+      </div>
+    </div>
+  );
 
   const socialBarElement = socialInteractions ? (
     <div
       className={cn(
-        "transition-all duration-300 ease-in-out",
+        "transition-all duration-300 ease-in-out z-10",
         "opacity-0 group-hover:opacity-100",
-        "translate-y-4 group-hover:translate-y-0"
+        "translate-y-full group-hover:translate-y-0"
       )}
     >
       <SocialBar interactions={socialInteractions} cardContext={cardContext} />
     </div>
   ) : null;
+
+  // This function now renders the structure for each card face
+  const renderCardFaceInternal = (
+    contentNode: React.ReactNode,
+    isFront: boolean
+  ) => (
+    <>
+      {deleteButtonElement}
+      {isFront && universalHeaderElement}{" "}
+      {/* Only render header on the front face */}
+      <div
+        className={cn(
+          "flex-grow overflow-y-auto relative", // Ensure this div can expand
+          isFront ? "px-3 pb-3 pt-0" : "px-3 pb-3 pt-7" // Adjust padding based on face
+        )}
+      >
+        {contentNode}{" "}
+        {/* This is the clickable wrapper from PriceCardContainer */}
+      </div>
+      {socialBarElement}
+    </>
+  );
 
   return (
     <div style={outerStyle} className={cn("group", className)}>
@@ -103,37 +162,27 @@ const BaseCard: React.FC<BaseCardProps> = ({
         data-testid="base-card-inner"
       >
         <ShadCard
-          style={faceAndBackSharedStyles}
+          style={cardSurfaceStyles}
           className={cn(
             "card-face-wrapper",
             "overflow-hidden",
             "rounded-2xl",
-            "shadow-lg",
-            "relative"
+            "shadow-lg"
           )}
         >
-          {deleteButton}
-          <div className="flex-grow overflow-y-auto p-4 pt-7">
-            {faceContent}
-          </div>
-          {socialBarElement}
+          {renderCardFaceInternal(faceContent, true)}
         </ShadCard>
 
         <ShadCard
-          style={backFaceSpecificStyles}
+          style={{ ...cardSurfaceStyles, ...backFaceTransformStyle }}
           className={cn(
             "card-back-wrapper",
             "overflow-hidden",
             "rounded-2xl",
-            "shadow-lg",
-            "relative"
+            "shadow-lg"
           )}
         >
-          {deleteButton}
-          <div className="flex-grow overflow-y-auto p-4 pt-7">
-            {backContent}
-          </div>
-          {socialBarElement}
+          {renderCardFaceInternal(backContent, false)}
         </ShadCard>
       </div>
       {children}

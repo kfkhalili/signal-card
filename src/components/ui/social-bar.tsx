@@ -19,11 +19,10 @@ export const SocialBar: React.FC<SocialBarProps> = ({
   className,
 }) => {
   if (!interactions) {
-    return null;
+    return null; // Don't render if no interaction callbacks are provided
   }
 
   const iconSize = 18;
-  // Removed hover:bg-muted/60 from here
   const buttonBaseClass =
     "flex items-center space-x-1.5 p-1.5 text-xs hover:text-primary rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
@@ -31,17 +30,18 @@ export const SocialBar: React.FC<SocialBarProps> = ({
     e: React.MouseEvent,
     action?: (context: CardActionContext) => void
   ) => {
-    e.stopPropagation();
+    e.stopPropagation(); // Prevent card flip
     action?.(cardContext);
   };
 
   return (
     <div
       className={cn(
-        "shrink-0 border-t p-1 flex justify-around items-center text-muted-foreground",
+        // Removed "border-t" from this div's className
+        "shrink-0 p-1 flex justify-around items-center text-muted-foreground",
         className
       )}
-      onClick={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()} // Prevent clicks on the bar itself from flipping the card
       role="toolbar"
       aria-label="Social actions"
     >
@@ -53,7 +53,6 @@ export const SocialBar: React.FC<SocialBarProps> = ({
           aria-label={`Like ${cardContext.symbol} card`}
         >
           <ThumbsUp size={iconSize} aria-hidden="true" />
-          <span>Like</span>
         </button>
       )}
       {interactions.onComment && (
@@ -64,7 +63,6 @@ export const SocialBar: React.FC<SocialBarProps> = ({
           aria-label={`Comment on ${cardContext.symbol} card`}
         >
           <MessageCircle size={iconSize} aria-hidden="true" />
-          <span>Comment</span>
         </button>
       )}
       {interactions.onSave && (
@@ -75,7 +73,6 @@ export const SocialBar: React.FC<SocialBarProps> = ({
           aria-label={`Save ${cardContext.symbol} card`}
         >
           <Bookmark size={iconSize} aria-hidden="true" />
-          <span>Save</span>
         </button>
       )}
       {interactions.onShare && (
@@ -86,7 +83,6 @@ export const SocialBar: React.FC<SocialBarProps> = ({
           aria-label={`Share ${cardContext.symbol} card`}
         >
           <Share2 size={iconSize} aria-hidden="true" />
-          <span>Share</span>
         </button>
       )}
     </div>

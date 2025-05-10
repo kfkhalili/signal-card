@@ -12,7 +12,7 @@ import type {
 } from "./price-card.types";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { ClickableDataItem } from "../../../ui/ClickableDataItem"; // Adjusted path
+import { ClickableDataItem } from "../../../ui/ClickableDataItem";
 
 const formatMarketCap = (cap: number | null | undefined): string => {
   if (cap === null || cap === undefined) return "N/A";
@@ -83,17 +83,16 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
     };
 
     if (isBackFace) {
+      // --- RENDER PRICE CARD BACK ---
+      // This content is now rendered within a div with p-3 by BaseCard
       return (
         <div
-          data-testid="price-card-back-content"
+          data-testid="price-card-back-content-data"
           className="pointer-events-auto"
         >
-          <CardHeader className="px-0 pt-0">
-            <CardTitle className="text-lg">{symbol} - Details</CardTitle>
-            <CardDescription>
-              {backData.explanation || "Market Data & Technicals"}
-            </CardDescription>
-          </CardHeader>
+          <h3 className="text-sm font-semibold text-muted-foreground mb-2">
+            {backData.explanation || "Market Data & Technicals"}
+          </h3>
           <ShadCardContent className="space-y-2 text-sm px-0 pb-0">
             <div className="grid grid-cols-2 gap-x-4 gap-y-1">
               <ClickableDataItem
@@ -184,28 +183,18 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
           : "text-red-600";
       return (
         <div
-          data-testid="price-card-front-content"
+          data-testid="price-card-front-content-data"
           className="pointer-events-auto"
         >
-          <CardHeader className="px-0 pt-0">
-            <div className="flex justify-between items-start">
-              <div>
-                <CardTitle className="text-2xl">{symbol}</CardTitle>
-                <CardDescription>Live Quote</CardDescription>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {faceData.timestamp
-                  ? format(new Date(faceData.timestamp), "p")
-                  : "N/A"}
-              </p>
-            </div>
-          </CardHeader>
-          <ShadCardContent className="px-0 pb-0">
+          {/* The universal header is now rendered by BaseCard.tsx */}
+          {/* This ShadCardContent is for the main price display area */}
+          <ShadCardContent className="px-0 pt-2 pb-0">
+            {" "}
+            {/* pt-2 for space from universal header */}
             <ClickableDataItem
               isInteractive={!!onGenerateDailyPerformanceSignal}
               onClickHandler={handleDailyPerformanceInteraction}
-              baseClassName="group/dps rounded-md p-2 -mx-2 -my-1 mb-1"
-              // MODIFIED HERE: Removed hover:bg-muted/30
+              baseClassName="group/dps rounded-md p-2 -mx-2 -my-1 mb-2" // Added mb-2 for spacing
               interactiveClassName="cursor-pointer transition-colors relative"
               data-testid="daily-performance-interactive-area"
               aria-label={
@@ -252,17 +241,19 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                 </p>
               </div>
             </ClickableDataItem>
-            <p className="text-xs text-muted-foreground mt-2">
+            {/* REMOVED "Data as of:" line */}
+            {/* <p className="text-xs text-muted-foreground mt-2">
               Data as of:{" "}
-              {faceData.timestamp
-                ? format(new Date(faceData.timestamp), "PP p")
-                : "N/A"}
-            </p>
+              {faceData.timestamp ? format(new Date(faceData.timestamp), "PP p") : "N/A"}
+            </p> 
+            */}
             {faceData.dayLow != null &&
               faceData.dayHigh != null &&
               faceData.price != null &&
               faceData.dayHigh > faceData.dayLow && (
                 <div className="mt-3">
+                  {" "}
+                  {/* This mt-3 might need adjustment after removing the line above */}
                   <div className="flex justify-between text-xs text-muted-foreground mb-1">
                     <ClickableDataItem
                       isInteractive={

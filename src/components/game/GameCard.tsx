@@ -4,21 +4,20 @@ import type { DisplayableCard } from "@/components/game/types";
 import type {
   PriceCardData,
   PriceCardSnapshotData,
-  PriceCardInteractionCallbacks,
+  PriceCardInteractionCallbacks, // For PriceSpecificInteractions type
   PriceCardSpecificBackData,
   PriceCardFaceData,
-} from "./cards/price-card/price-card.types";
+} from "./cards/price-card/price-card.types"; // PriceCardData now includes companyName, logoUrl
 import type {
   BaseCardData,
   CardActionContext,
   BaseCardSocialInteractions,
   CardType,
-} from "./cards/base-card/base-card.types";
+} from "./cards/base-card/base-card.types"; // CardActionContext now includes companyName, logoUrl
 import { PriceCardContainer } from "./cards/price-card/PriceCardContainer";
 import { cn } from "@/lib/utils";
-import { XIcon } from "lucide-react"; // Ensure XIcon is imported
+import { XIcon } from "lucide-react";
 
-// Define which specific interaction callbacks PriceCardContainer needs for PriceCardContent
 type PriceSpecificInteractionsForContainer = Pick<
   PriceCardInteractionCallbacks,
   | "onPriceCardSmaClick"
@@ -28,7 +27,7 @@ type PriceSpecificInteractionsForContainer = Pick<
 >;
 
 interface GameCardProps {
-  readonly card: DisplayableCard;
+  readonly card: DisplayableCard; // This is ConcreteCardData & DisplayableCardState
   readonly onToggleFlip: (id: string) => void;
   readonly onDeleteCardRequest: (id: string) => void;
   readonly socialInteractions?: BaseCardSocialInteractions;
@@ -45,20 +44,24 @@ const GameCard: React.FC<GameCardProps> = ({
   const handleFlip = () => onToggleFlip(card.id);
 
   const handleDeleteAction = (context: CardActionContext) => {
-    console.log("Delete requested for card:", context.id, context.symbol);
     onDeleteCardRequest(context.id);
   };
 
+  // Construct cardContext, ensuring companyName and logoUrl are included
+  // The 'card' prop is DisplayableCard, which means it's either PriceCardData or PriceCardSnapshotData (etc.)
+  // Both PriceCardData and PriceCardSnapshotData should now have companyName and logoUrl from your types.
   const cardContextForBaseCard: CardActionContext = {
     id: card.id,
     symbol: card.symbol,
-    type: card.type as CardType, // Cast to ensure compatibility
+    type: card.type as CardType,
+    companyName: card.companyName ?? null, // Access directly from card prop
+    logoUrl: card.logoUrl ?? null, // Access directly from card prop
   };
 
   const cardWrapperClassName = "w-[280px] aspect-[63/88] relative";
 
   if (card.type === "price") {
-    const priceCardData = card as PriceCardData & { isFlipped: boolean };
+    const priceCardData = card as PriceCardData & { isFlipped: boolean }; // card is already PriceCardData here
     return (
       <PriceCardContainer
         cardData={priceCardData}
@@ -66,8 +69,7 @@ const GameCard: React.FC<GameCardProps> = ({
         onFlip={handleFlip}
         cardContext={cardContextForBaseCard}
         socialInteractions={socialInteractions}
-        // MODIFIED HERE: Pass handleDeleteAction to enable delete for live price cards
-        onDeleteRequest={handleDeleteAction}
+        onDeleteRequest={handleDeleteAction} // Enable delete for live price cards
         priceSpecificInteractions={priceSpecificInteractions}
         className={cardWrapperClassName}
       />
@@ -76,6 +78,7 @@ const GameCard: React.FC<GameCardProps> = ({
 
   if (card.type === "price_snapshot") {
     const snapshotCard = card as PriceCardSnapshotData & { isFlipped: boolean };
+    // Adapt snapshot data for PriceCardContainer display
     const adaptedFaceData: PriceCardFaceData = {
       timestamp: snapshotCard.snapshotTime,
       price: snapshotCard.capturedPrice,
@@ -98,27 +101,27 @@ const GameCard: React.FC<GameCardProps> = ({
       type: "price",
       symbol: snapshotCard.symbol,
       createdAt: snapshotCard.createdAt,
+      companyName: snapshotCard.companyName, // Pass through from snapshot
+      logoUrl: snapshotCard.logoUrl, // Pass through from snapshot
       faceData: adaptedFaceData,
       backData: adaptedBackData,
     };
 
     return (
       <PriceCardContainer
-        cardData={adaptedDataForSnapshotDisplay}
+        cardData={adaptedDataForSnapshotDisplay} // This contains the adapted profile info
         isFlipped={snapshotCard.isFlipped}
         onFlip={handleFlip}
-        cardContext={cardContextForBaseCard}
+        cardContext={cardContextForBaseCard} // cardContext also has profile info
         socialInteractions={socialInteractions}
-        onDeleteRequest={handleDeleteAction} // Snapshots ARE deletable
+        onDeleteRequest={handleDeleteAction}
         priceSpecificInteractions={undefined}
         className={cn(cardWrapperClassName, "opacity-90")}
       />
     );
   }
 
-  // Fallback for other/unsupported card types
   const baseInfo = card as BaseCardData & { isFlipped: boolean };
-
   return (
     <div
       className={cn(
@@ -127,21 +130,18 @@ const GameCard: React.FC<GameCardProps> = ({
         "flex flex-col items-center justify-center shadow-lg relative"
       )}
     >
-      {/* For non-price and non-snapshot cards, we pass handleDeleteAction to BaseCard if we were using it directly.
-          Since we are rendering a simple div here, we add the button manually if needed.
-          The original logic was to disable delete for "price" type in BaseCard.
-          If this fallback is for types OTHER than "price", the delete button should appear.
-      */}
-      {/* This button will only render if this fallback is reached AND baseInfo.type is NOT "price" */}
-      {/* If you want ALL fallback cards to be deletable, remove the baseInfo.type check or adjust. */}
-      {baseInfo.type !== "price" && ( // Or simply always show if it's a fallback card
+      {baseInfo.type !== "price" && (
         <button
           onClick={() => handleDeleteAction(cardContextForBaseCard)}
           title="Delete Card"
           aria-label={`Delete ${baseInfo.symbol} card`}
-          className="absolute top-2 right-2 z-20 p-1 bg-red-500 hover:bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow-md transition-colors"
+          className={cn(
+            "absolute top-1.5 right-1.5 z-20 p-1.5 flex items-center justify-center transition-colors",
+            "text-muted-foreground/70 hover:text-primary rounded-sm",
+            "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+          )}
         >
-          <XIcon size={14} strokeWidth={2.5} />
+          <XIcon size={16} strokeWidth={2.5} />
         </button>
       )}
       <p className="font-semibold">Unsupported Card Type</p>

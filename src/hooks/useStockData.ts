@@ -1,16 +1,46 @@
 // src/hooks/useStockData.ts
 import { useState, useEffect, useCallback, useRef } from "react";
-import { createClient } from "@/lib/supabase/client"; // Used for initial fetch
+import { createClient } from "@/lib/supabase/client"; // Your client creation function
+import { type SupabaseClient } from "@supabase/supabase-js"; // Import SupabaseClient type directly
 import {
   subscribeToQuoteUpdates,
   type LiveQuotePayload,
   type SubscriptionStatus,
-  type LiveQuoteIndicatorDBRow, // Now imported
-  LiveQuoteIndicatorDBSchema, // Now imported
-} from "@/lib/supabase/realtime-service"; // Adjust path as needed
-// Zod is used by LiveQuoteIndicatorDBSchema which is imported, so no direct z import needed here unless used otherwise.
+  type LiveQuoteIndicatorDBRow,
+  LiveQuoteIndicatorDBSchema,
+} from "@/lib/supabase/realtime-service";
+import { z } from "zod";
 
-// This type is for UI display states managed by the hook
+// Define ProfileDBRow and Schema here
+export interface ProfileDBRow {
+  id: string; // UUID
+  symbol: string;
+  company_name?: string | null;
+  image?: string | null; // This is the logo URL
+  sector?: string | null;
+  industry?: string | null;
+  website?: string | null;
+  description?: string | null;
+  country?: string | null;
+}
+
+export const ProfileDBSchema = z.object({
+  id: z.string().uuid(),
+  symbol: z.string(),
+  company_name: z.string().nullable().optional(),
+  image: z.string().url().nullable().optional(),
+  sector: z.string().nullable().optional(),
+  industry: z.string().nullable().optional(),
+  website: z.string().url().nullable().optional(),
+  description: z.string().nullable().optional(),
+  country: z.string().nullable().optional(),
+});
+
+export interface CombinedQuoteData extends LiveQuoteIndicatorDBRow {
+  companyName?: string | null;
+  logoUrl?: string | null;
+}
+
 export type MarketStatusDisplayHook =
   | "Open"
   | "Closed"
@@ -24,7 +54,7 @@ export type MarketStatusDisplayHook =
 interface UseStockDataProps {
   symbol: string;
   onQuoteReceived: (
-    quoteData: LiveQuoteIndicatorDBRow, // Uses imported type
+    quoteData: CombinedQuoteData,
     source: "fetch" | "realtime"
   ) => void;
 }
@@ -33,6 +63,7 @@ interface UseStockDataReturn {
   marketStatus: MarketStatusDisplayHook;
   marketStatusMessage: string | null;
   lastApiTimestamp: number | null;
+  profileData?: ProfileDBRow | null;
 }
 
 export function useStockData({
@@ -45,10 +76,13 @@ export function useStockData({
     "Initializing..."
   );
   const [lastApiTimestamp, setLastApiTimestamp] = useState<number | null>(null);
-  const lastGoodQuoteRef = useRef<LiveQuoteIndicatorDBRow | null>(null);
+  const [profileData, setProfileData] = useState<ProfileDBRow | null>(null);
 
+  const lastGoodQuoteRef = useRef<LiveQuoteIndicatorDBRow | null>(null);
   const unsubscribeRealtimeRef = useRef<(() => void) | null>(null);
   const isMountedRef = useRef<boolean>(true);
+  // Initialize Supabase client using your createClient function
+  const supabaseClientRef = useRef<SupabaseClient>(createClient());
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -57,13 +91,73 @@ export function useStockData({
     };
   }, []);
 
+  useEffect(() => {
+    if (!symbol) {
+      setProfileData(null);
+      return;
+    }
+    let active = true;
+    const fetchProfile = async () => {
+      console.log(`useStockData (${symbol}): Fetching profile data...`);
+      try {
+        const { data, error } = await supabaseClientRef.current // Use the ref
+          .from("profiles")
+          .select(
+            "id, symbol, company_name, image, sector, industry, website, description, country"
+          )
+          .eq("symbol", symbol)
+          .maybeSingle();
+
+        if (!active || !isMountedRef.current) return;
+
+        if (error) {
+          console.error(
+            `useStockData (${symbol}): Error fetching profile data:`,
+            error
+          );
+          setProfileData(null);
+        } else if (data) {
+          const validationResult = ProfileDBSchema.safeParse(data);
+          if (validationResult.success) {
+            setProfileData(validationResult.data);
+            console.log(
+              `useStockData (${symbol}): Profile data loaded:`,
+              validationResult.data.company_name
+            );
+          } else {
+            console.error(
+              `useStockData (${symbol}): Zod validation failed for profile data:`,
+              validationResult.error.flatten()
+            );
+            setProfileData(null);
+          }
+        } else {
+          console.warn(
+            `useStockData (${symbol}): No profile data found for symbol.`
+          );
+          setProfileData(null);
+        }
+      } catch (err) {
+        if (!active || !isMountedRef.current) return;
+        console.error(
+          `useStockData (${symbol}): Exception during profile fetch:`,
+          err
+        );
+        setProfileData(null);
+      }
+    };
+    fetchProfile();
+    return () => {
+      active = false;
+    };
+  }, [symbol]);
+
   const updateDisplayStatus = useCallback(
     (
       quote: LiveQuoteIndicatorDBRow | null,
       context?: "fetch" | "realtime" | "status_update"
     ) => {
       if (!isMountedRef.current) return;
-
       if (quote) {
         lastGoodQuoteRef.current = quote;
         setLastApiTimestamp(quote.api_timestamp);
@@ -71,7 +165,6 @@ export function useStockData({
           ? "Market is Open"
           : "Market is Closed";
         let currentMarketStatus: MarketStatusDisplayHook = "Unknown";
-
         if (quote.is_market_open) {
           const apiTimeMillis = quote.api_timestamp * 1000;
           const diffMinutes = (Date.now() - apiTimeMillis) / (1000 * 60);
@@ -86,7 +179,6 @@ export function useStockData({
             quote.market_status_message || defaultMessageBase
           );
         }
-
         if (
           marketStatusRef.current === "Fetching" ||
           marketStatusRef.current === "Connecting" ||
@@ -110,7 +202,22 @@ export function useStockData({
     [symbol]
   );
 
-  const stableOnQuoteReceived = useCallback(onQuoteReceived, [onQuoteReceived]);
+  const stableOnQuoteReceived = useCallback(
+    (quoteData: LiveQuoteIndicatorDBRow, source: "fetch" | "realtime") => {
+      const combinedData: CombinedQuoteData = {
+        ...quoteData,
+        companyName: profileData?.company_name ?? null,
+        logoUrl: profileData?.image ?? null,
+      };
+      onQuoteReceived(combinedData, source);
+    },
+    [profileData, onQuoteReceived]
+  );
+
+  const marketStatusRef = useRef(marketStatus);
+  useEffect(() => {
+    marketStatusRef.current = marketStatus;
+  }, [marketStatus]);
 
   const handleSubscriptionStatusChange = useCallback(
     (status: SubscriptionStatus, err?: Error) => {
@@ -119,29 +226,42 @@ export function useStockData({
         `useStockData (${symbol}): Realtime Channel Status Received: ${status}`,
         err || ""
       );
-
       switch (status) {
         case "SUBSCRIBED":
           if (lastGoodQuoteRef.current) {
             updateDisplayStatus(lastGoodQuoteRef.current, "status_update");
+            const currentDataDrivenStatus = marketStatusRef.current;
             setMarketStatusMessage((prev) => {
-              const baseStatus =
-                marketStatusRef.current === "Delayed"
+              const baseStatusMessage =
+                currentDataDrivenStatus === "Delayed"
                   ? "Data is delayed"
-                  : marketStatusRef.current === "Open"
+                  : currentDataDrivenStatus === "Open"
                   ? "Market is Open"
-                  : marketStatusRef.current === "Closed"
+                  : currentDataDrivenStatus === "Closed"
                   ? "Market is Closed"
                   : "Status based on data";
-              return `${baseStatus} (Real-time active)`;
+              return `${baseStatusMessage} (Real-time active)`;
             });
-            if (marketStatusRef.current === "Connecting") {
-              // If it was connecting and now subscribed, ensure status reflects data.
-              // updateDisplayStatus should have already set it based on lastGoodQuoteRef
+            if (
+              ["Connecting", "Fetching", "Error"].includes(
+                marketStatusRef.current
+              )
+            ) {
+              const currentData = lastGoodQuoteRef.current;
+              const isMarketOpen = currentData.is_market_open;
+              let newStatus: MarketStatusDisplayHook = isMarketOpen
+                ? "Open"
+                : "Closed";
+              if (isMarketOpen) {
+                const apiTimeMillis = currentData.api_timestamp * 1000;
+                const diffMinutes = (Date.now() - apiTimeMillis) / (1000 * 60);
+                if (diffMinutes > 15) newStatus = "Delayed";
+              }
+              setMarketStatus(newStatus);
             }
           } else {
             setMarketStatus("Live");
-            setMarketStatusMessage("Real-time connected, waiting for data...");
+            setMarketStatusMessage("Real-time connected, awaiting data...");
           }
           break;
         case "CHANNEL_ERROR":
@@ -167,16 +287,56 @@ export function useStockData({
     [symbol, updateDisplayStatus]
   );
 
-  const marketStatusRef = useRef(marketStatus);
-  useEffect(() => {
-    marketStatusRef.current = marketStatus;
-  }, [marketStatus]);
-
   const setupSubscription = useCallback(async () => {
     if (!isMountedRef.current) return;
+    if (!profileData && symbol) {
+      console.log(
+        `useStockData (${symbol}): Profile data not yet loaded. Initial quote fetch might occur.`
+      );
+      if (!unsubscribeRealtimeRef.current) {
+        setMarketStatus("Fetching");
+        setMarketStatusMessage(
+          `Fetching initial quote for ${symbol}... (Profile pending)`
+        );
+        try {
+          const { data, error } = await supabaseClientRef.current
+            .from("live_quote_indicators")
+            .select("*")
+            .eq("symbol", symbol)
+            .order("fetched_at", { ascending: false })
+            .limit(1)
+            .single();
+          if (!isMountedRef.current) return;
+          if (error && error.code !== "PGRST116") {
+            updateDisplayStatus(null, "fetch");
+            setMarketStatus("Error");
+            setMarketStatusMessage("Failed to load initial quote.");
+          } else if (data) {
+            const validationResult = LiveQuoteIndicatorDBSchema.safeParse(data);
+            if (validationResult.success) {
+              stableOnQuoteReceived(validationResult.data, "fetch");
+              updateDisplayStatus(validationResult.data, "fetch");
+            } else {
+              updateDisplayStatus(null, "fetch");
+              setMarketStatus("Error");
+              setMarketStatusMessage("Invalid quote data format.");
+            }
+          } else {
+            updateDisplayStatus(null, "fetch");
+          }
+        } catch (e) {
+          if (isMountedRef.current) {
+            updateDisplayStatus(null, "fetch");
+            setMarketStatus("Error");
+            setMarketStatusMessage("Network error on initial quote fetch.");
+          }
+        }
+      }
+      return;
+    }
 
     console.log(
-      `useStockData (${symbol}): Setting up subscription and fetching initial data...`
+      `useStockData (${symbol}): Setting up subscription (profile data available).`
     );
     if (unsubscribeRealtimeRef.current) {
       unsubscribeRealtimeRef.current();
@@ -184,24 +344,20 @@ export function useStockData({
     }
 
     setMarketStatus("Fetching");
-    setMarketStatusMessage(`Workspaceing initial data for ${symbol}...`);
-    const supabase = createClient();
-
+    setMarketStatusMessage(`Refreshing data for ${symbol}...`);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseClientRef.current
         .from("live_quote_indicators")
         .select("*")
         .eq("symbol", symbol)
         .order("fetched_at", { ascending: false })
         .limit(1)
         .single();
-
       if (!isMountedRef.current) return;
-
       if (error && error.code !== "PGRST116") {
         updateDisplayStatus(null, "fetch");
         setMarketStatus("Error");
-        setMarketStatusMessage("Failed to load initial data.");
+        setMarketStatusMessage("Failed to refresh data.");
       } else if (data) {
         const validationResult = LiveQuoteIndicatorDBSchema.safeParse(data);
         if (validationResult.success) {
@@ -210,27 +366,24 @@ export function useStockData({
         } else {
           updateDisplayStatus(null, "fetch");
           setMarketStatus("Error");
-          setMarketStatusMessage("Invalid data format received.");
+          setMarketStatusMessage("Invalid data format on refresh.");
         }
       } else {
         updateDisplayStatus(null, "fetch");
       }
-    } catch (fetchError) {
-      if (!isMountedRef.current) return;
-      updateDisplayStatus(null, "fetch");
-      setMarketStatus("Error");
-      setMarketStatusMessage("Network error during initial data fetch.");
+    } catch (e) {
+      if (isMountedRef.current) {
+        updateDisplayStatus(null, "fetch");
+        setMarketStatus("Error");
+        setMarketStatusMessage("Network error on data refresh.");
+      }
     }
 
     if (!isMountedRef.current) return;
 
-    // After fetch attempt, if not in an Error state, try connecting to realtime.
-    // The current marketStatus reflects the outcome of the fetch.
     if (marketStatusRef.current !== "Error") {
-      setMarketStatus("Connecting"); // Explicitly set to Connecting before subscribe
+      setMarketStatus("Connecting");
       setMarketStatusMessage("Connecting to real-time updates...");
-    } else {
-      // If fetch resulted in error, don't say "Connecting", keep error message.
     }
 
     unsubscribeRealtimeRef.current = subscribeToQuoteUpdates(
@@ -241,9 +394,8 @@ export function useStockData({
           payload.eventType === "DELETE" ||
           !payload.new ||
           (payload.new as LiveQuoteIndicatorDBRow).symbol !== symbol
-        ) {
+        )
           return;
-        }
         const validationResult = LiveQuoteIndicatorDBSchema.safeParse(
           payload.new
         );
@@ -266,13 +418,25 @@ export function useStockData({
     stableOnQuoteReceived,
     updateDisplayStatus,
     handleSubscriptionStatusChange,
+    profileData,
   ]);
 
   useEffect(() => {
-    setupSubscription();
+    if (symbol && profileData) {
+      setupSubscription();
+    } else if (symbol && !profileData) {
+      console.log(
+        `useStockData (${symbol}): Profile data is loading, full subscription setup deferred.`
+      );
+    }
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible" && isMountedRef.current) {
+      if (
+        document.visibilityState === "visible" &&
+        isMountedRef.current &&
+        symbol &&
+        profileData
+      ) {
         console.log(
           `useStockData (${symbol}): Page became visible. Re-running setupSubscription.`
         );
@@ -282,7 +446,7 @@ export function useStockData({
       }
     };
     const handleOnlineStatus = () => {
-      if (isMountedRef.current && navigator.onLine) {
+      if (isMountedRef.current && navigator.onLine && symbol && profileData) {
         console.log(
           `useStockData (${symbol}): Network came online. Re-running setupSubscription.`
         );
@@ -299,11 +463,14 @@ export function useStockData({
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("online", handleOnlineStatus);
       if (unsubscribeRealtimeRef.current) {
+        console.log(
+          `useStockData (${symbol}): Cleaning up main subscription due to unmount or symbol/profile change.`
+        );
         unsubscribeRealtimeRef.current();
         unsubscribeRealtimeRef.current = null;
       }
     };
-  }, [symbol, setupSubscription]);
+  }, [symbol, profileData, setupSubscription]);
 
-  return { marketStatus, marketStatusMessage, lastApiTimestamp };
+  return { marketStatus, marketStatusMessage, lastApiTimestamp, profileData };
 }
