@@ -23,32 +23,33 @@ type PriceSpecificInteractions = Pick<
 interface PriceCardContainerProps {
   cardData: PriceCardData;
   isFlipped: boolean;
-  onFlip: () => void;
+  onFlip: () => void; // This is now passed to BaseCard
 
   cardContext: CardActionContext;
   socialInteractions?: BaseCardSocialInteractions;
-  onDeleteRequest?: (context: CardActionContext) => void; // New prop for delete
+  onDeleteRequest?: (context: CardActionContext) => void;
 
   priceSpecificInteractions?: PriceSpecificInteractions;
 
   className?: string;
   innerCardClassName?: string;
-  children?: React.ReactNode; // This children is for BaseCard's top-level overlays
+  children?: React.ReactNode; // Overlays from GameCard
 }
 
 export const PriceCardContainer = React.memo<PriceCardContainerProps>(
   ({
     cardData,
     isFlipped,
-    onFlip,
+    onFlip, // Will be passed to BaseCard
     cardContext,
     socialInteractions,
-    onDeleteRequest, // Receive delete request handler
+    onDeleteRequest,
     priceSpecificInteractions,
     className,
     innerCardClassName,
     children,
   }) => {
+    // PriceCardContent is now the direct content for face/back, no extra wrappers here
     const faceContentForBaseCard = (
       <PriceCardContent
         cardData={cardData}
@@ -76,49 +77,19 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
       />
     );
 
-    // Clickable wrappers for the entire card face/back to trigger flip
-    const wrappedFaceContent = (
-      <div
-        className="h-full w-full cursor-pointer"
-        onClick={onFlip}
-        role="button"
-        aria-label={`Flip ${cardData.symbol} card to see details`}
-        tabIndex={0}
-        onKeyDown={(e) =>
-          e.key === "Enter" || e.key === " " ? onFlip() : undefined
-        }
-      >
-        {faceContentForBaseCard}
-      </div>
-    );
-
-    const wrappedBackContent = (
-      <div
-        className="h-full w-full cursor-pointer"
-        onClick={onFlip}
-        role="button"
-        aria-label={`Flip ${cardData.symbol} card to see quote`}
-        tabIndex={0}
-        onKeyDown={(e) =>
-          e.key === "Enter" || e.key === " " ? onFlip() : undefined
-        }
-      >
-        {backContentForBaseCard}
-      </div>
-    );
-
     return (
       <BaseCard
         isFlipped={isFlipped}
-        faceContent={wrappedFaceContent}
-        backContent={wrappedBackContent}
+        faceContent={faceContentForBaseCard} // Pass PriceCardContent directly
+        backContent={backContentForBaseCard} // Pass PriceCardContent directly
+        onFlip={onFlip} // Pass the onFlip handler to BaseCard
         cardContext={cardContext}
         socialInteractions={socialInteractions}
-        onDeleteRequest={onDeleteRequest} // Pass delete request handler to BaseCard
+        onDeleteRequest={onDeleteRequest}
         className={className}
         innerCardClassName={innerCardClassName}
       >
-        {children} {/* Pass through overlays */}
+        {children} {/* Overlays */}
       </BaseCard>
     );
   }
