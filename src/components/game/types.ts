@@ -1,36 +1,46 @@
-import { PriceCard, PriceCardSnapshot } from "./cards/PriceCard/types";
-import type { DailyPerformanceCard } from "./cards/DailyPerformance/type";
-import type { PriceVsSmaSignal } from "./cards/PriceVsSma/types";
-import type { PriceRangeContextSignal } from "./cards/PriceRangeContext/types";
-import type { IntradayTrendCard } from "./cards/IntradayTrend/types";
+/**
+ * src/app/components/types.ts
+ * Defines application-level aggregate types for game cards.
+ */
 
-export interface CardBackData {
-  explanation: string;
-}
+// 1. Import all concrete, specific card data structures.
+// Ensure these paths are correct and that each imported type extends BaseCardData.
+import type {
+  PriceCardData,
+  PriceCardSnapshotData,
+} from "@/components/game/cards/price-card/price-card.types";
+// Example: import type { TrendCardData } from "./game/cards/trend-card/trend-card.types";
 
-export type CardType =
-  | "price"
-  | "trend"
-  | "daily_performance"
-  | "price_vs_sma"
-  | "price_range_context"
-  | "intraday_trend"
-  | "price_snapshot";
+// 2. Create a union of all currently supported *concrete* card data types.
+// This is the primary type a component like GameCard will use for the `card.data` prop.
+// As you implement more card types (e.g., TrendCardData), add them to this union.
+export type ConcreteCardData = PriceCardData | PriceCardSnapshotData;
+// | TrendCardData; // Example for future expansion
 
-export interface BaseGameCard {
-  id: string;
-  type: CardType;
+// 3. Define UI-specific state that can be associated with any displayable card.
+export interface DisplayableCardState {
   isFlipped: boolean;
-  symbol: string;
-  backData: CardBackData;
+  // Consider other UI states: isHighlighted?: boolean; order?: number; isDisabled?: boolean;
 }
 
-export type DiscoveredCard =
-  | DailyPerformanceCard
-  | PriceVsSmaSignal
-  | PriceRangeContextSignal
-  | IntradayTrendCard
-  | PriceCardSnapshot;
+// 4. Combine concrete card data with its UI state.
+// This is likely the type for a card object as managed in lists or passed to wrapper components.
+export type DisplayableCard = ConcreteCardData & DisplayableCardState;
 
-export type PrimaryGameCard = PriceCard;
-export type DisplayableCard = PrimaryGameCard | DiscoveredCard;
+// 5. Optional: More specific aliases for enhanced readability if needed.
+
+/**
+ * Alias for live, interactive price card data combined with UI state.
+ * Note: PriceCardData already includes its specific data. LivePriceCardDataType was redundant if it's just PriceCardData.
+ */
+export type DisplayableLivePriceCard = PriceCardData & DisplayableCardState;
+
+/**
+ * Alias for discovered signal/snapshot card data combined with UI state.
+ */
+export type DisplayableDiscoveredSignal = PriceCardSnapshotData &
+  DisplayableCardState;
+
+// It's generally recommended to import BaseCardData or CardType directly from
+// 'app/components/game/cards/base-card/base-card.types.ts' where needed,
+// rather than re-aliasing them here, to maintain a single source of truth.

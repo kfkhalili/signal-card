@@ -1,23 +1,31 @@
+/**
+ * src/app/components/active-cards-section.tsx
+ *
+ * This "smart" component manages the state and logic for active cards,
+ * including handling interactions, creating snapshots, and managing card lifecycle.
+ * It uses ActiveCardsPresentational for rendering.
+ */
 "use client";
 
 import React, { useCallback, useRef, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
+import type { DisplayableCard } from "./types"; // Path: src/app/components/types.ts
+import { ActiveCards as ActiveCardsPresentational } from "./active-cards"; // Path: src/app/components/active-cards.tsx
+import { useToast } from "@/hooks/use-toast"; // Assuming path to your toast hook
+
 import type {
-  PriceGameCard,
-  PriceCardFaceData,
-  DailyPerformanceSignal,
-  PriceVsSmaSignal,
-  PriceRangeContextSignal,
-  IntradayTrendSignal,
-  PriceSnapshotSignal,
-  DisplayableCard,
-} from "./types";
-import { ActiveCards as ActiveCardsPresentational } from "./active-cards"; // Changed to named import with alias
-import { useToast } from "@/hooks/use-toast";
+  PriceCardData,
+  PriceCardSnapshotData,
+  PriceCardInteractionCallbacks,
+} from "./cards/price-card/price-card.types"; // Path: src/app/components/cards/price-card/price-card.types.ts
 
 interface ActiveCardsSectionProps {
-  activeCards: DisplayableCard[];
-  setActiveCards: React.Dispatch<React.SetStateAction<DisplayableCard[]>>;
+  /** The current list of active cards. */
+  readonly activeCards: DisplayableCard[];
+  /** Function to update the list of active cards. */
+  readonly setActiveCards: React.Dispatch<
+    React.SetStateAction<DisplayableCard[]>
+  >;
 }
 
 const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
@@ -26,25 +34,23 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
 }) => {
   const { toast } = useToast();
 
+  // Using a ref for setActiveCards to keep callbacks stable if setActiveCards itself isn't memoized by parent.
+  // React's setState from useState is stable, so this is often for ESLint rules or complex scenarios.
   const setActiveCardsRef = useRef(setActiveCards);
   useEffect(() => {
     setActiveCardsRef.current = setActiveCards;
   }, [setActiveCards]);
 
-  const handleToggleFlipCard = useCallback((cardId: string) => {
-    setActiveCardsRef.current((prevCards) => {
-      const newCards = prevCards.map((c) =>
+  const handleToggleFlipCard = useCallback((cardId: string): void => {
+    setActiveCardsRef.current((prevCards) =>
+      prevCards.map((c) =>
         c.id === cardId ? { ...c, isFlipped: !c.isFlipped } : c
-      );
-      return newCards;
-    });
-  }, []);
+      )
+    );
+  }, []); // No dependency on setActiveCards due to ref
 
   const handleDeleteCard = useCallback(
-    (cardIdToDelete: string) => {
-      console.log(
-        `ActiveCardsSection: handleDeleteCard called for ID: ${cardIdToDelete}`
-      );
+    (cardIdToDelete: string): void => {
       setActiveCardsRef.current((prevCards) =>
         prevCards.filter((card) => card.id !== cardIdToDelete)
       );
@@ -53,222 +59,154 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
         description: "The signal card has been removed.",
       });
     },
-    [toast]
-  ); // setActiveCards is via ref
-
-  // --- Signal Generation Handlers update activeCards ---
-  const handleGenerateDailyPerformanceSignal = useCallback(
-    (pfData: PriceCardFaceData) => {
-      if (
-        pfData.price == null ||
-        pfData.previousClose == null ||
-        pfData.dayChange == null ||
-        pfData.changePercentage == null
-      ) {
-        toast({ title: "Data Incomplete", variant: "destructive" });
-        return;
-      }
-
-      const nSC: DailyPerformanceSignal = {
-        id: uuidv4(),
-        type: "daily_performance",
-        symbol: pfData.symbol, // Populate symbol for the signal card
-        currentPrice: pfData.price,
-        previousClose: pfData.previousClose,
-        dayChange: pfData.dayChange,
-        changePercentage: pfData.changePercentage,
-        // quoteTimestamp: new Date(pfData.timestamp), // This info is now part of discoveredAt or within backData
-        discoveredAt: new Date(),
-        isFlipped: false,
-        backData: {
-          explanation: `Daily performance for ${pfData.symbol} as of ${new Date(
-            pfData.timestamp
-          ).toLocaleTimeString()}`,
-        },
-      };
-      setActiveCardsRef.current((prev) => [prev[0], nSC, ...prev.slice(1)]);
-      toast({
-        title: "Signal Discovered!",
-        description: `Daily Performance logged.`,
-      });
-    },
-    [toast]
+    [toast] // No dependency on setActiveCards due to ref
   );
 
-  const handleGeneratePriceVsSmaSignal = useCallback(
-    (fData: PriceCardFaceData, smaP: 50 | 200, smaV: number) => {
-      if (fData.price == null) {
-        toast({ title: "Data Incomplete", variant: "destructive" });
-        return;
-      }
-
-      const nSC: PriceVsSmaSignal = {
-        id: uuidv4(),
-        type: "price_vs_sma",
-        symbol: fData.symbol, // Populate symbol
-        currentPrice: fData.price,
-        smaValue: smaV,
-        smaPeriod: smaP,
-        priceRelation:
-          fData.price > smaV ? "above" : fData.price < smaV ? "below" : "at",
-        // quoteTimestamp: new Date(fData.timestamp),
-        discoveredAt: new Date(),
-        isFlipped: false,
-        backData: {
-          explanation: `${fData.symbol} price vs ${smaP}D SMA at ${new Date(
-            fData.timestamp
-          ).toLocaleTimeString()}`,
-        },
-      };
-      setActiveCardsRef.current((prev) => [prev[0], nSC, ...prev.slice(1)]);
-      toast({
-        title: "SMA Signal Discovered!",
-        description: `Price vs ${smaP}D SMA logged.`,
-      });
-    },
-    [toast]
-  );
-
-  const handleGeneratePriceRangeContextSignal = useCallback(
-    (fData: PriceCardFaceData, lType: "High" | "Low", lValue: number) => {
-      if (fData.price == null) {
-        // lValue is a number, so lValue == null is always false
-        toast({ title: "Data Incomplete", variant: "destructive" });
-        return;
-      }
-      const diff = Math.abs(fData.price - lValue);
-
-      const nSC: PriceRangeContextSignal = {
-        id: uuidv4(),
-        type: "price_range_context",
-        symbol: fData.symbol, // Populate symbol
-        currentPrice: fData.price,
-        dayHigh: lType === "High" ? lValue : null, // Assuming fData contains dayHigh/Low for full context
-        dayLow: lType === "Low" ? lValue : null, // Or adjust based on what fData provides
-        // This signal might need more context from fData
-        // levelType: lType, // This is now part of the structure (dayHigh/dayLow)
-        // levelValue: lValue,
-        // difference: diff, // Can be calculated in the rendering if needed
-        discoveredAt: new Date(),
-        isFlipped: false,
-        backData: {
-          explanation: `${
-            fData.symbol
-          } price context vs Day ${lType} at ${new Date(
-            fData.timestamp
-          ).toLocaleTimeString()}`,
-        },
-      };
-      setActiveCardsRef.current((prev) => [prev[0], nSC, ...prev.slice(1)]);
-      toast({
-        title: "Range Signal Discovered!",
-        description: `Price vs Day ${lType} logged.`,
-      });
-    },
-    [toast]
-  );
-
-  const handleGenerateIntradayTrendSignal = useCallback(
-    (fData: PriceCardFaceData) => {
-      if (fData.price == null || fData.dayOpen == null) {
-        toast({ title: "Data Incomplete", variant: "destructive" });
-        return;
-      }
-      let rel: "Above" | "Below" | "At";
-      if (fData.price > fData.dayOpen) rel = "Above";
-      else if (fData.price < fData.dayOpen) rel = "Below";
-      else rel = "At";
-
-      const nSC: IntradayTrendSignal = {
-        id: uuidv4(),
-        type: "intraday_trend",
-        symbol: fData.symbol, // Populate symbol
-        // currentPrice: fData.price, // These would be part of observedTrendDescription or specific fields
-        // openPrice: fData.dayOpen,
-        // relationToOpen: rel,
-        observedTrendDescription: `Price ${fData.price.toFixed(
-          2
-        )} is ${rel.toLowerCase()} open price ${fData.dayOpen.toFixed(2)} for ${
-          fData.symbol
-        }.`,
-        // quoteTimestamp: new Date(fData.timestamp),
-        discoveredAt: new Date(),
-        isFlipped: false,
-        backData: {
-          explanation: `Intraday trend for ${
-            fData.symbol
-          } relative to open at ${new Date(
-            fData.timestamp
-          ).toLocaleTimeString()}`,
-        },
-      };
-      setActiveCardsRef.current((prev) => [prev[0], nSC, ...prev.slice(1)]);
-      toast({
-        title: "Intraday Trend Signal!",
-        description: `Price vs Open logged.`,
-      });
-    },
-    [toast]
-  );
-
-  const handleTakeSnapshot = useCallback(
-    () =>
-      // cardClickedOn: DisplayableCard // The card that triggered the snapshot action
-      {
-        // Snapshot action always captures the current live PriceGameCard
-        const livePriceCard = activeCards.find((c) => c.type === "price") as
-          | PriceGameCard
-          | undefined;
-
-        if (
-          !livePriceCard ||
-          !livePriceCard.faceData ||
-          !livePriceCard.backData
-        ) {
-          toast({
-            title: "Snapshot Error",
-            description: "Live price data not available to snapshot.",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        const newSnapSignal: PriceSnapshotSignal = {
-          id: uuidv4(),
-          type: "price_snapshot",
-          symbol: livePriceCard.faceData.symbol, // Populate symbol from the live card being snapshotted
-          snapshotFaceData: { ...livePriceCard.faceData },
-          snapshotBackData: { ...livePriceCard.backData },
-          discoveredAt: new Date(),
-          isFlipped: false,
-          backData: {
-            explanation: `Snapshot of ${
-              livePriceCard.faceData.symbol
-            } taken at ${new Date().toLocaleTimeString()}`,
-          },
-        };
-        setActiveCardsRef.current((prev) => [
-          prev[0],
-          newSnapSignal,
-          ...prev.slice(1),
-        ]);
+  // Grouped PriceCard interaction handlers
+  const priceCardInteractionHandlers: PriceCardInteractionCallbacks = {
+    onPriceCardSmaClick: useCallback(
+      (card: PriceCardData, smaPeriod: 50 | 200, smaValue: number): void => {
+        console.log("PriceCard SMA Click:", {
+          cardSymbol: card.symbol,
+          smaPeriod,
+          smaValue,
+        });
         toast({
-          title: "Snapshot Taken!",
-          description: `Snapshot of ${livePriceCard.faceData.symbol} logged.`,
+          title: "SMA Interaction",
+          description: `${smaPeriod}D SMA of ${smaValue.toFixed(
+            2
+          )} clicked on ${card.symbol}.`,
+        });
+        // Example: Generate a new card based on this interaction
+        // const newCard = { id: uuidv4(), type: "some_signal", symbol: card.symbol, createdAt: Date.now(), ... };
+        // setActiveCardsRef.current(prev => [...prev, newCard]);
+      },
+      [toast]
+    ),
+    onPriceCardRangeContextClick: useCallback(
+      (
+        card: PriceCardData,
+        levelType: "High" | "Low",
+        levelValue: number
+      ): void => {
+        console.log("PriceCard Range Context Click:", {
+          cardSymbol: card.symbol,
+          levelType,
+          levelValue,
+        });
+        toast({
+          title: "Range Interaction",
+          description: `Day ${levelType} of ${levelValue.toFixed(
+            2
+          )} clicked on ${card.symbol}.`,
         });
       },
-    [toast, activeCards] // Added activeCards as a dependency
+      [toast]
+    ),
+    onPriceCardOpenPriceClick: useCallback(
+      (card: PriceCardData): void => {
+        console.log("PriceCard Open Price Click:", { cardSymbol: card.symbol });
+        toast({
+          title: "Open Price Interaction",
+          description: `Open price ${
+            card.faceData.dayOpen?.toFixed(2) ?? "N/A"
+          } clicked on ${card.symbol}.`,
+        });
+      },
+      [toast]
+    ),
+    onPriceCardGenerateDailyPerformanceSignal: useCallback(
+      (card: PriceCardData): void => {
+        console.log("PriceCard Generate Daily Performance Signal:", {
+          cardSymbol: card.symbol,
+        });
+        toast({
+          title: "Daily Perf Signal",
+          description: `Daily performance signal generated for ${card.symbol}.`,
+        });
+      },
+      [toast]
+    ),
+  };
+
+  const handleTakeSnapshot = useCallback(
+    (cardIdToSnapshot?: string): void => {
+      const cardToSnapshot = cardIdToSnapshot
+        ? activeCards.find(
+            (c) => c.id === cardIdToSnapshot && c.type === "price"
+          )
+        : activeCards.find((c) => c.type === "price"); // Fallback to the first live price card
+
+      const livePriceCard =
+        cardToSnapshot?.type === "price"
+          ? (cardToSnapshot as PriceCardData & { isFlipped: boolean }) // Type assertion after check
+          : undefined;
+
+      if (!livePriceCard || livePriceCard.faceData.price === null) {
+        toast({
+          title: "Snapshot Error",
+          description: livePriceCard
+            ? "Live price is not available to snapshot."
+            : "Live price card not found to snapshot.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const currentTime = Date.now();
+
+      // Constructing the new snapshot with the correct structure for PriceCardSnapshotData
+      const newSnapshot: PriceCardSnapshotData & { isFlipped: boolean } = {
+        // BaseCardData fields
+        id: uuidv4(),
+        type: "price_snapshot",
+        symbol: livePriceCard.symbol,
+        createdAt: currentTime, // All cards now have createdAt
+
+        // PriceCardSnapshotData specific fields
+        capturedPrice: livePriceCard.faceData.price, // Known to be non-null from the check above
+        snapshotTime: currentTime, // Timestamp of when the data for the snapshot was captured
+
+        // PriceCardSnapshotData requires backData of type PriceCardSnapshotSpecificBackData
+        backData: {
+          explanation: `Snapshot of ${livePriceCard.symbol} taken on ${new Date(
+            currentTime
+          ).toLocaleString()}.`,
+          // discoveredReason: "User-initiated snapshot", // Optional: if you define this in PriceCardSnapshotSpecificBackData
+        },
+
+        // DisplayableCardState field
+        isFlipped: false, // Snapshots start unflipped
+      };
+
+      setActiveCardsRef.current((prevCards) => {
+        const mainPriceCardIndex = prevCards.findIndex(
+          (c) => c.id === livePriceCard.id
+        );
+        if (mainPriceCardIndex !== -1) {
+          // Insert the snapshot card immediately after its source live card
+          const newCardsList = [...prevCards];
+          newCardsList.splice(mainPriceCardIndex + 1, 0, newSnapshot);
+          return newCardsList;
+        }
+        // Fallback: if the source card wasn't found (e.g., deleted just before snapshot), add to start
+        return [newSnapshot, ...prevCards];
+      });
+
+      toast({
+        title: "Snapshot Taken!",
+        description: `Snapshot of ${livePriceCard.symbol} created.`,
+      });
+    },
+    [activeCards, toast] // activeCards is a dependency for finding the card to snapshot
   );
 
   return (
     <ActiveCardsPresentational
       cards={activeCards}
       onToggleFlipCard={handleToggleFlipCard}
-      onDeleteCard={handleDeleteCard} // Pass new handler
-      onGenerateDailyPerformanceSignal={handleGenerateDailyPerformanceSignal}
-      onGeneratePriceVsSmaSignal={handleGeneratePriceVsSmaSignal}
-      onGeneratePriceRangeContextSignal={handleGeneratePriceRangeContextSignal}
-      onGenerateIntradayTrendSignal={handleGenerateIntradayTrendSignal}
+      onDeleteCard={handleDeleteCard}
+      priceCardInteractions={priceCardInteractionHandlers}
       onTakeSnapshot={handleTakeSnapshot}
     />
   );

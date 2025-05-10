@@ -1,49 +1,71 @@
 /**
  * src/app/components/game/cards/price-card/price-card.types.ts
+ * Defines types specific to Price Cards, including live quotes and snapshots.
  */
+
 import type {
   BaseCardData,
   BaseCardBackData,
 } from "../base-card/base-card.types";
 
-// Face data specific to the PriceCard
+// --- Price Card Face Data (Live Quote) ---
 export interface PriceCardFaceData {
-  // symbol: string; // Removed: will use symbol from BaseCardData
-  price: number;
-  timestamp: Date;
-  changePercentage?: number | null;
-  dayChange?: number | null;
-  dayLow?: number | null;
-  dayHigh?: number | null;
-  volume?: number | null;
-  dayOpen?: number | null;
-  previousClose?: number | null;
+  readonly timestamp: number | null;
+  readonly price: number | null;
+  readonly dayChange: number | null;
+  readonly changePercentage: number | null;
+  readonly dayHigh: number | null;
+  readonly dayLow: number | null;
+  readonly dayOpen: number | null;
+  readonly previousClose: number | null;
+  readonly volume: number | null;
 }
 
-// Back data specific to the PriceCard, extending the base requirements
-export interface PriceCardBackData extends BaseCardBackData {
-  // explanation: string; // Already in BaseCardBackData via extension
-  marketCap?: number | null;
-  sma50d?: number | null;
-  sma200d?: number | null;
+// --- Price Card Specific Back Data ---
+export interface PriceCardSpecificBackData extends BaseCardBackData {
+  // Inherits 'explanation' from BaseCardBackData
+  readonly marketCap: number | null;
+  readonly sma50d: number | null;
+  readonly sma200d: number | null;
 }
 
-// The main data structure for a PriceCard
+// --- Full PriceCardData for Live Quotes ---
 export interface PriceCardData extends BaseCardData {
-  type: "price"; // Specific type for this card
-  faceData: PriceCardFaceData;
-  backData: PriceCardBackData; // Overrides BaseCardData.backData with more specific type
-  appearedAt?: number; // Optional: Per your context, keep if fade logic is relevant
+  readonly type: "price"; // Matches a literal from CardType in base-card.types.ts
+  readonly faceData: PriceCardFaceData;
+  readonly backData: PriceCardSpecificBackData; // Overrides BaseCardData.backData with a more specific type
 }
 
-// Snapshot type - adapting it similarly for future use if needed
+// --- Price Card Snapshot Specific Back Data ---
+export interface PriceCardSnapshotSpecificBackData extends BaseCardBackData {
+  // Inherits 'explanation'
+  readonly discoveredReason?: string; // Example: why this snapshot was taken
+}
+
+// --- PriceCardSnapshotData for Static Snapshots ---
 export interface PriceCardSnapshotData extends BaseCardData {
-  type: "price_snapshot";
-  discoveredAt: Date;
-  // If snapshots have a different visual or data structure for face/back than live PriceCard:
-  snapshotFaceData: PriceCardFaceData; // or a new specific type
-  snapshotBackData: PriceCardBackData; // or a new specific type
-  // If snapshot shares face/back structure, could be:
-  // faceData: PriceCardFaceData;
-  // backData: PriceCardBackData;
+  readonly type: "price_snapshot"; // Matches a literal from CardType
+  // Snapshot-specific fields for its "face"
+  readonly capturedPrice: number;
+  readonly snapshotTime: number;
+  readonly backData: PriceCardSnapshotSpecificBackData; // Overrides BaseCardData.backData
+}
+
+// --- Interaction Callbacks specific to PriceCard ---
+// These are the callbacks PriceCardContainer expects.
+export interface PriceCardInteractionCallbacks {
+  readonly onPriceCardSmaClick?: (
+    cardData: PriceCardData, // Specific to PriceCardData for type safety
+    smaPeriod: 50 | 200,
+    smaValue: number
+  ) => void;
+  readonly onPriceCardRangeContextClick?: (
+    cardData: PriceCardData,
+    levelType: "High" | "Low",
+    levelValue: number
+  ) => void;
+  readonly onPriceCardOpenPriceClick?: (cardData: PriceCardData) => void;
+  readonly onPriceCardGenerateDailyPerformanceSignal?: (
+    cardData: PriceCardData
+  ) => void;
 }

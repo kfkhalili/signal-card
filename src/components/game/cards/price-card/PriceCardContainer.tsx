@@ -3,30 +3,21 @@
  */
 import React from "react";
 import BaseCard from "../base-card/BaseCard";
-import type { PriceCardData, PriceCardFaceData } from "./price-card.types";
+// 1. CRITICAL IMPORT: Make sure this path is correct and imports the interface
+import type {
+  PriceCardData,
+  PriceCardInteractionCallbacks, // This interface must be imported
+} from "./price-card.types";
 import { PriceCardContent } from "./PriceCardContent";
 
-interface PriceCardInteractionProps {
-  onSmaClick?: (
-    smaPeriod: 50 | 200,
-    smaValue: number,
-    faceData: PriceCardFaceData
-  ) => void;
-  onRangeContextClick?: (
-    levelType: "High" | "Low",
-    levelValue: number,
-    faceData: PriceCardFaceData
-  ) => void;
-  onOpenPriceClick?: (faceData: PriceCardFaceData) => void;
-  onGenerateDailyPerformanceSignal?: (faceData: PriceCardFaceData) => void;
-}
-
-interface PriceCardContainerProps extends PriceCardInteractionProps {
+// 2. CRITICAL DEFINITION: Ensure PriceCardContainerProps EXTENDS PriceCardInteractionCallbacks
+interface PriceCardContainerProps extends PriceCardInteractionCallbacks {
   cardData: PriceCardData;
   isFlipped: boolean;
   onFlip: () => void;
   className?: string;
   innerCardClassName?: string;
+  children?: React.ReactNode; // For overlays passed from GameCard
 }
 
 export const PriceCardContainer = React.memo<PriceCardContainerProps>(
@@ -36,10 +27,12 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
     onFlip,
     className,
     innerCardClassName,
-    onSmaClick,
-    onRangeContextClick,
-    onOpenPriceClick,
-    onGenerateDailyPerformanceSignal,
+    children,
+    // 3. DESTRUCTURE THE CALLBACKS: These come from PriceCardInteractionCallbacks
+    onPriceCardSmaClick,
+    onPriceCardRangeContextClick,
+    onPriceCardOpenPriceClick,
+    onPriceCardGenerateDailyPerformanceSignal,
   }) => {
     const faceContent = (
       <div
@@ -55,10 +48,13 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
         <PriceCardContent
           cardData={cardData}
           isBackFace={false}
-          onSmaClick={onSmaClick}
-          onRangeContextClick={onRangeContextClick}
-          onOpenPriceClick={onOpenPriceClick}
-          onGenerateDailyPerformanceSignal={onGenerateDailyPerformanceSignal}
+          // 4. PASS THE CALLBACKS: These are now correctly typed
+          onSmaClick={onPriceCardSmaClick}
+          onRangeContextClick={onPriceCardRangeContextClick}
+          onOpenPriceClick={onPriceCardOpenPriceClick}
+          onGenerateDailyPerformanceSignal={
+            onPriceCardGenerateDailyPerformanceSignal
+          }
         />
       </div>
     );
@@ -77,10 +73,10 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
         <PriceCardContent
           cardData={cardData}
           isBackFace={true}
-          onSmaClick={onSmaClick}
-          onRangeContextClick={onRangeContextClick}
-          onOpenPriceClick={onOpenPriceClick}
-          // onGenerateDailyPerformanceSignal is typically a front-face only action
+          onSmaClick={onPriceCardSmaClick}
+          onRangeContextClick={onPriceCardRangeContextClick}
+          onOpenPriceClick={onPriceCardOpenPriceClick}
+          // onGenerateDailyPerformanceSignal is often front-face only
         />
       </div>
     );
@@ -92,9 +88,11 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
         backContent={backContent}
         className={className}
         innerCardClassName={innerCardClassName}
-      />
+      >
+        {children}
+      </BaseCard>
     );
   }
 );
 
-PriceCardContainer.displayName = "PriceCardContainer"; // Good practice for React.memo components
+PriceCardContainer.displayName = "PriceCardContainer";

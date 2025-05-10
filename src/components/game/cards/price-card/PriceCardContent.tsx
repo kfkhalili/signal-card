@@ -6,12 +6,17 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
-  CardContent as ShadCardContent,
+  CardContent as ShadCardContent, // Aliased to avoid conflict
 } from "@/components/ui/card";
-import type { PriceCardData, PriceCardFaceData } from "./price-card.types";
+// Assuming PriceCardInteractionCallbacks is defined in price-card.types.ts
+import type {
+  PriceCardData,
+  PriceCardFaceData, // Still needed for typing the 'faceData' variable
+  PriceCardInteractionCallbacks,
+} from "./price-card.types";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { ClickableDataItem } from "../../../ui/ClickableDataItem"; // Assuming path
+import { ClickableDataItem } from "../../../ui/ClickableDataItem"; // Adjusted path
 
 // Helper function (can be co-located or moved to a shared utils file)
 const formatMarketCap = (cap: number | null | undefined): string => {
@@ -25,18 +30,11 @@ const formatMarketCap = (cap: number | null | undefined): string => {
 interface PriceCardContentProps {
   cardData: PriceCardData;
   isBackFace: boolean;
-  onSmaClick?: (
-    smaPeriod: 50 | 200,
-    smaValue: number,
-    faceData: PriceCardFaceData
-  ) => void;
-  onRangeContextClick?: (
-    levelType: "High" | "Low",
-    levelValue: number,
-    faceData: PriceCardFaceData
-  ) => void;
-  onOpenPriceClick?: (faceData: PriceCardFaceData) => void;
-  onGenerateDailyPerformanceSignal?: (faceData: PriceCardFaceData) => void;
+  // Using the refined callback signatures from PriceCardInteractionCallbacks
+  onSmaClick?: PriceCardInteractionCallbacks["onPriceCardSmaClick"];
+  onRangeContextClick?: PriceCardInteractionCallbacks["onPriceCardRangeContextClick"];
+  onOpenPriceClick?: PriceCardInteractionCallbacks["onPriceCardOpenPriceClick"];
+  onGenerateDailyPerformanceSignal?: PriceCardInteractionCallbacks["onPriceCardGenerateDailyPerformanceSignal"];
 }
 
 export const PriceCardContent = React.memo<PriceCardContentProps>(
@@ -48,36 +46,41 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
     onOpenPriceClick,
     onGenerateDailyPerformanceSignal,
   }) => {
+    // cardData.symbol is available directly
+    // cardData.faceData and cardData.backData are also available
     const { faceData, backData, symbol } = cardData;
 
+    // --- INTERACTION HANDLERS ---
+    // These now call the prop callbacks with the full `cardData` object
     const handleSmaInteraction = (
       e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>,
       smaPeriod: 50 | 200,
       smaValue: number | null | undefined
     ) => {
       if (onSmaClick && smaValue != null) {
-        e.stopPropagation();
-        onSmaClick(smaPeriod, smaValue, faceData);
+        e.stopPropagation(); // Prevent card flip if specific element is clicked
+        onSmaClick(cardData, smaPeriod, smaValue); // Pass full cardData
       }
     };
 
     const handleRangeInteraction = (
-      e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>, // Changed from HTMLSpanElement for ClickableDataItem
+      e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>,
       levelType: "High" | "Low",
       levelValue: number | null | undefined
     ) => {
       if (onRangeContextClick && levelValue != null) {
         e.stopPropagation();
-        onRangeContextClick(levelType, levelValue, faceData);
+        onRangeContextClick(cardData, levelType, levelValue); // Pass full cardData
       }
     };
 
     const handleOpenPriceInteraction = (
       e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>
     ) => {
+      // Condition to enable interaction still depends on specific faceData fields
       if (onOpenPriceClick && faceData.dayOpen != null) {
         e.stopPropagation();
-        onOpenPriceClick(faceData);
+        onOpenPriceClick(cardData); // Pass full cardData
       }
     };
 
@@ -86,11 +89,13 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
     ) => {
       if (onGenerateDailyPerformanceSignal) {
         e.stopPropagation();
-        onGenerateDailyPerformanceSignal(faceData);
+        onGenerateDailyPerformanceSignal(cardData); // Pass full cardData
       }
     };
 
+    // --- RENDER LOGIC ---
     if (isBackFace) {
+      // --- RENDER PRICE CARD BACK ---
       return (
         <div
           data-testid="price-card-back-content"
@@ -115,7 +120,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                     ? `Interact with Open Price: ${faceData.dayOpen.toFixed(2)}`
                     : undefined
                 }
-                data-interactive-child="true" // Preserving your custom attribute
+                data-interactive-child="true" // Preserving custom attribute
               >
                 <span className="font-semibold">Open:</span> $
                 {faceData.dayOpen?.toFixed(2) ?? "N/A"}
@@ -181,6 +186,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
         </div>
       );
     } else {
+      // --- RENDER PRICE CARD FRONT ---
       const changePositive =
         faceData.dayChange != null && faceData.dayChange >= 0;
       const baseChangeColor =
@@ -211,7 +217,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
             <ClickableDataItem
               isInteractive={!!onGenerateDailyPerformanceSignal}
               onClickHandler={handleDailyPerformanceInteraction}
-              baseClassName="group/dps rounded-md p-2 -mx-2 -my-1 mb-1" // Negative margins to extend clickable area
+              baseClassName="group/dps rounded-md p-2 -mx-2 -my-1 mb-1"
               interactiveClassName="cursor-pointer hover:bg-muted/30 transition-colors relative"
               data-testid="daily-performance-interactive-area"
               aria-label={
@@ -227,7 +233,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                 className={cn(
                   "text-4xl font-bold",
                   onGenerateDailyPerformanceSignal &&
-                    "group-hover/dps:text-primary" // Keep specific hover for inner text if needed via group hover
+                    "group-hover/dps:text-primary"
                 )}
               >
                 ${faceData.price != null ? faceData.price.toFixed(2) : "N/A"}
