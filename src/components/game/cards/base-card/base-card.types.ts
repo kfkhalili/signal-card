@@ -23,7 +23,7 @@ export interface BaseCardData {
   id: string;
   type: CardType;
   symbol: string;
-  backData: CardBackData;
+  backData: BaseCardBackData;
 }
 
 // --- Generic Card Interaction Types ---
