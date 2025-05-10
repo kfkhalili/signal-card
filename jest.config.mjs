@@ -1,24 +1,28 @@
 // jest.config.mjs
-import nextJest from "next/jest.js"; // Use import
+import nextJest from "next/jest.js";
 
-// Provide the path to your Next.js app to load next.config.js and .env files in your test environment
 const createJestConfig = nextJest({
   dir: "./",
 });
 
-// Add any custom config to be passed to Jest
 /** @type {import('jest').Config} */
 const customJestConfig = {
-  // Add more setup options before each test is run
-  setupFilesAfterEnv: ["<rootDir>/src/setupTests.ts"], // Your existing setup file
+  setupFilesAfterEnv: ["<rootDir>/src/setupTests.ts"],
   testEnvironment: "jest-environment-jsdom",
   moduleNameMapper: {
-    // Handle module aliases (like @/components)
     "^@/(.*)$": "<rootDir>/src/$1",
-    // Handle CSS imports (if you import CSS modules in your components)
     "\\.(css|less|scss|sass)$": "identity-obj-proxy",
+    "^lucide-react$": "<rootDir>/__mocks__/lucide-react.tsx", // This line is key
   },
+  transformIgnorePatterns: [
+    "/node_modules/", // Keep lucide-react transformed by not including it in the negative lookahead
+    "^.+\\.module\\.(css|sass|scss)$",
+  ],
+  // Or, if you had other modules needing transformation:
+  // transformIgnorePatterns: [
+  //   "/node_modules/(?!another-esm-module)/",
+  //   '^.+\\.module\\.(css|sass|scss)$',
+  // ],
 };
 
-// createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
-export default createJestConfig(customJestConfig); // Use export default
+export default createJestConfig(customJestConfig);

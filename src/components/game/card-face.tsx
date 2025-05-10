@@ -8,14 +8,14 @@ import {
 import type {
   PriceCardSnapshot,
   DailyPerformanceCard,
-  PriceVsSmaSignal,
-  PriceRangeContextSignal,
+  PriceVsSmaCard,
+  PriceRangeContextCard,
   IntradayTrendCard,
   PriceCard,
   PriceCardFaceData,
   PriceCardBackData,
 } from "./cards/";
-import type { DiscoveredCard, DisplayableCard } from "./types";
+import type { DisplayableCard } from "./types";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import {
@@ -556,7 +556,7 @@ const CardFace: React.FC<CardFaceProps> = ({
         </>
       );
     } else if (discoveredCard.type === "price_vs_sma") {
-      const s = discoveredCard as PriceVsSmaSignal;
+      const s = discoveredCard as PriceVsSmaCard;
       const rT =
         s.priceRelation === "above"
           ? "Above"
@@ -619,7 +619,7 @@ const CardFace: React.FC<CardFaceProps> = ({
         </>
       );
     } else if (discoveredCard.type === "price_range_context") {
-      const r = discoveredCard as PriceRangeContextSignal;
+      const r = discoveredCard as PriceRangeContextCard;
       const levelType = r.dayHigh !== null ? "High" : "Low";
       const levelValue =
         (r.dayHigh !== null ? r.dayHigh : r.dayLow) ?? r.currentPrice; // Fallback, should have one
@@ -849,7 +849,7 @@ const CardFace: React.FC<CardFaceProps> = ({
         </>
       );
     } else if (discoveredCard.type === "price_vs_sma") {
-      const s = discoveredCard as PriceVsSmaSignal;
+      const s = discoveredCard as PriceVsSmaCard;
       content = (
         <>
           <CardHeader>
@@ -870,7 +870,7 @@ const CardFace: React.FC<CardFaceProps> = ({
         </>
       );
     } else if (discoveredCard.type === "price_range_context") {
-      const r = discoveredCard as PriceRangeContextSignal;
+      const r = discoveredCard as PriceRangeContextCard;
       content = (
         <>
           <CardHeader>

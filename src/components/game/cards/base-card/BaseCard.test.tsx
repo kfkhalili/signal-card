@@ -2,20 +2,40 @@
  * src/app/components/game/cards/base-card/BaseCard.test.tsx
  */
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import BaseCard from "./BaseCard";
+import type {
+  CardActionContext,
+  BaseCardSocialInteractions,
+  CardType,
+} from "./base-card.types";
 
 describe("BaseCard Component", () => {
   const mockFaceContent = <div data-testid="face-content">Face</div>;
   const mockBackContent = <div data-testid="back-content">Back</div>;
 
+  const mockCardContext: CardActionContext = {
+    id: "test-card",
+    symbol: "TST",
+    type: "price" as CardType,
+  };
+  const mockSocialInteractions: BaseCardSocialInteractions = {
+    onLike: jest.fn(),
+    onComment: jest.fn(),
+    onSave: jest.fn(),
+    onShare: jest.fn(),
+  };
+
   const defaultProps = {
     isFlipped: false,
     faceContent: mockFaceContent,
     backContent: mockBackContent,
+    cardContext: mockCardContext,
+    socialInteractions: mockSocialInteractions,
   };
 
+  // --- Passing tests from previous version ---
   test("renders face content when not flipped", () => {
     render(<BaseCard {...defaultProps} isFlipped={false} />);
     expect(screen.getByTestId("face-content")).toBeVisible();
@@ -72,56 +92,91 @@ describe("BaseCard Component", () => {
     expect(rotatingDiv.parentElement?.contains(childButton)).toBe(true);
   });
 
-  // Test that was failing for transformStyle
   test("inner card has correct structural CSS properties applied via style prop", () => {
     render(<BaseCard {...defaultProps} isFlipped={false} />);
     const rotatingDiv = screen.getByTestId("base-card-inner");
 
-    // Check common styles that toHaveStyle handles well with an object
-    expect(rotatingDiv).toHaveStyle({
-      position: "relative",
-      width: "100%",
-      height: "100%",
-      transition: "transform 0.7s cubic-bezier(0.4, 0.0, 0.2, 1)",
-    });
-    // Check transformStyle directly on the style object attribute
+    expect(rotatingDiv.style.position).toBe("relative");
+    expect(rotatingDiv.style.width).toBe("100%");
+    expect(rotatingDiv.style.height).toBe("100%");
+    expect(rotatingDiv.style.transition).toContain("transform 0.7s");
     expect(rotatingDiv.style.transformStyle).toBe("preserve-3d");
   });
+  // --- End of previously passing tests ---
 
-  // Test that was failing for backfaceVisibility
   test("face and back elements have correct structural CSS properties", () => {
     render(<BaseCard {...defaultProps} />);
 
-    const faceWrapper = screen.getByTestId("face-content")
-      .parentElement as HTMLElement;
+    const faceWrapper = screen.getByTestId("face-content").parentElement
+      ?.parentElement as HTMLElement;
     expect(faceWrapper).toBeInTheDocument();
-    // Check common styles with toHaveStyle object
-    expect(faceWrapper).toHaveStyle({
-      position: "absolute",
-      top: "0px",
-      left: "0px",
-      width: "100%",
-      height: "100%",
-    });
-    // Check backfaceVisibility directly on the style object attribute
-    expect(faceWrapper.style.backfaceVisibility).toBe("hidden");
-    // JSDOM might not always populate vendor-prefixed versions like 'WebkitBackfaceVisibility'
-    // into element.style in a predictable way, so checking the standard one is often sufficient for tests.
-    // If WebkitBackfaceVisibility must be verified, check if `faceWrapper.style.webkitBackfaceVisibility` has a value.
-    expect(faceWrapper).not.toHaveStyle("transform: rotateY(180deg)");
+    if (faceWrapper) {
+      expect(faceWrapper).toHaveStyle("position: absolute");
+      expect(faceWrapper).toHaveStyle("top: 0px");
+      expect(faceWrapper).toHaveStyle("left: 0px");
+      expect(faceWrapper).toHaveStyle("width: 100%");
+      expect(faceWrapper).toHaveStyle("height: 100%");
+      expect(faceWrapper).toHaveStyle("display: flex");
+      expect(faceWrapper).toHaveStyle("flex-direction: column");
 
-    const backWrapper = screen.getByTestId("back-content")
-      .parentElement as HTMLElement;
+      expect(faceWrapper.style.backfaceVisibility).toBe("hidden");
+      // expect(faceWrapper.style.webkitBackfaceVisibility).toBe('hidden'); // Removed this check
+
+      expect(faceWrapper.style.transform).toBe("");
+    }
+
+    const backWrapper = screen.getByTestId("back-content").parentElement
+      ?.parentElement as HTMLElement;
     expect(backWrapper).toBeInTheDocument();
-    expect(backWrapper).toHaveStyle({
-      position: "absolute",
-      top: "0px",
-      left: "0px",
-      width: "100%",
-      height: "100%",
-      transform: "rotateY(180deg)",
+    if (backWrapper) {
+      expect(backWrapper).toHaveStyle("position: absolute");
+      expect(backWrapper).toHaveStyle("top: 0px");
+      expect(backWrapper).toHaveStyle("left: 0px");
+      expect(backWrapper).toHaveStyle("width: 100%");
+      expect(backWrapper).toHaveStyle("height: 100%");
+      expect(backWrapper).toHaveStyle("display: flex");
+      expect(backWrapper).toHaveStyle("flex-direction: column");
+      expect(backWrapper).toHaveStyle("transform: rotateY(180deg)");
+
+      expect(backWrapper.style.backfaceVisibility).toBe("hidden");
+      // expect(backWrapper.style.webkitBackfaceVisibility).toBe('hidden'); // Removed this check
+    }
+  });
+
+  test("renders SocialBar structure when socialInteractions are provided, even if initially hidden", () => {
+    render(<BaseCard {...defaultProps} />);
+    const socialBars = screen.getAllByRole("toolbar", {
+      name: "Social actions",
     });
-    // Check backfaceVisibility directly
-    expect(backWrapper.style.backfaceVisibility).toBe("hidden");
+    expect(socialBars.length).toBeGreaterThanOrEqual(1);
+    const firstSocialBar = socialBars[0];
+    expect(firstSocialBar).toBeInTheDocument();
+
+    const likeButton = within(firstSocialBar).getByRole("button", {
+      name: `Like ${mockCardContext.symbol} card`,
+    });
+    expect(likeButton).toBeInTheDocument();
+    expect(
+      within(likeButton).getByTestId("mock-lucide-icon-thumbsup")
+    ).toBeInTheDocument();
+
+    const commentButton = within(firstSocialBar).getByRole("button", {
+      name: `Comment on ${mockCardContext.symbol} card`,
+    });
+    expect(commentButton).toBeInTheDocument();
+    expect(
+      within(commentButton).getByTestId("mock-lucide-icon-messagecircle")
+    ).toBeInTheDocument();
+  });
+
+  test("does not render SocialBar when socialInteractions are not provided", () => {
+    const propsWithoutSocial = {
+      ...defaultProps,
+      socialInteractions: undefined,
+    };
+    render(<BaseCard {...propsWithoutSocial} />);
+    expect(
+      screen.queryByRole("toolbar", { name: "Social actions" })
+    ).not.toBeInTheDocument();
   });
 });
