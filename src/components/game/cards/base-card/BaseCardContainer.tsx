@@ -8,8 +8,7 @@ import type {
   OnCardInteraction,
   BaseCardContainerDataPointDetails, // For this container's specific interactions
 } from "./base-card.types";
-import { ClickableDataItem } from "../../../ui/ClickableDataItem"; // Adjusted path
-import { cn } from "@/lib/utils"; // Ensure cn is imported if ClickableDataItem uses it internally for its own classes
+import { ClickableDataItem } from "@/components/ui/ClickableDataItem"; // Adjusted path
 
 interface BaseCardContainerProps {
   cardData: BaseCardData;
