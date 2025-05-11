@@ -22,8 +22,7 @@ jest.mock("./BaseCard", () => {
     }) => (
       <div
         data-testid="mock-base-card"
-        className={`${className || ""} ${innerCardClassName || ""}`}
-      >
+        className={`${className || ""} ${innerCardClassName || ""}`}>
         <div data-testid="mock-base-card-isFlipped">{isFlipped.toString()}</div>
         <div data-testid="mock-base-card-faceContent">{faceContent}</div>
         <div data-testid="mock-base-card-backContent">{backContent}</div>
@@ -69,8 +68,7 @@ jest.mock("../../../ui/ClickableDataItem", () => ({
             ) {
               onClickHandler(e as any);
             }
-          }}
-        >
+          }}>
           {children}
         </div>
       );
@@ -88,8 +86,9 @@ describe("BaseCardContainer Component", () => {
     id: "base-001",
     type: "base",
     symbol: "GENERIC",
+    createdAt: Date.now(),
     backData: {
-      explanation: "This is a generic explanation.",
+      description: "This is a generic description.",
     },
   };
 
@@ -229,7 +228,7 @@ describe("BaseCardContainer Component", () => {
       expect(mockOnFlip).not.toHaveBeenCalled();
     });
 
-    test("renders interactive explanation on back and calls onCardInteraction on click, stopping flip", () => {
+    test("renders interactive description on back and calls onCardInteraction on click, stopping flip", () => {
       render(
         <BaseCardContainer
           cardData={testCardData}
@@ -238,16 +237,16 @@ describe("BaseCardContainer Component", () => {
           onCardInteraction={mockOnCardInteraction}
         />
       );
-      const explanationItem = screen.getByTestId("base-card-explanation");
-      expect(explanationItem).toHaveAttribute("data-interactive", "true");
-      fireEvent.click(explanationItem);
+      const descriptionItem = screen.getByTestId("base-card-description");
+      expect(descriptionItem).toHaveAttribute("data-interactive", "true");
+      fireEvent.click(descriptionItem);
       expect(mockOnCardInteraction).toHaveBeenCalledTimes(1);
       expect(mockOnCardInteraction).toHaveBeenCalledWith(
         expect.objectContaining({
           clickedDataPoint: {
-            elementType: "explanation",
-            value: testCardData.backData.explanation,
-            details: { kind: "explanation" },
+            elementType: "description",
+            value: testCardData.backData.description,
+            details: { kind: "description" },
           },
         })
       );
@@ -256,7 +255,7 @@ describe("BaseCardContainer Component", () => {
   });
 
   describe("without onCardInteraction provided", () => {
-    test("renders non-interactive symbol, type, and explanation", () => {
+    test("renders non-interactive symbol, type, and description", () => {
       // Test front face
       const { rerender } = render(
         <BaseCardContainer
@@ -284,7 +283,7 @@ describe("BaseCardContainer Component", () => {
           // onCardInteraction is NOT provided
         />
       );
-      expect(screen.getByTestId("base-card-explanation")).toHaveAttribute(
+      expect(screen.getByTestId("base-card-description")).toHaveAttribute(
         "data-interactive",
         "false"
       );

@@ -14,7 +14,7 @@ export type CardType =
   | "base";
 
 export interface BaseCardBackData {
-  readonly explanation: string;
+  readonly description: string;
 }
 
 // BaseCardData itself doesn't need companyName/logoUrl if specific card types
@@ -71,5 +71,5 @@ export type OnCardInteraction<
 > = (event: CardInteractionEvent<TCardData, TDetails>) => void;
 
 export type BaseCardContainerDataPointDetails = {
-  readonly kind: "symbol" | "type" | "explanation";
+  readonly kind: "symbol" | "type" | "description";
 };

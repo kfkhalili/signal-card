@@ -23,8 +23,7 @@ jest.mock("./PriceCardContent", () => ({
           props.isBackFace
             ? "mock-price-card-content-back"
             : "mock-price-card-content-face"
-        }
-      >
+        }>
         Mock Content {props.isBackFace ? "Back" : "Face"}
       </div>
     )
@@ -61,7 +60,7 @@ const createMockPriceCardData = (
       ...overrides.faceData,
     },
     backData: {
-      explanation: "Explanation for XYZ.",
+      description: "Description for XYZ.",
       marketCap: 200e9,
       sma50d: 198.0,
       sma200d: 180.0,

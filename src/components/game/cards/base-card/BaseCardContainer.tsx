@@ -133,17 +133,17 @@ export const BaseCardContainer = React.memo<BaseCardContainerProps>(
           onClickHandler={(e) =>
             handleLocalInteraction(
               e,
-              "explanation",
-              cardData.backData.explanation,
-              { kind: "explanation" }
+              "description",
+              cardData.backData.description,
+              { kind: "description" }
             )
           }
           interactiveClassName="hover:text-primary underline"
           aria-label={
-            onCardInteraction ? `Interact with explanation` : undefined
+            onCardInteraction ? `Interact with description` : undefined
           }
-          data-testid="base-card-explanation">
-          {cardData.backData.explanation}
+          data-testid="base-card-description">
+          {cardData.backData.description}
         </ClickableDataItem>
       </>
     );
