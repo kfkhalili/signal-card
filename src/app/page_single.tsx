@@ -1,129 +1,35 @@
 // app/page.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback, Fragment } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import useLocalStorage from "@/hooks/use-local-storage";
 import { format } from "date-fns";
 
 import type { DisplayableCard } from "@/components/game/types";
 import type {
   PriceCardData,
-  PriceCardFaceData,
+  PriceCardFaceData, // Now includes yearHigh, yearLow
   PriceCardSpecificBackData,
+  PriceCardSnapshotData,
   PriceCardSnapshotSpecificBackData,
 } from "@/components/game/cards/price-card/price-card.types";
 
 import {
   useStockData,
-  type CombinedQuoteData,
+  type CombinedQuoteData, // This will need yearHigh, yearLow from useStockData
   type MarketStatusDisplayHook,
-  type ProfileDBRow,
 } from "@/hooks/useStockData";
 
 import ActiveCardsSection from "@/components/game/active-cards-section";
 import { useToast } from "@/hooks/use-toast";
 
 const INITIAL_ACTIVE_CARDS: DisplayableCard[] = [];
-
-// Define the list of symbols you want to subscribe to and display
-const SYMBOLS_TO_SUBSCRIBE_LIST: string[] = [
-  "AAPL",
-  "MSFT",
-  "GOOG",
-  "TSLA",
-  "NVDA",
-  "AMD",
-  "BTC",
-];
+const SYMBOL_TO_SUBSCRIBE: string = "AAPL";
 
 export type PageMarketStatusDisplay = MarketStatusDisplayHook;
 
-interface StockDataHandlerProps {
-  symbol: string;
-  onQuoteReceived: (
-    quoteData: CombinedQuoteData,
-    source: "fetch" | "realtime"
-  ) => void;
-  // Adjust the type of 'profile' here to include undefined
-  onProfileLoaded?: (
-    symbol: string,
-    profile: ProfileDBRow | null | undefined
-  ) => void;
-  onMarketStatusChange?: (
-    symbol: string,
-    status: MarketStatusDisplayHook,
-    message: string | null,
-    timestamp: number | null
-  ) => void;
-}
-
-const StockDataHandler: React.FC<StockDataHandlerProps> = ({
-  symbol,
-  onQuoteReceived,
-  onProfileLoaded,
-  onMarketStatusChange,
-}) => {
-  const { marketStatus, marketStatusMessage, lastApiTimestamp, profileData } =
-    useStockData({
-      symbol: symbol,
-      onQuoteReceived: onQuoteReceived, // Pass the callback from parent
-    });
-
-  useEffect(() => {
-    if (onProfileLoaded) {
-      onProfileLoaded(symbol, profileData);
-    }
-  }, [symbol, profileData, onProfileLoaded]);
-
-  useEffect(() => {
-    if (onMarketStatusChange) {
-      onMarketStatusChange(
-        symbol,
-        marketStatus,
-        marketStatusMessage,
-        lastApiTimestamp
-      );
-    }
-  }, [
-    symbol,
-    marketStatus,
-    marketStatusMessage,
-    lastApiTimestamp,
-    onMarketStatusChange,
-  ]);
-
-  return null; // This component doesn't render anything itself
-};
-
 export default function FinSignalGamePage() {
   const { toast } = useToast();
-
-  // State to manage market statuses for multiple symbols (optional, for more detailed UI)
-  const [marketStatuses, setMarketStatuses] = useState<
-    Record<
-      string,
-      {
-        status: MarketStatusDisplayHook;
-        message: string | null;
-        timestamp: number | null;
-      }
-    >
-  >({});
-
-  const handleMarketStatusChange = useCallback(
-    (
-      symbol: string,
-      status: MarketStatusDisplayHook,
-      message: string | null,
-      timestamp: number | null
-    ) => {
-      setMarketStatuses((prev) => ({
-        ...prev,
-        [symbol]: { status, message, timestamp },
-      }));
-    },
-    []
-  );
 
   const rehydrateCard = useCallback(
     (cardFromStorage: any): DisplayableCard | null => {
@@ -174,8 +80,8 @@ export default function FinSignalGamePage() {
           dayOpen: originalFaceData.dayOpen ?? null,
           previousClose: originalFaceData.previousClose ?? null,
           volume: originalFaceData.volume ?? null,
-          yearHigh: originalFaceData.yearHigh ?? null,
-          yearLow: originalFaceData.yearLow ?? null,
+          yearHigh: originalFaceData.yearHigh ?? null, // Rehydrate yearHigh
+          yearLow: originalFaceData.yearLow ?? null, // Rehydrate yearLow
         };
         const originalBackData = cardFromStorage.backData || {};
         const rehydratedBackData: PriceCardSpecificBackData = {
@@ -206,8 +112,8 @@ export default function FinSignalGamePage() {
           type: "price_snapshot",
           capturedPrice: cardFromStorage.capturedPrice ?? 0,
           snapshotTime,
-          yearHighAtCapture: cardFromStorage.yearHighAtCapture ?? null,
-          yearLowAtCapture: cardFromStorage.yearLowAtCapture ?? null,
+          yearHighAtCapture: cardFromStorage.yearHighAtCapture ?? null, // Rehydrate if stored
+          yearLowAtCapture: cardFromStorage.yearLowAtCapture ?? null, // Rehydrate if stored
           backData: rehydratedSnapshotBackData,
         };
       }
@@ -218,8 +124,10 @@ export default function FinSignalGamePage() {
 
   const [initialCardsFromStorage, setCardsInLocalStorage] = useLocalStorage<
     DisplayableCard[]
-  >("finSignal-activeCards-v4", INITIAL_ACTIVE_CARDS);
-
+  >(
+    "finSignal-activeCards-v4", // Incremented version due to yearHigh/Low
+    INITIAL_ACTIVE_CARDS
+  );
   const [activeCards, setActiveCards] = useState<DisplayableCard[]>(() =>
     Array.isArray(initialCardsFromStorage)
       ? (initialCardsFromStorage
@@ -235,13 +143,7 @@ export default function FinSignalGamePage() {
   const processQuoteData = useCallback(
     (quoteData: CombinedQuoteData, source: "fetch" | "realtime") => {
       const apiTimestampMillis = quoteData.api_timestamp * 1000;
-      if (isNaN(apiTimestampMillis)) {
-        console.warn(
-          "processQuoteData: Received NaN apiTimestampMillis for symbol",
-          quoteData.symbol
-        );
-        return;
-      }
+      if (isNaN(apiTimestampMillis)) return;
 
       const newFaceData: PriceCardFaceData = {
         timestamp: apiTimestampMillis,
@@ -253,20 +155,14 @@ export default function FinSignalGamePage() {
         volume: quoteData.volume ?? null,
         dayOpen: quoteData.day_open ?? null,
         previousClose: quoteData.previous_close ?? null,
-        yearHigh: quoteData.year_high ?? null,
-        yearLow: quoteData.year_low ?? null,
+        yearHigh: quoteData.year_high ?? null, // Populate from CombinedQuoteData
+        yearLow: quoteData.year_low ?? null, // Populate from CombinedQuoteData
       };
 
       const newBackData: PriceCardSpecificBackData = {
         marketCap: quoteData.market_cap ?? null,
         sma50d: quoteData.sma_50d ?? null,
         sma200d: quoteData.sma_200d ?? null,
-        // Note: FMP `quoteData.name` is company name, `quoteData.exchange` is exchange.
-        // `profileData.description` (if fetched) might be more detailed for card back.
-        // The `quoteData` from `useStockData` already includes `companyName` and `logoUrl`
-        // These are used for the `commonProps` when creating/updating cards.
-        // The specific `backData.description` for a PriceCard is often more generic or technical,
-        // or could be set by other means if needed.
       };
 
       setActiveCards((prevActiveCards) => {
@@ -281,48 +177,31 @@ export default function FinSignalGamePage() {
           const existingPriceCard = currentCards[
             existingCardIndex
           ] as PriceCardData & { isFlipped: boolean };
-
-          // More robust check to prevent updates with stale or identical data, especially from realtime
           if (
             source === "realtime" &&
             existingPriceCard.faceData.timestamp &&
-            apiTimestampMillis < existingPriceCard.faceData.timestamp
+            apiTimestampMillis <= existingPriceCard.faceData.timestamp &&
+            quoteData.current_price === existingPriceCard.faceData.price
           ) {
-            // console.log(`Skipping update for ${quoteData.symbol} - incoming data is older.`);
             return prevActiveCards;
           }
-          if (
-            source === "realtime" &&
-            apiTimestampMillis === existingPriceCard.faceData.timestamp &&
-            quoteData.current_price === existingPriceCard.faceData.price &&
-            (quoteData.companyName ?? existingPriceCard.companyName) ===
-              existingPriceCard.companyName &&
-            (quoteData.logoUrl ?? existingPriceCard.logoUrl) ===
-              existingPriceCard.logoUrl
-          ) {
-            // console.log(`Skipping update for ${quoteData.symbol} - data is identical.`);
-            return prevActiveCards;
-          }
-
           const updatedCard: PriceCardData & { isFlipped: boolean } = {
             ...existingPriceCard,
-            companyName: quoteData.companyName ?? existingPriceCard.companyName, // Use CombinedQuoteData
-            logoUrl: quoteData.logoUrl ?? existingPriceCard.logoUrl, // Use CombinedQuoteData
-            faceData: newFaceData,
-            backData: { ...existingPriceCard.backData, ...newBackData }, // Merge back data
+            companyName: quoteData.companyName ?? existingPriceCard.companyName,
+            logoUrl: quoteData.logoUrl ?? existingPriceCard.logoUrl,
+            faceData: newFaceData, // Contains new yearHigh/Low
+            backData: { ...existingPriceCard.backData, ...newBackData },
           };
           const newCards = [...currentCards];
           newCards[existingCardIndex] = updatedCard;
-
           if (source === "realtime" && quoteData.current_price != null) {
             setTimeout(
-              // Push to next tick
               () =>
                 toast({
-                  title: `Live Update: ${quoteData.symbol}`,
-                  description: `$${quoteData.current_price.toFixed(2)} (${
-                    newFaceData.changePercentage?.toFixed(2) ?? "N/A"
-                  }%)`,
+                  title: "Live Card Updated!",
+                  description: `${
+                    quoteData.symbol
+                  }: $${quoteData.current_price.toFixed(2)}`,
                 }),
               0
             );
@@ -334,24 +213,24 @@ export default function FinSignalGamePage() {
             type: "price",
             symbol: quoteData.symbol,
             createdAt: Date.now(),
-            companyName: quoteData.companyName ?? null, // Use CombinedQuoteData
-            logoUrl: quoteData.logoUrl ?? null, // Use CombinedQuoteData
-            faceData: newFaceData,
+            companyName: quoteData.companyName ?? null,
+            logoUrl: quoteData.logoUrl ?? null,
+            faceData: newFaceData, // Contains new yearHigh/Low
             backData: newBackData,
             isFlipped: false,
           };
           if (quoteData.current_price != null) {
             setTimeout(
-              // Push to next tick
               () =>
                 toast({
-                  title: `Card Loaded: ${quoteData.symbol}`,
-                  description: `$${quoteData.current_price.toFixed(2)}`,
+                  title: "Live Card Loaded!",
+                  description: `${
+                    quoteData.symbol
+                  }: $${quoteData.current_price.toFixed(2)}`,
                 }),
               0
             );
           }
-          // Ensure no duplicate live price cards for the same symbol are added
           return [
             newPriceCard,
             ...currentCards.filter(
@@ -361,11 +240,45 @@ export default function FinSignalGamePage() {
         }
       });
     },
-    [toast, setActiveCards] // Removed setCardsInLocalStorage, handled by useEffect on activeCards
+    [toast, setActiveCards]
   );
 
-  // Removed the useEffect that was updating activeCards based on a single profileData,
-  // as profile info is now passed within CombinedQuoteData to processQuoteData.
+  const { marketStatus, marketStatusMessage, lastApiTimestamp, profileData } =
+    useStockData({
+      symbol: SYMBOL_TO_SUBSCRIBE,
+      onQuoteReceived: processQuoteData,
+    });
+
+  useEffect(() => {
+    if (profileData) {
+      setActiveCards((prevActiveCards) => {
+        let hasChanged = false;
+        const updatedCards = prevActiveCards.map((card) => {
+          if (card.type === "price" && card.symbol === profileData.symbol) {
+            const priceCard = card as PriceCardData & { isFlipped: boolean };
+            const currentCompanyName = priceCard.companyName ?? null;
+            const currentLogoUrl = priceCard.logoUrl ?? null;
+            const newCompanyName = profileData.company_name ?? null;
+            const newLogoUrl = profileData.image ?? null;
+            if (
+              currentCompanyName !== newCompanyName ||
+              currentLogoUrl !== newLogoUrl
+            ) {
+              hasChanged = true;
+              return {
+                ...priceCard,
+                companyName: newCompanyName,
+                logoUrl: newLogoUrl,
+              };
+            }
+          }
+          return card;
+        });
+        if (hasChanged) return updatedCards;
+        return prevActiveCards;
+      });
+    }
+  }, [profileData, activeCards, setActiveCards]);
 
   const handleTakeSnapshot = useCallback(
     (cardId?: string) => {
@@ -385,8 +298,8 @@ export default function FinSignalGamePage() {
             logoUrl: livePriceCard.logoUrl,
             capturedPrice: livePriceCard.faceData.price!,
             snapshotTime: livePriceCard.faceData.timestamp!,
-            yearHighAtCapture: livePriceCard.faceData.yearHigh,
-            yearLowAtCapture: livePriceCard.faceData.yearLow,
+            yearHighAtCapture: livePriceCard.faceData.yearHigh, // Store yearHigh at time of snapshot
+            yearLowAtCapture: livePriceCard.faceData.yearLow, // Store yearLow at time of snapshot
             backData: {
               discoveredReason: `Snapshot of ${
                 livePriceCard.symbol
@@ -416,51 +329,31 @@ export default function FinSignalGamePage() {
         });
       }
     },
-    [activeCards, setActiveCards, toast] // Adjusted dependencies
+    [activeCards, setActiveCards, toast]
   );
-
-  // Render a StockDataHandler for each symbol in the list
-  const stockDataHandlers = SYMBOLS_TO_SUBSCRIBE_LIST.map((symbol) => (
-    <StockDataHandler
-      key={symbol}
-      symbol={symbol}
-      onQuoteReceived={processQuoteData}
-      onMarketStatusChange={handleMarketStatusChange}
-      // onProfileLoaded={(sym, profile) => console.log(`Profile for ${sym}:`, profile?.company_name)}
-    />
-  ));
-
-  // Simple way to display multiple market statuses (can be improved)
-  const renderMarketStatuses = () => {
-    const entries = Object.entries(marketStatuses);
-    if (entries.length === 0) {
-      return <p>Market Status: Initializing...</p>;
-    }
-    return entries.map(([symbol, data]) => (
-      <div key={symbol} className="text-xs mb-1">
-        <strong>{symbol}:</strong> {data.status}
-        {data.message && (
-          <span className="italic"> ({String(data.message)})</span>
-        )}
-        {data.timestamp && (
-          <span className="block">
-            Last Data: {format(new Date(data.timestamp * 1000), "PP p")}
-          </span>
-        )}
-      </div>
-    ));
-  };
 
   return (
     <div className="container mx-auto p-4 space-y-8">
-      {/* Render the StockDataHandler components (they don't produce visible output) */}
-      {stockDataHandlers}
-
-      {/* Updated Market Status Display Area */}
       <div className="text-center p-2 bg-muted text-muted-foreground rounded-md text-sm shadow">
-        {renderMarketStatuses()}
+        <p>
+          Status: <span className="font-semibold">{marketStatus}</span>
+          {marketStatusMessage && (
+            <span className="text-xs block italic">
+              ({String(marketStatusMessage)})
+            </span>
+          )}
+        </p>
+        {(marketStatus === "Open" ||
+          marketStatus === "Closed" ||
+          marketStatus === "Delayed" ||
+          marketStatus === "Live") &&
+          lastApiTimestamp &&
+          !isNaN(new Date(lastApiTimestamp * 1000).getTime()) && (
+            <p className="text-xs block mt-1">
+              Last API Data: {format(new Date(lastApiTimestamp * 1000), "PP p")}
+            </p>
+          )}
       </div>
-
       <ActiveCardsSection
         activeCards={activeCards}
         setActiveCards={setActiveCards}
