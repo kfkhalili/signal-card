@@ -1,11 +1,15 @@
-// src/app/components/active-cards.tsx
+// src/components/game/active-cards.tsx
 "use client";
 
 import React from "react";
 import GameCard from "@/components/game/GameCard";
 import type { DisplayableCard } from "./types";
-import type { BaseCardSocialInteractions } from "./cards/base-card/base-card.types";
-import type { PriceCardInteractionCallbacks } from "./cards/price-card/price-card.types"; // For priceSpecificInteractions
+import type {
+  BaseCardSocialInteractions,
+  CardActionContext,
+} from "./cards/base-card/base-card.types";
+import type { PriceCardInteractionCallbacks } from "./cards/price-card/price-card.types";
+import type { ProfileCardInteractionCallbacks } from "./cards/profile-card/profile-card.types"; // Import this
 
 import {
   AlertDialog,
@@ -18,7 +22,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-// Define which specific interaction callbacks PriceCardContent needs
 type PriceSpecificInteractionsForContainer = Pick<
   PriceCardInteractionCallbacks,
   | "onPriceCardSmaClick"
@@ -27,15 +30,17 @@ type PriceSpecificInteractionsForContainer = Pick<
   | "onPriceCardGenerateDailyPerformanceSignal"
 >;
 
+// This is the props interface for the presentational component
 interface ActiveCardsProps {
   cards: DisplayableCard[];
   onToggleFlipCard: (id: string) => void;
-  onDeleteCardRequest: (id: string) => void; // To show confirmation dialog
+  onDeleteCardRequest: (id: string) => void;
 
-  socialInteractions?: BaseCardSocialInteractions; // For the social bar in BaseCard
-  priceSpecificInteractions?: PriceSpecificInteractionsForContainer; // For PriceCardContent
+  socialInteractions?: BaseCardSocialInteractions;
+  priceSpecificInteractions?: PriceSpecificInteractionsForContainer;
+  profileSpecificInteractions?: ProfileCardInteractionCallbacks; // <<< ADDED THIS PROP
+  onHeaderIdentityClick?: (context: CardActionContext) => void; // <<< ADDED THIS PROP
 
-  // Props for AlertDialog
   cardIdToConfirmDelete: string | null;
   onConfirmDeletion: () => void;
   onCancelDeletion: () => void;
@@ -47,6 +52,8 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
   onDeleteCardRequest,
   socialInteractions,
   priceSpecificInteractions,
+  profileSpecificInteractions, // Destructure
+  onHeaderIdentityClick, // Destructure
   cardIdToConfirmDelete,
   onConfirmDeletion,
   onCancelDeletion,
@@ -70,14 +77,14 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
     <div className="flex-grow p-4 bg-secondary/30 rounded-lg shadow-inner min-h-screen">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-2xl font-semibold text-foreground">
-          Live Quote & Generated Signals
+          Active Cards & Signals
         </h2>
       </div>
 
       {cards.length === 0 ? (
         <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
           <p className="text-muted-foreground text-center py-10">
-            No active cards or signals. Waiting for live data...
+            No active cards. Click a Price Card header to load a profile.
           </p>
         </div>
       ) : (
@@ -88,9 +95,10 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
                 card={card}
                 onToggleFlip={onToggleFlipCard}
                 onDeleteCardRequest={onDeleteCardRequest}
-                // Pass down the interaction objects
                 socialInteractions={socialInteractions}
                 priceSpecificInteractions={priceSpecificInteractions}
+                profileSpecificInteractions={profileSpecificInteractions} // Pass down
+                onHeaderIdentityClick={onHeaderIdentityClick} // Pass down
               />
             </div>
           ))}

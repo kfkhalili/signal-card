@@ -9,6 +9,7 @@ import type {
   BaseCardSocialInteractions,
 } from "./base-card.types";
 import { SocialBar } from "@/components/ui/social-bar";
+import { ClickableDataItem } from "@/components/ui/ClickableDataItem"; // Import ClickableDataItem
 
 interface BaseCardProps {
   isFlipped: boolean;
@@ -18,6 +19,7 @@ interface BaseCardProps {
   socialInteractions?: BaseCardSocialInteractions;
   onDeleteRequest?: (context: CardActionContext) => void;
   onFlip: () => void;
+  onHeaderClick?: (context: CardActionContext) => void;
   className?: string;
   innerCardClassName?: string;
   children?: React.ReactNode;
@@ -31,6 +33,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
   socialInteractions,
   onDeleteRequest,
   onFlip,
+  onHeaderClick,
   className,
   innerCardClassName,
   children,
@@ -58,7 +61,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
     width: "100%",
     height: "100%",
     backfaceVisibility: "hidden",
-    WebkitBackfaceVisibility: "hidden", // For Safari
+    WebkitBackfaceVisibility: "hidden",
     display: "flex",
     flexDirection: "column",
     cursor: "pointer",
@@ -88,52 +91,73 @@ const BaseCard: React.FC<BaseCardProps> = ({
     </button>
   ) : null;
 
-  // Define the header properties for consistent spacing
   const headerClassNames =
     "px-3 sm:px-4 pb-2 pt-6 sm:pt-7 shrink-0 min-h-[56px] sm:min-h-[64px] md:min-h-[72px]";
 
-  const identityHeaderElement = // This is the actual visual header
-    (
-      <div
-        className={cn("flex justify-between items-center", headerClassNames)}>
-        {/* Logo Section */}
-        <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0 mr-2 sm:mr-3">
-          {logoUrl && (
-            <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 relative">
-              <Image
-                src={logoUrl}
-                alt={`${companyName || symbol} logo`}
-                fill
-                sizes="(max-width: 640px) 28px, (max-width: 768px) 32px, 40px"
-                className={cn("object-contain rounded", "drop-shadow-sm")}
-                unoptimized={!logoUrl.startsWith("/")}
-              />
-            </div>
-          )}
-        </div>
-        {/* Text Section (Name + Symbol) */}
-        <div className="text-right min-w-0 max-w-[60%] sm:max-w-[65%]">
-          <CardTitle
-            className="text-sm sm:text-base md:text-lg font-semibold leading-tight whitespace-normal break-words"
-            title={companyName || symbol}>
-            {companyName || symbol}
-          </CardTitle>
-          {companyName && (
-            <p
-              className="text-xs sm:text-sm text-muted-foreground truncate"
-              title={symbol}>
-              ({symbol})
-            </p>
-          )}
-          {!companyName && (
-            <p className="text-xs sm:text-sm text-muted-foreground">Quote</p>
-          )}
-        </div>
-      </div>
-    );
+  const handleHeaderTextClick = (
+    event:
+      | React.MouseEvent<HTMLDivElement>
+      | React.KeyboardEvent<HTMLDivElement>
+  ) => {
+    // This event comes from ClickableDataItem, which already handles Enter/Space for keyboard
+    if (onHeaderClick) {
+      event.stopPropagation(); // Prevent the main card's onFlip from firing
+      onHeaderClick(cardContext);
+    }
+  };
 
-  const headerPlaceholderElement = // Invisible placeholder for the back card
-    <div className={cn("invisible", headerClassNames)} aria-hidden="true" />;
+  const identityHeaderElement = (
+    <div className={cn("flex justify-between items-center", headerClassNames)}>
+      {/* Logo part is not interactive for onHeaderClick by default */}
+      <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0 mr-2 sm:mr-3">
+        {logoUrl && (
+          <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 relative">
+            <Image
+              src={logoUrl}
+              alt={`${companyName || symbol} logo`}
+              fill
+              sizes="(max-width: 640px) 28px, (max-width: 768px) 32px, 40px"
+              className={cn("object-contain rounded", "drop-shadow-sm")}
+              unoptimized={!logoUrl.startsWith("/")}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Text part of the header, now using ClickableDataItem */}
+      <ClickableDataItem
+        isInteractive={!!onHeaderClick}
+        onClickHandler={onHeaderClick ? handleHeaderTextClick : undefined}
+        baseClassName="text-right min-w-0 max-w-[60%] sm:max-w-[65%]"
+        interactiveClassName="hover:opacity-80 transition-opacity" // Applied by ClickableDataItem if isInteractive
+        aria-label={
+          onHeaderClick
+            ? `View details for ${companyName || symbol}`
+            : undefined
+        }
+        data-testid="header-text-clickable">
+        <CardTitle
+          className="text-sm sm:text-base md:text-lg font-semibold leading-tight whitespace-normal break-words"
+          title={companyName || symbol}>
+          {companyName || symbol}
+        </CardTitle>
+        {companyName && (
+          <p
+            className="text-xs sm:text-sm text-muted-foreground truncate"
+            title={symbol}>
+            ({symbol})
+          </p>
+        )}
+        {!companyName && (
+          <p className="text-xs sm:text-sm text-muted-foreground">Quote</p>
+        )}
+      </ClickableDataItem>
+    </div>
+  );
+
+  const headerPlaceholderElement = (
+    <div className={cn("invisible", headerClassNames)} aria-hidden="true" />
+  );
 
   const socialBarElement = socialInteractions ? (
     <div
@@ -153,7 +177,6 @@ const BaseCard: React.FC<BaseCardProps> = ({
         style={innerCardStyles}
         className={cn(innerCardClassName)}
         data-testid="base-card-inner">
-        {/* Card Face */}
         <ShadCard
           style={cardSurfaceStyles}
           className={cn(
@@ -165,21 +188,27 @@ const BaseCard: React.FC<BaseCardProps> = ({
           onClick={onFlip}
           role="button"
           tabIndex={0}
-          onKeyDown={(e) =>
-            e.key === "Enter" || e.key === " " ? onFlip() : undefined
-          }
+          onKeyDown={(e) => {
+            if (
+              (e.key === "Enter" || e.key === " ") &&
+              document.activeElement === e.currentTarget
+            ) {
+              // Only flip if the card itself is focused and not an interactive element within it
+              // (like the ClickableDataItem in the header, which handles its own Enter/Space)
+              onFlip();
+            }
+          }}
           aria-label={
             isFlipped ? `Show ${symbol} front` : `Show ${symbol} back details`
           }>
           {deleteButtonElement}
-          {identityHeaderElement} {/* Actual header on the front */}
+          {identityHeaderElement}
           <div className="flex-grow overflow-y-auto relative p-3 sm:p-4 md:p-5 pt-0">
             {faceContent}
           </div>
           {socialBarElement}
         </ShadCard>
 
-        {/* Card Back */}
         <ShadCard
           style={{ ...cardSurfaceStyles, ...backFaceTransformStyle }}
           className={cn(
@@ -191,9 +220,9 @@ const BaseCard: React.FC<BaseCardProps> = ({
           onClick={onFlip}
           role="button"
           tabIndex={0}
-          onKeyDown={(e) =>
-            e.key === "Enter" || e.key === " " ? onFlip() : undefined
-          }
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") onFlip();
+          }}
           aria-label={
             isFlipped ? `Show ${symbol} front` : `Show ${symbol} back details`
           }>

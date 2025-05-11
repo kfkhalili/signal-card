@@ -1,4 +1,4 @@
-// src/app/components/game/cards/price-card/PriceCardContainer.tsx
+// src/components/game/cards/price-card/PriceCardContainer.tsx
 import React from "react";
 import BaseCard from "../base-card/BaseCard";
 import type {
@@ -7,11 +7,12 @@ import type {
 } from "../base-card/base-card.types";
 import type {
   PriceCardData,
-  PriceCardInteractionCallbacks,
+  PriceCardInteractionCallbacks, // For PriceSpecificInteractions type
 } from "./price-card.types";
 import { PriceCardContent } from "./PriceCardContent";
-import { cn } from "@/lib/utils";
+// import { cn } from "@/lib/utils"; // Only if needed for specific container styling
 
+// Define which specific interaction callbacks PriceCardContent needs
 type PriceSpecificInteractions = Pick<
   PriceCardInteractionCallbacks,
   | "onPriceCardSmaClick"
@@ -23,33 +24,38 @@ type PriceSpecificInteractions = Pick<
 interface PriceCardContainerProps {
   cardData: PriceCardData;
   isFlipped: boolean;
-  onFlip: () => void; // This is now passed to BaseCard
+  onFlip: () => void;
 
-  cardContext: CardActionContext;
+  cardContext: CardActionContext; // Contains symbol, companyName, logoUrl
   socialInteractions?: BaseCardSocialInteractions;
   onDeleteRequest?: (context: CardActionContext) => void;
 
+  // Callback for when the header (company name/symbol) of this PriceCard is clicked
+  // This is intended to trigger showing a ProfileCard.
+  onHeaderIdentityClick?: (context: CardActionContext) => void; // <<<< THIS PROP WAS MISSING OR MISMATCHED
+
+  // Specific interactions for the content of the PriceCard
   priceSpecificInteractions?: PriceSpecificInteractions;
 
   className?: string;
   innerCardClassName?: string;
-  children?: React.ReactNode; // Overlays from GameCard
+  children?: React.ReactNode; // For overlays, passed to BaseCard
 }
 
 export const PriceCardContainer = React.memo<PriceCardContainerProps>(
   ({
     cardData,
     isFlipped,
-    onFlip, // Will be passed to BaseCard
+    onFlip,
     cardContext,
     socialInteractions,
     onDeleteRequest,
+    onHeaderIdentityClick, // Now correctly received as a prop
     priceSpecificInteractions,
     className,
     innerCardClassName,
     children,
   }) => {
-    // PriceCardContent is now the direct content for face/back, no extra wrappers here
     const faceContentForBaseCard = (
       <PriceCardContent
         cardData={cardData}
@@ -74,21 +80,22 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
           priceSpecificInteractions?.onPriceCardRangeContextClick
         }
         onOpenPriceClick={priceSpecificInteractions?.onPriceCardOpenPriceClick}
+        // No onGenerateDailyPerformanceSignal for back face
       />
     );
 
     return (
       <BaseCard
         isFlipped={isFlipped}
-        faceContent={faceContentForBaseCard} // Pass PriceCardContent directly
-        backContent={backContentForBaseCard} // Pass PriceCardContent directly
-        onFlip={onFlip} // Pass the onFlip handler to BaseCard
+        faceContent={faceContentForBaseCard}
+        backContent={backContentForBaseCard}
+        onFlip={onFlip}
         cardContext={cardContext}
         socialInteractions={socialInteractions}
         onDeleteRequest={onDeleteRequest}
+        onHeaderClick={onHeaderIdentityClick} // Pass it to BaseCard as onHeaderClick
         className={className}
-        innerCardClassName={innerCardClassName}
-      >
+        innerCardClassName={innerCardClassName}>
         {children} {/* Overlays */}
       </BaseCard>
     );

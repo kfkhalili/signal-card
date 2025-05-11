@@ -4,6 +4,7 @@
  */
 
 export type CardType =
+  | "profile"
   | "price"
   | "daily_performance"
   | "price_vs_sma"
