@@ -132,7 +132,6 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
             )}>
             <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-1 sm:gap-y-1.5">
               <div className={cn(gridCellClass)}>
-                {" "}
                 <ClickableDataItem
                   isInteractive={
                     !!(onOpenPriceClick && faceData.dayOpen != null)
@@ -149,28 +148,23 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                       : undefined
                   }
                   data-interactive-child="true">
-                  {" "}
-                  <span className="font-semibold block">Open</span>{" "}
-                  <span>${faceData.dayOpen?.toFixed(2) ?? "N/A"}</span>{" "}
-                </ClickableDataItem>{" "}
+                  <span className="font-semibold block">Open</span>
+                  <span>${faceData.dayOpen?.toFixed(2) ?? "N/A"}</span>
+                </ClickableDataItem>
               </div>
               <div className={cn(gridCellClass, "py-0.5")}>
-                {" "}
-                <span className="font-semibold block">Prev Close</span>{" "}
-                <span>${faceData.previousClose?.toFixed(2) ?? "N/A"}</span>{" "}
+                <span className="font-semibold block">Prev Close</span>
+                <span>${faceData.previousClose?.toFixed(2) ?? "N/A"}</span>
               </div>
               <div className={cn(gridCellClass, "py-0.5")}>
-                {" "}
-                <span className="font-semibold block">Volume</span>{" "}
-                <span>{formatVolume(faceData.volume)}</span>{" "}
+                <span className="font-semibold block">Volume</span>
+                <span>{formatVolume(faceData.volume)}</span>
               </div>
               <div className={cn(gridCellClass, "py-0.5")}>
-                {" "}
-                <span className="font-semibold block">Market Cap</span>{" "}
-                <span>{formatMarketCap(backData.marketCap)}</span>{" "}
+                <span className="font-semibold block">Market Cap</span>
+                <span>{formatMarketCap(backData.marketCap)}</span>
               </div>
               <div className={cn(gridCellClass)}>
-                {" "}
                 <ClickableDataItem
                   isInteractive={!!(onSmaClick && backData.sma50d != null)}
                   onClickHandler={(e) =>
@@ -185,13 +179,11 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                       : undefined
                   }
                   data-interactive-child="true">
-                  {" "}
-                  <span className="font-semibold block">50D SMA</span>{" "}
-                  <span>${backData.sma50d?.toFixed(2) ?? "N/A"}</span>{" "}
-                </ClickableDataItem>{" "}
+                  <span className="font-semibold block">50D SMA</span>
+                  <span>${backData.sma50d?.toFixed(2) ?? "N/A"}</span>
+                </ClickableDataItem>
               </div>
               <div className={cn(gridCellClass)}>
-                {" "}
                 <ClickableDataItem
                   isInteractive={!!(onSmaClick && backData.sma200d != null)}
                   onClickHandler={(e) =>
@@ -206,10 +198,9 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                       : undefined
                   }
                   data-interactive-child="true">
-                  {" "}
-                  <span className="font-semibold block">200D SMA</span>{" "}
-                  <span>${backData.sma200d?.toFixed(2) ?? "N/A"}</span>{" "}
-                </ClickableDataItem>{" "}
+                  <span className="font-semibold block">200D SMA</span>
+                  <span>${backData.sma200d?.toFixed(2) ?? "N/A"}</span>
+                </ClickableDataItem>
               </div>
             </div>
           </ShadCardContent>
@@ -294,7 +285,6 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                 )}`
               : undefined
           }>
-          {" "}
           <p
             className={cn(
               "text-2xl sm:text-3xl md:text-4xl font-bold",
@@ -302,9 +292,8 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                 "group-hover/textgroup:text-primary"
             )}
             title="Current Price">
-            {" "}
-            ${faceData.price != null ? faceData.price.toFixed(2) : "N/A"}{" "}
-          </p>{" "}
+            ${faceData.price != null ? faceData.price.toFixed(2) : "N/A"}
+          </p>
           <div
             className={cn(
               "flex items-baseline space-x-1 sm:space-x-2",
@@ -316,30 +305,27 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
               onGenerateDailyPerformanceSignal &&
                 "group-hover/textgroup:text-primary"
             )}>
-            {" "}
             <p
               className="text-base sm:text-lg font-semibold"
               title="Day Change">
-              {" "}
               {faceData.dayChange != null
                 ? `${
                     faceData.dayChange >= 0 ? "+" : ""
                   }${faceData.dayChange.toFixed(2)}`
-                : "N/A"}{" "}
-            </p>{" "}
+                : "N/A"}
+            </p>
             <p
               className="text-base sm:text-lg font-semibold"
               title="Percent Change">
-              {" "}
               (
               {faceData.changePercentage != null
                 ? `${
                     faceData.changePercentage >= 0 ? "+" : ""
                   }${faceData.changePercentage.toFixed(2)}%`
                 : "N/A"}
-              ){" "}
-            </p>{" "}
-          </div>{" "}
+              )
+            </p>
+          </div>
         </div>
       );
 

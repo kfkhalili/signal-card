@@ -89,15 +89,8 @@ const BaseCard: React.FC<BaseCardProps> = ({
     </button>
   ) : null;
 
-  const headerPlaceholderClasses =
-    "px-3 sm:px-4 pb-2 pt-6 sm:pt-7 shrink-0 min-h-[56px] sm:min-h-[64px] md:min-h-[72px]";
-
   const universalHeaderElement = (
-    <div
-      className={cn(
-        "flex justify-between items-center shrink-0",
-        headerPlaceholderClasses
-      )}>
+    <div className="flex justify-between items-center px-3 sm:px-4 pb-2 pt-6 sm:pt-7 shrink-0 min-h-[56px] sm:min-h-[64px] md:min-h-[72px]">
       <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0 mr-2 sm:mr-3">
         {logoUrl && (
           <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 relative">
@@ -152,18 +145,8 @@ const BaseCard: React.FC<BaseCardProps> = ({
   ) => (
     <>
       {deleteButtonElement}
-      {isFront ? (
-        universalHeaderElement
-      ) : (
-        // MODIFIED: Render an empty div with the same spacing classes as the header for the back face
-        <div
-          className={cn("shrink-0", headerPlaceholderClasses)}
-          aria-hidden="true">
-          {/* This div just creates space, no content needed */}
-        </div>
-      )}
-      {/* Padding for content area is now p-3 sm:p-4 */}
-      <div className="flex-grow overflow-y-auto relative p-3 sm:p-4">
+      {isFront && universalHeaderElement}
+      <div className="flex-grow overflow-y-auto relative p-3 sm:p-4 md:p-5">
         {contentNode}
       </div>
       {socialBarElement}

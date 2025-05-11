@@ -71,7 +71,6 @@ export const BaseCardContainer = React.memo<BaseCardContainerProps>(
     // BaseCard will add the social bar below it.
     const faceContentNode = (
       <>
-        {" "}
         {/* Use fragment if no single root needed, or a div if styling needed here */}
         <ClickableDataItem
           isInteractive={!!onCardInteraction}
@@ -87,8 +86,7 @@ export const BaseCardContainer = React.memo<BaseCardContainerProps>(
               ? `Interact with symbol ${cardData.symbol}`
               : undefined
           }
-          data-testid="base-card-symbol"
-        >
+          data-testid="base-card-symbol">
           {cardData.symbol} - Front
         </ClickableDataItem>
         <ClickableDataItem
@@ -102,8 +100,7 @@ export const BaseCardContainer = React.memo<BaseCardContainerProps>(
               ? `Interact with card type ${cardData.type}`
               : undefined
           }
-          data-testid="base-card-type"
-        >
+          data-testid="base-card-type">
           Type: {cardData.type}
         </ClickableDataItem>
       </>
@@ -113,7 +110,6 @@ export const BaseCardContainer = React.memo<BaseCardContainerProps>(
     // BaseCard will add the social bar below it.
     const backContentNode = (
       <>
-        {" "}
         {/* Use fragment or a div */}
         <ClickableDataItem
           isInteractive={!!onCardInteraction}
@@ -129,8 +125,7 @@ export const BaseCardContainer = React.memo<BaseCardContainerProps>(
               ? `Interact with symbol ${cardData.symbol}`
               : undefined
           }
-          data-testid="base-card-symbol-back"
-        >
+          data-testid="base-card-symbol-back">
           {cardData.symbol} - Back
         </ClickableDataItem>
         <ClickableDataItem
@@ -147,8 +142,7 @@ export const BaseCardContainer = React.memo<BaseCardContainerProps>(
           aria-label={
             onCardInteraction ? `Interact with explanation` : undefined
           }
-          data-testid="base-card-explanation"
-        >
+          data-testid="base-card-explanation">
           {cardData.backData.explanation}
         </ClickableDataItem>
       </>
@@ -177,10 +171,10 @@ export const BaseCardContainer = React.memo<BaseCardContainerProps>(
           (e.key === "Enter" || e.key === " ") && !e.defaultPrevented
             ? onFlip()
             : null
-        }
-      >
+        }>
         <BaseCard
           isFlipped={isFlipped}
+          onFlip={onFlip}
           faceContent={faceContentNode}
           backContent={backContentNode}
           cardContext={cardContextForBaseCard} // Pass the constructed context
