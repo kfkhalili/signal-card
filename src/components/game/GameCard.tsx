@@ -58,7 +58,7 @@ const GameCard: React.FC<GameCardProps> = ({
     logoUrl: card.logoUrl ?? null, // Access directly from card prop
   };
 
-  const cardWrapperClassName = "w-[280px] aspect-[63/88] relative";
+  const cardWrapperClassName = "w-full aspect-[63/88] relative";
 
   if (card.type === "price") {
     const priceCardData = card as PriceCardData & { isFlipped: boolean }; // card is already PriceCardData here
@@ -91,7 +91,7 @@ const GameCard: React.FC<GameCardProps> = ({
       volume: null,
     };
     const adaptedBackData: PriceCardSpecificBackData = {
-      explanation: snapshotCard.backData.explanation,
+      description: snapshotCard.backData.description,
       marketCap: null,
       sma50d: null,
       sma200d: null,
@@ -128,8 +128,7 @@ const GameCard: React.FC<GameCardProps> = ({
         cardWrapperClassName,
         "p-4 border rounded-2xl bg-muted/30 text-muted-foreground",
         "flex flex-col items-center justify-center shadow-lg relative"
-      )}
-    >
+      )}>
       {baseInfo.type !== "price" && (
         <button
           onClick={() => handleDeleteAction(cardContextForBaseCard)}
@@ -139,8 +138,7 @@ const GameCard: React.FC<GameCardProps> = ({
             "absolute top-1.5 right-1.5 z-20 p-1.5 flex items-center justify-center transition-colors",
             "text-muted-foreground/70 hover:text-primary rounded-sm",
             "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
-          )}
-        >
+          )}>
           <XIcon size={16} strokeWidth={2.5} />
         </button>
       )}

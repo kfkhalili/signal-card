@@ -89,33 +89,46 @@ const BaseCard: React.FC<BaseCardProps> = ({
     </button>
   ) : null;
 
+  const headerPlaceholderClasses =
+    "px-3 sm:px-4 pb-2 pt-6 sm:pt-7 shrink-0 min-h-[56px] sm:min-h-[64px] md:min-h-[72px]";
+
   const universalHeaderElement = (
-    <div className="flex justify-between items-center px-3 pb-2 pt-6 shrink-0 min-h-[52px]">
-      <div className="flex items-center space-x-1.5 flex-shrink-0 mr-1.5">
+    <div
+      className={cn(
+        "flex justify-between items-center shrink-0",
+        headerPlaceholderClasses
+      )}>
+      <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0 mr-2 sm:mr-3">
         {logoUrl && (
-          <Image
-            src={logoUrl}
-            alt={`${companyName || symbol} logo`}
-            width={28}
-            height={28}
-            className={cn("object-contain rounded", "drop-shadow-sm")}
-            unoptimized={!logoUrl.startsWith("/")}
-          />
+          <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 relative">
+            <Image
+              src={logoUrl}
+              alt={`${companyName || symbol} logo`}
+              fill
+              sizes="(max-width: 640px) 28px, (max-width: 768px) 32px, 40px"
+              className={cn("object-contain rounded", "drop-shadow-sm")}
+              unoptimized={!logoUrl.startsWith("/")}
+            />
+          </div>
         )}
       </div>
       <div className="text-right overflow-hidden">
         <CardTitle
-          className="text-sm font-semibold leading-tight truncate"
+          className="text-sm sm:text-base md:text-lg font-semibold leading-tight truncate"
           title={companyName || symbol}>
           {companyName || symbol}
         </CardTitle>
         {companyName && (
-          <p className="text-xs text-muted-foreground truncate" title={symbol}>
+          <p
+            className="text-xs sm:text-sm text-muted-foreground truncate"
+            title={symbol}>
             ({symbol})
           </p>
         )}
         {!companyName && (
-          <p className="text-xs text-muted-foreground">Stock Quote</p>
+          <p className="text-xs sm:text-sm text-muted-foreground">
+            Stock Quote
+          </p>
         )}
       </div>
     </div>
@@ -133,17 +146,25 @@ const BaseCard: React.FC<BaseCardProps> = ({
     </div>
   ) : null;
 
-  // This function now renders the structure for each card face
   const renderCardFaceInternal = (
     contentNode: React.ReactNode,
     isFront: boolean
   ) => (
     <>
       {deleteButtonElement}
-      {isFront && universalHeaderElement}
-      {/* BaseCard now provides the padding for the content slot */}
-      <div className="flex-grow overflow-y-auto relative p-5">
-        {contentNode} {/* contentNode is PriceCardContent */}
+      {isFront ? (
+        universalHeaderElement
+      ) : (
+        // MODIFIED: Render an empty div with the same spacing classes as the header for the back face
+        <div
+          className={cn("shrink-0", headerPlaceholderClasses)}
+          aria-hidden="true">
+          {/* This div just creates space, no content needed */}
+        </div>
+      )}
+      {/* Padding for content area is now p-3 sm:p-4 */}
+      <div className="flex-grow overflow-y-auto relative p-3 sm:p-4">
+        {contentNode}
       </div>
       {socialBarElement}
     </>

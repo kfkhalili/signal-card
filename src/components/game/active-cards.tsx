@@ -81,7 +81,7 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {cards.map((card) => (
             <div key={card.id} className="flex justify-center items-start">
               <GameCard
@@ -101,8 +101,7 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
         open={!!cardIdToConfirmDelete}
         onOpenChange={(open) => {
           if (!open) onCancelDeletion();
-        }}
-      >
+        }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
@@ -116,8 +115,7 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={onConfirmDeletion}
-              className="bg-red-600 hover:bg-red-700 text-destructive-foreground"
-            >
+              className="bg-red-600 hover:bg-red-700 text-destructive-foreground">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
