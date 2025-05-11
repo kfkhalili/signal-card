@@ -1,15 +1,15 @@
-// src/app/components/game/cards/price-card/PriceCardContent.tsx
+// src/components/game/cards/price-card/PriceCardContent.tsx
 import React from "react";
 import {
-  CardHeader,
-  CardDescription,
+  CardHeader, // Used for back face
+  CardDescription, // Used for back face
   CardContent as ShadCardContent,
 } from "@/components/ui/card";
 import type {
   PriceCardData,
   PriceCardInteractionCallbacks,
 } from "./price-card.types";
-import { format } from "date-fns";
+// import { format } from "date-fns"; // Not used in this version, but keep if needed for timestamps
 import { cn } from "@/lib/utils";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
 
@@ -42,14 +42,14 @@ const getRangeBarStyling = (
   isAtHigh: boolean,
   isAtLow: boolean
 ): RangeBarStyling => {
-  if (isAtLow && percentage < 1) return { bgColorClass: "bg-slate-600" };
+  if (isAtLow && percentage < 1) return { bgColorClass: "bg-slate-600" }; // Darker for low extreme
   if (isAtHigh && percentage > 99)
-    return { bgColorClass: "bg-emerald-500", animationClass: "animate-pulse" };
+    return { bgColorClass: "bg-emerald-500", animationClass: "animate-pulse" }; // Pulse at high extreme
   if (percentage <= 20) return { bgColorClass: "bg-slate-500" };
   if (percentage <= 40) return { bgColorClass: "bg-cyan-600" };
   if (percentage <= 60) return { bgColorClass: "bg-teal-500" };
   if (percentage <= 80) return { bgColorClass: "bg-emerald-400" };
-  return { bgColorClass: "bg-emerald-500" };
+  return { bgColorClass: "bg-emerald-500" }; // Brighter green for upper range
 };
 
 interface PriceCardContentProps {
@@ -70,7 +70,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
     onOpenPriceClick,
     onGenerateDailyPerformanceSignal,
   }) => {
-    const { faceData, backData, symbol } = cardData;
+    const { faceData, backData } = cardData; // Removed symbol as it's not directly used here
 
     const handleSmaInteraction = (
       e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>,
@@ -112,10 +112,11 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
       }
     };
 
-    const gridCellClass = "min-w-0";
+    const gridCellClass = "min-w-0"; // For grid layout on the back
 
     if (isBackFace) {
       return (
+        // Back face wrapper - no extra horizontal padding needed here
         <div
           data-testid="price-card-back-content-data"
           className="pointer-events-auto">
@@ -124,10 +125,9 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
               {backData.description || STATIC_BACK_FACE_DESCRIPTION}
             </CardDescription>
           </CardHeader>
-
           <ShadCardContent
             className={cn(
-              "text-xs sm:text-sm md:text-base pb-0 px-0",
+              "text-xs sm:text-sm md:text-base pb-0 px-0", // px-0 ensures it uses BaseCard padding
               "text-muted-foreground"
             )}>
             <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-1 sm:gap-y-1.5">
@@ -207,7 +207,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
         </div>
       );
     } else {
-      // Front Face
+      // --- Front Face ---
       const currentPrice = faceData.price;
       const dayLow = faceData.dayLow;
       const dayHigh = faceData.dayHigh;
@@ -330,17 +330,19 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
       );
 
       return (
+        // MODIFIED: Removed p-3 from this div. Its content will now use the padding from BaseCard.
         <div
           data-testid="price-card-front-content-data"
-          className="pointer-events-auto p-3">
+          className="pointer-events-auto">
+          {/* ShadCardContent itself doesn't add padding unless specified, so px-0 is good. */}
           <ShadCardContent className="px-0 pt-0 pb-0">
+            {" "}
+            {/* pt-0 to align with BaseCard's content div which has pt-0 */}
             <div
-              className="rounded-md p-2 -mx-2 -my-1 mb-2"
+              className="rounded-md p-2 -mx-2 -my-1 mb-2" // This inner div can have its own padding if desired for the price block
               data-testid="daily-performance-layout-area">
               {PriceDisplayBlock}
             </div>
-
-            {/* Daily Low/High Range */}
             {dayLow != null &&
               dayHigh != null &&
               currentPrice != null &&
@@ -348,7 +350,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                 <div className="mt-2 sm:mt-3">
                   <div className="flex justify-between text-xs text-muted-foreground mb-1">
                     <ClickableDataItem
-                      title={`${dayLow?.toFixed(2) ?? "N/A"}`} // Tooltip shows value
+                      title={`${dayLow?.toFixed(2) ?? "N/A"}`}
                       isInteractive={!!(onRangeContextClick && dayLow != null)}
                       onClickHandler={(e) =>
                         handleRangeInteraction(e, "Low", dayLow)
@@ -362,10 +364,10 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                           : undefined
                       }
                       data-interactive-child="true">
-                      Day Low {/* Static text */}
+                      Day Low
                     </ClickableDataItem>
                     <ClickableDataItem
-                      title={`${dayHigh?.toFixed(2) ?? "N/A"}`} // Tooltip shows value
+                      title={`${dayHigh?.toFixed(2) ?? "N/A"}`}
                       isInteractive={!!(onRangeContextClick && dayHigh != null)}
                       onClickHandler={(e) =>
                         handleRangeInteraction(e, "High", dayHigh)
@@ -379,7 +381,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                           : undefined
                       }
                       data-interactive-child="true">
-                      Day High {/* Static text */}
+                      Day High
                     </ClickableDataItem>
                   </div>
                   <div className="w-full bg-muted rounded-full h-1.5 pointer-events-none">
@@ -394,8 +396,6 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                   </div>
                 </div>
               )}
-
-            {/* 52-Week Low/High Range */}
             {yearLow != null &&
               yearHigh != null &&
               currentPrice != null &&
@@ -403,7 +403,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                 <div className="mt-3 sm:mt-4">
                   <div className="flex justify-between text-[10px] sm:text-xs text-muted-foreground/90 mb-0.5 sm:mb-1">
                     <ClickableDataItem
-                      title={`${yearLow?.toFixed(2) ?? "N/A"}`} // Tooltip shows value
+                      title={`${yearLow?.toFixed(2) ?? "N/A"}`}
                       isInteractive={!!(onRangeContextClick && yearLow != null)}
                       onClickHandler={(e) =>
                         handleRangeInteraction(e, "YearLow", yearLow)
@@ -417,10 +417,10 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                           : undefined
                       }
                       data-interactive-child="true">
-                      52W Low {/* Static text */}
+                      52W Low
                     </ClickableDataItem>
                     <ClickableDataItem
-                      title={`${yearHigh?.toFixed(2) ?? "N/A"}`} // Tooltip shows value
+                      title={`${yearHigh?.toFixed(2) ?? "N/A"}`}
                       isInteractive={
                         !!(onRangeContextClick && yearHigh != null)
                       }
@@ -436,7 +436,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                           : undefined
                       }
                       data-interactive-child="true">
-                      52W High {/* Static text */}
+                      52W High
                     </ClickableDataItem>
                   </div>
                   <div className="w-full bg-muted/70 rounded-full h-1 sm:h-1.5 pointer-events-none">

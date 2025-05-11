@@ -9,7 +9,7 @@ import type {
   BaseCardSocialInteractions,
 } from "./base-card.types";
 import { SocialBar } from "@/components/ui/social-bar";
-import { ClickableDataItem } from "@/components/ui/ClickableDataItem"; // Import ClickableDataItem
+import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
 
 interface BaseCardProps {
   isFlipped: boolean;
@@ -91,24 +91,24 @@ const BaseCard: React.FC<BaseCardProps> = ({
     </button>
   ) : null;
 
-  const headerClassNames =
-    "px-3 sm:px-4 pb-2 pt-6 sm:pt-7 shrink-0 min-h-[56px] sm:min-h-[64px] md:min-h-[72px]";
+  // MODIFIED: Added md:px-5 to match content padding
+  const headerAreaClassNames =
+    "px-3 sm:px-4 md:px-5 pb-2 pt-6 sm:pt-7 shrink-0 min-h-[56px] sm:min-h-[64px] md:min-h-[72px]";
 
   const handleHeaderTextClick = (
     event:
       | React.MouseEvent<HTMLDivElement>
       | React.KeyboardEvent<HTMLDivElement>
   ) => {
-    // This event comes from ClickableDataItem, which already handles Enter/Space for keyboard
     if (onHeaderClick) {
-      event.stopPropagation(); // Prevent the main card's onFlip from firing
+      event.stopPropagation();
       onHeaderClick(cardContext);
     }
   };
 
   const identityHeaderElement = (
-    <div className={cn("flex justify-between items-center", headerClassNames)}>
-      {/* Logo part is not interactive for onHeaderClick by default */}
+    <div
+      className={cn("flex justify-between items-start", headerAreaClassNames)}>
       <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0 mr-2 sm:mr-3">
         {logoUrl && (
           <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 relative">
@@ -123,13 +123,11 @@ const BaseCard: React.FC<BaseCardProps> = ({
           </div>
         )}
       </div>
-
-      {/* Text part of the header, now using ClickableDataItem */}
       <ClickableDataItem
         isInteractive={!!onHeaderClick}
         onClickHandler={onHeaderClick ? handleHeaderTextClick : undefined}
         baseClassName="text-right min-w-0 max-w-[60%] sm:max-w-[65%]"
-        interactiveClassName="hover:opacity-80 transition-opacity" // Applied by ClickableDataItem if isInteractive
+        interactiveClassName="hover:opacity-80 transition-opacity"
         aria-label={
           onHeaderClick
             ? `View details for ${companyName || symbol}`
@@ -156,7 +154,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
   );
 
   const headerPlaceholderElement = (
-    <div className={cn("invisible", headerClassNames)} aria-hidden="true" />
+    <div className={cn("invisible", headerAreaClassNames)} aria-hidden="true" />
   );
 
   const socialBarElement = socialInteractions ? (
@@ -177,6 +175,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
         style={innerCardStyles}
         className={cn(innerCardClassName)}
         data-testid="base-card-inner">
+        {/* Card Front Face */}
         <ShadCard
           style={cardSurfaceStyles}
           className={cn(
@@ -193,8 +192,6 @@ const BaseCard: React.FC<BaseCardProps> = ({
               (e.key === "Enter" || e.key === " ") &&
               document.activeElement === e.currentTarget
             ) {
-              // Only flip if the card itself is focused and not an interactive element within it
-              // (like the ClickableDataItem in the header, which handles its own Enter/Space)
               onFlip();
             }
           }}
@@ -203,12 +200,14 @@ const BaseCard: React.FC<BaseCardProps> = ({
           }>
           {deleteButtonElement}
           {identityHeaderElement}
+          {/* Content area uses p-3 sm:p-4 md:p-5, so header should match px part */}
           <div className="flex-grow overflow-y-auto relative p-3 sm:p-4 md:p-5 pt-0">
             {faceContent}
           </div>
           {socialBarElement}
         </ShadCard>
 
+        {/* Card Back Face */}
         <ShadCard
           style={{ ...cardSurfaceStyles, ...backFaceTransformStyle }}
           className={cn(
@@ -228,6 +227,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
           }>
           {deleteButtonElement}
           {headerPlaceholderElement}
+          {/* Content area uses p-3 sm:p-4 md:p-5, so header placeholder should match px part */}
           <div className="flex-grow overflow-y-auto relative p-3 sm:p-4 md:p-5 pt-0">
             {backContent}
           </div>
