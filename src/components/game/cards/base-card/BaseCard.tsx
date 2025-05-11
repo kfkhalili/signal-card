@@ -18,11 +18,9 @@ interface BaseCardProps {
   cardContext: CardActionContext;
   socialInteractions?: BaseCardSocialInteractions;
   onDeleteRequest?: (context: CardActionContext) => void;
-  onFlip: () => void; // Added onFlip back to props
-
   className?: string;
   innerCardClassName?: string;
-  children?: React.ReactNode;
+  children?: React.ReactNode; // For top-level overlays, if any, independent of flip
 }
 
 const BaseCard: React.FC<BaseCardProps> = ({
@@ -32,7 +30,6 @@ const BaseCard: React.FC<BaseCardProps> = ({
   cardContext,
   socialInteractions,
   onDeleteRequest,
-  onFlip, // Destructure onFlip
   className,
   innerCardClassName,
   children,
@@ -63,7 +60,6 @@ const BaseCard: React.FC<BaseCardProps> = ({
     WebkitBackfaceVisibility: "hidden",
     display: "flex",
     flexDirection: "column",
-    cursor: "pointer", // Indicate the whole surface is clickable for flip
   };
 
   const backFaceTransformStyle: React.CSSProperties = {
@@ -92,7 +88,8 @@ const BaseCard: React.FC<BaseCardProps> = ({
   ) : null;
 
   const universalHeaderElement = (
-    <div className="flex justify-between items-center px-2 pb-2 pt-6 shrink-0 min-h-[52px]">
+    // Header uses px-3, pb-2 (was pb-3), pt-6 (was pt-7)
+    <div className="flex justify-between items-center px-3 pb-2 pt-6 shrink-0 min-h-[52px]">
       <div className="flex items-center space-x-1.5 flex-shrink-0 mr-1.5">
         {logoUrl && (
           <Image
@@ -131,30 +128,10 @@ const BaseCard: React.FC<BaseCardProps> = ({
         "opacity-0 group-hover:opacity-100",
         "translate-y-full group-hover:translate-y-0"
       )}
-      onClick={(e) => e.stopPropagation()} // Prevent social bar background clicks from flipping
     >
       <SocialBar interactions={socialInteractions} cardContext={cardContext} />
     </div>
   ) : null;
-
-  const renderCardFaceInternal = (
-    contentNode: React.ReactNode,
-    isFront: boolean
-  ) => (
-    <>
-      {deleteButtonElement}
-      {isFront && universalHeaderElement}
-      <div
-        className={cn(
-          "flex-grow overflow-y-auto relative",
-          isFront ? "px-2 pb-2 pt-0" : "px-2 pb-2 pt-6"
-        )}
-      >
-        {contentNode}
-      </div>
-      {socialBarElement}
-    </>
-  );
 
   return (
     <div style={outerStyle} className={cn("group", className)}>
@@ -163,7 +140,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
         className={cn(innerCardClassName)}
         data-testid="base-card-inner"
       >
-        {/* Front Face - Re-added onFlip and accessibility props */}
+        {/* Front Face */}
         <ShadCard
           style={cardSurfaceStyles}
           className={cn(
@@ -172,20 +149,19 @@ const BaseCard: React.FC<BaseCardProps> = ({
             "rounded-2xl",
             "shadow-lg"
           )}
-          onClick={onFlip}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) =>
-            e.key === "Enter" || e.key === " " ? onFlip() : undefined
-          }
-          aria-label={
-            isFlipped ? `Show ${symbol} front` : `Show ${symbol} back details`
-          }
         >
-          {renderCardFaceInternal(faceContent, true)}
+          {deleteButtonElement}
+          {universalHeaderElement}
+          {/* MODIFIED: Main content area padding changed from px-2 to px-3 */}
+          <div className="flex-grow overflow-y-auto px-3 pb-2 pt-1">
+            {" "}
+            {/* Was px-2 pb-2 pt-0. Added pt-1 for space from header */}
+            {faceContent}
+          </div>
+          {socialBarElement}
         </ShadCard>
 
-        {/* Back Face - Re-added onFlip and accessibility props */}
+        {/* Back Face */}
         <ShadCard
           style={{ ...cardSurfaceStyles, ...backFaceTransformStyle }}
           className={cn(
@@ -194,17 +170,16 @@ const BaseCard: React.FC<BaseCardProps> = ({
             "rounded-2xl",
             "shadow-lg"
           )}
-          onClick={onFlip}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) =>
-            e.key === "Enter" || e.key === " " ? onFlip() : undefined
-          }
-          aria-label={
-            isFlipped ? `Show ${symbol} front` : `Show ${symbol} back details`
-          }
         >
-          {renderCardFaceInternal(backContent, false)}
+          {deleteButtonElement}
+          {/* No universalHeaderElement here for the back face */}
+          {/* MODIFIED: Main content area padding changed from px-2 to px-3. pt-6 to match header's top padding. */}
+          <div className="flex-grow overflow-y-auto px-3 pb-2 pt-6">
+            {" "}
+            {/* Was px-2 pb-2 pt-6 */}
+            {backContent}
+          </div>
+          {socialBarElement}
         </ShadCard>
       </div>
       {children}

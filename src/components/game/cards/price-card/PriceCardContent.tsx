@@ -2,7 +2,6 @@
 import React from "react";
 import {
   CardHeader,
-  CardTitle,
   CardDescription,
   CardContent as ShadCardContent,
 } from "@/components/ui/card";
@@ -22,8 +21,8 @@ const formatMarketCap = (cap: number | null | undefined): string => {
   return cap.toString();
 };
 
-const STATIC_BACK_FACE_EXPLANATION =
-  "The current market value of a single share of this company's stock.";
+const STATIC_BACK_FACE_DESCRIPTION =
+  "Share price represents the current market value of one share of company stock.";
 
 interface PriceCardContentProps {
   cardData: PriceCardData;
@@ -85,91 +84,110 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
       }
     };
 
+    const gridCellClass = "min-w-0";
+
     if (isBackFace) {
       return (
         <div
           data-testid="price-card-back-content-data"
           className="pointer-events-auto"
         >
-          <CardHeader className="px-0 pt-0 pb-2">
-            <CardDescription className="text-xs">
-              {STATIC_BACK_FACE_EXPLANATION}
+          {/* MODIFIED: Added px-0 to CardHeader to ensure it uses parent padding */}
+          <CardHeader className="pt-0 pb-2 px-0">
+            <CardDescription className="text-sm text-muted-foreground leading-relaxed">
+              {backData.description || STATIC_BACK_FACE_DESCRIPTION}
             </CardDescription>
           </CardHeader>
 
-          <ShadCardContent className="space-y-2 text-sm px-0 pb-0">
+          {/* MODIFIED: Added px-0 to ShadCardContent */}
+          <ShadCardContent className="text-sm pb-0 px-0">
             <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-              <ClickableDataItem
-                isInteractive={!!(onOpenPriceClick && faceData.dayOpen != null)}
-                onClickHandler={handleOpenPriceInteraction}
-                baseClassName="p-0.5 rounded-sm transition-colors relative"
-                interactiveClassName="cursor-pointer hover:text-primary"
-                data-testid="open-price-interactive-area"
-                aria-label={
-                  onOpenPriceClick && faceData.dayOpen != null
-                    ? `Interact with Open Price: ${faceData.dayOpen.toFixed(2)}`
-                    : undefined
-                }
-                data-interactive-child="true"
-              >
-                <span className="font-semibold">Open:</span> $
-                {faceData.dayOpen?.toFixed(2) ?? "N/A"}
-              </ClickableDataItem>
-              <p>
-                <span className="font-semibold">Prev Close:</span> $
-                {faceData.previousClose?.toFixed(2) ?? "N/A"}
-              </p>
-              {/* Day High and Day Low REMOVED from here */}
-              <p>
-                <span className="font-semibold">Volume:</span>
-                {faceData.volume?.toLocaleString() ?? "N/A"}
-              </p>
-              <p>
-                <span className="font-semibold">Market Cap:</span>
-                {formatMarketCap(backData.marketCap)}
-              </p>
-              <ClickableDataItem
-                isInteractive={!!(onSmaClick && backData.sma50d != null)}
-                onClickHandler={(e) =>
-                  handleSmaInteraction(e, 50, backData.sma50d)
-                }
-                baseClassName="mt-1 p-1 rounded-md transition-colors relative"
-                interactiveClassName="cursor-pointer hover:text-primary"
-                data-testid="sma-50d-interactive-area"
-                aria-label={
-                  onSmaClick && backData.sma50d != null
-                    ? `Interact with 50D SMA: ${backData.sma50d.toFixed(2)}`
-                    : undefined
-                }
-                data-interactive-child="true"
-              >
-                <span className="font-semibold">50D SMA:</span> $
-                {backData.sma50d?.toFixed(2) ?? "N/A"}
-              </ClickableDataItem>
-              <ClickableDataItem
-                isInteractive={!!(onSmaClick && backData.sma200d != null)}
-                onClickHandler={(e) =>
-                  handleSmaInteraction(e, 200, backData.sma200d)
-                }
-                baseClassName="mt-1 p-1 rounded-md transition-colors relative"
-                interactiveClassName="cursor-pointer hover:text-primary"
-                data-testid="sma-200d-interactive-area"
-                aria-label={
-                  onSmaClick && backData.sma200d != null
-                    ? `Interact with 200D SMA: ${backData.sma200d.toFixed(2)}`
-                    : undefined
-                }
-                data-interactive-child="true"
-              >
-                <span className="font-semibold">200D SMA:</span> $
-                {backData.sma200d?.toFixed(2) ?? "N/A"}
-              </ClickableDataItem>
+              <div className={cn(gridCellClass)}>
+                <ClickableDataItem
+                  isInteractive={
+                    !!(onOpenPriceClick && faceData.dayOpen != null)
+                  }
+                  onClickHandler={handleOpenPriceInteraction}
+                  baseClassName="transition-colors w-full py-0.5"
+                  interactiveClassName="cursor-pointer hover:text-primary"
+                  data-testid="open-price-interactive-area"
+                  aria-label={
+                    onOpenPriceClick && faceData.dayOpen != null
+                      ? `Interact with Open Price: ${faceData.dayOpen.toFixed(
+                          2
+                        )}`
+                      : undefined
+                  }
+                  data-interactive-child="true"
+                >
+                  <span className="font-semibold block">Open:</span>
+                  <span>${faceData.dayOpen?.toFixed(2) ?? "N/A"}</span>
+                </ClickableDataItem>
+              </div>
+
+              <div className={cn(gridCellClass, "py-0.5")}>
+                <span className="font-semibold block">Prev Close:</span>
+                <span>${faceData.previousClose?.toFixed(2) ?? "N/A"}</span>
+              </div>
+
+              <div className={cn(gridCellClass, "py-0.5")}>
+                <span className="font-semibold block">Volume:</span>
+                <span>{faceData.volume?.toLocaleString() ?? "N/A"}</span>
+              </div>
+
+              <div className={cn(gridCellClass, "py-0.5")}>
+                <span className="font-semibold block">Market Cap:</span>
+                <span>{formatMarketCap(backData.marketCap)}</span>
+              </div>
+
+              <div className={cn(gridCellClass)}>
+                <ClickableDataItem
+                  isInteractive={!!(onSmaClick && backData.sma50d != null)}
+                  onClickHandler={(e) =>
+                    handleSmaInteraction(e, 50, backData.sma50d)
+                  }
+                  baseClassName="transition-colors w-full py-0.5"
+                  interactiveClassName="cursor-pointer hover:text-primary"
+                  data-testid="sma-50d-interactive-area"
+                  aria-label={
+                    onSmaClick && backData.sma50d != null
+                      ? `Interact with 50D SMA: ${backData.sma50d.toFixed(2)}`
+                      : undefined
+                  }
+                  data-interactive-child="true"
+                >
+                  <span className="font-semibold block">50D SMA:</span>
+                  <span>${backData.sma50d?.toFixed(2) ?? "N/A"}</span>
+                </ClickableDataItem>
+              </div>
+
+              <div className={cn(gridCellClass)}>
+                <ClickableDataItem
+                  isInteractive={!!(onSmaClick && backData.sma200d != null)}
+                  onClickHandler={(e) =>
+                    handleSmaInteraction(e, 200, backData.sma200d)
+                  }
+                  baseClassName="transition-colors w-full py-0.5"
+                  interactiveClassName="cursor-pointer hover:text-primary"
+                  data-testid="sma-200d-interactive-area"
+                  aria-label={
+                    onSmaClick && backData.sma200d != null
+                      ? `Interact with 200D SMA: ${backData.sma200d.toFixed(2)}`
+                      : undefined
+                  }
+                  data-interactive-child="true"
+                >
+                  <span className="font-semibold block">200D SMA:</span>
+                  <span>${backData.sma200d?.toFixed(2) ?? "N/A"}</span>
+                </ClickableDataItem>
+              </div>
             </div>
           </ShadCardContent>
         </div>
       );
     } else {
       // Front Face
+      // ... (Front face JSX remains the same)
       const changePositive =
         faceData.dayChange != null && faceData.dayChange >= 0;
       const baseChangeColor =
