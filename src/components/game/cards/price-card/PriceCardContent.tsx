@@ -15,10 +15,19 @@ import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
 
 const formatMarketCap = (cap: number | null | undefined): string => {
   if (cap === null || cap === undefined) return "N/A";
-  if (cap >= 1e12) return `${(cap / 1e12).toFixed(2)}T`;
-  if (cap >= 1e9) return `${(cap / 1e9).toFixed(2)}B`;
-  if (cap >= 1e6) return `${(cap / 1e6).toFixed(2)}M`;
-  return cap.toString();
+  if (cap >= 1e12) return `${(cap / 1e12).toFixed(2)}T`; // Trillions
+  if (cap >= 1e9) return `${(cap / 1e9).toFixed(2)}B`; // Billions
+  if (cap >= 1e6) return `${(cap / 1e6).toFixed(2)}M`; // Millions
+  return cap.toString(); // Less than a million
+};
+
+// New helper function to format volume
+const formatVolume = (volume: number | null | undefined): string => {
+  if (volume === null || volume === undefined) return "N/A";
+  if (volume >= 1_000_000_000) return `${(volume / 1_000_000_000).toFixed(2)}B`; // Billions
+  if (volume >= 1_000_000) return `${(volume / 1_000_000).toFixed(2)}M`; // Millions
+  if (volume >= 1_000) return `${(volume / 1_000).toFixed(2)}K`; // Thousands
+  return volume.toLocaleString(); // Show with commas if less than 1000 or as is
 };
 
 const STATIC_BACK_FACE_DESCRIPTION =
@@ -90,16 +99,13 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
       return (
         <div
           data-testid="price-card-back-content-data"
-          className="pointer-events-auto"
-        >
-          {/* MODIFIED: Added px-0 to CardHeader to ensure it uses parent padding */}
+          className="pointer-events-auto">
           <CardHeader className="pt-0 pb-2 px-0">
             <CardDescription className="text-sm text-muted-foreground leading-relaxed">
               {backData.description || STATIC_BACK_FACE_DESCRIPTION}
             </CardDescription>
           </CardHeader>
 
-          {/* MODIFIED: Added px-0 to ShadCardContent */}
           <ShadCardContent className="text-sm pb-0 px-0">
             <div className="grid grid-cols-2 gap-x-4 gap-y-1">
               <div className={cn(gridCellClass)}>
@@ -118,8 +124,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                         )}`
                       : undefined
                   }
-                  data-interactive-child="true"
-                >
+                  data-interactive-child="true">
                   <span className="font-semibold block">Open:</span>
                   <span>${faceData.dayOpen?.toFixed(2) ?? "N/A"}</span>
                 </ClickableDataItem>
@@ -132,7 +137,8 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
 
               <div className={cn(gridCellClass, "py-0.5")}>
                 <span className="font-semibold block">Volume:</span>
-                <span>{faceData.volume?.toLocaleString() ?? "N/A"}</span>
+                {/* MODIFIED: Use formatVolume here */}
+                <span>{formatVolume(faceData.volume)}</span>
               </div>
 
               <div className={cn(gridCellClass, "py-0.5")}>
@@ -154,8 +160,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                       ? `Interact with 50D SMA: ${backData.sma50d.toFixed(2)}`
                       : undefined
                   }
-                  data-interactive-child="true"
-                >
+                  data-interactive-child="true">
                   <span className="font-semibold block">50D SMA:</span>
                   <span>${backData.sma50d?.toFixed(2) ?? "N/A"}</span>
                 </ClickableDataItem>
@@ -175,8 +180,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                       ? `Interact with 200D SMA: ${backData.sma200d.toFixed(2)}`
                       : undefined
                   }
-                  data-interactive-child="true"
-                >
+                  data-interactive-child="true">
                   <span className="font-semibold block">200D SMA:</span>
                   <span>${backData.sma200d?.toFixed(2) ?? "N/A"}</span>
                 </ClickableDataItem>
@@ -187,7 +191,6 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
       );
     } else {
       // Front Face
-      // ... (Front face JSX remains the same)
       const changePositive =
         faceData.dayChange != null && faceData.dayChange >= 0;
       const baseChangeColor =
@@ -223,15 +226,13 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                   2
                 )}`
               : undefined
-          }
-        >
+          }>
           <p
             className={cn(
               "text-4xl font-bold",
               onGenerateDailyPerformanceSignal &&
                 "group-hover/textgroup:text-primary"
-            )}
-          >
+            )}>
             ${faceData.price != null ? faceData.price.toFixed(2) : "N/A"}
           </p>
           <div
@@ -240,8 +241,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
               baseChangeColor,
               onGenerateDailyPerformanceSignal &&
                 "group-hover/textgroup:text-primary"
-            )}
-          >
+            )}>
             <p className="text-lg font-semibold">
               {faceData.dayChange != null
                 ? `${
@@ -265,13 +265,11 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
       return (
         <div
           data-testid="price-card-front-content-data"
-          className="pointer-events-auto"
-        >
-          <ShadCardContent className="px-0 pt-2 pb-0">
+          className="pointer-events-auto p-3">
+          <ShadCardContent className="px-0 pt-0 pb-0">
             <div
               className="rounded-md p-2 -mx-2 -my-1 mb-2"
-              data-testid="daily-performance-layout-area"
-            >
+              data-testid="daily-performance-layout-area">
               {PriceDisplayBlock}
             </div>
 
@@ -298,9 +296,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                             )}`
                           : undefined
                       }
-                      data-interactive-child="true"
-                    >
-                      {" "}
+                      data-interactive-child="true">
                       L: ${faceData.dayLow.toFixed(2)}{" "}
                     </ClickableDataItem>
                     <ClickableDataItem
@@ -320,14 +316,12 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                             )}`
                           : undefined
                       }
-                      data-interactive-child="true"
-                    >
+                      data-interactive-child="true">
                       {" "}
                       H: ${faceData.dayHigh.toFixed(2)}{" "}
                     </ClickableDataItem>
                   </div>
                   <div className="w-full bg-muted rounded-full h-1.5 pointer-events-none">
-                    {" "}
                     {(() => {
                       const range = faceData.dayHigh! - faceData.dayLow!;
                       const position = faceData.price! - faceData.dayLow!;
@@ -344,7 +338,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                           style={{ width: `${percentage}%` }}
                         />
                       );
-                    })()}{" "}
+                    })()}
                   </div>
                 </div>
               )}
