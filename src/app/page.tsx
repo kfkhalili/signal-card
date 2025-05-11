@@ -1,7 +1,7 @@
 // app/page.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback, Fragment } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import useLocalStorage from "@/hooks/use-local-storage";
 import { format, parseISO } from "date-fns";
 
@@ -14,7 +14,7 @@ import type {
   PriceCardFaceData,
   PriceCardSpecificBackData,
   PriceCardSnapshotSpecificBackData,
-  PriceCardSnapshotData, // Import this for newSnapshot type
+  PriceCardSnapshotData,
 } from "@/components/game/cards/price-card/price-card.types";
 import type {
   ProfileCardData,
@@ -30,7 +30,7 @@ import {
   type ProfileDBRow,
 } from "@/hooks/useStockData";
 
-import ActiveCardsSection from "@/components/game/active-cards-section";
+import ActiveCardsSection from "@/components/game/ActiveCardsSection";
 import { useToast } from "@/hooks/use-toast";
 
 const INITIAL_ACTIVE_CARDS: DisplayableCard[] = [];

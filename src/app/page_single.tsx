@@ -20,7 +20,7 @@ import {
   type MarketStatusDisplayHook,
 } from "@/hooks/useStockData";
 
-import ActiveCardsSection from "@/components/game/active-cards-section";
+import ActiveCardsSection from "@/components/game/ActiveCardsSection";
 import { useToast } from "@/hooks/use-toast";
 
 const INITIAL_ACTIVE_CARDS: DisplayableCard[] = [];

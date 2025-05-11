@@ -1,16 +1,13 @@
 // src/components/game/active-cards-section.tsx
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { DisplayableCard, DisplayableCardState } from "./types";
-import { ActiveCards as ActiveCardsPresentational } from "./active-cards";
+import { ActiveCards as ActiveCardsPresentational } from "./ActiveCards";
 import { useToast } from "@/hooks/use-toast";
-import type {
-  PriceCardData,
-  PriceCardInteractionCallbacks,
-} from "./cards/price-card/price-card.types";
+import type { PriceCardInteractionCallbacks } from "./cards/price-card/price-card.types";
 import type {
   ProfileCardData,
   ProfileCardStaticData,
-  ProfileCardBackDataType, // This type extends BaseCardBackData which has 'description'
+  ProfileCardBackDataType,
   ProfileCardInteractionCallbacks as ProfileCardSpecificInteractions,
 } from "./cards/profile-card/profile-card.types";
 import type { ProfileDBRow } from "@/hooks/useStockData";
