@@ -43,15 +43,13 @@ export const SocialBar: React.FC<SocialBarProps> = ({
       )}
       onClick={(e) => e.stopPropagation()} // Prevent clicks on the bar itself from flipping the card
       role="toolbar"
-      aria-label="Social actions"
-    >
+      aria-label="Social actions">
       {interactions.onLike && (
         <button
           onClick={(e) => handleInteraction(e, interactions.onLike)}
           title="Like"
           className={cn(buttonBaseClass)}
-          aria-label={`Like ${cardContext.symbol} card`}
-        >
+          aria-label={`Like ${cardContext.symbol} card`}>
           <ThumbsUp size={iconSize} aria-hidden="true" />
         </button>
       )}
@@ -60,8 +58,7 @@ export const SocialBar: React.FC<SocialBarProps> = ({
           onClick={(e) => handleInteraction(e, interactions.onComment)}
           title="Comment"
           className={cn(buttonBaseClass)}
-          aria-label={`Comment on ${cardContext.symbol} card`}
-        >
+          aria-label={`Comment on ${cardContext.symbol} card`}>
           <MessageCircle size={iconSize} aria-hidden="true" />
         </button>
       )}
@@ -70,8 +67,7 @@ export const SocialBar: React.FC<SocialBarProps> = ({
           onClick={(e) => handleInteraction(e, interactions.onSave)}
           title="Save"
           className={cn(buttonBaseClass)}
-          aria-label={`Save ${cardContext.symbol} card`}
-        >
+          aria-label={`Save ${cardContext.symbol} card`}>
           <Bookmark size={iconSize} aria-hidden="true" />
         </button>
       )}
@@ -80,8 +76,7 @@ export const SocialBar: React.FC<SocialBarProps> = ({
           onClick={(e) => handleInteraction(e, interactions.onShare)}
           title="Share"
           className={cn(buttonBaseClass)}
-          aria-label={`Share ${cardContext.symbol} card`}
-        >
+          aria-label={`Share ${cardContext.symbol} card`}>
           <Share2 size={iconSize} aria-hidden="true" />
         </button>
       )}

@@ -54,8 +54,7 @@ export const ClickableDataItem: React.FC<ClickableDataItemProps> = ({
       role={isInteractive ? "button" : undefined}
       tabIndex={isInteractive ? 0 : undefined}
       data-testid={dataTestId}
-      aria-label={isInteractive ? ariaLabel : undefined}
-    >
+      aria-label={isInteractive ? ariaLabel : undefined}>
       {children}
     </div>
   );
