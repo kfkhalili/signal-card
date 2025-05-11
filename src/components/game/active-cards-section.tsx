@@ -1,6 +1,6 @@
 // src/components/game/active-cards-section.tsx
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import type { DisplayableCard, DisplayableCardState } from "./types"; // Import DisplayableCardState
+import type { DisplayableCard, DisplayableCardState } from "./types";
 import { ActiveCards as ActiveCardsPresentational } from "./active-cards";
 import { useToast } from "@/hooks/use-toast";
 import type {
@@ -10,7 +10,7 @@ import type {
 import type {
   ProfileCardData,
   ProfileCardStaticData,
-  ProfileCardBackDataType, // Import the specific back data type
+  ProfileCardBackDataType, // This type extends BaseCardBackData which has 'description'
   ProfileCardInteractionCallbacks as ProfileCardSpecificInteractions,
 } from "./cards/profile-card/profile-card.types";
 import type { ProfileDBRow } from "@/hooks/useStockData";
@@ -32,7 +32,7 @@ type PriceSpecificInteractionsForContainer = Pick<
 interface ActiveCardsSectionProps {
   activeCards: DisplayableCard[];
   setActiveCards: React.Dispatch<React.SetStateAction<DisplayableCard[]>>;
-  onTakeSnapshot: (cardId?: string) => void;
+  onTakeSnapshot: (cardId?: string) => void; // Source card ID for snapshot
 }
 
 const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
@@ -76,7 +76,6 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
   const transformRawProfileToProfileCardData = (
     dbData: ProfileDBRow
   ): ProfileCardData & DisplayableCardState => {
-    // Ensure it returns a complete DisplayableCard part
     const staticData: ProfileCardStaticData = {
       db_id: dbData.id,
       sector: dbData.sector,
@@ -84,7 +83,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
       country: dbData.country,
       exchange_full_name: dbData.exchange_full_name,
       website: dbData.website,
-      description: dbData.description,
+      description: dbData.description, // This is the main company description
       ceo: dbData.ceo,
       full_address: [
         dbData.address,
@@ -110,11 +109,11 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
       is_fund: dbData.is_fund,
     };
 
+    // Correctly use 'description' as required by BaseCardBackData (via ProfileCardBackDataType)
     const cardBackData: ProfileCardBackDataType = {
       description:
         dbData.description ||
         `Profile information for ${dbData.company_name || dbData.symbol}.`,
-      // Add other specific back data fields if ProfileCardBackDataType defines them
     };
 
     return {
@@ -126,8 +125,8 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
       createdAt: Date.now(),
       staticData,
       liveData: {},
-      backData: cardBackData, // Populate backData
-      isFlipped: false, // Add isFlipped for DisplayableCardState
+      backData: cardBackData, // Use the corrected cardBackData
+      isFlipped: false,
     };
   };
 
@@ -141,6 +140,33 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
         toast({
           title: "Profile Card Active",
           description: `Profile card for ${context.symbol} is already displayed.`,
+        });
+        setActiveCardsRef.current((prevCards) => {
+          const currentCards = [...prevCards];
+          const sourceCardIndex = currentCards.findIndex(
+            (card) => card.id === context.id
+          );
+          const profileCardCurrentIndex = currentCards.findIndex(
+            (card) => card.id === existingProfileCard.id
+          );
+
+          if (
+            sourceCardIndex !== -1 &&
+            profileCardCurrentIndex !== -1 &&
+            profileCardCurrentIndex !== sourceCardIndex + 1
+          ) {
+            const [profileToMove] = currentCards.splice(
+              profileCardCurrentIndex,
+              1
+            );
+            const targetInsertIndex =
+              profileCardCurrentIndex < sourceCardIndex
+                ? sourceCardIndex
+                : sourceCardIndex + 1;
+            currentCards.splice(targetInsertIndex, 0, profileToMove);
+            return currentCards;
+          }
+          return prevCards;
         });
         return;
       }
@@ -163,10 +189,18 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
           const newProfileCard =
             transformRawProfileToProfileCardData(profileDBData);
 
-          // newProfileCard is now ProfileCardData & DisplayableCardState, so it's a valid DisplayableCard
-          setActiveCardsRef.current(
-            (prev) => [newProfileCard, ...prev] as DisplayableCard[]
-          );
+          setActiveCardsRef.current((prevCards) => {
+            const cards = [...prevCards];
+            const sourceCardIndex = cards.findIndex(
+              (card) => card.id === context.id
+            );
+            if (sourceCardIndex !== -1) {
+              cards.splice(sourceCardIndex + 1, 0, newProfileCard);
+            } else {
+              cards.unshift(newProfileCard);
+            }
+            return cards as DisplayableCard[];
+          });
           toast({
             title: "Profile Loaded!",
             description: `Profile for ${context.symbol} is now active.`,

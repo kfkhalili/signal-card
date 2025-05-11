@@ -14,6 +14,7 @@ import type {
   PriceCardFaceData,
   PriceCardSpecificBackData,
   PriceCardSnapshotSpecificBackData,
+  PriceCardSnapshotData, // Import this for newSnapshot type
 } from "@/components/game/cards/price-card/price-card.types";
 import type {
   ProfileCardData,
@@ -340,7 +341,6 @@ export default function FinSignalGamePage() {
       const apiTimestampMillis = quoteData.api_timestamp * 1000;
       if (isNaN(apiTimestampMillis)) return;
 
-      // Construct PriceCardFaceData directly
       const newPriceCardFaceData: PriceCardFaceData = {
         timestamp: apiTimestampMillis,
         price: quoteData.current_price,
@@ -354,16 +354,11 @@ export default function FinSignalGamePage() {
         yearHigh: quoteData.year_high ?? null,
         yearLow: quoteData.year_low ?? null,
       };
-
-      // Construct PriceCardSpecificBackData directly
       const newPriceCardBackData: PriceCardSpecificBackData = {
         marketCap: quoteData.market_cap ?? null,
         sma50d: quoteData.sma_50d ?? null,
         sma200d: quoteData.sma_200d ?? null,
-        // description: "Live market price data" // Optional: if PriceCardSpecificBackData requires a description
       };
-
-      // Construct ProfileCardLiveData directly
       const newProfileCardLiveData: ProfileCardLiveData = {
         price: quoteData.current_price,
         dayChange: quoteData.day_change ?? null,
@@ -372,7 +367,6 @@ export default function FinSignalGamePage() {
         dayLow: quoteData.day_low ?? null,
         timestamp: apiTimestampMillis,
         volume: quoteData.volume ?? null,
-        // yearHigh and yearLow can also be added if ProfileCardLiveData picks them
       };
 
       setActiveCards((prevActiveCards) => {
@@ -387,13 +381,11 @@ export default function FinSignalGamePage() {
               apiTimestampMillis < existingPriceCard.faceData.timestamp
             )
               return card;
-
-            // Check if data actually changed to avoid unnecessary updates
             if (
               JSON.stringify(existingPriceCard.faceData) !==
                 JSON.stringify(newPriceCardFaceData) ||
               JSON.stringify(existingPriceCard.backData) !==
-                JSON.stringify(newPriceCardBackData) || // Assuming backData can change too
+                JSON.stringify(newPriceCardBackData) ||
               existingPriceCard.companyName !==
                 (quoteData.companyName ?? existingPriceCard.companyName) ||
               existingPriceCard.logoUrl !==
@@ -409,7 +401,7 @@ export default function FinSignalGamePage() {
                 backData: {
                   ...existingPriceCard.backData,
                   ...newPriceCardBackData,
-                }, // Merge, assuming existing might have other non-live fields
+                },
               } as PriceCardData & DisplayableCardState;
             }
           }
@@ -448,7 +440,7 @@ export default function FinSignalGamePage() {
             companyName: quoteData.companyName ?? null,
             logoUrl: quoteData.logoUrl ?? null,
             faceData: newPriceCardFaceData,
-            backData: newPriceCardBackData, // Use the newly constructed back data
+            backData: newPriceCardBackData,
             isFlipped: false,
           };
           updatedCards.unshift(newPriceCard);
@@ -489,13 +481,20 @@ export default function FinSignalGamePage() {
   );
 
   const handleTakeSnapshot = useCallback(
-    (cardId?: string) => {
-      const cardToSnapshot = activeCards.find((c) => c.id === cardId);
+    (sourceCardId?: string) => {
+      // Renamed to sourceCardId for clarity
+      const sourceCardIndex = activeCards.findIndex(
+        (c) => c.id === sourceCardId
+      );
+      const cardToSnapshot =
+        sourceCardIndex !== -1 ? activeCards[sourceCardIndex] : undefined;
+
       if (cardToSnapshot && cardToSnapshot.type === "price") {
         const livePriceCard = cardToSnapshot as PriceCardData &
           DisplayableCardState;
         const currentTime = Date.now();
-        const newSnapshot: DisplayableCard = {
+        const newSnapshot: PriceCardSnapshotData & DisplayableCardState = {
+          // Ensure full type
           id: `snap-${livePriceCard.id}-${currentTime}`,
           type: "price_snapshot",
           symbol: livePriceCard.symbol,
@@ -515,11 +514,19 @@ export default function FinSignalGamePage() {
             description: `Snapshot of ${
               livePriceCard.symbol
             } price: $${livePriceCard.faceData.price?.toFixed(2)}.`,
-            // Add other PriceCardSnapshotSpecificBackData fields if any
           },
           isFlipped: false,
         };
-        setActiveCards((prev) => [newSnapshot, ...prev]);
+
+        setActiveCards((prev) => {
+          const cards = [...prev];
+          if (sourceCardIndex !== -1) {
+            cards.splice(sourceCardIndex + 1, 0, newSnapshot);
+          } else {
+            cards.unshift(newSnapshot); // Fallback
+          }
+          return cards as DisplayableCard[];
+        });
         toast({
           title: "Snapshot Created!",
           description: `Snapshot for ${livePriceCard.symbol} taken.`,
@@ -544,7 +551,7 @@ export default function FinSignalGamePage() {
         });
       }
     },
-    [activeCards, toast]
+    [activeCards, toast] // Removed setActiveCards from deps, it's stable
   );
 
   const stockDataHandlers = SYMBOLS_TO_SUBSCRIBE_LIST.map((symbol) => (
