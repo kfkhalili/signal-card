@@ -7,6 +7,7 @@ import type {
 } from "@supabase/supabase-js";
 import { z } from "zod";
 
+// Updated interface for the raw data from your 'live_quote_indicators' table
 export interface LiveQuoteIndicatorDBRow {
   id: string;
   symbol: string;
@@ -18,6 +19,8 @@ export interface LiveQuoteIndicatorDBRow {
   volume?: number | null;
   day_low?: number | null;
   day_high?: number | null;
+  year_high?: number | null;
+  year_low?: number | null;
   market_cap?: number | null;
   day_open?: number | null;
   previous_close?: number | null;
@@ -28,6 +31,7 @@ export interface LiveQuoteIndicatorDBRow {
   market_exchange_name?: string | null;
 }
 
+// Updated Zod schema
 export const LiveQuoteIndicatorDBSchema = z.object({
   id: z.string(),
   symbol: z.string(),
@@ -38,6 +42,8 @@ export const LiveQuoteIndicatorDBSchema = z.object({
   day_change: z.number().nullable().optional(),
   day_low: z.number().nullable().optional(),
   day_high: z.number().nullable().optional(),
+  year_high: z.number().nullable().optional(),
+  year_low: z.number().nullable().optional(),
   market_cap: z.number().nullable().optional(),
   day_open: z.number().nullable().optional(),
   previous_close: z.number().nullable().optional(),
@@ -77,12 +83,13 @@ function getSupabaseClient(): SupabaseClient {
 export function subscribeToQuoteUpdates(
   symbol: string,
   onData: QuoteUpdateCallback,
-  onStatusChange: SubscriptionStatusCallback // Parameter that might be causing issues
+  onStatusChange: SubscriptionStatusCallback
 ): () => void {
   const supabase = getSupabaseClient();
   const channelName = `realtime:stock-quote-${symbol.toLowerCase()}-${Math.random()
     .toString(36)
     .substring(2, 9)}`;
+  // The filter for postgres_changes remains on the symbol column
   const topicFilter = `symbol=eq.${symbol}`;
 
   console.log(
@@ -99,24 +106,19 @@ export function subscribeToQuoteUpdates(
       { event: "*", schema: "public", table: TABLE_NAME, filter: topicFilter },
       (payload) => {
         if (typeof onData === "function") {
-          // Guard for onData as well, just in case
           onData(payload as LiveQuotePayload);
         }
       }
     )
     .subscribe((status, err) => {
-      // CRITICAL GUARD: Ensure onStatusChange is still a function before calling it.
-      // This handles cases where an old channel might fire an event after its associated
-      // callback from the hook has been "cleaned up" or its closure became invalid.
       if (typeof onStatusChange === "function") {
         onStatusChange(status as SubscriptionStatus, err);
       } else {
         console.warn(
-          `RealtimeService (${symbol}): onStatusChange was not a function for channel ${channel.topic} when status event "${status}" occurred. This might be an old channel event firing after unsubscription.`
+          `RealtimeService (${symbol}): onStatusChange was not a function for channel ${channel.topic} when status event "${status}" occurred.`
         );
       }
 
-      // Existing logging for debug purposes (can be kept or removed if too noisy)
       switch (status) {
         case "SUBSCRIBED":
           console.log(
