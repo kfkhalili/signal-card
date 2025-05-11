@@ -13,7 +13,7 @@ import type {
 } from "./price-card.types";
 
 const STATIC_BACK_FACE_DESCRIPTION_IN_TEST =
-  "Share price represents the current market value of one share of company stock.";
+  "Market Price: The value of a single unit of this asset.";
 
 const createMockPriceCardData = (
   overrides: Partial<PriceCardData> = {}

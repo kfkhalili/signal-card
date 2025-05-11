@@ -30,7 +30,7 @@ const formatVolume = (volume: number | null | undefined): string => {
 };
 
 const STATIC_BACK_FACE_DESCRIPTION =
-  "Share price represents the current market value of one share of company stock.";
+  "Market Price: The value of a single unit of this asset.";
 
 interface RangeBarStyling {
   bgColorClass: string;
