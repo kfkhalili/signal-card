@@ -2,7 +2,7 @@
  * src/app/components/ui/ClickableDataItem.tsx (Assumed Location)
  */
 import React from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "../../lib/utils";
 
 interface ClickableDataItemProps extends React.HTMLAttributes<HTMLDivElement> {
   isInteractive: boolean;

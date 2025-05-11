@@ -1,7 +1,7 @@
 // src/components/game/cards/base-card/BaseCard.tsx
 import React from "react";
 import { Card as ShadCard, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { cn } from "../../../../lib/utils";
 import { XIcon } from "lucide-react";
 import Image from "next/image";
 import type {

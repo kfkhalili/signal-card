@@ -519,7 +519,6 @@ export default function FinSignalGamePage() {
         <strong>{symbol}:</strong> {data.status}
         {data.message && (
           <span className="italic text-muted-foreground">
-            {" "}
             ({String(data.message)})
           </span>
         )}

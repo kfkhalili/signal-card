@@ -10,7 +10,7 @@ import type {
   PriceCardInteractionCallbacks,
 } from "./price-card.types";
 // import { format } from "date-fns"; // Not used in this version, but keep if needed for timestamps
-import { cn } from "@/lib/utils";
+import { cn } from "../../../../lib/utils";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
 
 const formatMarketCap = (cap: number | null | undefined): string => {
@@ -336,7 +336,6 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
           className="pointer-events-auto">
           {/* ShadCardContent itself doesn't add padding unless specified, so px-0 is good. */}
           <ShadCardContent className="px-0 pt-0 pb-0">
-            {" "}
             {/* pt-0 to align with BaseCard's content div which has pt-0 */}
             <div
               className="rounded-md p-2 -mx-2 -my-1 mb-2" // This inner div can have its own padding if desired for the price block

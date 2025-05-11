@@ -1,7 +1,7 @@
 // src/app/components/ui/social-bar.tsx
 import React from "react";
 import { ThumbsUp, MessageCircle, Bookmark, Share2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "../../lib/utils";
 import type {
   CardActionContext,
   BaseCardSocialInteractions,

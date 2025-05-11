@@ -8,7 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
-import { cn } from "@/lib/utils";
+import { cn } from "../../../../lib/utils";
 import type {
   ProfileCardData,
   ProfileCardInteractionCallbacks,
@@ -228,7 +228,7 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
                       ? `Filter by sector: ${staticData.sector}`
                       : undefined
                   }>
-                  <span className="font-semibold">Sector:</span>{" "}
+                  <span className="font-semibold">Sector:</span>
                   <span className="text-muted-foreground">
                     {staticData.sector}
                   </span>
@@ -247,7 +247,7 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
                       ? `Filter by industry: ${staticData.industry}`
                       : undefined
                   }>
-                  <span className="font-semibold">Industry:</span>{" "}
+                  <span className="font-semibold">Industry:</span>
                   <span className="text-muted-foreground">
                     {staticData.industry}
                   </span>

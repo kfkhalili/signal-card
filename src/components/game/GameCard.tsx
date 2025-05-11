@@ -21,7 +21,7 @@ import type {
 
 import { PriceCardContainer } from "./cards/price-card/PriceCardContainer";
 import { ProfileCardContainer } from "@/components/game/cards/profile-card/ProfileCardContainer"; // Import ProfileCardContainer
-import { cn } from "@/lib/utils";
+import { cn } from "../../lib/utils";
 import { XIcon } from "lucide-react";
 
 // For PriceCard

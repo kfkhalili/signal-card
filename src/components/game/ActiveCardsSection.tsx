@@ -9,7 +9,7 @@ import { getProfileCardInteractionHandlers } from "./cards/profile-card/profileC
 import type { ProfileCardInteractionCallbacks } from "./cards/profile-card/profile-card.types";
 import type { PriceCardInteractionCallbacks } from "./cards/price-card/price-card.types";
 
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "../../lib/supabase/client";
 import { useCardActions } from "@/hooks/useCardActions"; // Import the new hook
 
 type PriceSpecificInteractionsForContainer = Pick<

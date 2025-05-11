@@ -1,9 +1,11 @@
+// src/app/layout.tsx
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import HeaderComponent from "@/components/layout/header";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/utils";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,15 +34,16 @@ export default function RootLayout({
           geistSans.variable,
           geistMono.variable,
           "antialiased font-sans"
-        )}
-      >
-        <div className="flex flex-col min-h-screen">
-          <HeaderComponent />
-          <main className="flex-grow container mx-auto px-4 py-8">
-            {children}
-          </main>
-        </div>
-        <Toaster />
+        )}>
+        <AuthProvider>
+          <div className="flex flex-col min-h-screen">
+            <HeaderComponent />
+            <main className="flex-grow container mx-auto px-4 py-8">
+              {children}
+            </main>
+          </div>
+          <Toaster />
+        </AuthProvider>
       </body>
     </html>
   );
