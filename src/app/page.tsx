@@ -8,6 +8,7 @@ import { format, parseISO } from "date-fns";
 import type {
   DisplayableCard,
   DisplayableProfileCard,
+  DisplayableCardState, // Keep if used directly, else it's part of Displayable<Type>Card
 } from "@/components/game/types";
 import type {
   PriceCardData,
@@ -15,10 +16,11 @@ import type {
   PriceCardSpecificBackData,
   PriceCardSnapshotData,
 } from "@/components/game/cards/price-card/price-card.types";
-import type { DisplayableCardState } from "@/components/game/types";
 import type {
+  ProfileCardData, // Base data type, DisplayableProfileCard is ProfileCardData & DisplayableCardState
   ProfileCardLiveData,
   ProfileCardStaticData,
+  ProfileCardBackDataType,
 } from "@/components/game/cards/profile-card/profile-card.types";
 
 import {
@@ -31,13 +33,15 @@ import {
 import ActiveCardsSection from "@/components/game/ActiveCardsSection";
 import { useToast } from "@/hooks/use-toast";
 
-import "@/components/game/cards/rehydrators";
+import "@/components/game/cards/rehydrators"; // Import this early to register all rehydrators
 import { rehydrateCardFromStorage } from "@/components/game/cardRehydration";
 import {
   createPriceCardFaceDataFromQuote,
   createPriceCardBackDataFromQuote,
   createDisplayablePriceCard,
 } from "@/components/game/cards/price-card/priceCardUtils";
+// Import the new utility for ProfileCardLiveData
+import { createProfileCardLiveDataFromQuote } from "@/components/game/cards/profile-card/profileCardUtils";
 
 const INITIAL_ACTIVE_CARDS: DisplayableCard[] = [];
 const SYMBOLS_TO_SUBSCRIBE_LIST: string[] = [
@@ -116,7 +120,6 @@ export default function FinSignalGamePage() {
     DisplayableCard[]
   >("finSignal-activeCards-v6", INITIAL_ACTIVE_CARDS);
 
-  // Declare activeCards and setActiveCards state first
   const [activeCards, setActiveCards] = useState<DisplayableCard[]>(() =>
     Array.isArray(initialCardsFromStorage)
       ? (initialCardsFromStorage
@@ -124,8 +127,6 @@ export default function FinSignalGamePage() {
           .filter(Boolean) as DisplayableCard[])
       : INITIAL_ACTIVE_CARDS
   );
-
-  // Now define useCallback hooks that might use setActiveCards or activeCards
 
   const handleMarketStatusChange = useCallback(
     (
@@ -139,7 +140,7 @@ export default function FinSignalGamePage() {
         [symbol]: { status, message, timestamp },
       }));
     },
-    [] // No dependency on setActiveCards or activeCards
+    []
   );
 
   const transformProfileDBRowToStaticData = useCallback(
@@ -177,7 +178,7 @@ export default function FinSignalGamePage() {
         is_fund: dbData.is_fund,
       };
     },
-    [] // No dependency on setActiveCards or activeCards
+    []
   );
 
   const handleStaticProfileUpdate = useCallback(
@@ -191,7 +192,7 @@ export default function FinSignalGamePage() {
               card.symbol === updatedProfileDBRow.symbol
             ) {
               const existingDisplayableProfileCard =
-                card as DisplayableProfileCard; // Type assertion after guard
+                card as DisplayableProfileCard;
 
               const newStaticData =
                 transformProfileDBRowToStaticData(updatedProfileDBRow);
@@ -249,7 +250,7 @@ export default function FinSignalGamePage() {
         return prevActiveCards;
       });
     },
-    [transformProfileDBRowToStaticData, setActiveCards] // Now setActiveCards is declared before this
+    [transformProfileDBRowToStaticData, setActiveCards]
   );
 
   useEffect(() => {
@@ -266,20 +267,16 @@ export default function FinSignalGamePage() {
         return;
       }
 
-      const newPriceCardFaceData: PriceCardFaceData =
-        createPriceCardFaceDataFromQuote(quoteData, apiTimestampMillis);
-      const newPriceCardBackData: PriceCardSpecificBackData =
-        createPriceCardBackDataFromQuote(quoteData);
-
-      const newProfileCardLiveData: ProfileCardLiveData = {
-        price: quoteData.current_price,
-        dayChange: quoteData.day_change ?? null,
-        changePercentage: quoteData.change_percentage ?? null,
-        dayHigh: quoteData.day_high ?? null,
-        dayLow: quoteData.day_low ?? null,
-        timestamp: apiTimestampMillis,
-        volume: quoteData.volume ?? null,
-      };
+      // Use utility functions for data transformation
+      const newPriceCardFaceData = createPriceCardFaceDataFromQuote(
+        quoteData,
+        apiTimestampMillis
+      );
+      const newPriceCardBackData = createPriceCardBackDataFromQuote(quoteData);
+      const newProfileCardLiveData = createProfileCardLiveDataFromQuote(
+        quoteData,
+        apiTimestampMillis
+      );
 
       setActiveCards((prevActiveCards) => {
         let cardsNeedUpdate = false;
@@ -374,6 +371,7 @@ export default function FinSignalGamePage() {
         );
         if (existingPriceCardIndex === -1) {
           cardsNeedUpdate = true;
+          // Use the comprehensive utility to create the full new price card
           const newPriceCard = createDisplayablePriceCard(
             quoteData,
             apiTimestampMillis
@@ -416,7 +414,7 @@ export default function FinSignalGamePage() {
         return prevActiveCards;
       });
     },
-    [toast, setActiveCards] // Now setActiveCards is declared before this
+    [toast, setActiveCards]
   );
 
   const handleTakeSnapshot = useCallback(
@@ -493,7 +491,7 @@ export default function FinSignalGamePage() {
         });
       }
     },
-    [activeCards, toast, setActiveCards] // Now setActiveCards is declared before this
+    [activeCards, toast, setActiveCards]
   );
 
   const stockDataHandlers = SYMBOLS_TO_SUBSCRIBE_LIST.map((symbol) => (
