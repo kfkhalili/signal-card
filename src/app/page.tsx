@@ -7,20 +7,18 @@ import { format, parseISO } from "date-fns";
 
 import type {
   DisplayableCard,
-  DisplayableCardState,
+  DisplayableProfileCard,
 } from "@/components/game/types";
 import type {
   PriceCardData,
   PriceCardFaceData,
   PriceCardSpecificBackData,
-  PriceCardSnapshotSpecificBackData,
   PriceCardSnapshotData,
 } from "@/components/game/cards/price-card/price-card.types";
+import type { DisplayableCardState } from "@/components/game/types";
 import type {
-  ProfileCardData,
   ProfileCardLiveData,
   ProfileCardStaticData,
-  ProfileCardBackDataType,
 } from "@/components/game/cards/profile-card/profile-card.types";
 
 import {
@@ -32,6 +30,14 @@ import {
 
 import ActiveCardsSection from "@/components/game/ActiveCardsSection";
 import { useToast } from "@/hooks/use-toast";
+
+import "@/components/game/cards/rehydrators";
+import { rehydrateCardFromStorage } from "@/components/game/cardRehydration";
+import {
+  createPriceCardFaceDataFromQuote,
+  createPriceCardBackDataFromQuote,
+  createDisplayablePriceCard,
+} from "@/components/game/cards/price-card/priceCardUtils";
 
 const INITIAL_ACTIVE_CARDS: DisplayableCard[] = [];
 const SYMBOLS_TO_SUBSCRIBE_LIST: string[] = [
@@ -106,6 +112,21 @@ export default function FinSignalGamePage() {
     >
   >({});
 
+  const [initialCardsFromStorage, setCardsInLocalStorage] = useLocalStorage<
+    DisplayableCard[]
+  >("finSignal-activeCards-v6", INITIAL_ACTIVE_CARDS);
+
+  // Declare activeCards and setActiveCards state first
+  const [activeCards, setActiveCards] = useState<DisplayableCard[]>(() =>
+    Array.isArray(initialCardsFromStorage)
+      ? (initialCardsFromStorage
+          .map(rehydrateCardFromStorage)
+          .filter(Boolean) as DisplayableCard[])
+      : INITIAL_ACTIVE_CARDS
+  );
+
+  // Now define useCallback hooks that might use setActiveCards or activeCards
+
   const handleMarketStatusChange = useCallback(
     (
       symbol: string,
@@ -118,218 +139,117 @@ export default function FinSignalGamePage() {
         [symbol]: { status, message, timestamp },
       }));
     },
-    []
+    [] // No dependency on setActiveCards or activeCards
   );
 
-  const transformProfileDBRowToStaticData = (
-    dbData: ProfileDBRow
-  ): ProfileCardStaticData => {
-    return {
-      db_id: dbData.id,
-      sector: dbData.sector,
-      industry: dbData.industry,
-      country: dbData.country,
-      exchange_full_name: dbData.exchange_full_name,
-      website: dbData.website,
-      description: dbData.description,
-      ceo: dbData.ceo,
-      full_address: [
-        dbData.address,
-        dbData.city,
-        dbData.state,
-        dbData.zip,
-        dbData.country,
-      ]
-        .filter(Boolean)
-        .join(", "),
-      phone: dbData.phone,
-      formatted_full_time_employees:
-        dbData.full_time_employees?.toLocaleString(),
-      profile_last_updated: dbData.modified_at
-        ? format(parseISO(dbData.modified_at), "MMM d, yyyy")
-        : undefined,
-      currency: dbData.currency,
-      formatted_ipo_date: dbData.ipo_date
-        ? format(parseISO(dbData.ipo_date), "MMMM d, yyyy")
-        : undefined,
-      is_etf: dbData.is_etf,
-      is_adr: dbData.is_adr,
-      is_fund: dbData.is_fund,
-    };
-  };
+  const transformProfileDBRowToStaticData = useCallback(
+    (dbData: ProfileDBRow): ProfileCardStaticData => {
+      return {
+        db_id: dbData.id,
+        sector: dbData.sector,
+        industry: dbData.industry,
+        country: dbData.country,
+        exchange_full_name: dbData.exchange_full_name,
+        website: dbData.website,
+        description: dbData.description,
+        ceo: dbData.ceo,
+        full_address: [
+          dbData.address,
+          dbData.city,
+          dbData.state,
+          dbData.zip,
+          dbData.country,
+        ]
+          .filter(Boolean)
+          .join(", "),
+        phone: dbData.phone,
+        formatted_full_time_employees:
+          dbData.full_time_employees?.toLocaleString(),
+        profile_last_updated: dbData.modified_at
+          ? format(parseISO(dbData.modified_at), "MMM d, yy")
+          : undefined,
+        currency: dbData.currency,
+        formatted_ipo_date: dbData.ipo_date
+          ? format(parseISO(dbData.ipo_date), "MMMM d, yyyy")
+          : undefined,
+        is_etf: dbData.is_etf,
+        is_adr: dbData.is_adr,
+        is_fund: dbData.is_fund,
+      };
+    },
+    [] // No dependency on setActiveCards or activeCards
+  );
 
   const handleStaticProfileUpdate = useCallback(
     (updatedProfileDBRow: ProfileDBRow) => {
       setActiveCards((prevActiveCards) => {
-        let cardUpdated = false;
-        const newCards = prevActiveCards.map((card: DisplayableCard) => {
-          if (
-            card.type === "profile" &&
-            card.symbol === updatedProfileDBRow.symbol
-          ) {
-            const existingProfileCard = card as ProfileCardData &
-              DisplayableCardState;
-            const newStaticData =
-              transformProfileDBRowToStaticData(updatedProfileDBRow);
-            const newBackData: ProfileCardBackDataType = {
-              ...existingProfileCard.backData,
-              description:
-                newStaticData.description ||
+        let cardUpdatedOverall = false;
+        const newCards = prevActiveCards.map(
+          (card: DisplayableCard): DisplayableCard => {
+            if (
+              card.type === "profile" &&
+              card.symbol === updatedProfileDBRow.symbol
+            ) {
+              const existingDisplayableProfileCard =
+                card as DisplayableProfileCard; // Type assertion after guard
+
+              const newStaticData =
+                transformProfileDBRowToStaticData(updatedProfileDBRow);
+
+              const newBackDataDescription =
+                updatedProfileDBRow.description ||
                 `Profile for ${
                   updatedProfileDBRow.company_name || updatedProfileDBRow.symbol
-                }.`,
-            };
+                }.`;
 
-            if (
-              JSON.stringify(existingProfileCard.staticData) !==
-                JSON.stringify(newStaticData) ||
-              existingProfileCard.companyName !==
-                updatedProfileDBRow.company_name ||
-              existingProfileCard.logoUrl !== updatedProfileDBRow.image ||
-              JSON.stringify(existingProfileCard.backData) !==
-                JSON.stringify(newBackData)
-            ) {
-              cardUpdated = true;
-              return {
-                ...existingProfileCard,
-                companyName: updatedProfileDBRow.company_name,
-                logoUrl: updatedProfileDBRow.image,
-                staticData: newStaticData,
-                backData: newBackData,
-              } as ProfileCardData & DisplayableCardState;
+              let profileDataPointsChanged = false;
+              if (
+                JSON.stringify(existingDisplayableProfileCard.staticData) !==
+                JSON.stringify(newStaticData)
+              )
+                profileDataPointsChanged = true;
+              if (
+                existingDisplayableProfileCard.companyName !==
+                updatedProfileDBRow.company_name
+              )
+                profileDataPointsChanged = true;
+              if (
+                existingDisplayableProfileCard.logoUrl !==
+                updatedProfileDBRow.image
+              )
+                profileDataPointsChanged = true;
+              if (
+                existingDisplayableProfileCard.backData.description !==
+                newBackDataDescription
+              )
+                profileDataPointsChanged = true;
+
+              if (profileDataPointsChanged) {
+                cardUpdatedOverall = true;
+                const updatedCard: DisplayableProfileCard = {
+                  ...existingDisplayableProfileCard,
+                  companyName: updatedProfileDBRow.company_name,
+                  logoUrl: updatedProfileDBRow.image,
+                  staticData: newStaticData,
+                  backData: {
+                    ...existingDisplayableProfileCard.backData,
+                    description: newBackDataDescription,
+                  },
+                };
+                return updatedCard;
+              }
             }
+            return card;
           }
-          return card;
-        });
-        return cardUpdated ? newCards : prevActiveCards;
+        );
+
+        if (cardUpdatedOverall) {
+          return newCards;
+        }
+        return prevActiveCards;
       });
     },
-    []
-  );
-
-  const rehydrateCard = useCallback(
-    (cardFromStorage: any): DisplayableCard | null => {
-      if (
-        !cardFromStorage ||
-        typeof cardFromStorage.id !== "string" ||
-        !cardFromStorage.type ||
-        !cardFromStorage.symbol
-      )
-        return null;
-      let finalCreatedAt: number;
-      if (typeof cardFromStorage.createdAt === "string")
-        finalCreatedAt = new Date(cardFromStorage.createdAt).getTime();
-      else if (typeof cardFromStorage.createdAt === "number")
-        finalCreatedAt = cardFromStorage.createdAt;
-      else finalCreatedAt = Date.now();
-
-      const commonProps: DisplayableCardState & {
-        id: string;
-        symbol: string;
-        createdAt: number;
-        companyName?: string | null;
-        logoUrl?: string | null;
-      } = {
-        id: cardFromStorage.id as string,
-        symbol: cardFromStorage.symbol as string,
-        isFlipped:
-          typeof cardFromStorage.isFlipped === "boolean"
-            ? cardFromStorage.isFlipped
-            : false,
-        createdAt: finalCreatedAt,
-        companyName: cardFromStorage.companyName ?? null,
-        logoUrl: cardFromStorage.logoUrl ?? null,
-      };
-
-      if (cardFromStorage.type === "price") {
-        const originalFaceData = cardFromStorage.faceData || {};
-        const timestamp =
-          typeof originalFaceData.timestamp === "string"
-            ? new Date(originalFaceData.timestamp).getTime()
-            : typeof originalFaceData.timestamp === "number" &&
-              !isNaN(originalFaceData.timestamp)
-            ? originalFaceData.timestamp
-            : null;
-
-        const rehydratedFaceData: PriceCardFaceData = {
-          timestamp: timestamp,
-          price: originalFaceData.price ?? null,
-          dayChange: originalFaceData.dayChange ?? null,
-          changePercentage: originalFaceData.changePercentage ?? null,
-          dayHigh: originalFaceData.dayHigh ?? null,
-          dayLow: originalFaceData.dayLow ?? null,
-          dayOpen: originalFaceData.dayOpen ?? null,
-          previousClose: originalFaceData.previousClose ?? null,
-          volume: originalFaceData.volume ?? null,
-          yearHigh: originalFaceData.yearHigh ?? null,
-          yearLow: originalFaceData.yearLow ?? null,
-        };
-        const originalBackData = cardFromStorage.backData || {};
-        const rehydratedBackData: PriceCardSpecificBackData = {
-          description: originalBackData.description,
-          marketCap: originalBackData.marketCap ?? null,
-          sma50d: originalBackData.sma50d ?? null,
-          sma200d: originalBackData.sma200d ?? null,
-        };
-        return {
-          ...commonProps,
-          type: "price",
-          faceData: rehydratedFaceData,
-          backData: rehydratedBackData,
-        };
-      } else if (cardFromStorage.type === "price_snapshot") {
-        const snapshotTime =
-          typeof cardFromStorage.snapshotTime === "string"
-            ? new Date(cardFromStorage.snapshotTime).getTime()
-            : typeof cardFromStorage.snapshotTime === "number" &&
-              !isNaN(cardFromStorage.snapshotTime)
-            ? cardFromStorage.snapshotTime
-            : Date.now();
-
-        const originalSnapshotBackData = cardFromStorage.backData || {};
-        const rehydratedSnapshotBackData: PriceCardSnapshotSpecificBackData = {
-          description: originalSnapshotBackData.description,
-          discoveredReason: originalSnapshotBackData.discoveredReason,
-        };
-        return {
-          ...commonProps,
-          type: "price_snapshot",
-          capturedPrice: cardFromStorage.capturedPrice ?? 0,
-          snapshotTime,
-          yearHighAtCapture: cardFromStorage.yearHighAtCapture ?? null,
-          yearLowAtCapture: cardFromStorage.yearLowAtCapture ?? null,
-          backData: rehydratedSnapshotBackData,
-        };
-      } else if (cardFromStorage.type === "profile") {
-        const staticDataFromStorage = cardFromStorage.staticData || {};
-        const rehydratedBackData: ProfileCardBackDataType = {
-          description:
-            staticDataFromStorage.description ||
-            `Profile for ${cardFromStorage.symbol || "unknown symbol"}`,
-        };
-        return {
-          ...commonProps,
-          type: "profile",
-          staticData: staticDataFromStorage,
-          liveData: {},
-          backData: rehydratedBackData,
-        } as ProfileCardData & DisplayableCardState;
-      }
-      return null;
-    },
-    []
-  );
-
-  const [initialCardsFromStorage, setCardsInLocalStorage] = useLocalStorage<
-    DisplayableCard[]
-  >("finSignal-activeCards-v6", INITIAL_ACTIVE_CARDS);
-
-  const [activeCards, setActiveCards] = useState<DisplayableCard[]>(() =>
-    Array.isArray(initialCardsFromStorage)
-      ? (initialCardsFromStorage
-          .map(rehydrateCard)
-          .filter(Boolean) as DisplayableCard[])
-      : INITIAL_ACTIVE_CARDS
+    [transformProfileDBRowToStaticData, setActiveCards] // Now setActiveCards is declared before this
   );
 
   useEffect(() => {
@@ -339,26 +259,18 @@ export default function FinSignalGamePage() {
   const processQuoteData = useCallback(
     (quoteData: CombinedQuoteData, source: "fetch" | "realtime") => {
       const apiTimestampMillis = quoteData.api_timestamp * 1000;
-      if (isNaN(apiTimestampMillis)) return;
+      if (isNaN(apiTimestampMillis)) {
+        console.warn(
+          `processQuoteData (${quoteData.symbol}): Invalid API timestamp received.`
+        );
+        return;
+      }
 
-      const newPriceCardFaceData: PriceCardFaceData = {
-        timestamp: apiTimestampMillis,
-        price: quoteData.current_price,
-        changePercentage: quoteData.change_percentage ?? null,
-        dayChange: quoteData.day_change ?? null,
-        dayLow: quoteData.day_low ?? null,
-        dayHigh: quoteData.day_high ?? null,
-        volume: quoteData.volume ?? null,
-        dayOpen: quoteData.day_open ?? null,
-        previousClose: quoteData.previous_close ?? null,
-        yearHigh: quoteData.year_high ?? null,
-        yearLow: quoteData.year_low ?? null,
-      };
-      const newPriceCardBackData: PriceCardSpecificBackData = {
-        marketCap: quoteData.market_cap ?? null,
-        sma50d: quoteData.sma_50d ?? null,
-        sma200d: quoteData.sma_200d ?? null,
-      };
+      const newPriceCardFaceData: PriceCardFaceData =
+        createPriceCardFaceDataFromQuote(quoteData, apiTimestampMillis);
+      const newPriceCardBackData: PriceCardSpecificBackData =
+        createPriceCardBackDataFromQuote(quoteData);
+
       const newProfileCardLiveData: ProfileCardLiveData = {
         price: quoteData.current_price,
         dayChange: quoteData.day_change ?? null,
@@ -371,78 +283,101 @@ export default function FinSignalGamePage() {
 
       setActiveCards((prevActiveCards) => {
         let cardsNeedUpdate = false;
-        const updatedCards = prevActiveCards.map((card: DisplayableCard) => {
-          if (card.type === "price" && card.symbol === quoteData.symbol) {
-            const existingPriceCard = card as PriceCardData &
-              DisplayableCardState;
-            if (
-              source === "realtime" &&
-              existingPriceCard.faceData.timestamp &&
-              apiTimestampMillis < existingPriceCard.faceData.timestamp
-            )
-              return card;
-            if (
-              JSON.stringify(existingPriceCard.faceData) !==
-                JSON.stringify(newPriceCardFaceData) ||
-              JSON.stringify(existingPriceCard.backData) !==
-                JSON.stringify(newPriceCardBackData) ||
-              existingPriceCard.companyName !==
-                (quoteData.companyName ?? existingPriceCard.companyName) ||
-              existingPriceCard.logoUrl !==
+        const updatedCards = prevActiveCards.map(
+          (card: DisplayableCard): DisplayableCard => {
+            if (card.type === "price" && card.symbol === quoteData.symbol) {
+              const existingPriceCard = card as PriceCardData &
+                DisplayableCardState;
+              if (
+                source === "realtime" &&
+                existingPriceCard.faceData.timestamp &&
+                apiTimestampMillis < existingPriceCard.faceData.timestamp
+              )
+                return card;
+
+              let priceCardDataChanged = false;
+              if (
+                JSON.stringify(existingPriceCard.faceData) !==
+                JSON.stringify(newPriceCardFaceData)
+              )
+                priceCardDataChanged = true;
+              if (
+                existingPriceCard.backData.marketCap !==
+                newPriceCardBackData.marketCap
+              )
+                priceCardDataChanged = true;
+              if (
+                existingPriceCard.backData.sma50d !==
+                newPriceCardBackData.sma50d
+              )
+                priceCardDataChanged = true;
+              if (
+                existingPriceCard.backData.sma200d !==
+                newPriceCardBackData.sma200d
+              )
+                priceCardDataChanged = true;
+              if (
+                existingPriceCard.companyName !==
+                (quoteData.companyName ?? existingPriceCard.companyName)
+              )
+                priceCardDataChanged = true;
+              if (
+                existingPriceCard.logoUrl !==
                 (quoteData.logoUrl ?? existingPriceCard.logoUrl)
-            ) {
-              cardsNeedUpdate = true;
-              return {
-                ...existingPriceCard,
-                companyName:
-                  quoteData.companyName ?? existingPriceCard.companyName,
-                logoUrl: quoteData.logoUrl ?? existingPriceCard.logoUrl,
-                faceData: newPriceCardFaceData,
-                backData: {
-                  ...existingPriceCard.backData,
-                  ...newPriceCardBackData,
-                },
-              } as PriceCardData & DisplayableCardState;
+              )
+                priceCardDataChanged = true;
+
+              if (priceCardDataChanged) {
+                cardsNeedUpdate = true;
+                const updatedPriceCard: PriceCardData & DisplayableCardState = {
+                  ...existingPriceCard,
+                  companyName:
+                    quoteData.companyName ?? existingPriceCard.companyName,
+                  logoUrl: quoteData.logoUrl ?? existingPriceCard.logoUrl,
+                  faceData: newPriceCardFaceData,
+                  backData: {
+                    description: existingPriceCard.backData.description,
+                    ...newPriceCardBackData,
+                  },
+                };
+                return updatedPriceCard;
+              }
             }
-          }
-          if (card.type === "profile" && card.symbol === quoteData.symbol) {
-            const existingProfileCard = card as ProfileCardData &
-              DisplayableCardState;
-            if (
-              existingProfileCard.liveData.timestamp &&
-              apiTimestampMillis < existingProfileCard.liveData.timestamp
-            )
-              return card;
-            if (
-              JSON.stringify(existingProfileCard.liveData) !==
-              JSON.stringify(newProfileCardLiveData)
-            ) {
-              cardsNeedUpdate = true;
-              return {
-                ...existingProfileCard,
-                liveData: newProfileCardLiveData,
-              } as ProfileCardData & DisplayableCardState;
+            if (card.type === "profile" && card.symbol === quoteData.symbol) {
+              const existingDisplayableProfileCard =
+                card as DisplayableProfileCard;
+              if (
+                source === "realtime" &&
+                existingDisplayableProfileCard.liveData.timestamp &&
+                apiTimestampMillis <
+                  existingDisplayableProfileCard.liveData.timestamp
+              )
+                return card;
+              if (
+                JSON.stringify(existingDisplayableProfileCard.liveData) !==
+                JSON.stringify(newProfileCardLiveData)
+              ) {
+                cardsNeedUpdate = true;
+                const updatedProfileCard: DisplayableProfileCard = {
+                  ...existingDisplayableProfileCard,
+                  liveData: newProfileCardLiveData,
+                };
+                return updatedProfileCard;
+              }
             }
+            return card;
           }
-          return card;
-        });
+        );
 
         const existingPriceCardIndex = updatedCards.findIndex(
           (c) => c.type === "price" && c.symbol === quoteData.symbol
         );
         if (existingPriceCardIndex === -1) {
           cardsNeedUpdate = true;
-          const newPriceCard: PriceCardData & DisplayableCardState = {
-            id: `${quoteData.symbol}-live-price-${Date.now()}`,
-            type: "price",
-            symbol: quoteData.symbol,
-            createdAt: Date.now(),
-            companyName: quoteData.companyName ?? null,
-            logoUrl: quoteData.logoUrl ?? null,
-            faceData: newPriceCardFaceData,
-            backData: newPriceCardBackData,
-            isFlipped: false,
-          };
+          const newPriceCard = createDisplayablePriceCard(
+            quoteData,
+            apiTimestampMillis
+          );
           updatedCards.unshift(newPriceCard);
           if (quoteData.current_price != null && source === "fetch") {
             setTimeout(
@@ -474,15 +409,18 @@ export default function FinSignalGamePage() {
             );
           }
         }
-        return cardsNeedUpdate ? updatedCards : prevActiveCards;
+
+        if (cardsNeedUpdate) {
+          return updatedCards;
+        }
+        return prevActiveCards;
       });
     },
-    [toast]
+    [toast, setActiveCards] // Now setActiveCards is declared before this
   );
 
   const handleTakeSnapshot = useCallback(
     (sourceCardId?: string) => {
-      // Renamed to sourceCardId for clarity
       const sourceCardIndex = activeCards.findIndex(
         (c) => c.id === sourceCardId
       );
@@ -494,7 +432,6 @@ export default function FinSignalGamePage() {
           DisplayableCardState;
         const currentTime = Date.now();
         const newSnapshot: PriceCardSnapshotData & DisplayableCardState = {
-          // Ensure full type
           id: `snap-${livePriceCard.id}-${currentTime}`,
           type: "price_snapshot",
           symbol: livePriceCard.symbol,
@@ -506,14 +443,14 @@ export default function FinSignalGamePage() {
           yearHighAtCapture: livePriceCard.faceData.yearHigh,
           yearLowAtCapture: livePriceCard.faceData.yearLow,
           backData: {
-            discoveredReason: `Snapshot of ${
-              livePriceCard.symbol
-            } from ${new Date(
-              livePriceCard.faceData.timestamp!
-            ).toLocaleString()}`,
             description: `Snapshot of ${
               livePriceCard.symbol
-            } price: $${livePriceCard.faceData.price?.toFixed(2)}.`,
+            } price: $${livePriceCard.faceData.price?.toFixed(
+              2
+            )}. Captured on ${new Date(
+              livePriceCard.faceData.timestamp!
+            ).toLocaleString()}`,
+            discoveredReason: `Snapshot from live card event.`,
           },
           isFlipped: false,
         };
@@ -521,11 +458,15 @@ export default function FinSignalGamePage() {
         setActiveCards((prev) => {
           const cards = [...prev];
           if (sourceCardIndex !== -1) {
-            cards.splice(sourceCardIndex + 1, 0, newSnapshot);
+            cards.splice(
+              sourceCardIndex + 1,
+              0,
+              newSnapshot as DisplayableCard
+            );
           } else {
-            cards.unshift(newSnapshot); // Fallback
+            cards.unshift(newSnapshot as DisplayableCard);
           }
-          return cards as DisplayableCard[];
+          return cards;
         });
         toast({
           title: "Snapshot Created!",
@@ -546,12 +487,13 @@ export default function FinSignalGamePage() {
       } else {
         toast({
           title: "Snapshot Error",
-          description: "Card not found to take a snapshot.",
+          description:
+            "Card not found to take a snapshot from, or no source ID provided.",
           variant: "destructive",
         });
       }
     },
-    [activeCards, toast] // Removed setActiveCards from deps, it's stable
+    [activeCards, toast, setActiveCards] // Now setActiveCards is declared before this
   );
 
   const stockDataHandlers = SYMBOLS_TO_SUBSCRIBE_LIST.map((symbol) => (
@@ -578,13 +520,15 @@ export default function FinSignalGamePage() {
       <div key={symbol} className="text-xs mb-1">
         <strong>{symbol}:</strong> {data.status}
         {data.message && (
-          <span className="italic"> ({String(data.message)})</span>
+          <span className="italic text-muted-foreground">
+            {" "}
+            ({String(data.message)})
+          </span>
         )}
         {data.timestamp &&
           !isNaN(new Date(data.timestamp * 1000).getTime()) && (
-            <span className="block">
-              {" "}
-              Last Data: {format(new Date(data.timestamp * 1000), "PP p")}{" "}
+            <span className="block text-muted-foreground/80">
+              Last Data: {format(new Date(data.timestamp * 1000), "PP p")}
             </span>
           )}
       </div>
@@ -594,7 +538,7 @@ export default function FinSignalGamePage() {
   return (
     <div className="container mx-auto p-4 space-y-8">
       {stockDataHandlers}
-      <div className="text-center p-2 bg-muted text-muted-foreground rounded-md text-sm shadow max-h-32 overflow-y-auto">
+      <div className="text-center p-2 bg-card border text-card-foreground rounded-md text-sm shadow max-h-32 overflow-y-auto">
         {renderMarketStatuses()}
       </div>
       <ActiveCardsSection

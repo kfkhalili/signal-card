@@ -1,4 +1,4 @@
-// src/components/game/active-cards.tsx
+// src/components/game/ActiveCards.tsx
 "use client";
 
 import React from "react";
