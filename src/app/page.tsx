@@ -8,15 +8,15 @@ import { format } from "date-fns";
 import type { DisplayableCard } from "@/components/game/types";
 import type {
   PriceCardData,
-  PriceCardFaceData,
-  PriceCardSpecificBackData, // description is now optional here
+  PriceCardFaceData, // Now includes yearHigh, yearLow
+  PriceCardSpecificBackData,
   PriceCardSnapshotData,
-  PriceCardSnapshotSpecificBackData, // description is now optional here
+  PriceCardSnapshotSpecificBackData,
 } from "@/components/game/cards/price-card/price-card.types";
 
 import {
   useStockData,
-  type CombinedQuoteData,
+  type CombinedQuoteData, // This will need yearHigh, yearLow from useStockData
   type MarketStatusDisplayHook,
 } from "@/hooks/useStockData";
 
@@ -69,6 +69,7 @@ export default function FinSignalGamePage() {
           timestamp = new Date(timestamp).getTime();
         else if (typeof timestamp !== "number" || isNaN(timestamp))
           timestamp = null;
+
         const rehydratedFaceData: PriceCardFaceData = {
           timestamp,
           price: originalFaceData.price ?? null,
@@ -79,10 +80,12 @@ export default function FinSignalGamePage() {
           dayOpen: originalFaceData.dayOpen ?? null,
           previousClose: originalFaceData.previousClose ?? null,
           volume: originalFaceData.volume ?? null,
+          yearHigh: originalFaceData.yearHigh ?? null, // Rehydrate yearHigh
+          yearLow: originalFaceData.yearLow ?? null, // Rehydrate yearLow
         };
         const originalBackData = cardFromStorage.backData || {};
         const rehydratedBackData: PriceCardSpecificBackData = {
-          description: originalBackData.description, // Changed from explanation
+          description: originalBackData.description,
           marketCap: originalBackData.marketCap ?? null,
           sma50d: originalBackData.sma50d ?? null,
           sma200d: originalBackData.sma200d ?? null,
@@ -101,7 +104,7 @@ export default function FinSignalGamePage() {
           snapshotTime = Date.now();
         const originalSnapshotBackData = cardFromStorage.backData || {};
         const rehydratedSnapshotBackData: PriceCardSnapshotSpecificBackData = {
-          description: originalSnapshotBackData.description, // Changed from explanation
+          description: originalSnapshotBackData.description,
           discoveredReason: originalSnapshotBackData.discoveredReason,
         };
         return {
@@ -109,6 +112,8 @@ export default function FinSignalGamePage() {
           type: "price_snapshot",
           capturedPrice: cardFromStorage.capturedPrice ?? 0,
           snapshotTime,
+          yearHighAtCapture: cardFromStorage.yearHighAtCapture ?? null, // Rehydrate if stored
+          yearLowAtCapture: cardFromStorage.yearLowAtCapture ?? null, // Rehydrate if stored
           backData: rehydratedSnapshotBackData,
         };
       }
@@ -119,7 +124,10 @@ export default function FinSignalGamePage() {
 
   const [initialCardsFromStorage, setCardsInLocalStorage] = useLocalStorage<
     DisplayableCard[]
-  >("finSignal-activeCards-v3", INITIAL_ACTIVE_CARDS);
+  >(
+    "finSignal-activeCards-v4", // Incremented version due to yearHigh/Low
+    INITIAL_ACTIVE_CARDS
+  );
   const [activeCards, setActiveCards] = useState<DisplayableCard[]>(() =>
     Array.isArray(initialCardsFromStorage)
       ? (initialCardsFromStorage
@@ -135,9 +143,7 @@ export default function FinSignalGamePage() {
   const processQuoteData = useCallback(
     (quoteData: CombinedQuoteData, source: "fetch" | "realtime") => {
       const apiTimestampMillis = quoteData.api_timestamp * 1000;
-      if (isNaN(apiTimestampMillis)) {
-        return;
-      }
+      if (isNaN(apiTimestampMillis)) return;
 
       const newFaceData: PriceCardFaceData = {
         timestamp: apiTimestampMillis,
@@ -149,13 +155,11 @@ export default function FinSignalGamePage() {
         volume: quoteData.volume ?? null,
         dayOpen: quoteData.day_open ?? null,
         previousClose: quoteData.previous_close ?? null,
+        yearHigh: quoteData.year_high ?? null, // Populate from CombinedQuoteData
+        yearLow: quoteData.year_low ?? null, // Populate from CombinedQuoteData
       };
 
-      // The static description is now in PriceCardContent.
-      // The `description` field in `newBackData` can be omitted if not used,
-      // or used for a dynamic description if ever needed.
       const newBackData: PriceCardSpecificBackData = {
-        // description: "Some dynamic description if needed", // Or omit if always static
         marketCap: quoteData.market_cap ?? null,
         sma50d: quoteData.sma_50d ?? null,
         sma200d: quoteData.sma_200d ?? null,
@@ -185,12 +189,8 @@ export default function FinSignalGamePage() {
             ...existingPriceCard,
             companyName: quoteData.companyName ?? existingPriceCard.companyName,
             logoUrl: quoteData.logoUrl ?? existingPriceCard.logoUrl,
-            faceData: newFaceData,
-            backData: {
-              // Ensure backData is updated, respecting optional description
-              ...existingPriceCard.backData, // Preserve existing backData fields
-              ...newBackData, // Overlay with new marketCap, SMAs (description might be undefined)
-            },
+            faceData: newFaceData, // Contains new yearHigh/Low
+            backData: { ...existingPriceCard.backData, ...newBackData },
           };
           const newCards = [...currentCards];
           newCards[existingCardIndex] = updatedCard;
@@ -215,7 +215,7 @@ export default function FinSignalGamePage() {
             createdAt: Date.now(),
             companyName: quoteData.companyName ?? null,
             logoUrl: quoteData.logoUrl ?? null,
-            faceData: newFaceData,
+            faceData: newFaceData, // Contains new yearHigh/Low
             backData: newBackData,
             isFlipped: false,
           };
@@ -278,7 +278,7 @@ export default function FinSignalGamePage() {
         return prevActiveCards;
       });
     }
-  }, [profileData, setActiveCards]);
+  }, [profileData, activeCards, setActiveCards]);
 
   const handleTakeSnapshot = useCallback(
     (cardId?: string) => {
@@ -298,8 +298,9 @@ export default function FinSignalGamePage() {
             logoUrl: livePriceCard.logoUrl,
             capturedPrice: livePriceCard.faceData.price!,
             snapshotTime: livePriceCard.faceData.timestamp!,
+            yearHighAtCapture: livePriceCard.faceData.yearHigh, // Store yearHigh at time of snapshot
+            yearLowAtCapture: livePriceCard.faceData.yearLow, // Store yearLow at time of snapshot
             backData: {
-              // description is now optional and handled statically by PriceCardContent for snapshots too
               discoveredReason: `Snapshot of ${
                 livePriceCard.symbol
               } from ${new Date(

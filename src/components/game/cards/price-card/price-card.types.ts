@@ -2,7 +2,7 @@
 import type { CardType } from "../base-card/base-card.types";
 
 export interface PriceCardFaceData {
-  readonly timestamp: number | null;
+  readonly timestamp: number | null; // Milliseconds since epoch
   readonly price: number | null;
   readonly dayChange: number | null;
   readonly changePercentage: number | null;
@@ -11,10 +11,13 @@ export interface PriceCardFaceData {
   readonly dayOpen: number | null;
   readonly previousClose: number | null;
   readonly volume: number | null;
+  // New fields for 52-week range
+  readonly yearHigh?: number | null;
+  readonly yearLow?: number | null;
 }
 
 export interface PriceCardSpecificBackData {
-  readonly description?: string | null; // Renamed from explanation, kept optional
+  readonly description?: string | null;
   readonly marketCap: number | null;
   readonly sma50d: number | null;
   readonly sma200d: number | null;
@@ -27,12 +30,12 @@ export interface PriceCardData {
   readonly createdAt: number;
   readonly companyName?: string | null;
   readonly logoUrl?: string | null;
-  readonly faceData: PriceCardFaceData;
-  readonly backData: PriceCardSpecificBackData; // Uses the updated type
+  readonly faceData: PriceCardFaceData; // Will now include yearHigh/Low
+  readonly backData: PriceCardSpecificBackData;
 }
 
 export interface PriceCardSnapshotSpecificBackData {
-  readonly description?: string | null; // Renamed from explanation, kept optional
+  readonly description?: string | null;
   readonly discoveredReason?: string;
 }
 
@@ -45,7 +48,10 @@ export interface PriceCardSnapshotData {
   readonly logoUrl?: string | null;
   readonly capturedPrice: number;
   readonly snapshotTime: number;
-  readonly backData: PriceCardSnapshotSpecificBackData; // Uses the updated type
+  // Snapshots might also benefit from storing yearHigh/Low at the time of capture
+  readonly yearHighAtCapture?: number | null;
+  readonly yearLowAtCapture?: number | null;
+  readonly backData: PriceCardSnapshotSpecificBackData;
 }
 
 export interface PriceCardInteractionCallbacks {
@@ -56,7 +62,7 @@ export interface PriceCardInteractionCallbacks {
   ) => void;
   readonly onPriceCardRangeContextClick?: (
     cardData: PriceCardData,
-    levelType: "High" | "Low",
+    levelType: "High" | "Low" | "YearHigh" | "YearLow", // Added YearHigh/Low
     levelValue: number
   ) => void;
   readonly onPriceCardOpenPriceClick?: (cardData: PriceCardData) => void;
