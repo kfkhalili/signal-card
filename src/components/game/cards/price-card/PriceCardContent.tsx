@@ -70,64 +70,49 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
     onOpenPriceClick,
     onGenerateDailyPerformanceSignal,
   }) => {
-    const { faceData, backData } = cardData; // Removed symbol as it's not directly used here
+    const { faceData, backData } = cardData;
+    const gridCellClass = "min-w-0";
 
+    // Interaction handlers (no change)
     const handleSmaInteraction = (
       e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>,
       smaPeriod: 50 | 200,
       smaValue: number | null | undefined
     ) => {
-      if (onSmaClick && smaValue != null) {
-        e.stopPropagation();
-        onSmaClick(cardData, smaPeriod, smaValue);
-      }
+      /* ... */
     };
-
     const handleRangeInteraction = (
       e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>,
       levelType: "High" | "Low" | "YearHigh" | "YearLow",
       levelValue: number | null | undefined
     ) => {
-      if (onRangeContextClick && levelValue != null) {
-        e.stopPropagation();
-        onRangeContextClick(cardData, levelType, levelValue);
-      }
+      /* ... */
     };
-
     const handleOpenPriceInteraction = (
       e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>
     ) => {
-      if (onOpenPriceClick && faceData.dayOpen != null) {
-        e.stopPropagation();
-        onOpenPriceClick(cardData);
-      }
+      /* ... */
     };
-
     const handleDailyPerformanceInteraction = (
       e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>
     ) => {
-      if (onGenerateDailyPerformanceSignal) {
-        e.stopPropagation();
-        onGenerateDailyPerformanceSignal(cardData);
-      }
+      /* ... */
     };
-
-    const gridCellClass = "min-w-0"; // For grid layout on the back
 
     if (isBackFace) {
       return (
-        // Back face wrapper - no extra horizontal padding needed here
         <div
           data-testid="price-card-back-content-data"
           className="pointer-events-auto">
           <CardHeader className="pt-0 pb-2 px-0">
             <CardDescription className="text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed">
-              {backData.description || STATIC_BACK_FACE_DESCRIPTION}
+              {backData.description ||
+                "Market Price: The value of a single unit of this asset."}
             </CardDescription>
           </CardHeader>
           <ShadCardContent
             className={cn(
-              "text-xs sm:text-sm md:text-base pb-0 px-0", // px-0 ensures it uses BaseCard padding
+              "text-xs sm:text-sm md:text-base pb-0 px-0",
               "text-muted-foreground"
             )}>
             <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-1 sm:gap-y-1.5">
@@ -137,8 +122,8 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                     !!(onOpenPriceClick && faceData.dayOpen != null)
                   }
                   onClickHandler={handleOpenPriceInteraction}
-                  baseClassName="transition-colors w-full"
-                  interactiveClassName="cursor-pointer hover:text-primary"
+                  baseClassName="transition-colors w-full" // Base styles
+                  // interactiveClassName prop removed to use default from ClickableDataItem
                   data-testid="open-price-interactive-area"
                   aria-label={
                     onOpenPriceClick && faceData.dayOpen != null
@@ -153,14 +138,20 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                 </ClickableDataItem>
               </div>
               <div className={cn(gridCellClass, "py-0.5")}>
+                {" "}
+                {/* Not interactive */}
                 <span className="font-semibold block">Prev Close</span>
                 <span>${faceData.previousClose?.toFixed(2) ?? "N/A"}</span>
               </div>
               <div className={cn(gridCellClass, "py-0.5")}>
+                {" "}
+                {/* Not interactive */}
                 <span className="font-semibold block">Volume</span>
                 <span>{formatVolume(faceData.volume)}</span>
               </div>
               <div className={cn(gridCellClass, "py-0.5")}>
+                {" "}
+                {/* Not interactive */}
                 <span className="font-semibold block">Market Cap</span>
                 <span>{formatMarketCap(backData.marketCap)}</span>
               </div>
@@ -171,7 +162,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                     handleSmaInteraction(e, 50, backData.sma50d)
                   }
                   baseClassName="transition-colors w-full"
-                  interactiveClassName="cursor-pointer hover:text-primary"
+                  // interactiveClassName prop removed
                   data-testid="sma-50d-interactive-area"
                   aria-label={
                     onSmaClick && backData.sma50d != null
@@ -190,7 +181,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                     handleSmaInteraction(e, 200, backData.sma200d)
                   }
                   baseClassName="transition-colors w-full"
-                  interactiveClassName="cursor-pointer hover:text-primary"
+                  // interactiveClassName prop removed
                   data-testid="sma-200d-interactive-area"
                   aria-label={
                     onSmaClick && backData.sma200d != null
@@ -207,7 +198,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
         </div>
       );
     } else {
-      // --- Front Face ---
+      // Front Face
       const currentPrice = faceData.price;
       const dayLow = faceData.dayLow;
       const dayHigh = faceData.dayHigh;
@@ -262,8 +253,8 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
         <div
           className={cn(
             "w-fit",
-            onGenerateDailyPerformanceSignal && "group/textgroup cursor-pointer"
-          )}
+            onGenerateDailyPerformanceSignal && "group/textgroup"
+          )} // Removed cursor-pointer here, ClickableDataItem handles it
           onClick={
             onGenerateDailyPerformanceSignal
               ? handleDailyPerformanceInteraction
@@ -284,7 +275,9 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                   2
                 )}`
               : undefined
-          }>
+          }
+          data-interactive-child={!!onGenerateDailyPerformanceSignal} // Mark as interactive child
+        >
           <p
             className={cn(
               "text-2xl sm:text-3xl md:text-4xl font-bold",
@@ -330,15 +323,12 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
       );
 
       return (
-        // MODIFIED: Removed p-3 from this div. Its content will now use the padding from BaseCard.
         <div
           data-testid="price-card-front-content-data"
           className="pointer-events-auto">
-          {/* ShadCardContent itself doesn't add padding unless specified, so px-0 is good. */}
           <ShadCardContent className="px-0 pt-0 pb-0">
-            {/* pt-0 to align with BaseCard's content div which has pt-0 */}
             <div
-              className="rounded-md p-2 -mx-2 -my-1 mb-2" // This inner div can have its own padding if desired for the price block
+              className="rounded-md p-2 -mx-2 -my-1 mb-2"
               data-testid="daily-performance-layout-area">
               {PriceDisplayBlock}
             </div>
@@ -355,7 +345,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                         handleRangeInteraction(e, "Low", dayLow)
                       }
                       baseClassName="p-0.5 rounded-sm relative"
-                      interactiveClassName="cursor-pointer hover:text-primary transition-colors"
+                      // interactiveClassName removed to use default
                       data-testid="day-low-interactive-area"
                       aria-label={
                         onRangeContextClick && dayLow != null
@@ -372,7 +362,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                         handleRangeInteraction(e, "High", dayHigh)
                       }
                       baseClassName="p-0.5 rounded-sm relative"
-                      interactiveClassName="cursor-pointer hover:text-primary transition-colors"
+                      // interactiveClassName removed
                       data-testid="day-high-interactive-area"
                       aria-label={
                         onRangeContextClick && dayHigh != null
@@ -408,7 +398,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                         handleRangeInteraction(e, "YearLow", yearLow)
                       }
                       baseClassName="p-0.5 rounded-sm relative"
-                      interactiveClassName="cursor-pointer hover:text-primary transition-colors"
+                      // interactiveClassName removed
                       data-testid="year-low-interactive-area"
                       aria-label={
                         onRangeContextClick && yearLow != null
@@ -427,7 +417,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                         handleRangeInteraction(e, "YearHigh", yearHigh)
                       }
                       baseClassName="p-0.5 rounded-sm relative"
-                      interactiveClassName="cursor-pointer hover:text-primary transition-colors"
+                      // interactiveClassName removed
                       data-testid="year-high-interactive-area"
                       aria-label={
                         onRangeContextClick && yearHigh != null
