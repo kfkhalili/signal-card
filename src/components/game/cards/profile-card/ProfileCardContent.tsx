@@ -4,7 +4,7 @@ import {
   CardContent as ShadCardContent,
   CardDescription,
   CardFooter,
-} from "@/components/ui/card"; // Assuming CardFooter might be useful for actions
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
@@ -13,18 +13,11 @@ import type {
   ProfileCardData,
   ProfileCardInteractionCallbacks,
 } from "./profile-card.types";
-import { ExternalLink, BarChart3 } from "lucide-react"; // Example icons
-
-// Helper to format numbers, you might have a global one
-const formatNumberDisplay = (num: number | null | undefined): string => {
-  if (num === null || num === undefined) return "N/A";
-  return num.toLocaleString();
-};
-
-const formatPercentage = (num: number | null | undefined): string => {
-  if (num === null || num === undefined) return "N/A";
-  return `${num.toFixed(2)}%`;
-};
+import {
+  formatNumberWithAbbreviations,
+  formatPercentage,
+} from "@/lib/formatters";
+import { ExternalLink, BarChart3 } from "lucide-react";
 
 interface ProfileCardContentProps {
   cardData: ProfileCardData;
@@ -204,7 +197,9 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
                 </div>
               </div>
               <div className="text-xs text-muted-foreground flex justify-between">
-                <span>Volume: {formatNumberDisplay(liveData.volume)}</span>
+                <span>
+                  Volume: {formatNumberWithAbbreviations(liveData.volume)}
+                </span>
                 {liveData.timestamp && (
                   <span>
                     Live: {new Date(liveData.timestamp).toLocaleTimeString()}
@@ -230,6 +225,7 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
                   }>
                   <span className="font-semibold">Sector:</span>
                   <span className="text-muted-foreground">
+                    {" "}
                     {staticData.sector}
                   </span>
                 </ClickableDataItem>
@@ -249,6 +245,7 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
                   }>
                   <span className="font-semibold">Industry:</span>
                   <span className="text-muted-foreground">
+                    {" "}
                     {staticData.industry}
                   </span>
                 </ClickableDataItem>

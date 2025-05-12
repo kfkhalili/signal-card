@@ -5,6 +5,7 @@ import type {
   ConcreteCardData,
 } from "@/components/game/types";
 import { RARITY_LEVELS } from "@/components/game/rarityCalculator";
+import { parseTimestampSafe } from "@/lib/formatters";
 
 export interface CommonCardPropsForRehydration extends DisplayableCardState {
   id: string;
@@ -12,8 +13,6 @@ export interface CommonCardPropsForRehydration extends DisplayableCardState {
   createdAt: number;
   companyName?: string | null;
   logoUrl?: string | null;
-  // currentRarity and rarityReason are part of DisplayableCardState
-  // and will be initialized when commonProps is created.
 }
 
 export type SpecificCardRehydrator = (
@@ -21,15 +20,19 @@ export type SpecificCardRehydrator = (
   commonProps: CommonCardPropsForRehydration // Common properties including initialized rarity
 ) => ConcreteCardData | null; // Specific rehydrator returns the core data part
 
-// Define the registry BEFORE any function that uses it is exported or called.
+// Registry to hold rehydration functions for each card type
 const cardRehydratorRegistry = new Map<string, SpecificCardRehydrator>();
 
+/**
+ * Registers a rehydration function for a specific card type.
+ * This function should be called by each card type's rehydrator module.
+ * @param cardType The string identifier for the card type (e.g., "price", "profile").
+ * @param rehydrator The function that takes raw storage data and common props, returning ConcreteCardData.
+ */
 export function registerCardRehydrator(
   cardType: string,
   rehydrator: SpecificCardRehydrator
 ): void {
-  // Now cardRehydratorRegistry is guaranteed to be initialized before this function is called
-  // by external modules.
   if (cardRehydratorRegistry.has(cardType)) {
     console.warn(
       `Rehydrator for card type "${cardType}" is being overwritten.`
@@ -38,17 +41,12 @@ export function registerCardRehydrator(
   cardRehydratorRegistry.set(cardType, rehydrator);
 }
 
-function parseTimestamp(timestamp: any): number | null {
-  if (typeof timestamp === "string") {
-    const parsed = new Date(timestamp).getTime();
-    return isNaN(parsed) ? null : parsed;
-  }
-  if (typeof timestamp === "number" && !isNaN(timestamp)) {
-    return timestamp > 0 ? timestamp : null;
-  }
-  return null;
-}
-
+/**
+ * Takes a raw object from local storage and attempts to reconstruct
+ * a fully typed DisplayableCard using registered rehydrators.
+ * @param cardFromStorage The raw object retrieved from local storage.
+ * @returns A DisplayableCard object or null if rehydration fails.
+ */
 export function rehydrateCardFromStorage(
   cardFromStorage: any
 ): DisplayableCard | null {
@@ -72,12 +70,15 @@ export function rehydrateCardFromStorage(
     console.warn(
       `No rehydrator registered for card type "${cardType}". Skipping card ID: ${cardFromStorage.id}`
     );
+    // Optionally, return a basic representation or null
+    // Returning null seems safer to avoid rendering broken cards.
     return null;
   }
 
-  const parsedCreatedAt = parseTimestamp(cardFromStorage.createdAt);
+  const parsedCreatedAt = parseTimestampSafe(cardFromStorage.createdAt);
   const finalCreatedAt = parsedCreatedAt ?? Date.now();
 
+  // Prepare common properties, including UI state and rarity read from storage
   const commonProps: CommonCardPropsForRehydration = {
     id: cardFromStorage.id,
     symbol: cardFromStorage.symbol,
@@ -93,6 +94,7 @@ export function rehydrateCardFromStorage(
   };
 
   try {
+    // Call the specific rehydrator to get the core data part (PriceCardData, ProfileCardData, etc.)
     const concreteCardData = specificRehydrator(cardFromStorage, commonProps);
 
     if (!concreteCardData) {
@@ -102,14 +104,17 @@ export function rehydrateCardFromStorage(
       return null;
     }
 
+    // Combine the ConcreteCardData from the specific rehydrator
+    // with the DisplayableCardState derived from commonProps.
+    // Ensure ConcreteCardData properties (like type, symbol, etc.) take precedence
+    // if they were potentially modified by the rehydrator, then add UI state.
     return {
-      // Start with ConcreteCardData properties (which include id, symbol, type etc. from specific rehydrator)
-      ...concreteCardData,
-      // Ensure DisplayableCardState properties from commonProps are correctly merged/override
+      ...concreteCardData, // Has id, type, symbol, createdAt, companyName, logoUrl, face/back/static/live data
+      // Explicitly add/override the state fields from commonProps
       isFlipped: commonProps.isFlipped,
       currentRarity: commonProps.currentRarity,
       rarityReason: commonProps.rarityReason,
-    } as DisplayableCard;
+    } as DisplayableCard; // Assert the final type
   } catch (error) {
     console.error(
       `Error during specific rehydration for type "${cardType}", card ID: ${commonProps.id}:`,

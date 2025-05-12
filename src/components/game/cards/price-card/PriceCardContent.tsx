@@ -1,33 +1,17 @@
 // src/components/game/cards/price-card/PriceCardContent.tsx
 import React from "react";
 import {
-  CardHeader, // Used for back face
-  CardDescription, // Used for back face
+  CardHeader,
+  CardDescription,
   CardContent as ShadCardContent,
 } from "@/components/ui/card";
 import type {
   PriceCardData,
   PriceCardInteractionCallbacks,
 } from "./price-card.types";
-// import { format } from "date-fns"; // Not used in this version, but keep if needed for timestamps
-import { cn } from "../../../../lib/utils";
+import { cn } from "@/lib/utils";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
-
-const formatMarketCap = (cap: number | null | undefined): string => {
-  if (cap === null || cap === undefined) return "N/A";
-  if (cap >= 1e12) return `${(cap / 1e12).toFixed(2)}T`;
-  if (cap >= 1e9) return `${(cap / 1e9).toFixed(2)}B`;
-  if (cap >= 1e6) return `${(cap / 1e6).toFixed(2)}M`;
-  return cap.toString();
-};
-
-const formatVolume = (volume: number | null | undefined): string => {
-  if (volume === null || volume === undefined) return "N/A";
-  if (volume >= 1_000_000_000) return `${(volume / 1_000_000_000).toFixed(2)}B`;
-  if (volume >= 1_000_000) return `${(volume / 1_000_000).toFixed(2)}M`;
-  if (volume >= 1_000) return `${(volume / 1_000).toFixed(2)}K`;
-  return volume.toLocaleString();
-};
+import { formatNumberWithAbbreviations } from "@/lib/formatters"; // Import centralized formatter
 
 const STATIC_BACK_FACE_DESCRIPTION =
   "Market Price: The value of a single unit of this asset.";
@@ -79,24 +63,36 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
       smaPeriod: 50 | 200,
       smaValue: number | null | undefined
     ) => {
-      /* ... */
+      if (onSmaClick && smaValue != null) {
+        e.stopPropagation();
+        onSmaClick(cardData, smaPeriod, smaValue);
+      }
     };
     const handleRangeInteraction = (
       e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>,
       levelType: "High" | "Low" | "YearHigh" | "YearLow",
       levelValue: number | null | undefined
     ) => {
-      /* ... */
+      if (onRangeContextClick && levelValue != null) {
+        e.stopPropagation();
+        onRangeContextClick(cardData, levelType, levelValue);
+      }
     };
     const handleOpenPriceInteraction = (
       e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>
     ) => {
-      /* ... */
+      if (onOpenPriceClick && faceData.dayOpen != null) {
+        e.stopPropagation();
+        onOpenPriceClick(cardData);
+      }
     };
     const handleDailyPerformanceInteraction = (
       e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>
     ) => {
-      /* ... */
+      if (onGenerateDailyPerformanceSignal) {
+        e.stopPropagation();
+        onGenerateDailyPerformanceSignal(cardData);
+      }
     };
 
     if (isBackFace) {
@@ -106,8 +102,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
           className="pointer-events-auto">
           <CardHeader className="pt-0 pb-2 px-0">
             <CardDescription className="text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed">
-              {backData.description ||
-                "Market Price: The value of a single unit of this asset."}
+              {backData.description || STATIC_BACK_FACE_DESCRIPTION}
             </CardDescription>
           </CardHeader>
           <ShadCardContent
@@ -122,8 +117,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                     !!(onOpenPriceClick && faceData.dayOpen != null)
                   }
                   onClickHandler={handleOpenPriceInteraction}
-                  baseClassName="transition-colors w-full" // Base styles
-                  // interactiveClassName prop removed to use default from ClickableDataItem
+                  baseClassName="transition-colors w-full"
                   data-testid="open-price-interactive-area"
                   aria-label={
                     onOpenPriceClick && faceData.dayOpen != null
@@ -138,22 +132,23 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                 </ClickableDataItem>
               </div>
               <div className={cn(gridCellClass, "py-0.5")}>
-                {" "}
                 {/* Not interactive */}
                 <span className="font-semibold block">Prev Close</span>
                 <span>${faceData.previousClose?.toFixed(2) ?? "N/A"}</span>
               </div>
               <div className={cn(gridCellClass, "py-0.5")}>
-                {" "}
                 {/* Not interactive */}
                 <span className="font-semibold block">Volume</span>
-                <span>{formatVolume(faceData.volume)}</span>
+                {/* Use centralized formatter */}
+                <span>{formatNumberWithAbbreviations(faceData.volume)}</span>
               </div>
               <div className={cn(gridCellClass, "py-0.5")}>
-                {" "}
                 {/* Not interactive */}
                 <span className="font-semibold block">Market Cap</span>
-                <span>{formatMarketCap(backData.marketCap)}</span>
+                {/* Use centralized formatter, assuming $ prefix */}
+                <span>
+                  ${formatNumberWithAbbreviations(backData.marketCap)}
+                </span>
               </div>
               <div className={cn(gridCellClass)}>
                 <ClickableDataItem
@@ -162,7 +157,6 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                     handleSmaInteraction(e, 50, backData.sma50d)
                   }
                   baseClassName="transition-colors w-full"
-                  // interactiveClassName prop removed
                   data-testid="sma-50d-interactive-area"
                   aria-label={
                     onSmaClick && backData.sma50d != null
@@ -181,7 +175,6 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                     handleSmaInteraction(e, 200, backData.sma200d)
                   }
                   baseClassName="transition-colors w-full"
-                  // interactiveClassName prop removed
                   data-testid="sma-200d-interactive-area"
                   aria-label={
                     onSmaClick && backData.sma200d != null
@@ -254,7 +247,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
           className={cn(
             "w-fit",
             onGenerateDailyPerformanceSignal && "group/textgroup"
-          )} // Removed cursor-pointer here, ClickableDataItem handles it
+          )}
           onClick={
             onGenerateDailyPerformanceSignal
               ? handleDailyPerformanceInteraction
@@ -345,7 +338,6 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                         handleRangeInteraction(e, "Low", dayLow)
                       }
                       baseClassName="p-0.5 rounded-sm relative"
-                      // interactiveClassName removed to use default
                       data-testid="day-low-interactive-area"
                       aria-label={
                         onRangeContextClick && dayLow != null
@@ -362,7 +354,6 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                         handleRangeInteraction(e, "High", dayHigh)
                       }
                       baseClassName="p-0.5 rounded-sm relative"
-                      // interactiveClassName removed
                       data-testid="day-high-interactive-area"
                       aria-label={
                         onRangeContextClick && dayHigh != null
@@ -398,7 +389,6 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                         handleRangeInteraction(e, "YearLow", yearLow)
                       }
                       baseClassName="p-0.5 rounded-sm relative"
-                      // interactiveClassName removed
                       data-testid="year-low-interactive-area"
                       aria-label={
                         onRangeContextClick && yearLow != null
@@ -417,7 +407,6 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                         handleRangeInteraction(e, "YearHigh", yearHigh)
                       }
                       baseClassName="p-0.5 rounded-sm relative"
-                      // interactiveClassName removed
                       data-testid="year-high-interactive-area"
                       aria-label={
                         onRangeContextClick && yearHigh != null

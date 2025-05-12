@@ -4,32 +4,19 @@ import {
   type CommonCardPropsForRehydration,
   type SpecificCardRehydrator,
 } from "@/components/game/cardRehydration";
-import type { ConcreteCardData } from "@/components/game/types";
 import type {
   PriceCardData,
   PriceCardFaceData,
   PriceCardSpecificBackData,
 } from "./price-card.types";
-
-// Helper to safely parse timestamps (from string or number to number | null)
-// This could be moved to a shared util if used in many rehydrators
-function parseLocalTimestamp(timestamp: any): number | null {
-  if (typeof timestamp === "string") {
-    const parsed = new Date(timestamp).getTime();
-    return isNaN(parsed) ? null : parsed;
-  }
-  if (typeof timestamp === "number" && !isNaN(timestamp)) {
-    return timestamp > 0 ? timestamp : null;
-  }
-  return null;
-}
+import { parseTimestampSafe } from "@/lib/formatters";
 
 const rehydrateLivePriceCard: SpecificCardRehydrator = (
   cardFromStorage: any,
   commonProps: CommonCardPropsForRehydration
 ): PriceCardData | null => {
   const originalFaceData = cardFromStorage.faceData || {};
-  const timestamp = parseLocalTimestamp(originalFaceData.timestamp);
+  const timestamp = parseTimestampSafe(originalFaceData.timestamp);
 
   const rehydratedFaceData: PriceCardFaceData = {
     timestamp: timestamp,
@@ -53,11 +40,12 @@ const rehydrateLivePriceCard: SpecificCardRehydrator = (
     sma200d: originalBackData.sma200d ?? null,
   };
 
-  // commonProps already contains id, symbol, createdAt, companyName, logoUrl, isFlipped
-  // The SpecificCardRehydrator should return the ConcreteCardData part
+  // commonProps already contains id, symbol, createdAt, companyName, logoUrl, isFlipped, rarity etc.
+  // The SpecificCardRehydrator returns the ConcreteCardData part.
+  // BaseCardData properties are merged here.
   return {
     id: commonProps.id,
-    type: "price", // Set by the dispatcher or ensure consistency
+    type: "price", // Ensure type is set correctly
     symbol: commonProps.symbol,
     createdAt: commonProps.createdAt,
     companyName: commonProps.companyName,
@@ -67,5 +55,5 @@ const rehydrateLivePriceCard: SpecificCardRehydrator = (
   };
 };
 
-// Register these rehydrators
+// Register the rehydrator
 registerCardRehydrator("price", rehydrateLivePriceCard);
