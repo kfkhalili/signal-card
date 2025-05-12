@@ -90,7 +90,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
       )}
       data-interactive-child="true" // Mark as interactive child
     >
-      <XIcon size={16} strokeWidth={2.5} />{" "}
+      <XIcon size={16} strokeWidth={2.5} />
       {/* Slightly larger for easier clicking */}
     </button>
   ) : null;
@@ -159,7 +159,6 @@ const BaseCard: React.FC<BaseCardProps> = ({
         </CardTitle>
         {/* This div helps reserve space for the symbol/Quote text, acting as the third line */}
         <div className="h-[1.1em] sm:h-[1.2em] md:h-[1.25em] flex items-end justify-end">
-          {" "}
           {/* Approx 1 line height for this text, aligned to bottom of its space */}
           {companyName && (
             <p
@@ -199,12 +198,12 @@ const BaseCard: React.FC<BaseCardProps> = ({
        */}
       <div className="flex justify-between items-start">
         <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0 mr-2 sm:mr-3">
-          <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10"></div>{" "}
+          <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10"></div>
           {/* Logo placeholder */}
         </div>
         <div
           className="min-w-0 max-w-[60%] sm:max-w-[65%]"
-          style={{ minHeight: "4.25rem" }}></div>{" "}
+          style={{ minHeight: "4.25rem" }}></div>
         {/* Text block placeholder */}
       </div>
     </div>
@@ -301,7 +300,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
           {socialBarElement}
         </ShadCard>
       </div>
-      {children}{" "}
+      {children}
       {/* For overlays or other elements positioned relative to the outer card div */}
     </div>
   );
