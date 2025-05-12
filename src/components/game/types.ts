@@ -1,27 +1,21 @@
 // src/components/game/types.ts
-import type {
-  PriceCardData,
-  // PriceCardSnapshotData, // Remove if no longer used on dashboard
-} from "@/components/game/cards/price-card/price-card.types";
+import type { PriceCardData } from "@/components/game/cards/price-card/price-card.types";
 import type { ProfileCardData } from "@/components/game/cards/profile-card/profile-card.types";
 
-// Add other concrete card data types here as they are created
-// e.g. import type { NewsCardData } from "./cards/news-card/news-card.types";
+export type ConcreteCardData = PriceCardData | ProfileCardData;
 
-export type ConcreteCardData =
-  | PriceCardData
-  // | PriceCardSnapshotData // Remove if not part of active dashboard display
-  | ProfileCardData;
-// | NewsCardData // Example
-
+// UI-specific state AND COMMON state like rarity for ANY displayable card.
 export interface DisplayableCardState {
   isFlipped: boolean;
-  // Consider other UI states: isHighlighted?: boolean; order?: number; isDisabled?: boolean;
+  // Rarity fields are part of the live, displayable state on the dashboard
+  currentRarity?: string | null;
+  rarityReason?: string | null;
 }
 
 export type DisplayableCard = ConcreteCardData & DisplayableCardState;
 
-// Specific aliases for clarity. Remove snapshot alias if type is removed.
+// Specific aliases will also inherit these
 export type DisplayableLivePriceCard = PriceCardData & DisplayableCardState;
-// export type DisplayablePriceSnapshotCard = PriceCardSnapshotData & DisplayableCardState; // Remove
 export type DisplayableProfileCard = ProfileCardData & DisplayableCardState;
+// If PriceCardSnapshotData is still a dashboard type:
+// export type DisplayablePriceSnapshotCard = PriceCardSnapshotData & DisplayableCardState;

@@ -50,13 +50,8 @@ export interface ProfileCardBackDataType extends BaseCardBackDataType {
   // This backData will primarily serve the 'explanation' for BaseCard.
 }
 
-// The main data structure for a ProfileCard instance
 export interface ProfileCardData extends BaseCardData {
   readonly type: "profile";
-  readonly symbol: string;
-  readonly companyName?: string | null;
-  readonly logoUrl?: string | null;
-
   readonly staticData: ProfileCardStaticData;
   liveData: ProfileCardLiveData;
 

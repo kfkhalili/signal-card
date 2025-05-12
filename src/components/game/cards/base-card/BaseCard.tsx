@@ -2,7 +2,7 @@
 import React from "react";
 import { Card as ShadCard, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { XIcon } from "lucide-react";
+import { XIcon, Sparkle, Award, Gem, Crown } from "lucide-react"; // Lucide icons for rarity
 import Image from "next/image";
 import type {
   CardActionContext,
@@ -10,25 +10,35 @@ import type {
 } from "./base-card.types";
 import { SocialBar } from "@/components/ui/social-bar";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
+import { RARITY_LEVELS } from "@/components/game/rarityCalculator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface BaseCardProps {
   isFlipped: boolean;
   faceContent: React.ReactNode;
   backContent: React.ReactNode;
   cardContext: CardActionContext;
+
+  currentRarity?: string | null;
+  rarityReason?: string | null;
+
   socialInteractions?: BaseCardSocialInteractions;
   onDeleteRequest?: (context: CardActionContext) => void;
   onFlip: () => void;
   onHeaderClick?: (context: CardActionContext) => void;
   className?: string;
   innerCardClassName?: string;
-  children?: React.ReactNode; // For overlays or other absolutely positioned elements relative to the card
+  children?: React.ReactNode;
 }
 
-// Define these style objects outside the component if they don't depend on props
 const outerStyle: React.CSSProperties = {
   perspective: "1000px",
-  position: "relative", // Added for potential children positioning
+  position: "relative",
 };
 
 const cardSurfaceBaseStyle: React.CSSProperties = {
@@ -38,10 +48,10 @@ const cardSurfaceBaseStyle: React.CSSProperties = {
   width: "100%",
   height: "100%",
   backfaceVisibility: "hidden",
-  WebkitBackfaceVisibility: "hidden", // For Safari
+  WebkitBackfaceVisibility: "hidden",
   display: "flex",
   flexDirection: "column",
-  cursor: "pointer", // Base cursor for flippable area
+  cursor: "pointer",
 };
 
 const backFaceTransformStyle: React.CSSProperties = {
@@ -53,6 +63,8 @@ const BaseCard: React.FC<BaseCardProps> = ({
   faceContent,
   backContent,
   cardContext,
+  currentRarity,
+  rarityReason,
   socialInteractions,
   onDeleteRequest,
   onFlip,
@@ -73,7 +85,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
   };
 
   const handleDeleteClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent card flip
+    e.stopPropagation();
     onDeleteRequest?.(cardContext);
   };
 
@@ -83,15 +95,13 @@ const BaseCard: React.FC<BaseCardProps> = ({
       title="Delete Card"
       aria-label={`Delete ${symbol} card`}
       className={cn(
-        "absolute top-1 right-1 z-30 p-1 flex items-center justify-center transition-all", // Adjusted padding and position
+        "absolute top-1 right-1 z-30 p-1 flex items-center justify-center transition-all",
         "text-muted-foreground/60 hover:text-destructive rounded-full hover:bg-destructive/10",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
         "opacity-0 group-hover:opacity-100 duration-200 ease-in-out"
       )}
-      data-interactive-child="true" // Mark as interactive child
-    >
+      data-interactive-child="true">
       <XIcon size={16} strokeWidth={2.5} />
-      {/* Slightly larger for easier clicking */}
     </button>
   ) : null;
 
@@ -101,20 +111,17 @@ const BaseCard: React.FC<BaseCardProps> = ({
       | React.KeyboardEvent<HTMLDivElement>
   ) => {
     if (onHeaderClick) {
-      event.stopPropagation(); // Prevent card flip
+      event.stopPropagation();
       onHeaderClick(cardContext);
     }
   };
 
-  // Defines overall header padding and the min-height for its content area (logo + text).
-  // md:min-h-[72px] means the content area (logo + text block) has at least 72px height on medium screens.
   const headerWrapperClassNames =
-    "px-3 sm:px-4 md:px-5 pb-2 pt-6 sm:pt-7 shrink-0 min-h-[56px] sm:min-h-[64px] md:min-h-[72px]";
+    "px-3 sm:px-4 md:px-5 pb-1 pt-3 sm:pt-4 shrink-0 min-h-[56px] sm:min-h-[64px] md:min-h-[72px]";
 
-  // This is the content of the header (logo + text block)
   const identityHeaderContent = (
     <>
-      <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0 mr-2 sm:mr-3 self-start pt-px">
+      <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0 mr-2 sm:mr-3 self-start">
         {logoUrl && (
           <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 relative">
             <Image
@@ -123,7 +130,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
               fill
               sizes="(max-width: 640px) 28px, (max-width: 768px) 32px, 40px"
               className="object-contain rounded drop-shadow-sm"
-              unoptimized={!logoUrl.startsWith("/")} // Assuming internal paths are optimized
+              unoptimized={!logoUrl.startsWith("/")}
             />
           </div>
         )}
@@ -132,24 +139,18 @@ const BaseCard: React.FC<BaseCardProps> = ({
         isInteractive={!!onHeaderClick}
         onClickHandler={onHeaderClick ? handleHeaderTextClick : undefined}
         className={cn(
-          "text-right min-w-0 max-w-[60%] sm:max-w-[65%]", // Ensure it doesn't overflow
-          "flex flex-col justify-center" // Vertically center its content
+          "text-right min-w-0 max-w-[60%] sm:max-w-[65%]",
+          "flex flex-col justify-center"
         )}
-        style={{
-          // Target height for ~3 lines of md:text-lg.
-          // text-lg (1.125rem) with leading-tight (1.25) -> line-height: ~1.4rem.
-          // 3 lines * 1.4rem = 4.2rem. Using 4.25rem (68px) for a slight buffer.
-          // This ensures this text block reserves consistent space.
-          minHeight: "4.25rem",
-        }}
+        style={{ minHeight: "4.25rem" }}
         aria-label={
           onHeaderClick
             ? `View details for ${companyName || symbol}`
             : undefined
         }
-        data-interactive-child={!!onHeaderClick} // Mark as interactive if it has a click handler
+        data-interactive-child={!!onHeaderClick}
         data-testid="header-text-clickable">
-        <CardTitle // This is a div from shadcn/ui
+        <CardTitle
           className={cn(
             "text-sm sm:text-base md:text-lg font-semibold leading-tight line-clamp-2",
             "text-right"
@@ -157,9 +158,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
           title={companyName || symbol}>
           {companyName || symbol}
         </CardTitle>
-        {/* This div helps reserve space for the symbol/Quote text, acting as the third line */}
         <div className="h-[1.1em] sm:h-[1.2em] md:h-[1.25em] flex items-end justify-end">
-          {/* Approx 1 line height for this text, aligned to bottom of its space */}
           {companyName && (
             <p
               className="text-xs sm:text-sm text-muted-foreground truncate leading-tight pt-[1px] sm:pt-[2px]"
@@ -187,27 +186,109 @@ const BaseCard: React.FC<BaseCardProps> = ({
     </div>
   );
 
-  // Placeholder for the back of the card to maintain layout consistency
-  const headerPlaceholderElement = (
+  const headerPlaceholderElementForBack = (
     <div
       className={cn("invisible", headerWrapperClassNames)}
       aria-hidden="true">
-      {/* Simplified structure to mimic height drivers if necessary,
-           but min-height on headerWrapperClassNames should handle it.
-           Forcing content ensures flexbox calculates height similarly.
-       */}
       <div className="flex justify-between items-start">
         <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0 mr-2 sm:mr-3">
           <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10"></div>
-          {/* Logo placeholder */}
         </div>
         <div
           className="min-w-0 max-w-[60%] sm:max-w-[65%]"
           style={{ minHeight: "4.25rem" }}></div>
-        {/* Text block placeholder */}
       </div>
     </div>
   );
+
+  const RarityReasonOnBackHeader =
+    // Show if there's a rarityReason, regardless of currentRarity level
+    rarityReason ? (
+      <div className="absolute top-3 sm:top-4 left-3 sm:left-4 md:left-5 pr-8 sm:pr-10 md:pr-12 max-w-[calc(100%-40px-1rem)] pointer-events-none">
+        <p className="text-xs font-medium text-muted-foreground leading-tight text-left line-clamp-3">
+          {/* Optionally, prefix with rarity level if not Common */}
+          {currentRarity && currentRarity !== RARITY_LEVELS.COMMON && (
+            <span className="font-semibold text-primary italic">
+              {currentRarity}:{" "}
+            </span>
+          )}
+          {rarityReason}
+        </p>
+      </div>
+    ) : null;
+
+  const RarityIconOnFront = () => {
+    // Always render the container if a rarity is set (even "Common" for spacing, but icon only if not Common)
+    // Or, only render container if not Common. Let's go with only rendering if not Common for cleaner DOM.
+    if (!currentRarity || currentRarity === RARITY_LEVELS.COMMON) {
+      return (
+        <div className="px-3 sm:px-4 md:px-5 py-1.5 h-[26px] sm:h-[28px]"></div>
+      ); // Placeholder for consistent height if no icon
+    }
+
+    let IconComponent: React.ElementType | null = null;
+    let iconColor = "text-muted-foreground";
+
+    switch (currentRarity) {
+      case RARITY_LEVELS.UNCOMMON:
+        IconComponent = Sparkle;
+        iconColor = "text-sky-500";
+        break;
+      case RARITY_LEVELS.RARE:
+        IconComponent = Award;
+        iconColor = "text-blue-600";
+        break;
+      case RARITY_LEVELS.EPIC:
+        IconComponent = Gem;
+        iconColor = "text-purple-600";
+        break;
+      case RARITY_LEVELS.LEGENDARY:
+        IconComponent = Crown;
+        iconColor = "text-amber-500";
+        break;
+    }
+
+    if (!IconComponent) {
+      // Should not happen if currentRarity is not Common and in RARITY_LEVELS
+      return (
+        <div className="px-3 sm:px-4 md:px-5 py-1.5 h-[26px] sm:h-[28px]"></div>
+      );
+    }
+
+    const tooltipContent = (
+      <>
+        <p className="font-semibold">{currentRarity}</p>
+        {rarityReason && (
+          <p className="text-xs text-muted-foreground max-w-xs">
+            {rarityReason}
+          </p>
+        )}
+      </>
+    );
+
+    return (
+      <div className="px-3 sm:px-4 md:px-5 py-1.5 text-right h-[26px] sm:h-[28px] flex items-center justify-end">
+        {" "}
+        {/* Fixed height, flex for alignment */}
+        <TooltipProvider delayDuration={100}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              {/* Icon is inline-block, container div handles alignment */}
+              <IconComponent
+                className={cn("h-4 w-4 sm:h-5 sm:w-5", iconColor)}
+              />
+            </TooltipTrigger>
+            <TooltipContent
+              side="top"
+              align="end"
+              className="bg-popover text-popover-foreground p-2 rounded-md shadow-lg text-xs">
+              {tooltipContent}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+    );
+  };
 
   const socialBarElement = socialInteractions ? (
     <div
@@ -216,8 +297,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
         "opacity-0 group-hover:opacity-100",
         "translate-y-full group-hover:translate-y-0"
       )}
-      onClick={(e) => e.stopPropagation()} // Prevent card flip when interacting with social bar
-    >
+      onClick={(e) => e.stopPropagation()}>
       <SocialBar interactions={socialInteractions} cardContext={cardContext} />
     </div>
   ) : null;
@@ -225,19 +305,17 @@ const BaseCard: React.FC<BaseCardProps> = ({
   const handleCardFlipInteraction = (
     e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>
   ) => {
-    // Check if the event target or its parent is an interactive child
     let target = e.target as HTMLElement;
     while (target && target !== (e.currentTarget as HTMLElement)) {
       if (
         target.dataset.interactiveChild === "true" ||
         ["BUTTON", "A", "INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)
       ) {
-        return; // Don't flip if an interactive child was clicked/activated
+        return;
       }
       target = target.parentElement as HTMLElement;
     }
 
-    // Proceed with flip if it's a click or appropriate keydown
     if (e.type === "click") {
       onFlip();
     } else if (e.type === "keydown") {
@@ -246,7 +324,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
         (keyboardEvent.key === "Enter" || keyboardEvent.key === " ") &&
         document.activeElement === e.currentTarget
       ) {
-        keyboardEvent.preventDefault(); // Prevent default spacebar scroll
+        keyboardEvent.preventDefault();
         onFlip();
       }
     }
@@ -265,7 +343,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
           onClick={handleCardFlipInteraction}
           onKeyDown={handleCardFlipInteraction}
           role="button"
-          tabIndex={0} // Make the card focusable
+          tabIndex={0}
           aria-label={
             isFlipped
               ? `Show ${symbol} front details`
@@ -273,7 +351,8 @@ const BaseCard: React.FC<BaseCardProps> = ({
           }>
           {deleteButtonElement}
           {actualIdentityHeaderElement}
-          <div className="flex-grow overflow-y-auto relative p-3 sm:p-4 md:p-5 pt-0">
+          {RarityIconOnFront()} {/* Rarity icon rendered below header */}
+          <div className="flex-grow overflow-y-auto relative p-3 sm:p-4 md:px-5 md:pb-5 md:pt-2">
             {faceContent}
           </div>
           {socialBarElement}
@@ -286,22 +365,23 @@ const BaseCard: React.FC<BaseCardProps> = ({
           onClick={handleCardFlipInteraction}
           onKeyDown={handleCardFlipInteraction}
           role="button"
-          tabIndex={-1} // Only one face should be in tab order at a time generally, or manage focus
+          tabIndex={-1}
           aria-label={
             isFlipped
               ? `Show ${symbol} front details`
               : `Show ${symbol} back details`
           }>
           {deleteButtonElement}
-          {headerPlaceholderElement}
-          <div className="flex-grow overflow-y-auto relative p-3 sm:p-4 md:p-5 pt-0">
+          {headerPlaceholderElementForBack}
+          {RarityReasonOnBackHeader}{" "}
+          {/* Rarity reason rendered in header area of back face */}
+          <div className="flex-grow overflow-y-auto relative p-3 sm:p-4 md:px-5 md:pb-5 md:pt-2">
             {backContent}
           </div>
           {socialBarElement}
         </ShadCard>
       </div>
       {children}
-      {/* For overlays or other elements positioned relative to the outer card div */}
     </div>
   );
 };

@@ -20,6 +20,7 @@ export interface DisplayableCollectedCard {
   captured_at: string; // ISO string
   card_data_snapshot: PriceCardData | ProfileCardData; // Parsed JSONB
   rarity_level?: string | null;
+  rarity_reason?: string | null;
   user_notes?: string | null;
   source_card_id?: string | null;
   created_at: string; // DB row created_at

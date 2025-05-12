@@ -10,25 +10,25 @@ import type {
   ProfileCardInteractionCallbacks,
 } from "./profile-card.types";
 import { ProfileCardContent } from "./ProfileCardContent";
-// cn utility might be used for additional styling on the container itself if needed
-// import { cn } from "@/lib/utils";
 
 interface ProfileCardContainerProps {
-  cardData: ProfileCardData;
+  cardData: ProfileCardData; // This now includes currentRarity and rarityReason
   isFlipped: boolean;
   onFlip: () => void;
 
-  cardContext: CardActionContext; // Already contains symbol, companyName, logoUrl
+  cardContext: CardActionContext;
   socialInteractions?: BaseCardSocialInteractions;
   onDeleteRequest?: (context: CardActionContext) => void;
-  onHeaderIdentityClick?: (context: CardActionContext) => void; // For PriceCard -> ProfileCard
-
-  // Specific interactions for the content of the ProfileCard
+  onHeaderIdentityClick?: (context: CardActionContext) => void;
   specificInteractions?: ProfileCardInteractionCallbacks;
+
+  // Pass through rarity to BaseCard
+  currentRarity?: string | null;
+  rarityReason?: string | null;
 
   className?: string;
   innerCardClassName?: string;
-  children?: React.ReactNode; // For overlays, passed to BaseCard
+  children?: React.ReactNode;
 }
 
 export const ProfileCardContainer: React.FC<ProfileCardContainerProps> =
@@ -38,9 +38,11 @@ export const ProfileCardContainer: React.FC<ProfileCardContainerProps> =
       isFlipped,
       onFlip,
       cardContext,
+      currentRarity, // Receive prop
+      rarityReason, // Receive prop
       socialInteractions,
       onDeleteRequest,
-      onHeaderIdentityClick, // Received from GameCard (originating from PriceCard's header click)
+      onHeaderIdentityClick,
       specificInteractions,
       className,
       innerCardClassName,
@@ -48,7 +50,7 @@ export const ProfileCardContainer: React.FC<ProfileCardContainerProps> =
     }) => {
       const faceContentForBaseCard = (
         <ProfileCardContent
-          cardData={cardData}
+          cardData={cardData} // ProfileCardContent will now NOT render rarity itself
           isBackFace={false}
           interactionCallbacks={specificInteractions}
         />
@@ -68,17 +70,15 @@ export const ProfileCardContainer: React.FC<ProfileCardContainerProps> =
           faceContent={faceContentForBaseCard}
           backContent={backContentForBaseCard}
           onFlip={onFlip}
-          cardContext={cardContext} // Pass the comprehensive context
+          cardContext={cardContext}
+          currentRarity={currentRarity} // Pass to BaseCard
+          rarityReason={rarityReason} // Pass to BaseCard
           socialInteractions={socialInteractions}
           onDeleteRequest={onDeleteRequest}
-          // If ProfileCard's header should also trigger profile view (e.g. for consistency, though redundant here)
-          // onHeaderClick={onHeaderIdentityClick}
-          // For ProfileCard, the header itself is just identity, not a trigger to show *another* profile card.
-          // The onHeaderIdentityClick is primarily for PriceCard -> ProfileCard.
-          // If ProfileCard's header needs to do something else, a new callback would be needed.
+          onHeaderClick={onHeaderIdentityClick}
           className={className}
           innerCardClassName={innerCardClassName}>
-          {children} {/* Overlays */}
+          {children}
         </BaseCard>
       );
     }

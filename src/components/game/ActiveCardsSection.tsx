@@ -6,7 +6,6 @@ import { useToast as useAppToast } from "@/hooks/use-toast";
 import type {
   BaseCardSocialInteractions,
   CardActionContext,
-  CardType,
 } from "./cards/base-card/base-card.types";
 import { getPriceCardInteractionHandlers } from "./cards/price-card/priceCardInteractions";
 import { getProfileCardInteractionHandlers } from "./cards/profile-card/profileCardInteractions";
@@ -111,12 +110,14 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
         } to your collection.`,
       });
 
-      let cardDataForSnapshot: ConcreteCardData;
+      let concreteDataForSnapshot: ConcreteCardData;
 
-      switch (cardToCapture.type) {
+      switch (
+        cardToCapture.type // Switch on cardToCapture.type
+      ) {
         case "price":
           const priceCard = cardToCapture as PriceCardData;
-          cardDataForSnapshot = {
+          concreteDataForSnapshot = {
             id: priceCard.id,
             type: priceCard.type,
             symbol: priceCard.symbol,
@@ -125,13 +126,11 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
             logoUrl: priceCard.logoUrl,
             faceData: priceCard.faceData,
             backData: priceCard.backData,
-            // If you've augmented PriceCardData to include is_market_open from DisplayableCard for the snapshot:
-            // is_market_open: (cardToCapture as PriceCardData & { is_market_open?: boolean }).is_market_open,
           };
           break;
         case "profile":
           const profileCard = cardToCapture as ProfileCardData;
-          cardDataForSnapshot = {
+          concreteDataForSnapshot = {
             id: profileCard.id,
             type: profileCard.type,
             symbol: profileCard.symbol,
@@ -143,36 +142,37 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
             backData: profileCard.backData,
           };
           break;
+        // Add cases for other ConcreteCardData types if they exist
+        // case 'price_snapshot':
+        //     const priceSnapshotCard = cardToCapture as PriceCardSnapshotData;
+        //     concreteDataForSnapshot = { /* ... */ };
+        //     break;
         default:
-          // At this point, TypeScript has narrowed `cardToCapture` to `never`
-          // because all known types in `ConcreteCardData` (which `cardToCapture.type`
-          // is derived from) have been handled.
-          // Use `context.type` for logging, as it still holds the original broader `CardType`.
+          // Use `context.type` for logging/toast message as `cardToCapture.type`
+          // would be problematic if `cardToCapture` is narrowed to `never` here.
+          // `context` is from the function argument and its type is stable.
           console.error(
-            "Unhandled card type for snapshot. Type from context:",
-            context.type, // 'context.type' is 'CardType', not 'never'
-            "This should be an unreachable state if ConcreteCardData is exhaustive for activeCards."
+            "Cannot capture card of unknown type (from context):",
+            context.type
           );
           toast({
             title: "Capture Error",
-            description: `Card type "${context.type}" is not configured for capture.`,
+            description: `Cannot capture card of type: ${context.type}.`,
             variant: "destructive",
           });
-          // For compile-time exhaustiveness check, you can do:
-          // const _exhaustiveCheck: never = cardToCapture;
-          // This line would cause a TypeScript error if you add a new type to ConcreteCardData
-          // but forget to add a case for it here, which is a good safety measure.
           return;
       }
 
       try {
         const requestBody = {
-          cardType: cardDataForSnapshot.type, // Use the type from the specifically constructed snapshot
-          symbol: cardDataForSnapshot.symbol,
-          companyName: cardDataForSnapshot.companyName,
-          logoUrl: cardDataForSnapshot.logoUrl,
-          cardDataSnapshot: cardDataForSnapshot,
-          sourceCardId: cardToCapture.id, // or context.id
+          cardType: cardToCapture.type,
+          symbol: cardToCapture.symbol,
+          companyName: cardToCapture.companyName,
+          logoUrl: cardToCapture.logoUrl,
+          cardDataSnapshot: concreteDataForSnapshot,
+          sourceCardId: cardToCapture.id,
+          currentRarity: cardToCapture.currentRarity,
+          rarityReason: cardToCapture.rarityReason,
         };
 
         const response = await fetch("/api/collection/capture-card", {
@@ -204,7 +204,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
           toast({
             title: "Card Captured!",
             description: `${
-              cardDataForSnapshot.companyName || cardDataForSnapshot.symbol
+              cardToCapture.companyName || cardToCapture.symbol
             } added to your collection.`,
             variant: "default",
           });

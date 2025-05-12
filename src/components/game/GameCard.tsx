@@ -1,29 +1,33 @@
 // src/components/game/GameCard.tsx
 import React from "react";
-import type { DisplayableCard } from "@/components/game/types";
+import type {
+  DisplayableCard,
+  DisplayableCardState,
+  ConcreteCardData,
+} from "@/components/game/types";
 import type {
   PriceCardData,
   PriceCardInteractionCallbacks,
-  PriceCardSpecificBackData,
-  PriceCardFaceData,
 } from "./cards/price-card/price-card.types";
 import type {
-  ProfileCardData as ProfileCardDataType, // Alias for clarity
+  ProfileCardData,
   ProfileCardInteractionCallbacks,
-} from "./cards/profile-card/profile-card.types"; // Import ProfileCard types
+} from "./cards/profile-card/profile-card.types";
 import type {
-  BaseCardData,
   CardActionContext,
   BaseCardSocialInteractions,
   CardType,
 } from "./cards/base-card/base-card.types";
 
 import { PriceCardContainer } from "./cards/price-card/PriceCardContainer";
-import { ProfileCardContainer } from "@/components/game/cards/profile-card/ProfileCardContainer"; // Import ProfileCardContainer
-import { cn } from "../../lib/utils";
+import { ProfileCardContainer } from "@/components/game/cards/profile-card/ProfileCardContainer";
+import { cn } from "@/lib/utils";
 import { XIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
-// For PriceCard
+type DisplayableLivePriceCard = PriceCardData & DisplayableCardState;
+type DisplayableUserProfileCard = ProfileCardData & DisplayableCardState;
+
 type PriceSpecificInteractionsForContainer = Pick<
   PriceCardInteractionCallbacks,
   | "onPriceCardSmaClick"
@@ -32,31 +36,24 @@ type PriceSpecificInteractionsForContainer = Pick<
   | "onPriceCardGenerateDailyPerformanceSignal"
 >;
 
-// For ProfileCard (ensure this matches what ProfileCardContainer expects)
-type ProfileSpecificInteractionsForContainer = ProfileCardInteractionCallbacks;
-
 interface GameCardProps {
   readonly card: DisplayableCard;
   readonly onToggleFlip: (id: string) => void;
   readonly onDeleteCardRequest: (id: string) => void;
   readonly socialInteractions?: BaseCardSocialInteractions;
-
-  // Callbacks for PriceCard
   readonly priceSpecificInteractions?: PriceSpecificInteractionsForContainer;
-  // Callbacks for ProfileCard
-  readonly profileSpecificInteractions?: ProfileSpecificInteractionsForContainer;
-  // Callback for PriceCard header click -> show ProfileCard
+  readonly profileSpecificInteractions?: ProfileCardInteractionCallbacks;
   readonly onHeaderIdentityClick?: (context: CardActionContext) => void;
 }
 
 const GameCard: React.FC<GameCardProps> = ({
-  card,
+  card, // card is DisplayableCard
   onToggleFlip,
   onDeleteCardRequest,
   socialInteractions,
   priceSpecificInteractions,
-  profileSpecificInteractions, // New prop
-  onHeaderIdentityClick, // New prop
+  profileSpecificInteractions,
+  onHeaderIdentityClick,
 }) => {
   const handleFlip = () => onToggleFlip(card.id);
 
@@ -64,82 +61,119 @@ const GameCard: React.FC<GameCardProps> = ({
     onDeleteCardRequest(context.id);
   };
 
+  // Destructure properties from 'card' that are needed both inside and outside the switch,
+  // especially for the default case to avoid 'never' type issues.
+  const {
+    id: cardId, // Renamed to avoid conflict if 'id' is used elsewhere
+    symbol: cardSymbol,
+    type: cardTypeActual, // This is the actual type string from the card data
+    companyName: cardCompanyName,
+    logoUrl: cardLogoUrl,
+    currentRarity: cardCurrentRarity, // From DisplayableCardState
+    rarityReason: cardRarityReason, // From DisplayableCardState
+  } = card;
+
   const cardContextForBaseCard: CardActionContext = {
-    id: card.id,
-    symbol: card.symbol,
-    type: card.type as CardType,
-    companyName: card.companyName ?? null,
-    logoUrl: card.logoUrl ?? null,
+    id: cardId,
+    symbol: cardSymbol,
+    type: cardTypeActual as CardType, // Assert that the string is one of the known CardType literals
+    companyName: cardCompanyName ?? null,
+    logoUrl: cardLogoUrl ?? null,
   };
 
   const cardWrapperClassName = "w-full aspect-[63/88] relative";
 
-  if (card.type === "price") {
-    const priceCardData = card as PriceCardData & { isFlipped: boolean };
-    return (
-      <PriceCardContainer
-        cardData={priceCardData}
-        isFlipped={priceCardData.isFlipped}
-        onFlip={handleFlip}
-        cardContext={cardContextForBaseCard}
-        socialInteractions={socialInteractions}
-        onDeleteRequest={handleDeleteAction}
-        priceSpecificInteractions={priceSpecificInteractions}
-        onHeaderIdentityClick={onHeaderIdentityClick} // Pass this down
-        className={cardWrapperClassName}
-      />
-    );
-  }
+  switch (
+    card.type // Switch on card.type (which is the same as cardTypeActual)
+  ) {
+    case "price":
+      const priceCard = card as DisplayableLivePriceCard;
+      return (
+        <PriceCardContainer
+          cardData={priceCard}
+          isFlipped={priceCard.isFlipped}
+          onFlip={handleFlip}
+          cardContext={cardContextForBaseCard}
+          currentRarity={priceCard.currentRarity}
+          rarityReason={priceCard.rarityReason}
+          socialInteractions={socialInteractions}
+          onDeleteRequest={handleDeleteAction}
+          priceSpecificInteractions={priceSpecificInteractions}
+          onHeaderIdentityClick={onHeaderIdentityClick}
+          className={cardWrapperClassName}
+        />
+      );
+    case "profile":
+      const profileCard = card as DisplayableUserProfileCard;
+      return (
+        <ProfileCardContainer
+          cardData={profileCard}
+          isFlipped={profileCard.isFlipped}
+          onFlip={handleFlip}
+          cardContext={cardContextForBaseCard}
+          currentRarity={profileCard.currentRarity}
+          rarityReason={profileCard.rarityReason}
+          socialInteractions={socialInteractions}
+          onDeleteRequest={handleDeleteAction}
+          specificInteractions={profileSpecificInteractions}
+          onHeaderIdentityClick={onHeaderIdentityClick}
+          className={cardWrapperClassName}
+        />
+      );
+    // Add other cases for known card types here
 
-  if (card.type === "profile") {
-    const profileCardData = card as ProfileCardDataType & {
-      isFlipped: boolean;
-    };
-    return (
-      <ProfileCardContainer
-        cardData={profileCardData}
-        isFlipped={profileCardData.isFlipped}
-        onFlip={handleFlip}
-        cardContext={cardContextForBaseCard}
-        socialInteractions={socialInteractions}
-        onDeleteRequest={handleDeleteAction}
-        specificInteractions={profileSpecificInteractions}
-        // ProfileCard's own header won't trigger another profile card.
-        // onHeaderIdentityClick={undefined}
-        className={cardWrapperClassName}
-      />
-    );
-  }
+    default:
+      // Use the destructured variables from the outer scope for display
+      console.warn(
+        "Rendering fallback for unhandled card type:",
+        cardTypeActual,
+        card
+      );
 
-  // Fallback for any other card types
-  const baseInfo = card as BaseCardData & { isFlipped: boolean };
-  return (
-    <div
-      className={cn(
-        cardWrapperClassName,
-        "p-4 border rounded-2xl bg-muted/30 text-muted-foreground",
-        "flex flex-col items-center justify-center shadow-lg relative"
-      )}>
-      {baseInfo.type !== "price" &&
-        baseInfo.type !== "profile" && ( // Adjust condition if needed
+      return (
+        <div
+          className={cn(
+            cardWrapperClassName,
+            "p-4 border border-dashed border-muted-foreground/50 rounded-2xl bg-muted/20 text-muted-foreground",
+            "flex flex-col items-center justify-center shadow-lg relative"
+          )}>
           <button
             onClick={() => handleDeleteAction(cardContextForBaseCard)}
             title="Delete Card"
-            aria-label={`Delete ${baseInfo.symbol} card`}
+            aria-label={`Delete ${
+              cardContextForBaseCard.symbol || "unknown"
+            } card`}
             className={cn(
               "absolute top-1.5 right-1.5 z-20 p-1.5 flex items-center justify-center transition-colors",
-              "text-muted-foreground/70 hover:text-primary rounded-sm",
+              "text-muted-foreground/70 hover:text-destructive rounded-sm",
               "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
-            )}>
+            )}
+            data-interactive-child="true">
             <XIcon size={16} strokeWidth={2.5} />
           </button>
-        )}
-      <p className="font-semibold">Unsupported Card Type</p>
-      <p className="text-sm ">ID: {baseInfo.id}</p>
-      <p className="text-sm ">Type: {baseInfo.type}</p>
-      <p className="text-sm ">Symbol: {baseInfo.symbol}</p>
-    </div>
-  );
+          <p className="font-semibold text-sm text-foreground">
+            Unsupported Card
+          </p>
+          {/* Use destructured variables that are not narrowed to 'never' */}
+          <p className="text-xs mt-1">ID: {cardId}</p>
+          <p className="text-xs">Type: {cardTypeActual}</p>
+          <p className="text-xs">Symbol: {cardSymbol}</p>
+
+          {cardCurrentRarity && cardCurrentRarity !== "Common" && (
+            <div className="mt-2 text-center border-t border-muted-foreground/20 pt-2 w-full">
+              <Badge variant="outline" className="text-xs">
+                {cardCurrentRarity}
+              </Badge>
+              {cardRarityReason && (
+                <p className="text-xs mt-0.5 text-muted-foreground/80">
+                  {cardRarityReason}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      );
+  }
 };
 
 export default GameCard;

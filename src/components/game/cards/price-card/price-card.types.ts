@@ -1,6 +1,8 @@
 // src/app/components/game/cards/price-card/price-card.types.ts
 // import type { CardType } from "../base-card/base-card.types"; // Not directly used here if types are specific
 
+import { BaseCardBackData, BaseCardData } from "../base-card/base-card.types";
+
 export interface PriceCardFaceData {
   readonly timestamp: number | null;
   readonly price: number | null;
@@ -15,25 +17,16 @@ export interface PriceCardFaceData {
   readonly yearLow?: number | null;
 }
 
-export interface PriceCardSpecificBackData {
-  readonly description?: string | null; // User-defined or default description for the card type
+export interface PriceCardSpecificBackData extends BaseCardBackData {
   readonly marketCap: number | null;
   readonly sma50d: number | null;
   readonly sma200d: number | null;
 }
 
-export interface PriceCardData {
-  // This is a ConcreteCardData type
-  readonly id: string;
-  readonly type: "price"; // Discriminating literal type
-  readonly symbol: string;
-  readonly createdAt: number; // Timestamp of when this card instance was created on dashboard
-  readonly companyName?: string | null;
-  readonly logoUrl?: string | null;
+export interface PriceCardData extends BaseCardData {
+  readonly type: "price";
   readonly faceData: PriceCardFaceData;
   readonly backData: PriceCardSpecificBackData;
-  // If you added is_market_open here for the snapshot to the API, it would be:
-  // readonly is_market_open?: boolean | null;
 }
 
 // PriceCardSnapshotData and PriceCardSnapshotSpecificBackData removed

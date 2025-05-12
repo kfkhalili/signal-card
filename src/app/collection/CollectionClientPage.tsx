@@ -1,16 +1,18 @@
 // src/app/collection/CollectionClientPage.tsx
 "use client";
 
-import React, { useState, useCallback } from "react";
-import type { DisplayableCollectedCard } from "./page"; // Import from the server component
-import GameCard from "@/components/game/GameCard"; // We'll adapt GameCard or create a new one
+import React, { useState, useCallback, useEffect } from "react"; // Added useEffect for one-time log
+import type { DisplayableCollectedCard } from "./page";
+import GameCard from "@/components/game/GameCard";
 import type {
   DisplayableCard,
   ConcreteCardData,
+  DisplayableCardState,
 } from "@/components/game/types";
 import type {
   CardActionContext,
   BaseCardSocialInteractions,
+  CardType,
 } from "@/components/game/cards/base-card/base-card.types";
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@/lib/supabase/client";
@@ -25,46 +27,93 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Trash2, Edit3, Info } from "lucide-react"; // Icons for actions
+import { Trash2 } from "lucide-react";
 import { format } from "date-fns";
+import type { PriceCardData } from "@/components/game/cards/price-card/price-card.types";
+import type { ProfileCardData } from "@/components/game/cards/profile-card/profile-card.types";
 
 interface CollectionClientPageProps {
   initialCollectedCards: DisplayableCollectedCard[];
 }
 
-// Function to adapt DisplayableCollectedCard to what GameCard expects (DisplayableCard)
 function adaptCollectedToDisplayable(
   collectedCard: DisplayableCollectedCard
 ): DisplayableCard {
-  // The core data is in card_data_snapshot. We need to ensure it aligns with ConcreteCardData
-  // and add the UI state (isFlipped).
-  // The 'type' field should be correctly within collectedCard.card_data_snapshot
+  const concreteDataFromSnapshot =
+    collectedCard.card_data_snapshot as ConcreteCardData;
 
-  const concreteData = collectedCard.card_data_snapshot as ConcreteCardData;
+  // Log the incoming collectedCard, specifically its rarity_reason
+  console.log(
+    `[CollectionClientPage - adaptCollectedToDisplayable] INPUT for ${collectedCard.symbol}:`,
+    `collectedCard.rarity_level = '${collectedCard.rarity_level}'`,
+    `collectedCard.rarity_reason = '${
+      collectedCard.rarity_reason
+    }' (Type: ${typeof collectedCard.rarity_reason})`
+  );
 
-  return {
-    // Use properties from the ConcreteCardData part for GameCard compatibility
-    id: concreteData.id || collectedCard.id, // Prefer ID from snapshot if it exists, else collection ID
-    type: concreteData.type,
-    symbol: concreteData.symbol,
-    createdAt: new Date(collectedCard.captured_at).getTime(), // Use captured_at as a sort of "createdAt" for this view
-    companyName: concreteData.companyName,
-    logoUrl: concreteData.logoUrl,
-
-    // Add specific data based on type, directly from the snapshot
-    ...(concreteData.type === "price" && {
-      faceData: concreteData.faceData,
-      backData: concreteData.backData,
-    }),
-    ...(concreteData.type === "profile" && {
-      staticData: concreteData.staticData,
-      liveData: concreteData.liveData,
-      backData: concreteData.backData,
-    }),
-
-    // UI state
+  const uiState: DisplayableCardState = {
     isFlipped: collectedCard.isFlipped,
-  } as DisplayableCard; // Assert as DisplayableCard
+    currentRarity: collectedCard.rarity_level,
+    rarityReason: collectedCard.rarity_reason, // This is the critical mapping
+  };
+
+  let adaptedCardBase: ConcreteCardData;
+
+  switch (concreteDataFromSnapshot.type) {
+    case "price":
+      adaptedCardBase = {
+        ...(concreteDataFromSnapshot as PriceCardData),
+        id: collectedCard.id,
+        createdAt: new Date(collectedCard.captured_at).getTime(),
+        companyName:
+          collectedCard.company_name || concreteDataFromSnapshot.companyName,
+        logoUrl: collectedCard.logo_url || concreteDataFromSnapshot.logoUrl,
+      };
+      break;
+    case "profile":
+      adaptedCardBase = {
+        ...(concreteDataFromSnapshot as ProfileCardData),
+        id: collectedCard.id,
+        createdAt: new Date(collectedCard.captured_at).getTime(),
+        companyName:
+          collectedCard.company_name || concreteDataFromSnapshot.companyName,
+        logoUrl: collectedCard.logo_url || concreteDataFromSnapshot.logoUrl,
+      };
+      break;
+    default:
+      const unknownBase = concreteDataFromSnapshot as any;
+      console.error(
+        "Unhandled card type in adaptCollectedToDisplayable:",
+        unknownBase?.type
+      );
+      adaptedCardBase = {
+        id: collectedCard.id,
+        type: collectedCard.card_type,
+        symbol: collectedCard.symbol,
+        createdAt: new Date(collectedCard.captured_at).getTime(),
+        companyName: collectedCard.company_name,
+        logoUrl: collectedCard.logo_url,
+        backData: {
+          description: `Data for ${collectedCard.symbol} of type ${collectedCard.card_type}`,
+        },
+      } as ConcreteCardData;
+  }
+
+  const finalDisplayableCard = {
+    ...adaptedCardBase,
+    ...uiState,
+  } as DisplayableCard;
+
+  // Log the output that GameCard will receive
+  console.log(
+    `[CollectionClientPage - adaptCollectedToDisplayable] OUTPUT for ${finalDisplayableCard.symbol}:`,
+    `finalDisplayableCard.currentRarity = '${finalDisplayableCard.currentRarity}'`,
+    `finalDisplayableCard.rarityReason = '${
+      finalDisplayableCard.rarityReason
+    }' (Type: ${typeof finalDisplayableCard.rarityReason})`
+  );
+
+  return finalDisplayableCard;
 }
 
 export default function CollectionClientPage({
@@ -77,6 +126,14 @@ export default function CollectionClientPage({
     useState<DisplayableCollectedCard | null>(null);
   const { toast } = useToast();
   const supabase = createClient();
+
+  // Log initial props once
+  useEffect(() => {
+    console.log(
+      "[CollectionClientPage] Initial collected cards received:",
+      initialCollectedCards
+    );
+  }, [initialCollectedCards]);
 
   const handleToggleFlipCard = useCallback((collectedCardId: string) => {
     setCollectedCards((prev) =>
@@ -92,12 +149,10 @@ export default function CollectionClientPage({
 
   const confirmDeletion = useCallback(async () => {
     if (!cardToConfirmDelete) return;
-
     const { error } = await supabase
       .from("user_collected_cards")
       .delete()
       .eq("id", cardToConfirmDelete.id);
-
     if (error) {
       toast({
         title: "Deletion Failed",
@@ -122,15 +177,11 @@ export default function CollectionClientPage({
     setCardToConfirmDelete(null);
   }, []);
 
-  // Social interactions for collected cards (likely simplified - e.g., no "save" again)
   const collectedCardSocialInteractions = useCallback(
-    (collectedCard: DisplayableCollectedCard): BaseCardSocialInteractions => ({
-      // onLike: () => toast({ title: "TODO", description: "Like collected card?" }),
-      // onComment: () => toast({ title: "TODO", description: "Comment on collected card?" }),
-      // No onSave for already collected cards
-      // onShare: () => toast({ title: "TODO", description: "Share collected card?" }),
+    (_collectedCard: DisplayableCollectedCard): BaseCardSocialInteractions => ({
+      // Minimal social interactions for collected cards view
     }),
-    [toast]
+    []
   );
 
   if (collectedCards.length === 0) {
@@ -148,41 +199,35 @@ export default function CollectionClientPage({
           const displayableCardForGameCard =
             adaptCollectedToDisplayable(collectedCard);
 
-          // Context for actions targeting the *collected card entry*
           const collectedCardActionContext: CardActionContext = {
-            id: collectedCard.id, // Use the DB row ID for actions like delete
+            id: collectedCard.id,
             symbol: collectedCard.symbol,
             type: collectedCard.card_type,
             companyName: collectedCard.company_name,
             logoUrl: collectedCard.logo_url,
           };
 
+          // Log what GameCard is receiving
+          //   console.log(`[CollectionClientPage - map] Passing to GameCard for ${displayableCardForGameCard.symbol}:`,
+          //     `currentRarity: '${displayableCardForGameCard.currentRarity}',`,
+          //     `rarityReason: '${displayableCardForGameCard.rarityReason}'`
+          //   );
+
           return (
             <div
               key={collectedCard.id}
               className="flex flex-col items-center space-y-2">
-              {/* Displaying captured card using GameCard */}
-              {/* GameCard expects a DisplayableCard. We need to adapt collectedCard.card_data_snapshot */}
               <GameCard
                 card={displayableCardForGameCard}
                 onToggleFlip={() => handleToggleFlipCard(collectedCard.id)}
-                // onDeleteCardRequest is more for dashboard cards. Here we use direct delete.
-                // For collected cards, we might want different actions.
-                // Let's make onDeleteCardRequest do nothing here or adapt GameCard.
                 onDeleteCardRequest={() => {
-                  // This onDeleteCardRequest on GameCard might not be what we want directly.
-                  // We have requestDeleteCard(collectedCard) below.
-                  // For now, let's pass a no-op or remove it if GameCard allows.
-                  // Or, GameCard's onDeleteCardRequest could be made optional.
+                  /* Deletion handled by button below */
                 }}
                 socialInteractions={collectedCardSocialInteractions(
                   collectedCard
                 )}
-                // Price/Profile specific interactions might not be relevant for static collected cards,
-                // or they would operate on the snapshot data. For now, passing undefined.
                 priceSpecificInteractions={undefined}
                 profileSpecificInteractions={undefined}
-                // Header click might not be needed or could link to a detailed view of the collected card.
                 onHeaderIdentityClick={undefined}
               />
               <div className="text-center w-full px-1">
@@ -193,16 +238,7 @@ export default function CollectionClientPage({
                     "MMM d, yyyy HH:mm"
                   )}
                 </p>
-                {collectedCard.rarity_level && (
-                  <p className="text-xs font-semibold text-primary">
-                    {collectedCard.rarity_level}
-                  </p>
-                )}
-                {/* Add action buttons for collection items */}
                 <div className="flex justify-center space-x-2 mt-1">
-                  {/* <Button variant="outline" size="xs" onClick={() => alert(`Notes for ${collectedCard.id}`)} title="View/Edit Notes">
-                        <Edit3 size={14} /> <span className="ml-1 hidden sm:inline">Notes</span>
-                    </Button> */}
                   <Button
                     variant="ghost"
                     size="sm"

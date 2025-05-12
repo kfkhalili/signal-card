@@ -2,33 +2,34 @@
 import type {
   DisplayableCard,
   DisplayableCardState,
-  ConcreteCardData, // To type the output of specific rehydrators
-} from "@/components/game/types"; // Assuming ConcreteCardData is a union of all specific card data types (PriceCardData, ProfileCardData, etc.)
+  ConcreteCardData,
+} from "@/components/game/types";
+import { RARITY_LEVELS } from "@/components/game/rarityCalculator";
 
-// Properties common to all cards that the main rehydrator can extract
-// and pass to specific rehydrators.
 export interface CommonCardPropsForRehydration extends DisplayableCardState {
   id: string;
   symbol: string;
-  createdAt: number; // Already parsed and validated
+  createdAt: number;
   companyName?: string | null;
   logoUrl?: string | null;
-  // cardFromStorage: any; // The raw object from storage, if needed by specific rehydrators for deeply nested or complex fields
+  // currentRarity and rarityReason are part of DisplayableCardState
+  // and will be initialized when commonProps is created.
 }
 
-// Interface for a specific card type's rehydration logic
 export type SpecificCardRehydrator = (
-  cardDataFromStorage: any, // The raw 'cardFromStorage' object
-  commonProps: CommonCardPropsForRehydration
-) => ConcreteCardData | null; // Returns the core data part, commonProps adds DisplayableCardState
+  cardDataFromStorage: any, // The raw object from localStorage for this card
+  commonProps: CommonCardPropsForRehydration // Common properties including initialized rarity
+) => ConcreteCardData | null; // Specific rehydrator returns the core data part
 
-// Registry to hold rehydrators
+// Define the registry BEFORE any function that uses it is exported or called.
 const cardRehydratorRegistry = new Map<string, SpecificCardRehydrator>();
 
 export function registerCardRehydrator(
   cardType: string,
   rehydrator: SpecificCardRehydrator
 ): void {
+  // Now cardRehydratorRegistry is guaranteed to be initialized before this function is called
+  // by external modules.
   if (cardRehydratorRegistry.has(cardType)) {
     console.warn(
       `Rehydrator for card type "${cardType}" is being overwritten.`
@@ -37,14 +38,13 @@ export function registerCardRehydrator(
   cardRehydratorRegistry.set(cardType, rehydrator);
 }
 
-// Helper to safely parse timestamps (from string or number to number | null)
 function parseTimestamp(timestamp: any): number | null {
   if (typeof timestamp === "string") {
     const parsed = new Date(timestamp).getTime();
     return isNaN(parsed) ? null : parsed;
   }
   if (typeof timestamp === "number" && !isNaN(timestamp)) {
-    return timestamp > 0 ? timestamp : null; // Ensure positive timestamp
+    return timestamp > 0 ? timestamp : null;
   }
   return null;
 }
@@ -55,7 +55,7 @@ export function rehydrateCardFromStorage(
   if (
     !cardFromStorage ||
     typeof cardFromStorage.id !== "string" ||
-    !cardFromStorage.type || // type is crucial for dispatching
+    !cardFromStorage.type ||
     !cardFromStorage.symbol
   ) {
     console.warn(
@@ -88,6 +88,8 @@ export function rehydrateCardFromStorage(
     createdAt: finalCreatedAt,
     companyName: cardFromStorage.companyName ?? null,
     logoUrl: cardFromStorage.logoUrl ?? null,
+    currentRarity: cardFromStorage.currentRarity || RARITY_LEVELS.COMMON,
+    rarityReason: cardFromStorage.rarityReason || null,
   };
 
   try {
@@ -100,18 +102,14 @@ export function rehydrateCardFromStorage(
       return null;
     }
 
-    // Combine the rehydrated concrete data with the common stateful properties
     return {
-      ...concreteCardData, // This is PriceCardData, ProfileCardData, etc.
-      // Common props already include DisplayableCardState (isFlipped) and other top-level fields
-      id: commonProps.id,
-      symbol: commonProps.symbol,
-      createdAt: commonProps.createdAt,
-      companyName: commonProps.companyName,
-      logoUrl: commonProps.logoUrl,
+      // Start with ConcreteCardData properties (which include id, symbol, type etc. from specific rehydrator)
+      ...concreteCardData,
+      // Ensure DisplayableCardState properties from commonProps are correctly merged/override
       isFlipped: commonProps.isFlipped,
-      type: cardType, // Ensure type is correctly set from the rehydrated data or commonProps
-    } as DisplayableCard; // Cast to the final union type
+      currentRarity: commonProps.currentRarity,
+      rarityReason: commonProps.rarityReason,
+    } as DisplayableCard;
   } catch (error) {
     console.error(
       `Error during specific rehydration for type "${cardType}", card ID: ${commonProps.id}:`,

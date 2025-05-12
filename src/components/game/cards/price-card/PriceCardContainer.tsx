@@ -7,12 +7,10 @@ import type {
 } from "../base-card/base-card.types";
 import type {
   PriceCardData,
-  PriceCardInteractionCallbacks, // For PriceSpecificInteractions type
+  PriceCardInteractionCallbacks,
 } from "./price-card.types";
 import { PriceCardContent } from "./PriceCardContent";
-// import { cn } from "@/lib/utils"; // Only if needed for specific container styling
 
-// Define which specific interaction callbacks PriceCardContent needs
 type PriceSpecificInteractions = Pick<
   PriceCardInteractionCallbacks,
   | "onPriceCardSmaClick"
@@ -22,24 +20,23 @@ type PriceSpecificInteractions = Pick<
 >;
 
 interface PriceCardContainerProps {
-  cardData: PriceCardData;
+  cardData: PriceCardData; // This now includes currentRarity and rarityReason
   isFlipped: boolean;
   onFlip: () => void;
 
-  cardContext: CardActionContext; // Contains symbol, companyName, logoUrl
+  cardContext: CardActionContext;
   socialInteractions?: BaseCardSocialInteractions;
   onDeleteRequest?: (context: CardActionContext) => void;
-
-  // Callback for when the header (company name/symbol) of this PriceCard is clicked
-  // This is intended to trigger showing a ProfileCard.
-  onHeaderIdentityClick?: (context: CardActionContext) => void; // <<<< THIS PROP WAS MISSING OR MISMATCHED
-
-  // Specific interactions for the content of the PriceCard
+  onHeaderIdentityClick?: (context: CardActionContext) => void;
   priceSpecificInteractions?: PriceSpecificInteractions;
+
+  // Pass through rarity to BaseCard
+  currentRarity?: string | null;
+  rarityReason?: string | null;
 
   className?: string;
   innerCardClassName?: string;
-  children?: React.ReactNode; // For overlays, passed to BaseCard
+  children?: React.ReactNode;
 }
 
 export const PriceCardContainer = React.memo<PriceCardContainerProps>(
@@ -48,9 +45,11 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
     isFlipped,
     onFlip,
     cardContext,
+    currentRarity, // Receive prop
+    rarityReason, // Receive prop
     socialInteractions,
     onDeleteRequest,
-    onHeaderIdentityClick, // Now correctly received as a prop
+    onHeaderIdentityClick,
     priceSpecificInteractions,
     className,
     innerCardClassName,
@@ -58,7 +57,7 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
   }) => {
     const faceContentForBaseCard = (
       <PriceCardContent
-        cardData={cardData}
+        cardData={cardData} // PriceCardContent will now NOT render rarity itself
         isBackFace={false}
         onSmaClick={priceSpecificInteractions?.onPriceCardSmaClick}
         onRangeContextClick={
@@ -80,7 +79,6 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
           priceSpecificInteractions?.onPriceCardRangeContextClick
         }
         onOpenPriceClick={priceSpecificInteractions?.onPriceCardOpenPriceClick}
-        // No onGenerateDailyPerformanceSignal for back face
       />
     );
 
@@ -91,12 +89,14 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
         backContent={backContentForBaseCard}
         onFlip={onFlip}
         cardContext={cardContext}
+        currentRarity={currentRarity} // Pass to BaseCard
+        rarityReason={rarityReason} // Pass to BaseCard
         socialInteractions={socialInteractions}
         onDeleteRequest={onDeleteRequest}
-        onHeaderClick={onHeaderIdentityClick} // Pass it to BaseCard as onHeaderClick
+        onHeaderClick={onHeaderIdentityClick}
         className={className}
         innerCardClassName={innerCardClassName}>
-        {children} {/* Overlays */}
+        {children}
       </BaseCard>
     );
   }

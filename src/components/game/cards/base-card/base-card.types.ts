@@ -15,7 +15,7 @@ export type CardType =
   | "base";
 
 export interface BaseCardBackData {
-  readonly description: string;
+  readonly description?: string;
 }
 
 // BaseCardData itself doesn't need companyName/logoUrl if specific card types
@@ -24,9 +24,18 @@ export interface BaseCardBackData {
 export interface BaseCardData {
   readonly id: string;
   readonly type: CardType;
-  readonly symbol: string;
+  readonly symbol: string; // Common to most financial cards
+  readonly createdAt: number; // When this card instance was created/came into view
+  readonly companyName?: string | null; // Often common
+  readonly logoUrl?: string | null; // Often common
+
+  // Rarity fields - common to all displayable cards on the dashboard
+  readonly currentRarity?: string | null;
+  readonly rarityReason?: string | null;
+
+  // This backData is for the generic "back" defined by BaseCard itself,
+  // usually a simple description. Specific cards have their own detailed backData.
   readonly backData: BaseCardBackData;
-  readonly createdAt: number;
 }
 
 // --- Context for Actions ---
