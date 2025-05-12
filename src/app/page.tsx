@@ -8,21 +8,14 @@ import { format, parseISO } from "date-fns";
 
 import type {
   DisplayableCard,
-  DisplayableProfileCard,
-  DisplayableCardState,
+  DisplayableLivePriceCard,
   ConcreteCardData,
-  DisplayableLivePriceCard, // Added for clarity
 } from "@/components/game/types";
-import type {
-  PriceCardData,
-  PriceCardFaceData,
-  PriceCardSpecificBackData,
-} from "@/components/game/cards/price-card/price-card.types";
+import type { PriceCardData } from "@/components/game/cards/price-card/price-card.types";
 import type {
   ProfileCardData,
   ProfileCardLiveData,
   ProfileCardStaticData,
-  ProfileCardBackDataType,
 } from "@/components/game/cards/profile-card/profile-card.types";
 
 import {
@@ -39,7 +32,6 @@ import { rehydrateCardFromStorage } from "@/components/game/cardRehydration";
 import {
   createPriceCardFaceDataFromQuote,
   createPriceCardBackDataFromQuote,
-  createDisplayablePriceCard,
 } from "@/components/game/cards/price-card/priceCardUtils";
 import { createProfileCardLiveDataFromQuote } from "@/components/game/cards/profile-card/profileCardUtils";
 import { calculateDynamicCardRarity } from "@/components/game/rarityCalculator";
@@ -129,6 +121,110 @@ export default function FinSignalGamePage() {
       : INITIAL_ACTIVE_CARDS
   );
 
+  // --- START REFACTORED HELPER ---
+  const updateOrAddCard = useCallback(
+    <SpecificConcreteCardData extends ConcreteCardData, NewExternalDataType>(
+      prevCards: DisplayableCard[],
+      symbol: string,
+      cardType: SpecificConcreteCardData["type"],
+      newExternalData: NewExternalDataType,
+      // This function takes the existing *ConcreteCardData* (or undefined if new)
+      // and the new external data, returning the updated *ConcreteCardData*.
+      updateConcreteLogic: (
+        existingConcreteData: SpecificConcreteCardData | undefined,
+        externalData: NewExternalDataType,
+        // Pass full existing card for context if needed (e.g., for companyName, logoUrl fallbacks)
+        existingDisplayableCard?: DisplayableCard
+      ) => SpecificConcreteCardData,
+      // This function creates a new *DisplayableCard* if one needs to be added.
+      // Typically used when a Price card is created for the first time.
+      newDisplayableCardCreator?: (
+        concreteData: SpecificConcreteCardData
+      ) => DisplayableCard
+    ): {
+      updatedCards: DisplayableCard[];
+      cardChangedOrAdded: boolean;
+      finalCard?: DisplayableCard; // The card that was updated or added
+    } => {
+      let cardChangedOrAdded = false;
+      const newCardsArray = [...prevCards]; // Work on a mutable copy
+      const existingCardIndex = newCardsArray.findIndex(
+        (c) => c.symbol === symbol && c.type === cardType
+      );
+      const existingDisplayableCard =
+        existingCardIndex !== -1 ? newCardsArray[existingCardIndex] : undefined;
+
+      // Extract the ConcreteCardData part if the card exists
+      const existingConcreteCardData = existingDisplayableCard as
+        | SpecificConcreteCardData
+        | undefined;
+
+      const updatedConcreteCardData = updateConcreteLogic(
+        existingConcreteCardData,
+        newExternalData,
+        existingDisplayableCard
+      );
+
+      // Calculate rarity based on the new concrete data and existing (or default) UI state
+      const { rarity: newRarity, reason: newRarityReason } =
+        calculateDynamicCardRarity({
+          ...updatedConcreteCardData, // This is the ConcreteCardData
+          isFlipped: existingDisplayableCard?.isFlipped || false, // Include isFlipped for context
+        } as DisplayableCard); // Cast for rarity calculator
+
+      let finalDisplayableCard: DisplayableCard;
+
+      if (existingDisplayableCard) {
+        // Check for actual changes in the core data or rarity
+        const oldDataStringForCompare = JSON.stringify(
+          existingConcreteCardData
+        );
+        const newDataStringForCompare = JSON.stringify(updatedConcreteCardData);
+
+        if (
+          oldDataStringForCompare !== newDataStringForCompare ||
+          existingDisplayableCard.currentRarity !== newRarity ||
+          existingDisplayableCard.rarityReason !== newRarityReason
+        ) {
+          cardChangedOrAdded = true;
+          finalDisplayableCard = {
+            ...existingDisplayableCard, // Preserve existing UI state like id, isFlipped
+            ...updatedConcreteCardData, // Merge updated data
+            currentRarity: newRarity,
+            rarityReason: newRarityReason,
+          };
+          newCardsArray[existingCardIndex] = finalDisplayableCard;
+        } else {
+          finalDisplayableCard = existingDisplayableCard; // No change
+        }
+      } else if (newDisplayableCardCreator) {
+        // New card needs to be created (typically for Price cards on initial fetch)
+        const newBaseDisplayable = newDisplayableCardCreator(
+          updatedConcreteCardData
+        );
+        finalDisplayableCard = {
+          ...newBaseDisplayable,
+          currentRarity: newRarity, // Apply calculated rarity
+          rarityReason: newRarityReason,
+        };
+        newCardsArray.unshift(finalDisplayableCard); // Add to the beginning
+        cardChangedOrAdded = true;
+      } else {
+        // Card doesn't exist and no creator function was provided (e.g., for profile live updates)
+        // This means no change to the array if the card wasn't found.
+        return { updatedCards: prevCards, cardChangedOrAdded: false };
+      }
+
+      return {
+        updatedCards: newCardsArray,
+        cardChangedOrAdded,
+        finalCard: finalDisplayableCard,
+      };
+    },
+    [calculateDynamicCardRarity] // calculateDynamicCardRarity is a stable import
+  );
+  // --- END REFACTORED HELPER ---
+
   const handleMarketStatusChange = useCallback(
     (
       symbol: string,
@@ -185,83 +281,68 @@ export default function FinSignalGamePage() {
   const handleStaticProfileUpdate = useCallback(
     (updatedProfileDBRow: ProfileDBRow) => {
       setActiveCards((prevActiveCards) => {
-        let cardUpdatedOverall = false;
-        const newCards = prevActiveCards.map(
-          (card: DisplayableCard): DisplayableCard => {
-            if (
-              card.type === "profile" &&
-              card.symbol === updatedProfileDBRow.symbol
-            ) {
-              const existingDisplayableProfileCard =
-                card as DisplayableProfileCard;
-              const newStaticData =
-                transformProfileDBRowToStaticData(updatedProfileDBRow);
-              const newBackDataDescription =
-                updatedProfileDBRow.description ||
-                `Profile for ${
-                  updatedProfileDBRow.company_name || updatedProfileDBRow.symbol
-                }.`;
-
-              let profileDataPointsChanged = false;
-              if (
-                JSON.stringify(existingDisplayableProfileCard.staticData) !==
-                JSON.stringify(newStaticData)
-              )
-                profileDataPointsChanged = true;
-              if (
-                existingDisplayableProfileCard.companyName !==
-                updatedProfileDBRow.company_name
-              )
-                profileDataPointsChanged = true;
-              if (
-                existingDisplayableProfileCard.logoUrl !==
-                updatedProfileDBRow.image
-              )
-                profileDataPointsChanged = true;
-              if (
-                existingDisplayableProfileCard.backData.description !==
-                newBackDataDescription
-              )
-                profileDataPointsChanged = true;
-
-              // Construct the card with updated static data to pass for rarity calculation
-              const tempCardForRarity: DisplayableProfileCard = {
-                ...existingDisplayableProfileCard,
-                companyName: updatedProfileDBRow.company_name,
-                logoUrl: updatedProfileDBRow.image,
-                staticData: newStaticData,
+        const result = updateOrAddCard<ProfileCardData, ProfileDBRow>(
+          prevActiveCards,
+          updatedProfileDBRow.symbol,
+          "profile",
+          updatedProfileDBRow,
+          (existingConcrete, newProfileDBData, existingDisplayable) => {
+            const typedExistingConcrete = existingConcrete as
+              | ProfileCardData
+              | undefined; // Should exist for profile static update
+            if (!typedExistingConcrete) {
+              // This should ideally not happen if a profile card is expected to be there for an update
+              console.warn(
+                `Profile card for ${newProfileDBData.symbol} not found for static update.`
+              );
+              // Create a new one if absolutely necessary, though profile cards are added via useCardActions
+              return {
+                id: `${newProfileDBData.symbol}-profile-${Date.now()}`,
+                type: "profile",
+                symbol: newProfileDBData.symbol,
+                companyName: newProfileDBData.company_name,
+                logoUrl: newProfileDBData.image,
+                createdAt: Date.now(),
+                staticData: transformProfileDBRowToStaticData(newProfileDBData),
+                liveData: {}, // Initial empty live data
                 backData: {
-                  ...existingDisplayableProfileCard.backData,
-                  description: newBackDataDescription,
+                  description:
+                    newProfileDBData.description ||
+                    `Profile for ${
+                      newProfileDBData.company_name || newProfileDBData.symbol
+                    }.`,
                 },
-              };
-              const { rarity, reason } =
-                calculateDynamicCardRarity(tempCardForRarity);
-
-              if (
-                existingDisplayableProfileCard.currentRarity !== rarity ||
-                existingDisplayableProfileCard.rarityReason !== reason
-              ) {
-                profileDataPointsChanged = true;
-              }
-
-              if (profileDataPointsChanged) {
-                cardUpdatedOverall = true;
-                return {
-                  ...tempCardForRarity, // This already has the updated static data
-                  currentRarity: rarity,
-                  rarityReason: reason,
-                };
-              }
+              } as ProfileCardData;
             }
-            return card;
-          }
-        );
 
-        return cardUpdatedOverall ? newCards : prevActiveCards;
+            const newStaticData =
+              transformProfileDBRowToStaticData(newProfileDBData);
+            return {
+              ...typedExistingConcrete,
+              companyName: newProfileDBData.company_name, // Update top-level common fields
+              logoUrl: newProfileDBData.image,
+              staticData: newStaticData,
+              backData: {
+                // Ensure backData is also updated
+                ...typedExistingConcrete.backData,
+                description:
+                  newProfileDBData.description ||
+                  existingDisplayable?.backData.description || // Fallback to existing description
+                  `Profile for ${
+                    newProfileDBData.company_name || newProfileDBData.symbol
+                  }.`,
+              },
+            };
+          }
+          // No newDisplayableCardCreator for static profile updates, as they only modify existing cards.
+        );
+        // Could add a toast for profile static data updates if desired.
+        return result.cardChangedOrAdded
+          ? result.updatedCards
+          : prevActiveCards;
       });
     },
-    [transformProfileDBRowToStaticData, setActiveCards]
+    [setActiveCards, updateOrAddCard, transformProfileDBRowToStaticData, toast]
   );
 
   useEffect(() => {
@@ -278,211 +359,169 @@ export default function FinSignalGamePage() {
         return;
       }
 
-      const newPriceCardFaceData = createPriceCardFaceDataFromQuote(
-        quoteData,
-        apiTimestampMillis
-      );
-      const newPriceCardBackData = createPriceCardBackDataFromQuote(quoteData);
-      const newProfileCardLiveData = createProfileCardLiveDataFromQuote(
-        quoteData,
-        apiTimestampMillis
-      );
-
       setActiveCards((prevActiveCards) => {
-        let cardsNeedUpdate = false;
-        const updatedCards = prevActiveCards.map(
-          (card: DisplayableCard): DisplayableCard => {
-            let modifiedCard = card;
+        let cardsOverallNeedUpdate = false;
+        let currentCardsState = [...prevActiveCards];
 
-            if (card.type === "price" && card.symbol === quoteData.symbol) {
-              const existingPriceCard = card as DisplayableLivePriceCard; // More specific type
+        // --- Update Price Card ---
+        const priceResult = updateOrAddCard<PriceCardData, CombinedQuoteData>(
+          currentCardsState,
+          quoteData.symbol,
+          "price",
+          quoteData,
+          (existingConcrete, newQuoteData, existingDisplayable) => {
+            const typedExistingConcrete = existingConcrete as
+              | PriceCardData
+              | undefined;
 
-              if (
-                source === "realtime" &&
-                existingPriceCard.faceData.timestamp &&
-                apiTimestampMillis < existingPriceCard.faceData.timestamp
-              ) {
-                return card;
-              }
-
-              // Construct a temporary DisplayableLivePriceCard with all new data for rarity calculation
-              const tempCardForRarity: DisplayableLivePriceCard = {
-                // Core PriceCardData fields
-                id: existingPriceCard.id,
-                type: existingPriceCard.type,
-                symbol: existingPriceCard.symbol,
-                createdAt: existingPriceCard.createdAt,
-                companyName:
-                  quoteData.companyName ?? existingPriceCard.companyName,
-                logoUrl: quoteData.logoUrl ?? existingPriceCard.logoUrl,
-                faceData: newPriceCardFaceData,
-                backData: {
-                  description: existingPriceCard.backData.description,
-                  ...newPriceCardBackData,
-                },
-                // DisplayableCardState fields from existing card
-                isFlipped: existingPriceCard.isFlipped,
-                // currentRarity and rarityReason will be overridden by calculation
-                currentRarity: existingPriceCard.currentRarity,
-                rarityReason: existingPriceCard.rarityReason,
-              };
-              const { rarity: newRarity, reason: newRarityReason } =
-                calculateDynamicCardRarity(tempCardForRarity);
-
-              let priceCardDataChanged = false;
-              if (
-                JSON.stringify(existingPriceCard.faceData) !==
-                JSON.stringify(newPriceCardFaceData)
-              )
-                priceCardDataChanged = true;
-              if (
-                existingPriceCard.backData.marketCap !==
-                newPriceCardBackData.marketCap
-              )
-                priceCardDataChanged = true;
-              if (
-                existingPriceCard.backData.sma50d !==
-                newPriceCardBackData.sma50d
-              )
-                priceCardDataChanged = true;
-              if (
-                existingPriceCard.backData.sma200d !==
-                newPriceCardBackData.sma200d
-              )
-                priceCardDataChanged = true;
-              if (
-                existingPriceCard.companyName !==
-                (quoteData.companyName ?? existingPriceCard.companyName)
-              )
-                priceCardDataChanged = true;
-              if (
-                existingPriceCard.logoUrl !==
-                (quoteData.logoUrl ?? existingPriceCard.logoUrl)
-              )
-                priceCardDataChanged = true;
-              if (existingPriceCard.currentRarity !== newRarity)
-                priceCardDataChanged = true;
-              if (existingPriceCard.rarityReason !== newRarityReason)
-                priceCardDataChanged = true;
-
-              if (priceCardDataChanged) {
-                cardsNeedUpdate = true;
-                modifiedCard = {
-                  ...existingPriceCard,
-                  companyName:
-                    quoteData.companyName ?? existingPriceCard.companyName,
-                  logoUrl: quoteData.logoUrl ?? existingPriceCard.logoUrl,
-                  faceData: newPriceCardFaceData,
-                  backData: {
-                    description: existingPriceCard.backData.description,
-                    ...newPriceCardBackData,
-                  },
-                  currentRarity: newRarity,
-                  rarityReason: newRarityReason,
-                };
-              }
-              return modifiedCard;
+            // Stale data check
+            if (
+              source === "realtime" &&
+              typedExistingConcrete?.faceData.timestamp &&
+              apiTimestampMillis < typedExistingConcrete.faceData.timestamp
+            ) {
+              return typedExistingConcrete; // Return existing data if incoming is stale
             }
 
-            if (card.type === "profile" && card.symbol === quoteData.symbol) {
-              const existingProfileCard = card as DisplayableProfileCard;
-              if (
-                source === "realtime" &&
-                existingProfileCard.liveData.timestamp &&
-                apiTimestampMillis < existingProfileCard.liveData.timestamp
-              ) {
-                return card;
-              }
-              if (
-                JSON.stringify(existingProfileCard.liveData) !==
-                JSON.stringify(newProfileCardLiveData)
-              ) {
-                cardsNeedUpdate = true;
-                // Construct a temporary DisplayableProfileCard for rarity calculation
-                const tempProfileCardForRarity: DisplayableProfileCard = {
-                  ...existingProfileCard, // Includes isFlipped and current rarity from DisplayableCardState
-                  liveData: newProfileCardLiveData,
-                };
-                const { rarity, reason } = calculateDynamicCardRarity(
-                  tempProfileCardForRarity
-                );
-                modifiedCard = {
-                  ...tempProfileCardForRarity,
-                  currentRarity: rarity,
-                  rarityReason: reason,
-                };
-              }
-              return modifiedCard;
-            }
-            return card;
+            const newFaceData = createPriceCardFaceDataFromQuote(
+              newQuoteData,
+              apiTimestampMillis
+            );
+            const newBackSpecificData =
+              createPriceCardBackDataFromQuote(newQuoteData);
+
+            return {
+              id:
+                typedExistingConcrete?.id ||
+                `${newQuoteData.symbol}-price-${Date.now()}`,
+              type: "price",
+              symbol: newQuoteData.symbol,
+              createdAt: typedExistingConcrete?.createdAt || Date.now(),
+              companyName:
+                newQuoteData.companyName ??
+                typedExistingConcrete?.companyName ??
+                existingDisplayable?.companyName,
+              logoUrl:
+                newQuoteData.logoUrl ??
+                typedExistingConcrete?.logoUrl ??
+                existingDisplayable?.logoUrl,
+              faceData: newFaceData,
+              backData: {
+                description:
+                  typedExistingConcrete?.backData.description ||
+                  existingDisplayable?.backData.description ||
+                  `Price data for ${newQuoteData.symbol}`,
+                ...newBackSpecificData,
+              },
+            };
+          },
+          (concretePriceData) => {
+            // newDisplayableCardCreator
+            // This reuses the existing createDisplayablePriceCard but adapts its output
+            // We need the full ConcreteCardData (PriceCardData in this case)
+            // calculateDynamicCardRarity will be called by updateOrAddCard later
+            return {
+              ...(concretePriceData as PriceCardData), // This IS PriceCardData
+              isFlipped: false, // Default state
+              // Rarity to be added by updateOrAddCard
+            } as DisplayableLivePriceCard;
           }
         );
 
-        const existingPriceCardIndex = updatedCards.findIndex(
-          (c) => c.type === "price" && c.symbol === quoteData.symbol
-        );
-
-        if (existingPriceCardIndex === -1) {
-          cardsNeedUpdate = true;
-          let newDisplayablePriceCard = createDisplayablePriceCard(
-            quoteData,
-            apiTimestampMillis
-          );
-          // newDisplayablePriceCard is already DisplayableLivePriceCard (PriceCardData & DisplayableCardState)
-          // So it can be passed directly to calculateDynamicCardRarity
-          const { rarity, reason } = calculateDynamicCardRarity(
-            newDisplayablePriceCard
-          );
-          newDisplayablePriceCard = {
-            ...newDisplayablePriceCard,
-            currentRarity: rarity,
-            rarityReason: reason,
-          };
-
-          updatedCards.unshift(newDisplayablePriceCard);
-          if (quoteData.current_price != null && source === "fetch") {
-            setTimeout(
-              () =>
-                toast({
-                  title: `Card Loaded: ${quoteData.symbol}`,
-                  description: `$${quoteData.current_price.toFixed(2)}`,
-                }),
-              0
+        currentCardsState = priceResult.updatedCards;
+        if (priceResult.cardChangedOrAdded) {
+          cardsOverallNeedUpdate = true;
+          const finalPriceCard = priceResult.finalCard as
+            | DisplayableLivePriceCard
+            | undefined;
+          if (finalPriceCard) {
+            const isNew = !prevActiveCards.find(
+              (c) => c.id === finalPriceCard.id
             );
-          }
-        } else if (source === "realtime" && quoteData.current_price != null) {
-          // Check if the card actually updated to show toast
-          const originalCard = prevActiveCards.find(
-            (c) => c.id === updatedCards[existingPriceCardIndex].id
-          );
-          const updatedCard = updatedCards[existingPriceCardIndex];
-          if (JSON.stringify(originalCard) !== JSON.stringify(updatedCard)) {
-            setTimeout(
-              () =>
-                toast({
-                  title: `Live Update: ${updatedCard.symbol}`,
-                  description: `$${(
-                    updatedCard as DisplayableLivePriceCard
-                  ).faceData.price?.toFixed(2)} (${
-                    (
-                      updatedCard as DisplayableLivePriceCard
-                    ).faceData.changePercentage?.toFixed(2) ?? "N/A"
-                  }) ${
-                    updatedCard.currentRarity &&
-                    updatedCard.currentRarity !== "Common"
-                      ? `Rarity: ${updatedCard.currentRarity}`
-                      : ""
-                  }`,
-                }),
-              0
-            );
+            if (
+              isNew &&
+              source === "fetch" &&
+              finalPriceCard.faceData.price != null
+            ) {
+              setTimeout(
+                () =>
+                  toast({
+                    title: `Card Loaded: ${finalPriceCard.symbol}`,
+                    description: `$${finalPriceCard.faceData.price?.toFixed(
+                      2
+                    )}`,
+                  }),
+                0
+              );
+            } else if (
+              !isNew &&
+              priceResult.cardChangedOrAdded &&
+              source === "realtime" &&
+              finalPriceCard.faceData.price != null
+            ) {
+              setTimeout(
+                () =>
+                  toast({
+                    title: `Live Update: ${finalPriceCard.symbol}`,
+                    description: `$${finalPriceCard.faceData.price?.toFixed(
+                      2
+                    )} (${
+                      finalPriceCard.faceData.changePercentage?.toFixed(2) ??
+                      "N/A"
+                    }) ${
+                      finalPriceCard.currentRarity &&
+                      finalPriceCard.currentRarity !== "Common"
+                        ? `Rarity: ${finalPriceCard.currentRarity}`
+                        : ""
+                    }`,
+                  }),
+                0
+              );
+            }
           }
         }
 
-        return cardsNeedUpdate ? updatedCards : prevActiveCards;
+        // --- Update Profile Card's LiveData (if profile card exists) ---
+        const existingProfileCardIndex = currentCardsState.findIndex(
+          (c) => c.symbol === quoteData.symbol && c.type === "profile"
+        );
+        if (existingProfileCardIndex !== -1) {
+          const newProfileLiveData = createProfileCardLiveDataFromQuote(
+            quoteData,
+            apiTimestampMillis
+          );
+          const profileResult = updateOrAddCard<
+            ProfileCardData,
+            ProfileCardLiveData
+          >(
+            currentCardsState,
+            quoteData.symbol,
+            "profile",
+            newProfileLiveData,
+            (existingConcrete, newLiveData) => {
+              const typedExistingConcrete = existingConcrete as ProfileCardData; // Assumed to exist
+              if (
+                source === "realtime" &&
+                typedExistingConcrete.liveData.timestamp &&
+                apiTimestampMillis < typedExistingConcrete.liveData.timestamp
+              ) {
+                return typedExistingConcrete; // Stale data
+              }
+              return {
+                ...typedExistingConcrete,
+                liveData: newLiveData,
+              };
+            }
+            // No new card creator for profile live updates; profile card must exist
+          );
+          currentCardsState = profileResult.updatedCards;
+          if (profileResult.cardChangedOrAdded) cardsOverallNeedUpdate = true;
+          // Optional: Add toast for profile live data update if significant
+        }
+        return cardsOverallNeedUpdate ? currentCardsState : prevActiveCards;
       });
     },
-    [toast, setActiveCards]
+    [toast, setActiveCards, updateOrAddCard] // updateOrAddCard is now a dependency
   );
 
   const stockDataHandlers = SYMBOLS_TO_SUBSCRIBE_LIST.map((symbol) => (
