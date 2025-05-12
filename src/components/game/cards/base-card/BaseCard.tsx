@@ -268,7 +268,6 @@ const BaseCard: React.FC<BaseCardProps> = ({
 
     return (
       <div className="px-3 sm:px-4 md:px-5 py-1.5 text-right h-[26px] sm:h-[28px] flex items-center justify-end">
-        {" "}
         {/* Fixed height, flex for alignment */}
         <TooltipProvider delayDuration={100}>
           <Tooltip>

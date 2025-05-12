@@ -80,8 +80,9 @@ export default async function CollectionPage() {
         company_name: dbRow.company_name,
         logo_url: dbRow.logo_url,
         captured_at: dbRow.captured_at,
-        card_data_snapshot: concreteCardData, // The actual card data
+        card_data_snapshot: concreteCardData,
         rarity_level: dbRow.rarity_level,
+        rarity_reason: dbRow.rarity_reason,
         user_notes: dbRow.user_notes,
         source_card_id: dbRow.source_card_id,
         created_at: dbRow.created_at,
