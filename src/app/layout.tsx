@@ -4,8 +4,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import HeaderComponent from "@/components/layout/header";
-import { cn } from "../lib/utils";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { cn } from "../lib/utils"; // Corrected path if utils is one level up from app
+import { AuthProvider } from "@/contexts/AuthContext"; // Correct import
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

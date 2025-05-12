@@ -5,7 +5,7 @@ import React from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { LogIn, LogOut } from "lucide-react";
+import { LogIn, LogOut, UserCircle, LibraryBig } from "lucide-react"; // Added LibraryBig
 
 const HeaderComponent: React.FC = () => {
   const { user, signOut, isLoading } = useAuth();
@@ -18,14 +18,22 @@ const HeaderComponent: React.FC = () => {
           className="text-3xl font-bold text-primary hover:opacity-80 transition-opacity">
           FinSignal Game
         </Link>
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 sm:space-x-3">
           {isLoading ? (
             <Button variant="ghost" size="sm" disabled>
               Loading...
             </Button>
           ) : user ? (
             <>
-              <span className="text-sm text-muted-foreground hidden sm:inline">
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/collection" title="My Collection">
+                  <LibraryBig className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">My Collection</span>
+                </Link>
+              </Button>
+              <span
+                className="text-sm text-muted-foreground hidden md:inline truncate max-w-[150px]"
+                title={user.email}>
                 {user.email}
               </span>
               <Button variant="outline" size="sm" onClick={signOut}>
