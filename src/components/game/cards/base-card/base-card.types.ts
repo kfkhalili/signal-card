@@ -3,16 +3,7 @@
  * Defines foundational types and interfaces for all game cards.
  */
 
-export type CardType =
-  | "profile"
-  | "price"
-  | "daily_performance"
-  | "price_vs_sma"
-  | "price_range_context"
-  | "intraday_trend"
-  | "price_snapshot"
-  | "trend"
-  | "base";
+export type CardType = "profile" | "price";
 
 export interface BaseCardBackData {
   readonly description?: string;

@@ -1,13 +1,14 @@
 // src/app/collection/CollectionClientPage.tsx
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react"; // Added useEffect for one-time log
-import type { DisplayableCollectedCard } from "./page";
+import React, { useState, useCallback, useEffect } from "react";
+import type { ServerFetchedCollectedCard } from "./page";
 import GameCard from "@/components/game/GameCard";
 import type {
   DisplayableCard,
+  DisplayableLivePriceCard,
+  DisplayableProfileCard,
   ConcreteCardData,
-  DisplayableCardState,
 } from "@/components/game/types";
 import type {
   CardActionContext,
@@ -32,107 +33,102 @@ import { format } from "date-fns";
 import type { PriceCardData } from "@/components/game/cards/price-card/price-card.types";
 import type { ProfileCardData } from "@/components/game/cards/profile-card/profile-card.types";
 
-interface CollectionClientPageProps {
-  initialCollectedCards: DisplayableCollectedCard[];
+interface ClientCollectedCard extends ServerFetchedCollectedCard {
+  isFlipped: boolean;
 }
 
-function adaptCollectedToDisplayable(
-  collectedCard: DisplayableCollectedCard
+interface CollectionClientPageProps {
+  initialCollectedCards: ServerFetchedCollectedCard[];
+}
+
+// Refactored adapter function - DRYer and respects readonly
+function adaptServerToDisplayable(
+  serverCard: ServerFetchedCollectedCard,
+  isFlipped: boolean
 ): DisplayableCard {
-  const concreteDataFromSnapshot =
-    collectedCard.card_data_snapshot as ConcreteCardData;
+  const capturedAtTimestamp = new Date(serverCard.captured_at).getTime();
 
-  // Log the incoming collectedCard, specifically its rarity_reason
-  console.log(
-    `[CollectionClientPage - adaptCollectedToDisplayable] INPUT for ${collectedCard.symbol}:`,
-    `collectedCard.rarity_level = '${collectedCard.rarity_level}'`,
-    `collectedCard.rarity_reason = '${
-      collectedCard.rarity_reason
-    }' (Type: ${typeof collectedCard.rarity_reason})`
-  );
-
-  const uiState: DisplayableCardState = {
-    isFlipped: collectedCard.isFlipped,
-    currentRarity: collectedCard.rarity_level,
-    rarityReason: collectedCard.rarity_reason, // This is the critical mapping
+  // Prepare common display state and base data properties
+  // These will be merged with the specific card data from the snapshot
+  const commonData = {
+    id: serverCard.id, // Use DB collection ID
+    symbol: serverCard.symbol,
+    // We will handle potential override/fallback for companyName/logoUrl below
+    createdAt: capturedAtTimestamp,
+    isFlipped: isFlipped,
+    currentRarity: serverCard.rarity_level,
+    rarityReason: serverCard.rarity_reason,
   };
 
-  let adaptedCardBase: ConcreteCardData;
-
-  switch (concreteDataFromSnapshot.type) {
-    case "price":
-      adaptedCardBase = {
-        ...(concreteDataFromSnapshot as PriceCardData),
-        id: collectedCard.id,
-        createdAt: new Date(collectedCard.captured_at).getTime(),
-        companyName:
-          collectedCard.company_name || concreteDataFromSnapshot.companyName,
-        logoUrl: collectedCard.logo_url || concreteDataFromSnapshot.logoUrl,
+  switch (serverCard.card_type) {
+    case "price": {
+      const snapshot = serverCard.card_data_snapshot as PriceCardData;
+      // Construct the object directly, spreading snapshot first, then common data
+      const card: DisplayableLivePriceCard = {
+        ...snapshot, // Includes snapshot's type, faceData, backData, etc.
+        ...commonData, // Overrides id, symbol, createdAt, state
+        type: "price", // **Crucially override type to the specific literal**
+        // Apply fallback logic for potentially readonly fields during construction
+        companyName: serverCard.company_name ?? snapshot.companyName,
+        logoUrl: serverCard.logo_url ?? snapshot.logoUrl,
       };
-      break;
-    case "profile":
-      adaptedCardBase = {
-        ...(concreteDataFromSnapshot as ProfileCardData),
-        id: collectedCard.id,
-        createdAt: new Date(collectedCard.captured_at).getTime(),
-        companyName:
-          collectedCard.company_name || concreteDataFromSnapshot.companyName,
-        logoUrl: collectedCard.logo_url || concreteDataFromSnapshot.logoUrl,
+      return card;
+    }
+    case "profile": {
+      const snapshot = serverCard.card_data_snapshot as ProfileCardData;
+      // Construct the object directly
+      const card: DisplayableProfileCard = {
+        ...snapshot, // Includes snapshot's type, staticData, liveData, etc.
+        ...commonData, // Overrides id, symbol, createdAt, state
+        type: "profile", // **Crucially override type to the specific literal**
+        // Apply fallback logic for potentially readonly fields during construction
+        companyName: serverCard.company_name ?? snapshot.companyName,
+        logoUrl: serverCard.logo_url ?? snapshot.logoUrl,
       };
-      break;
-    default:
-      const unknownBase = concreteDataFromSnapshot as any;
+      return card;
+    }
+    default: {
+      // Handle unexpected card types - log error and provide a minimal fallback
       console.error(
-        "Unhandled card type in adaptCollectedToDisplayable:",
-        unknownBase?.type
+        "Unhandled card type in adaptServerToDisplayable:",
+        serverCard.card_type,
+        serverCard
       );
-      adaptedCardBase = {
-        id: collectedCard.id,
-        type: collectedCard.card_type,
-        symbol: collectedCard.symbol,
-        createdAt: new Date(collectedCard.captured_at).getTime(),
-        companyName: collectedCard.company_name,
-        logoUrl: collectedCard.logo_url,
-        backData: {
-          description: `Data for ${collectedCard.symbol} of type ${collectedCard.card_type}`,
+      const snapshot = serverCard.card_data_snapshot;
+      const fallbackCard = {
+        ...(snapshot ?? {}), // Spread snapshot if exists, otherwise empty object
+        ...commonData, // Add common fields
+        type: serverCard.card_type, // Keep original type string
+        // Apply fallback logic
+        companyName: serverCard.company_name ?? snapshot?.companyName,
+        logoUrl: serverCard.logo_url ?? snapshot?.logoUrl,
+        // Ensure minimal required fields exist to avoid runtime errors downstream
+        backData: snapshot?.backData ?? {
+          description: `Unknown Card Type: ${serverCard.card_type}`,
         },
-      } as ConcreteCardData;
+      };
+      // This cast is necessary because we cannot guarantee conformance
+      return fallbackCard as unknown as DisplayableCard;
+    }
   }
-
-  const finalDisplayableCard = {
-    ...adaptedCardBase,
-    ...uiState,
-  } as DisplayableCard;
-
-  // Log the output that GameCard will receive
-  console.log(
-    `[CollectionClientPage - adaptCollectedToDisplayable] OUTPUT for ${finalDisplayableCard.symbol}:`,
-    `finalDisplayableCard.currentRarity = '${finalDisplayableCard.currentRarity}'`,
-    `finalDisplayableCard.rarityReason = '${
-      finalDisplayableCard.rarityReason
-    }' (Type: ${typeof finalDisplayableCard.rarityReason})`
-  );
-
-  return finalDisplayableCard;
 }
 
 export default function CollectionClientPage({
   initialCollectedCards,
 }: CollectionClientPageProps) {
-  const [collectedCards, setCollectedCards] = useState<
-    DisplayableCollectedCard[]
-  >(initialCollectedCards);
+  const [collectedCards, setCollectedCards] = useState<ClientCollectedCard[]>(
+    initialCollectedCards.map((card) => ({ ...card, isFlipped: false }))
+  );
   const [cardToConfirmDelete, setCardToConfirmDelete] =
-    useState<DisplayableCollectedCard | null>(null);
+    useState<ClientCollectedCard | null>(null);
   const { toast } = useToast();
   const supabase = createClient();
 
-  // Log initial props once
   useEffect(() => {
-    console.log(
-      "[CollectionClientPage] Initial collected cards received:",
-      initialCollectedCards
-    );
+    // console.log(
+    //   "[CollectionClientPage] Initial server cards received:",
+    //   initialCollectedCards
+    // );
   }, [initialCollectedCards]);
 
   const handleToggleFlipCard = useCallback((collectedCardId: string) => {
@@ -143,7 +139,7 @@ export default function CollectionClientPage({
     );
   }, []);
 
-  const requestDeleteCard = useCallback((card: DisplayableCollectedCard) => {
+  const requestDeleteCard = useCallback((card: ClientCollectedCard) => {
     setCardToConfirmDelete(card);
   }, []);
 
@@ -153,6 +149,7 @@ export default function CollectionClientPage({
       .from("user_collected_cards")
       .delete()
       .eq("id", cardToConfirmDelete.id);
+
     if (error) {
       toast({
         title: "Deletion Failed",
@@ -178,8 +175,8 @@ export default function CollectionClientPage({
   }, []);
 
   const collectedCardSocialInteractions = useCallback(
-    (_collectedCard: DisplayableCollectedCard): BaseCardSocialInteractions => ({
-      // Minimal social interactions for collected cards view
+    (collectedCard: ClientCollectedCard): BaseCardSocialInteractions => ({
+      // Define interactions if needed
     }),
     []
   );
@@ -195,37 +192,53 @@ export default function CollectionClientPage({
   return (
     <>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-6">
-        {collectedCards.map((collectedCard) => {
-          const displayableCardForGameCard =
-            adaptCollectedToDisplayable(collectedCard);
+        {collectedCards.map((clientCard) => {
+          const displayableCardForGameCard = adaptServerToDisplayable(
+            clientCard,
+            clientCard.isFlipped
+          );
 
           const collectedCardActionContext: CardActionContext = {
-            id: collectedCard.id,
-            symbol: collectedCard.symbol,
-            type: collectedCard.card_type,
-            companyName: collectedCard.company_name,
-            logoUrl: collectedCard.logo_url,
+            id: clientCard.id,
+            symbol: clientCard.symbol,
+            type: clientCard.card_type,
+            companyName: clientCard.company_name,
+            logoUrl: clientCard.logo_url,
           };
 
-          // Log what GameCard is receiving
-          //   console.log(`[CollectionClientPage - map] Passing to GameCard for ${displayableCardForGameCard.symbol}:`,
-          //     `currentRarity: '${displayableCardForGameCard.currentRarity}',`,
-          //     `rarityReason: '${displayableCardForGameCard.rarityReason}'`
-          //   );
+          // Add a check for the fallback case from adaptServerToDisplayable
+          // to prevent rendering potentially broken cards fully.
+          if (
+            !displayableCardForGameCard ||
+            (displayableCardForGameCard.type !== "price" &&
+              displayableCardForGameCard.type !== "profile")
+          ) {
+            console.warn(
+              "Skipping render for card with unhandled or fallback type:",
+              clientCard
+            );
+            // Optionally render a placeholder or skip entirely
+            return (
+              <div
+                key={clientCard.id}
+                className="p-4 border border-dashed rounded-lg text-xs text-muted-foreground">
+                Unsupported Card Type: {clientCard.card_type} <br />
+                ID: {clientCard.id}
+              </div>
+            );
+          }
 
           return (
             <div
-              key={collectedCard.id}
+              key={clientCard.id}
               className="flex flex-col items-center space-y-2">
               <GameCard
                 card={displayableCardForGameCard}
-                onToggleFlip={() => handleToggleFlipCard(collectedCard.id)}
+                onToggleFlip={() => handleToggleFlipCard(clientCard.id)}
                 onDeleteCardRequest={() => {
                   /* Deletion handled by button below */
                 }}
-                socialInteractions={collectedCardSocialInteractions(
-                  collectedCard
-                )}
+                socialInteractions={collectedCardSocialInteractions(clientCard)}
                 priceSpecificInteractions={undefined}
                 profileSpecificInteractions={undefined}
                 onHeaderIdentityClick={undefined}
@@ -233,17 +246,14 @@ export default function CollectionClientPage({
               <div className="text-center w-full px-1">
                 <p className="text-xs text-muted-foreground">
                   Captured:{" "}
-                  {format(
-                    new Date(collectedCard.captured_at),
-                    "MMM d, yyyy HH:mm"
-                  )}
+                  {format(new Date(clientCard.captured_at), "MMM d, yy HH:mm")}
                 </p>
                 <div className="flex justify-center space-x-2 mt-1">
                   <Button
                     variant="ghost"
                     size="sm"
                     className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => requestDeleteCard(collectedCard)}
+                    onClick={() => requestDeleteCard(clientCard)}
                     title="Delete from Collection">
                     <Trash2 size={14} />{" "}
                     <span className="ml-1 hidden sm:inline">Delete</span>

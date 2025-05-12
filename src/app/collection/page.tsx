@@ -1,36 +1,29 @@
 // src/app/collection/page.tsx
-import { createClient } from "@/lib/supabase/server"; // Server client to fetch data
+import { createClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import CollectionClientPage from "./CollectionClientPage"; // We'll create this next
-import type { PriceCardData } from "@/components/game/cards/price-card/price-card.types";
-import type { ProfileCardData } from "@/components/game/cards/profile-card/profile-card.types";
+import CollectionClientPage from "./CollectionClientPage";
 import type { CardType } from "@/components/game/cards/base-card/base-card.types";
+import type { ConcreteCardData } from "@/components/game/types"; // Import ConcreteCardData
 
-// This type will represent a row from your user_collected_cards table
-// It will also include the fully parsed card_data_snapshot
-export interface DisplayableCollectedCard {
-  id: string; // DB row ID
+// Define the structure of the data passed from Server to Client
+// This combines the DB row data with the fully typed snapshot
+export interface ServerFetchedCollectedCard {
+  // DB Row fields
+  id: string; // user_collected_cards.id
   user_id: string;
   card_type: CardType;
   symbol: string;
   company_name?: string | null;
   logo_url?: string | null;
   captured_at: string; // ISO string
-  card_data_snapshot: PriceCardData | ProfileCardData; // Parsed JSONB
+  card_data_snapshot: ConcreteCardData; // Parsed JSONB object (PriceCardData | ProfileCardData)
   rarity_level?: string | null;
   rarity_reason?: string | null;
-  user_notes?: string | null;
-  source_card_id?: string | null;
-  created_at: string; // DB row created_at
-
-  // UI state for the collection page (managed client-side)
-  isFlipped: boolean;
 }
 
 export default async function CollectionPage() {
-  const cookieStore = cookies();
   const supabase = await createClient();
 
   const {
@@ -38,20 +31,20 @@ export default async function CollectionPage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    // If you have a middleware protecting this route, this might not be strictly necessary
-    // but it's good practice for server components that require auth.
     redirect("/auth?message=Please log in to view your collection.");
   }
 
+  // Fetch only the columns needed for ServerFetchedCollectedCard
   const { data: collectedCardsData, error } = await supabase
     .from("user_collected_cards")
-    .select("*")
+    .select(
+      "id, user_id, card_type, symbol, company_name, logo_url, captured_at, card_data_snapshot, rarity_level, rarity_reason" // Select specific columns
+    )
     .eq("user_id", user.id)
     .order("captured_at", { ascending: false });
 
   if (error) {
     console.error("Error fetching collected cards:", error);
-    // Handle error display appropriately
     return (
       <div className="container mx-auto p-4">
         <h1 className="text-3xl font-bold mb-6 text-primary">
@@ -64,16 +57,22 @@ export default async function CollectionPage() {
     );
   }
 
-  const displayableCollectedCards: DisplayableCollectedCard[] =
+  // Map directly to ServerFetchedCollectedCard
+  const serverCollectedCards: ServerFetchedCollectedCard[] =
     collectedCardsData?.map((dbRow) => {
-      // The card_data_snapshot from the DB is already the ConcreteCardData.
-      // We just need to add the top-level DB fields and the UI state.
-      const concreteCardData = dbRow.card_data_snapshot as
-        | PriceCardData
-        | ProfileCardData;
+      // Assert the type of the snapshot fetched from the DB
+      const concreteCardData = dbRow.card_data_snapshot as ConcreteCardData;
+
+      // Ensure card_type from DB matches the type within the snapshot
+      if (dbRow.card_type !== concreteCardData.type) {
+        console.warn(
+          `Mismatch between dbRow.card_type (${dbRow.card_type}) and snapshot.type (${concreteCardData.type}) for card ID ${dbRow.id}. Using dbRow.card_type.`
+        );
+        // Potentially log this mismatch more formally or handle it
+      }
 
       return {
-        id: dbRow.id, // This is the ID of the collected_card entry
+        id: dbRow.id,
         user_id: dbRow.user_id,
         card_type: dbRow.card_type as CardType,
         symbol: dbRow.symbol,
@@ -83,10 +82,6 @@ export default async function CollectionPage() {
         card_data_snapshot: concreteCardData,
         rarity_level: dbRow.rarity_level,
         rarity_reason: dbRow.rarity_reason,
-        user_notes: dbRow.user_notes,
-        source_card_id: dbRow.source_card_id,
-        created_at: dbRow.created_at,
-        isFlipped: false, // Default UI state for collection display
       };
     }) || [];
 
@@ -98,7 +93,8 @@ export default async function CollectionPage() {
           &larr; Back to Dashboard
         </Link>
       </div>
-      <CollectionClientPage initialCollectedCards={displayableCollectedCards} />
+      {/* Pass the new structure to the client */}
+      <CollectionClientPage initialCollectedCards={serverCollectedCards} />
     </div>
   );
 }
