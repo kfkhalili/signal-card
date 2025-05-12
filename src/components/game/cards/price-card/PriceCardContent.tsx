@@ -9,32 +9,16 @@ import type {
   PriceCardData,
   PriceCardInteractionCallbacks,
 } from "./price-card.types";
-import { cn } from "@/lib/utils";
+import { cn } from "../../../../lib/utils";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
-import { formatNumberWithAbbreviations } from "@/lib/formatters"; // Import centralized formatter
+import { formatNumberWithAbbreviations } from "@/lib/formatters";
+// Import the new RangeIndicator component
+import { RangeIndicator } from "@/components/ui/RangeIndicator";
 
 const STATIC_BACK_FACE_DESCRIPTION =
   "Market Price: The value of a single unit of this asset.";
 
-interface RangeBarStyling {
-  bgColorClass: string;
-  animationClass?: string;
-}
-
-const getRangeBarStyling = (
-  percentage: number,
-  isAtHigh: boolean,
-  isAtLow: boolean
-): RangeBarStyling => {
-  if (isAtLow && percentage < 1) return { bgColorClass: "bg-slate-600" }; // Darker for low extreme
-  if (isAtHigh && percentage > 99)
-    return { bgColorClass: "bg-emerald-500", animationClass: "animate-pulse" }; // Pulse at high extreme
-  if (percentage <= 20) return { bgColorClass: "bg-slate-500" };
-  if (percentage <= 40) return { bgColorClass: "bg-cyan-600" };
-  if (percentage <= 60) return { bgColorClass: "bg-teal-500" };
-  if (percentage <= 80) return { bgColorClass: "bg-emerald-400" };
-  return { bgColorClass: "bg-emerald-500" }; // Brighter green for upper range
-};
+// RangeBarStyling interface and getRangeBarStyling function REMOVED
 
 interface PriceCardContentProps {
   cardData: PriceCardData;
@@ -57,7 +41,6 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
     const { faceData, backData } = cardData;
     const gridCellClass = "min-w-0";
 
-    // Interaction handlers (no change)
     const handleSmaInteraction = (
       e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>,
       smaPeriod: 50 | 200,
@@ -68,16 +51,24 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
         onSmaClick(cardData, smaPeriod, smaValue);
       }
     };
-    const handleRangeInteraction = (
-      e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>,
-      levelType: "High" | "Low" | "YearHigh" | "YearLow",
-      levelValue: number | null | undefined
-    ) => {
-      if (onRangeContextClick && levelValue != null) {
-        e.stopPropagation();
-        onRangeContextClick(cardData, levelType, levelValue);
-      }
-    };
+
+    // Updated to be passed to RangeIndicator
+    const handleRangeLabelClick =
+      (
+        levelType: "High" | "Low" | "YearHigh" | "YearLow",
+        levelValue: number | null | undefined
+      ) =>
+      (
+        event:
+          | React.MouseEvent<HTMLDivElement>
+          | React.KeyboardEvent<HTMLDivElement>
+      ) => {
+        if (onRangeContextClick && levelValue != null) {
+          event.stopPropagation();
+          onRangeContextClick(cardData, levelType, levelValue);
+        }
+      };
+
     const handleOpenPriceInteraction = (
       e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>
     ) => {
@@ -132,20 +123,15 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                 </ClickableDataItem>
               </div>
               <div className={cn(gridCellClass, "py-0.5")}>
-                {/* Not interactive */}
                 <span className="font-semibold block">Prev Close</span>
                 <span>${faceData.previousClose?.toFixed(2) ?? "N/A"}</span>
               </div>
               <div className={cn(gridCellClass, "py-0.5")}>
-                {/* Not interactive */}
                 <span className="font-semibold block">Volume</span>
-                {/* Use centralized formatter */}
                 <span>{formatNumberWithAbbreviations(faceData.volume)}</span>
               </div>
               <div className={cn(gridCellClass, "py-0.5")}>
-                {/* Not interactive */}
                 <span className="font-semibold block">Market Cap</span>
-                {/* Use centralized formatter, assuming $ prefix */}
                 <span>
                   ${formatNumberWithAbbreviations(backData.marketCap)}
                 </span>
@@ -193,54 +179,11 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
     } else {
       // Front Face
       const currentPrice = faceData.price;
+      // Day and Year range values remain needed here for the logic
       const dayLow = faceData.dayLow;
       const dayHigh = faceData.dayHigh;
       const yearLow = faceData.yearLow;
       const yearHigh = faceData.yearHigh;
-
-      let dailyRangePercentage = 0;
-      let dailyRangeStyling: RangeBarStyling = { bgColorClass: "bg-slate-300" };
-      if (
-        dayHigh != null &&
-        dayLow != null &&
-        currentPrice != null &&
-        dayHigh > dayLow
-      ) {
-        const range = dayHigh - dayLow;
-        const position = currentPrice - dayLow;
-        dailyRangePercentage = Math.max(
-          0,
-          Math.min(100, (position / range) * 100)
-        );
-        dailyRangeStyling = getRangeBarStyling(
-          dailyRangePercentage,
-          currentPrice >= dayHigh,
-          currentPrice <= dayLow
-        );
-      }
-
-      let yearlyRangePercentage = 0;
-      let yearlyRangeStyling: RangeBarStyling = {
-        bgColorClass: "bg-slate-300",
-      };
-      if (
-        yearHigh != null &&
-        yearLow != null &&
-        currentPrice != null &&
-        yearHigh > yearLow
-      ) {
-        const range = yearHigh - yearLow;
-        const position = currentPrice - yearLow;
-        yearlyRangePercentage = Math.max(
-          0,
-          Math.min(100, (position / range) * 100)
-        );
-        yearlyRangeStyling = getRangeBarStyling(
-          yearlyRangePercentage,
-          currentPrice >= yearHigh,
-          currentPrice <= yearLow
-        );
-      }
 
       const PriceDisplayBlock = (
         <div
@@ -269,8 +212,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                 )}`
               : undefined
           }
-          data-interactive-child={!!onGenerateDailyPerformanceSignal} // Mark as interactive child
-        >
+          data-interactive-child={!!onGenerateDailyPerformanceSignal}>
           <p
             className={cn(
               "text-2xl sm:text-3xl md:text-4xl font-bold",
@@ -325,110 +267,54 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
               data-testid="daily-performance-layout-area">
               {PriceDisplayBlock}
             </div>
-            {dayLow != null &&
-              dayHigh != null &&
-              currentPrice != null &&
-              dayHigh > dayLow && (
-                <div className="mt-2 sm:mt-3">
-                  <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                    <ClickableDataItem
-                      title={`${dayLow?.toFixed(2) ?? "N/A"}`}
-                      isInteractive={!!(onRangeContextClick && dayLow != null)}
-                      onClickHandler={(e) =>
-                        handleRangeInteraction(e, "Low", dayLow)
-                      }
-                      baseClassName="p-0.5 rounded-sm relative"
-                      data-testid="day-low-interactive-area"
-                      aria-label={
-                        onRangeContextClick && dayLow != null
-                          ? `Interact with Day Low value`
-                          : undefined
-                      }
-                      data-interactive-child="true">
-                      Day Low
-                    </ClickableDataItem>
-                    <ClickableDataItem
-                      title={`${dayHigh?.toFixed(2) ?? "N/A"}`}
-                      isInteractive={!!(onRangeContextClick && dayHigh != null)}
-                      onClickHandler={(e) =>
-                        handleRangeInteraction(e, "High", dayHigh)
-                      }
-                      baseClassName="p-0.5 rounded-sm relative"
-                      data-testid="day-high-interactive-area"
-                      aria-label={
-                        onRangeContextClick && dayHigh != null
-                          ? `Interact with Day High value`
-                          : undefined
-                      }
-                      data-interactive-child="true">
-                      Day High
-                    </ClickableDataItem>
-                  </div>
-                  <div className="w-full bg-muted rounded-full h-1.5 pointer-events-none">
-                    <div
-                      className={cn(
-                        "h-1.5 rounded-full",
-                        dailyRangeStyling.bgColorClass,
-                        dailyRangeStyling.animationClass
-                      )}
-                      style={{ width: `${dailyRangePercentage}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-            {yearLow != null &&
-              yearHigh != null &&
-              currentPrice != null &&
-              yearHigh > yearLow && (
-                <div className="mt-3 sm:mt-4">
-                  <div className="flex justify-between text-[10px] sm:text-xs text-muted-foreground/90 mb-0.5 sm:mb-1">
-                    <ClickableDataItem
-                      title={`${yearLow?.toFixed(2) ?? "N/A"}`}
-                      isInteractive={!!(onRangeContextClick && yearLow != null)}
-                      onClickHandler={(e) =>
-                        handleRangeInteraction(e, "YearLow", yearLow)
-                      }
-                      baseClassName="p-0.5 rounded-sm relative"
-                      data-testid="year-low-interactive-area"
-                      aria-label={
-                        onRangeContextClick && yearLow != null
-                          ? `Interact with 52-Week Low value`
-                          : undefined
-                      }
-                      data-interactive-child="true">
-                      52W Low
-                    </ClickableDataItem>
-                    <ClickableDataItem
-                      title={`${yearHigh?.toFixed(2) ?? "N/A"}`}
-                      isInteractive={
-                        !!(onRangeContextClick && yearHigh != null)
-                      }
-                      onClickHandler={(e) =>
-                        handleRangeInteraction(e, "YearHigh", yearHigh)
-                      }
-                      baseClassName="p-0.5 rounded-sm relative"
-                      data-testid="year-high-interactive-area"
-                      aria-label={
-                        onRangeContextClick && yearHigh != null
-                          ? `Interact with 52-Week High value`
-                          : undefined
-                      }
-                      data-interactive-child="true">
-                      52W High
-                    </ClickableDataItem>
-                  </div>
-                  <div className="w-full bg-muted/70 rounded-full h-1 sm:h-1.5 pointer-events-none">
-                    <div
-                      className={cn(
-                        "h-1 sm:h-1.5 rounded-full",
-                        yearlyRangeStyling.bgColorClass,
-                        yearlyRangeStyling.animationClass
-                      )}
-                      style={{ width: `${yearlyRangePercentage}%` }}
-                    />
-                  </div>
-                </div>
-              )}
+
+            {/* Daily Range Indicator */}
+            <RangeIndicator
+              containerClassName="mt-2 sm:mt-3"
+              currentValue={currentPrice}
+              lowValue={dayLow}
+              highValue={dayHigh}
+              lowLabel="Day Low"
+              highLabel="Day High"
+              onLowLabelClick={
+                onRangeContextClick && dayLow != null
+                  ? handleRangeLabelClick("Low", dayLow)
+                  : undefined
+              }
+              onHighLabelClick={
+                onRangeContextClick && dayHigh != null
+                  ? handleRangeLabelClick("High", dayHigh)
+                  : undefined
+              }
+              lowValueForTitle={dayLow}
+              highValueForTitle={dayHigh}
+              barHeightClassName="h-1.5"
+              labelClassName="text-xs text-muted-foreground"
+            />
+
+            {/* Yearly Range Indicator */}
+            <RangeIndicator
+              containerClassName="mt-3 sm:mt-4"
+              currentValue={currentPrice}
+              lowValue={yearLow}
+              highValue={yearHigh}
+              lowLabel="52W Low"
+              highLabel="52W High"
+              onLowLabelClick={
+                onRangeContextClick && yearLow != null
+                  ? handleRangeLabelClick("YearLow", yearLow)
+                  : undefined
+              }
+              onHighLabelClick={
+                onRangeContextClick && yearHigh != null
+                  ? handleRangeLabelClick("YearHigh", yearHigh)
+                  : undefined
+              }
+              lowValueForTitle={yearLow}
+              highValueForTitle={yearHigh}
+              barHeightClassName="h-1 sm:h-1.5"
+              labelClassName="text-[10px] sm:text-xs text-muted-foreground/90"
+            />
           </ShadCardContent>
         </div>
       );
