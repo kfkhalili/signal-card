@@ -150,7 +150,10 @@ const BaseCard: React.FC<BaseCardProps> = ({
         data-interactive-child={!!onHeaderClick} // Mark as interactive if it has a click handler
         data-testid="header-text-clickable">
         <CardTitle // This is a div from shadcn/ui
-          className="text-sm sm:text-base md:text-lg font-semibold leading-tight line-clamp-2" // Limit title to 2 lines
+          className={cn(
+            "text-sm sm:text-base md:text-lg font-semibold leading-tight line-clamp-2",
+            "text-right"
+          )}
           title={companyName || symbol}>
           {companyName || symbol}
         </CardTitle>
