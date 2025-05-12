@@ -4,12 +4,14 @@ import {
   type CommonCardPropsForRehydration,
   type SpecificCardRehydrator,
 } from "@/components/game/cardRehydration";
-import type { ConcreteCardData } from "@/components/game/types";
+// import type { ConcreteCardData } from "@/components/game/types"; // Not directly used here
 import type {
   ProfileCardData,
-  ProfileCardBackDataType,
-  // ProfileCardStaticData is assumed to be correctly structured in localStorage
+  // ProfileCardStaticData, // Assumed to be correctly structured in localStorage
 } from "./profile-card.types";
+// Import BaseCardBackData for the updated type
+import type { BaseCardBackData } from "../base-card/base-card.types";
+import { parseTimestampSafe } from "@/lib/formatters"; // Already using centralized formatter
 
 const rehydrateProfileCardInstance: SpecificCardRehydrator = (
   cardFromStorage: any,
@@ -19,11 +21,12 @@ const rehydrateProfileCardInstance: SpecificCardRehydrator = (
   const liveDataFromStorage = cardFromStorage.liveData || {};
 
   const descriptionForBack =
-    cardFromStorage.backData?.description ||
+    cardFromStorage.backData?.description || // Check if backData itself exists
     staticDataFromStorage.description ||
     `Profile for ${commonProps.symbol || "unknown symbol"}`;
 
-  const rehydratedBackData: ProfileCardBackDataType = {
+  // Adjust type to BaseCardBackData
+  const rehydratedBackData: BaseCardBackData = {
     description: descriptionForBack,
   };
 
@@ -37,6 +40,7 @@ const rehydrateProfileCardInstance: SpecificCardRehydrator = (
     staticData: staticDataFromStorage,
     liveData: liveDataFromStorage,
     backData: rehydratedBackData,
+    // isFlipped, currentRarity, and rarityReason are handled by the main rehydrateCardFromStorage
   };
 };
 

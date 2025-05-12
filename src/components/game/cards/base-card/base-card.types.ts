@@ -1,17 +1,15 @@
+// src/components/game/cards/base-card/base-card.types.ts
 /**
  * src/app/components/game/cards/base-card/base-card.types.ts
  * Defines foundational types and interfaces for all game cards.
  */
 
-export type CardType = "profile" | "price";
+export type CardType = "profile" | "price"; // Simplified based on current usage
 
 export interface BaseCardBackData {
   readonly description?: string;
 }
 
-// BaseCardData itself doesn't need companyName/logoUrl if specific card types
-// (like PriceCardData) will hold them and provide them to BaseCard via props.
-// However, CardActionContext will carry them for actions.
 export interface BaseCardData {
   readonly id: string;
   readonly type: CardType;
@@ -20,9 +18,8 @@ export interface BaseCardData {
   readonly companyName?: string | null; // Often common
   readonly logoUrl?: string | null; // Often common
 
-  // Rarity fields - common to all displayable cards on the dashboard
-  readonly currentRarity?: string | null;
-  readonly rarityReason?: string | null;
+  // currentRarity and rarityReason removed from here.
+  // They belong to DisplayableCardState.
 
   // This backData is for the generic "back" defined by BaseCard itself,
   // usually a simple description. Specific cards have their own detailed backData.
@@ -30,12 +27,10 @@ export interface BaseCardData {
 }
 
 // --- Context for Actions ---
-// This context is passed to interaction handlers (e.g., social bar, delete)
 export interface CardActionContext {
   readonly id: string;
   readonly symbol: string;
   readonly type: CardType;
-  // Add company info here if actions need it directly without full cardData
   readonly companyName?: string | null;
   readonly logoUrl?: string | null;
 }
@@ -56,7 +51,7 @@ export interface DataPoint<TDetails = unknown> {
 }
 
 export interface CardInteractionEvent<
-  TCardData extends BaseCardData = BaseCardData, // TCardData might be PriceCardData which has company info
+  TCardData extends BaseCardData = BaseCardData,
   TDetails = unknown
 > {
   readonly cardData: TCardData;

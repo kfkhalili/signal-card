@@ -1,13 +1,13 @@
 // src/components/game/cards/profile-card/profileCardUtils.ts
 import { format, parseISO } from "date-fns";
-import type { CombinedQuoteData, ProfileDBRow } from "@/hooks/useStockData"; // Added CombinedQuoteData
+import type { CombinedQuoteData, ProfileDBRow } from "@/hooks/useStockData";
 import type { DisplayableCardState } from "@/components/game/types";
 import type {
   ProfileCardData,
   ProfileCardStaticData,
-  ProfileCardBackDataType,
-  ProfileCardLiveData, // Ensure ProfileCardLiveData is exported from profile-card.types.ts
+  ProfileCardLiveData,
 } from "./profile-card.types";
+import type { BaseCardBackData } from "../base-card/base-card.types";
 
 export function createDisplayableProfileCardFromDB(
   dbData: ProfileDBRow
@@ -33,18 +33,19 @@ export function createDisplayableProfileCardFromDB(
     phone: dbData.phone,
     formatted_full_time_employees: dbData.full_time_employees?.toLocaleString(),
     profile_last_updated: dbData.modified_at
-      ? format(parseISO(dbData.modified_at), "MMM d, yyyy") // Consistent date format
+      ? format(parseISO(dbData.modified_at), "MMM d, yy")
       : undefined,
     currency: dbData.currency,
     formatted_ipo_date: dbData.ipo_date
-      ? format(parseISO(dbData.ipo_date), "MMMM d, yyyy") // Consistent date format
+      ? format(parseISO(dbData.ipo_date), "MMMM d, yyyy")
       : undefined,
     is_etf: dbData.is_etf,
     is_adr: dbData.is_adr,
     is_fund: dbData.is_fund,
   };
 
-  const cardBackData: ProfileCardBackDataType = {
+  // Adjust type to BaseCardBackData
+  const cardBackData: BaseCardBackData = {
     description:
       dbData.description ||
       `Profile information for ${dbData.company_name || dbData.symbol}.`,
@@ -61,6 +62,7 @@ export function createDisplayableProfileCardFromDB(
     liveData: {}, // Initial live data is empty
     backData: cardBackData,
     isFlipped: false,
+    // currentRarity and rarityReason will be calculated and added when it becomes a live DisplayableCard
   };
 }
 
@@ -76,10 +78,5 @@ export function createProfileCardLiveDataFromQuote(
     dayLow: quoteData.day_low ?? null,
     timestamp: apiTimestampMillis,
     volume: quoteData.volume ?? null,
-    // yearHigh and yearLow are generally part of PriceCardFaceData,
-    // but can be added here if ProfileCard explicitly needs to display them
-    // in its live section. For now, keeping it to the most common live updates.
-    // yearHigh: quoteData.year_high ?? null,
-    // yearLow: quoteData.year_low ?? null,
   };
 }
