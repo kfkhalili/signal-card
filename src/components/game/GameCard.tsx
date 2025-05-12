@@ -3,7 +3,6 @@ import React from "react";
 import type { DisplayableCard } from "@/components/game/types";
 import type {
   PriceCardData,
-  PriceCardSnapshotData,
   PriceCardInteractionCallbacks,
   PriceCardSpecificBackData,
   PriceCardFaceData,
@@ -88,53 +87,6 @@ const GameCard: React.FC<GameCardProps> = ({
         priceSpecificInteractions={priceSpecificInteractions}
         onHeaderIdentityClick={onHeaderIdentityClick} // Pass this down
         className={cardWrapperClassName}
-      />
-    );
-  }
-
-  if (card.type === "price_snapshot") {
-    const snapshotCard = card as PriceCardSnapshotData & { isFlipped: boolean };
-    const adaptedFaceData: PriceCardFaceData = {
-      timestamp: snapshotCard.snapshotTime,
-      price: snapshotCard.capturedPrice,
-      dayChange: null,
-      changePercentage: null,
-      dayHigh: null,
-      dayLow: null,
-      dayOpen: null,
-      previousClose: null,
-      volume: null,
-      yearHigh: snapshotCard.yearHighAtCapture,
-      yearLow: snapshotCard.yearLowAtCapture,
-    };
-    const adaptedBackData: PriceCardSpecificBackData = {
-      description: snapshotCard.backData.description,
-      marketCap: null,
-      sma50d: null,
-      sma200d: null,
-    };
-    const adaptedDataForSnapshotDisplay: PriceCardData = {
-      id: snapshotCard.id,
-      type: "price",
-      symbol: snapshotCard.symbol,
-      createdAt: snapshotCard.createdAt,
-      companyName: snapshotCard.companyName,
-      logoUrl: snapshotCard.logoUrl,
-      faceData: adaptedFaceData,
-      backData: adaptedBackData,
-    };
-    return (
-      <PriceCardContainer
-        cardData={adaptedDataForSnapshotDisplay}
-        isFlipped={snapshotCard.isFlipped}
-        onFlip={handleFlip}
-        cardContext={cardContextForBaseCard}
-        socialInteractions={socialInteractions}
-        onDeleteRequest={handleDeleteAction}
-        // Snapshots likely don't have the header click to show profile, or live interactions
-        priceSpecificInteractions={undefined}
-        onHeaderIdentityClick={undefined}
-        className={cn(cardWrapperClassName, "opacity-90")}
       />
     );
   }

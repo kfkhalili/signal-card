@@ -10,18 +10,8 @@ import type {
   DisplayableProfileCard,
   DisplayableCardState, // Keep if used directly, else it's part of Displayable<Type>Card
 } from "@/components/game/types";
-import type {
-  PriceCardData,
-  PriceCardFaceData,
-  PriceCardSpecificBackData,
-  PriceCardSnapshotData,
-} from "@/components/game/cards/price-card/price-card.types";
-import type {
-  ProfileCardData, // Base data type, DisplayableProfileCard is ProfileCardData & DisplayableCardState
-  ProfileCardLiveData,
-  ProfileCardStaticData,
-  ProfileCardBackDataType,
-} from "@/components/game/cards/profile-card/profile-card.types";
+import type { PriceCardData } from "@/components/game/cards/price-card/price-card.types";
+import type { ProfileCardStaticData } from "@/components/game/cards/profile-card/profile-card.types";
 
 import {
   useStockData,
@@ -417,83 +407,6 @@ export default function FinSignalGamePage() {
     [toast, setActiveCards]
   );
 
-  const handleTakeSnapshot = useCallback(
-    (sourceCardId?: string) => {
-      const sourceCardIndex = activeCards.findIndex(
-        (c) => c.id === sourceCardId
-      );
-      const cardToSnapshot =
-        sourceCardIndex !== -1 ? activeCards[sourceCardIndex] : undefined;
-
-      if (cardToSnapshot && cardToSnapshot.type === "price") {
-        const livePriceCard = cardToSnapshot as PriceCardData &
-          DisplayableCardState;
-        const currentTime = Date.now();
-        const newSnapshot: PriceCardSnapshotData & DisplayableCardState = {
-          id: `snap-${livePriceCard.id}-${currentTime}`,
-          type: "price_snapshot",
-          symbol: livePriceCard.symbol,
-          createdAt: currentTime,
-          companyName: livePriceCard.companyName,
-          logoUrl: livePriceCard.logoUrl,
-          capturedPrice: livePriceCard.faceData.price!,
-          snapshotTime: livePriceCard.faceData.timestamp!,
-          yearHighAtCapture: livePriceCard.faceData.yearHigh,
-          yearLowAtCapture: livePriceCard.faceData.yearLow,
-          backData: {
-            description: `Snapshot of ${
-              livePriceCard.symbol
-            } price: $${livePriceCard.faceData.price?.toFixed(
-              2
-            )}. Captured on ${new Date(
-              livePriceCard.faceData.timestamp!
-            ).toLocaleString()}`,
-            discoveredReason: `Snapshot from live card event.`,
-          },
-          isFlipped: false,
-        };
-
-        setActiveCards((prev) => {
-          const cards = [...prev];
-          if (sourceCardIndex !== -1) {
-            cards.splice(
-              sourceCardIndex + 1,
-              0,
-              newSnapshot as DisplayableCard
-            );
-          } else {
-            cards.unshift(newSnapshot as DisplayableCard);
-          }
-          return cards;
-        });
-        toast({
-          title: "Snapshot Created!",
-          description: `Snapshot for ${livePriceCard.symbol} taken.`,
-        });
-      } else if (cardToSnapshot && cardToSnapshot.type === "price_snapshot") {
-        toast({
-          title: "Info",
-          description: "This is already a snapshot.",
-          variant: "default",
-        });
-      } else if (cardToSnapshot) {
-        toast({
-          title: "Info",
-          description: `Snapshots can only be taken of Price Cards. This is a ${cardToSnapshot.type} card.`,
-          variant: "default",
-        });
-      } else {
-        toast({
-          title: "Snapshot Error",
-          description:
-            "Card not found to take a snapshot from, or no source ID provided.",
-          variant: "destructive",
-        });
-      }
-    },
-    [activeCards, toast, setActiveCards]
-  );
-
   const stockDataHandlers = SYMBOLS_TO_SUBSCRIBE_LIST.map((symbol) => (
     <StockDataHandler
       key={symbol}
@@ -541,7 +454,6 @@ export default function FinSignalGamePage() {
       <ActiveCardsSection
         activeCards={activeCards}
         setActiveCards={setActiveCards}
-        onTakeSnapshot={handleTakeSnapshot}
       />
     </div>
   );

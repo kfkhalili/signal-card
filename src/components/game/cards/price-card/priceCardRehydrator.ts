@@ -9,8 +9,6 @@ import type {
   PriceCardData,
   PriceCardFaceData,
   PriceCardSpecificBackData,
-  PriceCardSnapshotData,
-  PriceCardSnapshotSpecificBackData,
 } from "./price-card.types";
 
 // Helper to safely parse timestamps (from string or number to number | null)
@@ -69,34 +67,5 @@ const rehydrateLivePriceCard: SpecificCardRehydrator = (
   };
 };
 
-const rehydratePriceSnapshotCard: SpecificCardRehydrator = (
-  cardFromStorage: any,
-  commonProps: CommonCardPropsForRehydration
-): PriceCardSnapshotData | null => {
-  const snapshotTime =
-    parseLocalTimestamp(cardFromStorage.snapshotTime) ?? Date.now();
-
-  const originalSnapshotBackData = cardFromStorage.backData || {};
-  const rehydratedSnapshotBackData: PriceCardSnapshotSpecificBackData = {
-    description: originalSnapshotBackData.description,
-    discoveredReason: originalSnapshotBackData.discoveredReason,
-  };
-
-  return {
-    id: commonProps.id,
-    type: "price_snapshot",
-    symbol: commonProps.symbol,
-    createdAt: commonProps.createdAt,
-    companyName: commonProps.companyName,
-    logoUrl: commonProps.logoUrl,
-    capturedPrice: cardFromStorage.capturedPrice ?? 0,
-    snapshotTime,
-    yearHighAtCapture: cardFromStorage.yearHighAtCapture ?? null,
-    yearLowAtCapture: cardFromStorage.yearLowAtCapture ?? null,
-    backData: rehydratedSnapshotBackData,
-  };
-};
-
 // Register these rehydrators
 registerCardRehydrator("price", rehydrateLivePriceCard);
-registerCardRehydrator("price_snapshot", rehydratePriceSnapshotCard);
