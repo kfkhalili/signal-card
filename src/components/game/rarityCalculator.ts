@@ -86,8 +86,6 @@ export function calculateDynamicCardRarity(
       return calculatePriceCardRarityLogic(card as PriceCardData);
     case "profile":
       return calculateProfileCardRarityLogic(card as ProfileCardData);
-    // case "price_snapshot": // If PriceCardSnapshotData is still a dashboard type and needs rarity
-    //   return calculatePriceCardRarityLogic(card as PriceCardData); // Or a specific snapshot rarity logic
     // Add cases for other card types
     default:
       // For unhandled types, or types that don't have dynamic rarity based on their data

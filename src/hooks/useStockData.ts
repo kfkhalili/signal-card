@@ -12,7 +12,7 @@ import {
   type SubscriptionStatus as LiveQuoteSubscriptionStatus,
   type LiveQuoteIndicatorDBRow,
   LiveQuoteIndicatorDBSchema,
-} from "../lib/supabase/realtime-service";
+} from "@/lib/supabase/realtime-service";
 import { z } from "zod";
 
 // ProfileDBRow and Schema (as defined before)

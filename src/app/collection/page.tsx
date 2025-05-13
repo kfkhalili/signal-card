@@ -89,8 +89,10 @@ export default async function CollectionPage() {
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-primary">My Card Collection</h1>
-        <Link href="/" className="text-sm text-primary hover:underline">
-          &larr; Back to Dashboard
+        <Link
+          href="/workspace"
+          className="text-sm text-primary hover:underline">
+          &larr; Back to Workspace
         </Link>
       </div>
       {/* Pass the new structure to the client */}

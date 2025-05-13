@@ -16,7 +16,7 @@ export default function AuthPage() {
       (event, session) => {
         if (event === "SIGNED_IN") {
           // Redirect to home page after sign-in
-          // Or to a specific dashboard page if you have one
+          // Or to a specific workspace page if you have one
           router.push("/");
           router.refresh(); // Important to refresh server components if any depend on auth state
         }

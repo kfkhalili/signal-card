@@ -5,7 +5,7 @@ import React from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { LogIn, LogOut, UserCircle, LibraryBig } from "lucide-react"; // Added LibraryBig
+import { LogIn, LogOut } from "lucide-react";
 
 const HeaderComponent: React.FC = () => {
   const { user, signOut, isLoading } = useAuth();
@@ -26,8 +26,14 @@ const HeaderComponent: React.FC = () => {
           ) : user ? (
             <>
               <Button variant="ghost" size="sm" asChild>
+                <Link href="/workspace" title="Workspace">
+                  {/* Use an appropriate icon if desired */}
+                  <span className="hidden sm:inline">Workspace</span>
+                </Link>
+              </Button>
+              {/* Existing Collection Link */}
+              <Button variant="ghost" size="sm" asChild>
                 <Link href="/collection" title="My Collection">
-                  <LibraryBig className="h-4 w-4 sm:mr-2" />
                   <span className="hidden sm:inline">My Collection</span>
                 </Link>
               </Button>
