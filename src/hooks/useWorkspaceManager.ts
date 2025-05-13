@@ -12,7 +12,7 @@ import type {
   ConcreteCardData,
   DisplayableLivePriceCard,
 } from "@/components/game/types";
-import type { AddCardFormValues } from "@/components/workspace/AddCardForm";
+import type { AddCardFormValues } from "@/components/workspace/AddCardForm"; // Ensure path is correct
 import type { CardType } from "@/components/game/cards/base-card/base-card.types";
 import type { PriceCardData } from "@/components/game/cards/price-card/price-card.types";
 import type {
@@ -31,8 +31,8 @@ import {
 import { calculateDynamicCardRarity } from "@/components/game/rarityCalculator";
 import { rehydrateCardFromStorage } from "@/components/game/cardRehydration";
 import type { CombinedQuoteData, ProfileDBRow } from "@/hooks/useStockData";
-import { format, parseISO } from "date-fns";
 import { LiveQuoteIndicatorDBRow } from "@/lib/supabase/realtime-service";
+import { format, parseISO } from "date-fns";
 
 const INITIAL_ACTIVE_CARDS: DisplayableCard[] = [];
 const WORKSPACE_LOCAL_STORAGE_KEY = "finSignal-mainWorkspace-v1";
@@ -40,6 +40,11 @@ const WORKSPACE_LOCAL_STORAGE_KEY = "finSignal-mainWorkspace-v1";
 interface UseWorkspaceManagerProps {
   supabase: SupabaseClient;
   isPremiumUser: boolean;
+}
+
+// Options for addCardToWorkspace
+interface AddCardOptions {
+  requestingCardId?: string; // ID of the card that triggered this request
 }
 
 export function useWorkspaceManager({
@@ -214,40 +219,76 @@ export function useWorkspaceManager({
   );
 
   const addCardToWorkspace = useCallback(
-    async (values: AddCardFormValues) => {
-      // <<< --- ADD DEBUG LOG HERE --- >>>
+    async (values: AddCardFormValues, options?: AddCardOptions) => {
       console.log(
         "[useWorkspaceManager] addCardToWorkspace called with values:",
-        values
+        values,
+        "and options:",
+        options
       );
-
       setIsAddingCardInProgress(true);
-      let { symbol, cardType } = values; // cardType here comes from AddCardFormValues
+      let { symbol, cardType } = values;
+      const requestingCardId = options?.requestingCardId;
 
-      // This logic correctly overrides for regular users if symbol is locked
       if (!isPremiumUser && workspaceSymbolForRegularUser) {
         symbol = workspaceSymbolForRegularUser;
       }
-      // For regular users, cardType from AddCardForm is already 'profile' if symbol is locked.
-      // If they click the price on profile card, 'price' is passed in `values`.
-      // We should respect the `cardType` from `values` if it's 'price' for this specific interaction.
-      // The AddCardForm itself handles locking cardType to 'profile' for general additions by regular users.
-      // So, no override of cardType here is needed if values.cardType is already 'price'.
 
-      const cardExists = activeCards.some(
+      const existingCardIndex = activeCards.findIndex(
         (card) => card.symbol === symbol && card.type === cardType
       );
 
-      if (cardExists) {
-        setTimeout(
-          () =>
-            toast({
-              title: "Card Exists",
-              description: `A ${cardType} card for ${symbol} is already in your workspace.`,
-              variant: "default",
-            }),
-          0
-        );
+      if (existingCardIndex !== -1) {
+        const existingCard = activeCards[existingCardIndex];
+        if (requestingCardId && existingCard.id !== requestingCardId) {
+          setActiveCards((prevCards) => {
+            const currentCards = [...prevCards];
+            const sourceCardActualIndex = currentCards.findIndex(
+              (c) => c.id === requestingCardId
+            );
+            const targetCardActualIndex = currentCards.findIndex(
+              (c) => c.id === existingCard.id
+            );
+
+            if (
+              sourceCardActualIndex !== -1 &&
+              targetCardActualIndex !== -1 &&
+              targetCardActualIndex !== sourceCardActualIndex + 1
+            ) {
+              const [cardToMove] = currentCards.splice(
+                targetCardActualIndex,
+                1
+              );
+              const insertAtIndex =
+                targetCardActualIndex < sourceCardActualIndex
+                  ? sourceCardActualIndex
+                  : sourceCardActualIndex + 1;
+              currentCards.splice(insertAtIndex, 0, cardToMove);
+              setTimeout(
+                () =>
+                  toast({
+                    title: "Card Reordered",
+                    description: `${
+                      existingCard.companyName || existingCard.symbol
+                    } ${existingCard.type} card moved.`,
+                  }),
+                0
+              );
+              return currentCards;
+            }
+            return prevCards;
+          });
+        } else {
+          setTimeout(
+            () =>
+              toast({
+                title: "Card Exists",
+                description: `A ${cardType} card for ${symbol} is already in your workspace.`,
+                variant: "default",
+              }),
+            0
+          );
+        }
         setIsAddingCardInProgress(false);
         return;
       }
@@ -282,7 +323,6 @@ export function useWorkspaceManager({
             );
           }
         } else if (cardType === "price") {
-          // This block should execute
           const { data: quoteData, error: quoteError } = await supabase
             .from("live_quote_indicators")
             .select("*")
@@ -353,7 +393,23 @@ export function useWorkspaceManager({
           const { rarity, reason } = calculateDynamicCardRarity(newCardToAdd);
           newCardToAdd.currentRarity = rarity;
           newCardToAdd.rarityReason = reason;
-          setActiveCards((prev) => [...prev, newCardToAdd!]);
+
+          setActiveCards((prev) => {
+            let updatedCards = [...prev];
+            if (requestingCardId) {
+              const sourceIndex = updatedCards.findIndex(
+                (c) => c.id === requestingCardId
+              );
+              if (sourceIndex !== -1) {
+                updatedCards.splice(sourceIndex + 1, 0, newCardToAdd!);
+              } else {
+                updatedCards.push(newCardToAdd!);
+              }
+            } else {
+              updatedCards.push(newCardToAdd!);
+            }
+            return updatedCards;
+          });
           setTimeout(
             () =>
               toast({
@@ -385,6 +441,7 @@ export function useWorkspaceManager({
       isPremiumUser,
       workspaceSymbolForRegularUser,
       setActiveCards,
+      updateOrAddCardInternal,
     ]
   );
 
