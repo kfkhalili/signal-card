@@ -12,26 +12,27 @@ import type {
   ConcreteCardData,
   DisplayableLivePriceCard,
 } from "@/components/game/types";
-import type { AddCardFormValues } from "@/components/workspace/AddCardForm"; // Ensure this path is correct
-import type { CardType } from "@/components/game/cards/base-card/base-card.types";
+import type { AddCardFormValues } from "@/components/workspace/AddCardForm";
 import type { PriceCardData } from "@/components/game/cards/price-card/price-card.types";
 import type {
   ProfileCardData,
   ProfileCardLiveData,
   ProfileCardStaticData,
 } from "@/components/game/cards/profile-card/profile-card.types";
+
+// Utility functions for creating card data
 import { createDisplayableProfileCardFromDB } from "@/components/game/cards/profile-card/profileCardUtils";
 import {
   createPriceCardFaceDataFromQuote,
   createPriceCardBackDataFromQuote,
   createDisplayablePriceCard,
 } from "@/components/game/cards/price-card/priceCardUtils";
-import { createProfileCardLiveDataFromQuote } from "@/components/game/cards/profile-card/profileCardUtils";
+// This is the function in question - ensure the path and export are correct in its source file
 import { calculateDynamicCardRarity } from "@/components/game/rarityCalculator";
 import { rehydrateCardFromStorage } from "@/components/game/cardRehydration";
-import type { CombinedQuoteData, ProfileDBRow } from "@/hooks/useStockData"; // Ensure types are exported from useStockData or a shared types file
+import type { CombinedQuoteData, ProfileDBRow } from "@/hooks/useStockData";
+import type { LiveQuoteIndicatorDBRow } from "@/lib/supabase/realtime-service";
 import { format, parseISO } from "date-fns";
-import { LiveQuoteIndicatorDBRow } from "@/lib/supabase/realtime-service";
 
 const INITIAL_ACTIVE_CARDS: DisplayableCard[] = [];
 const WORKSPACE_LOCAL_STORAGE_KEY = "finSignal-mainWorkspace-v1";
@@ -183,6 +184,7 @@ export function useWorkspaceManager({
         exchange_full_name: dbData.exchange_full_name,
         website: dbData.website,
         description: dbData.description,
+        short_description: dbData.short_description,
         ceo: dbData.ceo,
         full_address: [
           dbData.address,
@@ -227,16 +229,23 @@ export function useWorkspaceManager({
         (card) => card.symbol === symbol && card.type === cardType
       );
       if (cardExists) {
-        toast({
-          title: "Card Exists",
-          description: `A ${cardType} card for ${symbol} is already in your workspace.`,
-          variant: "default",
-        });
+        setTimeout(
+          () =>
+            toast({
+              title: "Card Exists",
+              description: `A ${cardType} card for ${symbol} is already in your workspace.`,
+              variant: "default",
+            }),
+          0
+        );
         setIsAddingCardInProgress(false);
         return;
       }
 
-      toast({ title: `Adding ${symbol} ${cardType} card...` });
+      setTimeout(
+        () => toast({ title: `Adding ${symbol} ${cardType} card...` }),
+        0
+      );
       let newCardToAdd: DisplayableCard | null = null;
 
       try {
@@ -252,11 +261,15 @@ export function useWorkspaceManager({
               data as ProfileDBRow
             ) as DisplayableCard;
           } else {
-            toast({
-              title: "Profile Not Found",
-              description: `No profile data for ${symbol}. Card not added.`,
-              variant: "destructive",
-            });
+            setTimeout(
+              () =>
+                toast({
+                  title: "Profile Not Found",
+                  description: `No profile data for ${symbol}. Card not added.`,
+                  variant: "destructive",
+                }),
+              0
+            );
           }
         } else if (cardType === "price") {
           const { data: quoteData, error: quoteError } = await supabase
@@ -267,7 +280,6 @@ export function useWorkspaceManager({
             .limit(1)
             .single();
           if (quoteError && quoteError.code !== "PGRST116") {
-            // PGRST116: RLS error or no rows found
             throw quoteError;
           }
           if (quoteData) {
@@ -275,7 +287,7 @@ export function useWorkspaceManager({
               (c) => c.symbol === symbol && c.type === "profile"
             );
             const combinedQuote: CombinedQuoteData = {
-              ...(quoteData as LiveQuoteIndicatorDBRow), // Cast to ensure all fields from DB are present
+              ...(quoteData as LiveQuoteIndicatorDBRow),
               companyName: profileCardForSymbol?.companyName ?? null,
               logoUrl: profileCardForSymbol?.logoUrl ?? null,
             };
@@ -284,7 +296,6 @@ export function useWorkspaceManager({
               combinedQuote.api_timestamp * 1000
             ) as DisplayableCard;
           } else {
-            // Create a shell price card if no initial quote data from DB
             const now = Date.now();
             const profileCardForSymbol = activeCards.find(
               (c) => c.symbol === symbol && c.type === "profile"
@@ -295,7 +306,7 @@ export function useWorkspaceManager({
               symbol: symbol,
               createdAt: now,
               isFlipped: false,
-              companyName: profileCardForSymbol?.companyName ?? symbol, // Fallback to symbol for companyName
+              companyName: profileCardForSymbol?.companyName ?? symbol,
               logoUrl: profileCardForSymbol?.logoUrl ?? null,
               faceData: {
                 timestamp: now,
@@ -314,12 +325,16 @@ export function useWorkspaceManager({
                 sma50d: null,
                 sma200d: null,
               },
-            } as DisplayableLivePriceCard; // Explicitly type as DisplayableLivePriceCard
-            toast({
-              title: "Price Card Added (Shell)",
-              description: `Awaiting live data for ${symbol}.`,
-              variant: "default",
-            });
+            } as DisplayableLivePriceCard;
+            setTimeout(
+              () =>
+                toast({
+                  title: "Price Card Added (Shell)",
+                  description: `Awaiting live data for ${symbol}.`,
+                  variant: "default",
+                }),
+              0
+            );
           }
         }
 
@@ -328,18 +343,26 @@ export function useWorkspaceManager({
           newCardToAdd.currentRarity = rarity;
           newCardToAdd.rarityReason = reason;
           setActiveCards((prev) => [...prev, newCardToAdd!]);
-          toast({
-            title: "Card Added!",
-            description: `${symbol} ${cardType} card added to workspace.`,
-          });
+          setTimeout(
+            () =>
+              toast({
+                title: "Card Added!",
+                description: `${symbol} ${cardType} card added to workspace.`,
+              }),
+            0
+          );
         }
       } catch (err: any) {
         console.error(`Error adding ${cardType} card for ${symbol}:`, err);
-        toast({
-          title: "Error Adding Card",
-          description: err.message || "Could not add card.",
-          variant: "destructive",
-        });
+        setTimeout(
+          () =>
+            toast({
+              title: "Error Adding Card",
+              description: err.message || "Could not add card.",
+              variant: "destructive",
+            }),
+          0
+        );
       } finally {
         setIsAddingCardInProgress(false);
       }
@@ -418,7 +441,7 @@ export function useWorkspaceManager({
               },
             };
           },
-          undefined // IMPORTANT: No creator function passed here
+          undefined // No creator function for PriceCard in processLiveQuote
         );
 
         if (priceResult.cardChangedOrAdded) {
@@ -449,7 +472,7 @@ export function useWorkspaceManager({
                       : ""
                   }`,
                 }),
-              100
+              0
             );
           }
         }
@@ -458,7 +481,8 @@ export function useWorkspaceManager({
           (c) => c.symbol === quoteData.symbol && c.type === "profile"
         );
         if (existingProfileCardIndex !== -1) {
-          const newProfileLiveData = createProfileCardLiveDataFromQuote(
+          // Use the imported function here
+          const newProfileLiveData = createPriceCardFaceDataFromQuote(
             quoteData,
             apiTimestampMillis
           );
@@ -531,10 +555,12 @@ export function useWorkspaceManager({
           }
         );
         if (result.cardChangedOrAdded) {
-          toast({
-            title: `Profile Updated: ${updatedProfileDBRow.symbol}`,
-            description: "Company details have been refreshed.",
-          });
+          setTimeout(() => {
+            toast({
+              title: `Profile Updated: ${updatedProfileDBRow.symbol}`,
+              description: "Company details have been refreshed.",
+            });
+          }, 0);
         }
         return result.cardChangedOrAdded
           ? result.updatedCards
@@ -553,10 +579,14 @@ export function useWorkspaceManager({
     setActiveCards(INITIAL_ACTIVE_CARDS);
     setWorkspaceSymbolForRegularUser(null);
     setCardsInLocalStorage(INITIAL_ACTIVE_CARDS);
-    toast({
-      title: "Workspace Cleared",
-      description: "You can now start fresh with any symbol.",
-    });
+    setTimeout(
+      () =>
+        toast({
+          title: "Workspace Cleared",
+          description: "You can now start fresh with any symbol.",
+        }),
+      0
+    );
   }, [
     setActiveCards,
     setCardsInLocalStorage,

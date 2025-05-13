@@ -1,10 +1,6 @@
 // src/components/game/cards/base-card/base-card.types.ts
-/**
- * src/app/components/game/cards/base-card/base-card.types.ts
- * Defines foundational types and interfaces for all game cards.
- */
 
-export type CardType = "profile" | "price"; // Simplified based on current usage
+export type CardType = "profile" | "price";
 
 export interface BaseCardBackData {
   readonly description?: string;
@@ -13,29 +9,25 @@ export interface BaseCardBackData {
 export interface BaseCardData {
   readonly id: string;
   readonly type: CardType;
-  readonly symbol: string; // Common to most financial cards
-  readonly createdAt: number; // When this card instance was created/came into view
-  readonly companyName?: string | null; // Often common
-  readonly logoUrl?: string | null; // Often common
-
-  // currentRarity and rarityReason removed from here.
-  // They belong to DisplayableCardState.
-
-  // This backData is for the generic "back" defined by BaseCard itself,
-  // usually a simple description. Specific cards have their own detailed backData.
+  readonly symbol: string;
+  readonly createdAt: number;
+  readonly companyName?: string | null;
+  readonly logoUrl?: string | null;
   readonly backData: BaseCardBackData;
+  readonly websiteUrl?: string | null;
 }
 
-// --- Context for Actions ---
+// Context for Actions passed to BaseCard and its children
 export interface CardActionContext {
   readonly id: string;
   readonly symbol: string;
   readonly type: CardType;
   readonly companyName?: string | null;
   readonly logoUrl?: string | null;
+  readonly websiteUrl?: string | null;
 }
 
-// --- Social Interactions ---
+// Social Interactions (remains the same)
 export interface BaseCardSocialInteractions {
   readonly onLike?: (context: CardActionContext) => void;
   readonly onComment?: (context: CardActionContext) => void;
@@ -43,7 +35,7 @@ export interface BaseCardSocialInteractions {
   readonly onShare?: (context: CardActionContext) => void;
 }
 
-// --- Generic Card Data Point Interactions (existing) ---
+// Generic Card Data Point Interactions (remains the same)
 export interface DataPoint<TDetails = unknown> {
   readonly elementType: string;
   readonly value?: any;

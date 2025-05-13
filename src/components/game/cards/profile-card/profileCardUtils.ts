@@ -1,11 +1,10 @@
 // src/components/game/cards/profile-card/profileCardUtils.ts
 import { format, parseISO } from "date-fns";
-import type { CombinedQuoteData, ProfileDBRow } from "@/hooks/useStockData";
+import type { ProfileDBRow } from "@/hooks/useStockData";
 import type { DisplayableCardState } from "@/components/game/types";
 import type {
   ProfileCardData,
   ProfileCardStaticData,
-  ProfileCardLiveData,
 } from "./profile-card.types";
 import type { BaseCardBackData } from "../base-card/base-card.types";
 
@@ -19,7 +18,8 @@ export function createDisplayableProfileCardFromDB(
     country: dbData.country,
     exchange_full_name: dbData.exchange_full_name,
     website: dbData.website,
-    description: dbData.description,
+    description: dbData.description, // Full company description
+    short_description: dbData.short_description, // Company's short description
     ceo: dbData.ceo,
     full_address: [
       dbData.address,
@@ -37,18 +37,20 @@ export function createDisplayableProfileCardFromDB(
       : undefined,
     currency: dbData.currency,
     formatted_ipo_date: dbData.ipo_date
-      ? format(parseISO(dbData.ipo_date), "MMMM d, yyyy")
+      ? format(parseISO(dbData.ipo_date), "MMMM d, yy")
       : undefined,
     is_etf: dbData.is_etf,
     is_adr: dbData.is_adr,
     is_fund: dbData.is_fund,
   };
 
-  // Adjust type to BaseCardBackData
+  // Generic description for the Profile Card type itself
+  const cardTypeDescription = `Provides an overview of ${
+    dbData.company_name || dbData.symbol
+  }'s company profile, including sector, industry, and key operational highlights.`;
+
   const cardBackData: BaseCardBackData = {
-    description:
-      dbData.description ||
-      `Profile information for ${dbData.company_name || dbData.symbol}.`,
+    description: cardTypeDescription, // This is the generic description of the card type
   };
 
   return {
@@ -58,25 +60,10 @@ export function createDisplayableProfileCardFromDB(
     companyName: dbData.company_name,
     logoUrl: dbData.image,
     createdAt: Date.now(),
-    staticData,
-    liveData: {}, // Initial live data is empty
-    backData: cardBackData,
+    staticData, // Contains company's short_description and full description
+    liveData: {}, // Initial empty live data
+    backData: cardBackData, // Contains the generic card type description
     isFlipped: false,
     // currentRarity and rarityReason will be calculated and added when it becomes a live DisplayableCard
-  };
-}
-
-export function createProfileCardLiveDataFromQuote(
-  quoteData: CombinedQuoteData,
-  apiTimestampMillis: number
-): ProfileCardLiveData {
-  return {
-    price: quoteData.current_price,
-    dayChange: quoteData.day_change ?? null,
-    changePercentage: quoteData.change_percentage ?? null,
-    dayHigh: quoteData.day_high ?? null,
-    dayLow: quoteData.day_low ?? null,
-    timestamp: apiTimestampMillis,
-    volume: quoteData.volume ?? null,
   };
 }

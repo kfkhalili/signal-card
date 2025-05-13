@@ -25,6 +25,7 @@ export interface ProfileDBRow {
   industry?: string | null;
   website?: string | null;
   description?: string | null;
+  short_description?: string | null;
   country?: string | null;
   // Add all other fields from your 'profiles' table schema here
   // to ensure the type is complete
@@ -68,6 +69,7 @@ export const ProfileDBSchema = z.object({
   industry: z.string().nullable().optional(),
   website: z.string().url().nullable().optional(),
   description: z.string().nullable().optional(),
+  short_description: z.string().nullable().optional(),
   country: z.string().nullable().optional(),
   // Add all other fields from your 'profiles' table schema here with Zod types
   price: z.number().nullable().optional(),
