@@ -1,14 +1,14 @@
 // src/app/workspace/page.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react"; // Removed useMemo, useLocalStorage
+import React, { useState, useEffect, useCallback } from "react";
 import { format } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
-import { createClient } from "@/lib/supabase/client"; // Keep for passing to hook
+import { createClient } from "@/lib/supabase/client";
 
-// Workspace specific components and hooks
 import { AddCardForm } from "@/components/workspace/AddCardForm";
-import { useWorkspaceManager } from "@/hooks/useWorkspaceManager"; // Import the new hook
+import { StockDataHandler } from "@/components/workspace/StockDataHandler";
+import { useWorkspaceManager } from "@/hooks/useWorkspaceManager";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, RefreshCw } from "lucide-react";
 import {
@@ -22,24 +22,33 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-// Game Logic & Types (no changes here, they are used by the hook)
 import "@/components/game/cards/rehydrators";
 import ActiveCardsSection from "@/components/game/ActiveCardsSection";
 import type {
   CombinedQuoteData,
   MarketStatusDisplayHook,
-  ProfileDBRow,
-} from "@/hooks/useStockData"; // Types used by StockDataHandler
-import { StockDataHandler } from "@/components/workspace/StockDataHandler";
+  // ProfileDBRow, // Not directly used in this component, but by hooks/handlers
+} from "@/hooks/useStockData";
 
 export default function WorkspacePage() {
-  const { user } = useAuth();
-  const supabase = createClient(); // Create client instance to pass to hook
-  const isPremiumUser = user?.app_metadata?.is_premium ?? false;
+  const { user, isLoading: isAuthLoading } = useAuth(); // Get auth loading state
+  const supabase = createClient();
+
+  // State to prevent hydration mismatch for client-side initialized data
+  const [hasMounted, setHasMounted] = useState(false);
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  // isPremium should only be considered final after auth is loaded and component is mounted
+  const isPremium =
+    hasMounted && !isAuthLoading
+      ? user?.app_metadata?.is_premium ?? false
+      : false;
 
   const {
     activeCards,
-    setActiveCards, // Important for ActiveCardsSection's internal optimistic updates
+    setActiveCards,
     workspaceSymbolForRegularUser,
     isAddingCardInProgress,
     addCardToWorkspace,
@@ -47,9 +56,8 @@ export default function WorkspacePage() {
     processLiveQuote,
     processStaticProfileUpdate,
     uniqueSymbolsInWorkspace,
-  } = useWorkspaceManager({ supabase, isPremiumUser });
+  } = useWorkspaceManager({ supabase, isPremiumUser: isPremium }); // Pass stable isPremium
 
-  // Market status state remains in the page component as it's UI-related for this page
   const [marketStatuses, setMarketStatuses] = useState<
     Record<
       string,
@@ -78,17 +86,23 @@ export default function WorkspacePage() {
   );
 
   const confirmedClearWorkspace = () => {
-    clearWorkspace(); // Call the function from the hook
-    setMarketStatuses({}); // Also clear market statuses locally
+    clearWorkspace();
+    setMarketStatuses({});
     setIsClearConfirmOpen(false);
   };
+
+  // Determine effective activeCards length only after mount to match server's initial empty state
+  const effectiveActiveCardsLength = hasMounted ? activeCards.length : 0;
 
   return (
     <div className="space-y-6 pb-10">
       <div className="px-2 sm:px-4 pt-4 flex flex-col sm:flex-row justify-between items-center gap-3">
         <h1 className="text-xl sm:text-2xl font-semibold">My Workspace</h1>
-        <div className="flex gap-2 items-center">
-          {activeCards.length > 0 && (
+        <div className="flex gap-2 items-center" style={{ minHeight: "32px" }}>
+          {" "}
+          {/* Ensure min-height for layout consistency */}
+          {/* Only render these buttons after mount and auth state is resolved */}
+          {hasMounted && !isAuthLoading && effectiveActiveCardsLength > 0 && (
             <Button
               variant="outline"
               size="sm"
@@ -97,28 +111,33 @@ export default function WorkspacePage() {
               <RefreshCw className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Clear All
             </Button>
           )}
-          {(activeCards.length > 0 || isPremiumUser) && (
-            <AddCardForm
-              onAddCard={addCardToWorkspace} // From hook
-              existingCards={activeCards} // From hook
-              isPremiumUser={isPremiumUser}
-              lockedSymbolForRegularUser={workspaceSymbolForRegularUser} // From hook
-            />
-          )}
+          {hasMounted &&
+            !isAuthLoading &&
+            (effectiveActiveCardsLength > 0 || isPremium) && (
+              <AddCardForm
+                onAddCard={addCardToWorkspace}
+                existingCards={activeCards} // Pass actual activeCards for logic
+                isPremiumUser={isPremium}
+                lockedSymbolForRegularUser={workspaceSymbolForRegularUser}
+              />
+            )}
         </div>
       </div>
 
-      {uniqueSymbolsInWorkspace.map((s) => (
-        <StockDataHandler // Assuming StockDataHandler is correctly defined/imported
-          key={`handler-${s}`}
-          symbol={s}
-          onQuoteReceived={processLiveQuote} // From hook
-          onStaticProfileUpdate={processStaticProfileUpdate} // From hook
-          onMarketStatusChange={handleMarketStatusChange} // Local to page
-        />
-      ))}
+      {/* Conditionally render StockDataHandlers only after mount to avoid issues with uniqueSymbolsInWorkspace */}
+      {hasMounted &&
+        uniqueSymbolsInWorkspace.map((s) => (
+          <StockDataHandler
+            key={`handler-${s}`}
+            symbol={s}
+            onQuoteReceived={processLiveQuote}
+            onStaticProfileUpdate={processStaticProfileUpdate}
+            onMarketStatusChange={handleMarketStatusChange}
+          />
+        ))}
 
-      {uniqueSymbolsInWorkspace.length > 0 && (
+      {/* Conditionally render Market Status Display */}
+      {hasMounted && effectiveActiveCardsLength > 0 && (
         <div className="px-2 sm:px-4 text-center py-2 bg-card border text-card-foreground rounded-md text-xs sm:text-sm shadow max-h-48 overflow-y-auto">
           <h3 className="font-semibold mb-1 text-sm">Market Data Status:</h3>
           {uniqueSymbolsInWorkspace.map((s) => {
@@ -161,7 +180,16 @@ export default function WorkspacePage() {
       )}
 
       <div className="px-2 sm:px-0">
-        {activeCards.length === 0 && !isAddingCardInProgress ? (
+        {/* Conditional rendering for empty state vs. active cards section */}
+        {!hasMounted || isAuthLoading ? (
+          // Initial loading state (matches server if everything else is empty)
+          <div className="text-center py-16 sm:py-20">
+            <p className="text-lg text-muted-foreground">
+              Loading Workspace...
+            </p>
+          </div>
+        ) : effectiveActiveCardsLength === 0 && !isAddingCardInProgress ? (
+          // Empty state shown only after mount and if truly empty
           <div className="text-center py-16 sm:py-20">
             <RefreshCw
               size={48}
@@ -172,9 +200,9 @@ export default function WorkspacePage() {
               Your workspace is currently empty.
             </p>
             <AddCardForm
-              onAddCard={addCardToWorkspace} // From hook
-              existingCards={activeCards} // From hook
-              isPremiumUser={isPremiumUser}
+              onAddCard={addCardToWorkspace}
+              existingCards={activeCards} // Pass actual activeCards
+              isPremiumUser={isPremium}
               lockedSymbolForRegularUser={null}
               triggerButton={
                 <Button size="lg">
@@ -182,7 +210,7 @@ export default function WorkspacePage() {
                 </Button>
               }
             />
-            {!isPremiumUser && (
+            {!isPremium && (
               <p className="text-xs text-muted-foreground mt-3">
                 (You can add one symbol at a time. Clear workspace to change
                 symbol.)
@@ -190,13 +218,15 @@ export default function WorkspacePage() {
             )}
           </div>
         ) : (
+          // Active cards section
           <ActiveCardsSection
-            activeCards={activeCards} // From hook
-            setActiveCards={setActiveCards} // From hook (for local UI updates in ActiveCardsSection)
+            activeCards={activeCards}
+            setActiveCards={setActiveCards}
           />
         )}
       </div>
 
+      {/* Clear Workspace Confirmation Dialog */}
       <AlertDialog
         open={isClearConfirmOpen}
         onOpenChange={setIsClearConfirmOpen}>
@@ -213,7 +243,7 @@ export default function WorkspacePage() {
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={confirmedClearWorkspace} // Use the page-level handler
+              onClick={confirmedClearWorkspace}
               className="bg-destructive hover:bg-destructive/90">
               Clear Workspace
             </AlertDialogAction>
