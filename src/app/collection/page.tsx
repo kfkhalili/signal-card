@@ -1,26 +1,32 @@
 // src/app/collection/page.tsx
 import { createClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import CollectionClientPage from "./CollectionClientPage";
 import type { CardType } from "@/components/game/cards/base-card/base-card.types";
-import type { ConcreteCardData } from "@/components/game/types"; // Import ConcreteCardData
+import type { ConcreteCardData } from "@/components/game/types";
 
-// Define the structure of the data passed from Server to Client
-// This combines the DB row data with the fully typed snapshot
-export interface ServerFetchedCollectedCard {
-  // DB Row fields
-  id: string; // user_collected_cards.id
-  user_id: string;
+// Define the structure of a snapshot as fetched from the 'card_snapshots' table
+interface CardSnapshotFromDB {
+  id: string; // This is the snapshot_id (UUID) from card_snapshots table
   card_type: CardType;
   symbol: string;
   company_name?: string | null;
   logo_url?: string | null;
-  captured_at: string; // ISO string
-  card_data_snapshot: ConcreteCardData; // Parsed JSONB object (PriceCardData | ProfileCardData)
+  card_data_snapshot: ConcreteCardData; // Parsed JSONB object
   rarity_level?: string | null;
   rarity_reason?: string | null;
+  first_seen_at: string; // ISO string for timestamp
+}
+
+// Define the structure of the data passed from Server to Client
+export interface ServerFetchedCollectedCard {
+  user_collection_id: string; // The ID of the entry in user_collections (UUID)
+  user_id: string;
+  snapshot_id: string;
+  captured_at: string;
+  user_notes?: string | null;
+  card_snapshot_data: CardSnapshotFromDB;
 }
 
 export default async function CollectionPage() {
@@ -34,11 +40,27 @@ export default async function CollectionPage() {
     redirect("/auth?message=Please log in to view your collection.");
   }
 
-  // Fetch only the columns needed for ServerFetchedCollectedCard
-  const { data: collectedCardsData, error } = await supabase
-    .from("user_collected_cards")
+  const { data: userCollectionEntries, error } = await supabase
+    .from("user_collections")
     .select(
-      "id, user_id, card_type, symbol, company_name, logo_url, captured_at, card_data_snapshot, rarity_level, rarity_reason" // Select specific columns
+      `
+      id,
+      user_id,
+      captured_at,
+      user_notes,
+      snapshot_id,
+      card_snapshots (
+        id,
+        card_type,
+        symbol,
+        company_name,
+        logo_url,
+        card_data_snapshot,
+        rarity_level,
+        rarity_reason,
+        first_seen_at
+      )
+    `
     )
     .eq("user_id", user.id)
     .order("captured_at", { ascending: false });
@@ -57,33 +79,57 @@ export default async function CollectionPage() {
     );
   }
 
-  // Map directly to ServerFetchedCollectedCard
   const serverCollectedCards: ServerFetchedCollectedCard[] =
-    collectedCardsData?.map((dbRow) => {
-      // Assert the type of the snapshot fetched from the DB
-      const concreteCardData = dbRow.card_data_snapshot as ConcreteCardData;
+    (userCollectionEntries
+      ?.map((entry) => {
+        // --- Corrected Handling ---
+        // Supabase might return card_snapshots as an array or an object depending on the join.
+        // If it's a to-one relationship, it's often an object. If it could be many, it's an array.
+        // Given snapshot_id is a direct FK to card_snapshots.id (PK), it should be one.
+        // However, the type inference suggests it might be an array.
+        let snapshotData: CardSnapshotFromDB | null = null;
+        if (Array.isArray(entry.card_snapshots)) {
+          if (entry.card_snapshots.length > 0) {
+            snapshotData = entry.card_snapshots[0] as CardSnapshotFromDB;
+          }
+        } else if (entry.card_snapshots) {
+          // If it's already an object (and not null)
+          snapshotData = entry.card_snapshots as CardSnapshotFromDB;
+        }
+        // --- End Corrected Handling ---
 
-      // Ensure card_type from DB matches the type within the snapshot
-      if (dbRow.card_type !== concreteCardData.type) {
-        console.warn(
-          `Mismatch between dbRow.card_type (${dbRow.card_type}) and snapshot.type (${concreteCardData.type}) for card ID ${dbRow.id}. Using dbRow.card_type.`
-        );
-        // Potentially log this mismatch more formally or handle it
-      }
+        if (!snapshotData) {
+          console.warn(
+            `Collection entry ${entry.id} is missing its card snapshot data. Skipping.`
+          );
+          return null;
+        }
 
-      return {
-        id: dbRow.id,
-        user_id: dbRow.user_id,
-        card_type: dbRow.card_type as CardType,
-        symbol: dbRow.symbol,
-        company_name: dbRow.company_name,
-        logo_url: dbRow.logo_url,
-        captured_at: dbRow.captured_at,
-        card_data_snapshot: concreteCardData,
-        rarity_level: dbRow.rarity_level,
-        rarity_reason: dbRow.rarity_reason,
-      };
-    }) || [];
+        const concreteCardData =
+          snapshotData.card_data_snapshot as ConcreteCardData;
+
+        if (snapshotData.card_type !== concreteCardData.type) {
+          console.warn(
+            `Data inconsistency: snapshotData.card_type (${snapshotData.card_type}) vs. concreteCardData.type (${concreteCardData.type}) for snapshot ID ${snapshotData.id}. Using snapshotData.card_type.`
+          );
+        }
+
+        const correctlyTypedSnapshot: CardSnapshotFromDB = {
+          ...snapshotData,
+          card_data_snapshot: concreteCardData,
+          card_type: snapshotData.card_type as CardType,
+        };
+
+        return {
+          user_collection_id: entry.id,
+          user_id: entry.user_id,
+          snapshot_id: entry.snapshot_id,
+          captured_at: entry.captured_at,
+          user_notes: entry.user_notes,
+          card_snapshot_data: correctlyTypedSnapshot,
+        };
+      })
+      .filter(Boolean) as ServerFetchedCollectedCard[]) || [];
 
   return (
     <div className="container mx-auto p-4">
@@ -95,7 +141,6 @@ export default async function CollectionPage() {
           &larr; Back to Workspace
         </Link>
       </div>
-      {/* Pass the new structure to the client */}
       <CollectionClientPage initialCollectedCards={serverCollectedCards} />
     </div>
   );

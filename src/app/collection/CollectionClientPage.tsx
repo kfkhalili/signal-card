@@ -2,12 +2,10 @@
 "use client";
 
 import React, { useState, useCallback, useEffect } from "react";
-import type { ServerFetchedCollectedCard } from "./page";
+import type { ServerFetchedCollectedCard } from "./page"; // Uses new type from page.tsx
 import GameCard from "@/components/game/GameCard";
 import type {
   DisplayableCard,
-  DisplayableLivePriceCard,
-  DisplayableProfileCard,
   ConcreteCardData,
 } from "@/components/game/types";
 import type {
@@ -16,7 +14,7 @@ import type {
   CardType,
 } from "@/components/game/cards/base-card/base-card.types";
 import { useToast } from "@/hooks/use-toast";
-import { createClient } from "@/lib/supabase/client";
+// No direct Supabase client needed here for CRUD, using fetch for API calls
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,73 +39,61 @@ interface CollectionClientPageProps {
   initialCollectedCards: ServerFetchedCollectedCard[];
 }
 
-// Refactored adapter function - DRYer and respects readonly
 function adaptServerToDisplayable(
   serverCard: ServerFetchedCollectedCard,
   isFlipped: boolean
 ): DisplayableCard {
+  const snapshot = serverCard.card_snapshot_data; // Main source of card content
   const capturedAtTimestamp = new Date(serverCard.captured_at).getTime();
 
-  // Prepare common display state and base data properties
-  // These will be merged with the specific card data from the snapshot
   const commonData = {
-    id: serverCard.id, // Use DB collection ID
-    symbol: serverCard.symbol,
-    // We will handle potential override/fallback for companyName/logoUrl below
+    id: snapshot.id, // Use snapshot_id as the primary ID for GameCard and its interactions
+    symbol: snapshot.symbol,
+    // Use captured_at for when this user collected it. first_seen_at is when the snapshot was globally created.
     createdAt: capturedAtTimestamp,
     isFlipped: isFlipped,
-    currentRarity: serverCard.rarity_level,
-    rarityReason: serverCard.rarity_reason,
+    currentRarity: snapshot.rarity_level,
+    rarityReason: snapshot.rarity_reason,
+    companyName: snapshot.company_name,
+    logoUrl: snapshot.logo_url,
   };
 
-  switch (serverCard.card_type) {
+  const concreteCardDataFromSnapshot = snapshot.card_data_snapshot;
+
+  switch (snapshot.card_type) {
     case "price": {
-      const snapshot = serverCard.card_data_snapshot as PriceCardData;
-      // Construct the object directly, spreading snapshot first, then common data
-      const card: DisplayableLivePriceCard = {
-        ...snapshot, // Includes snapshot's type, faceData, backData, etc.
-        ...commonData, // Overrides id, symbol, createdAt, state
-        type: "price", // **Crucially override type to the specific literal**
-        // Apply fallback logic for potentially readonly fields during construction
-        companyName: serverCard.company_name ?? snapshot.companyName,
-        logoUrl: serverCard.logo_url ?? snapshot.logoUrl,
+      const priceSpecificData = concreteCardDataFromSnapshot as PriceCardData;
+      const card: DisplayableCard = {
+        ...priceSpecificData, // Contains faceData, backData specific to PriceCard
+        ...commonData, // Overrides id, symbol, etc. with values from commonData
+        type: "price", // Explicitly set type
       };
       return card;
     }
     case "profile": {
-      const snapshot = serverCard.card_data_snapshot as ProfileCardData;
-      // Construct the object directly
-      const card: DisplayableProfileCard = {
-        ...snapshot, // Includes snapshot's type, staticData, liveData, etc.
-        ...commonData, // Overrides id, symbol, createdAt, state
-        type: "profile", // **Crucially override type to the specific literal**
-        // Apply fallback logic for potentially readonly fields during construction
-        companyName: serverCard.company_name ?? snapshot.companyName,
-        logoUrl: serverCard.logo_url ?? snapshot.logoUrl,
+      const profileSpecificData =
+        concreteCardDataFromSnapshot as ProfileCardData;
+      const card: DisplayableCard = {
+        ...profileSpecificData, // Contains staticData, liveData specific to ProfileCard
+        ...commonData,
+        type: "profile",
       };
       return card;
     }
     default: {
-      // Handle unexpected card types - log error and provide a minimal fallback
       console.error(
         "Unhandled card type in adaptServerToDisplayable:",
-        serverCard.card_type,
+        snapshot.card_type,
         serverCard
       );
-      const snapshot = serverCard.card_data_snapshot;
       const fallbackCard = {
-        ...(snapshot ?? {}), // Spread snapshot if exists, otherwise empty object
-        ...commonData, // Add common fields
-        type: serverCard.card_type, // Keep original type string
-        // Apply fallback logic
-        companyName: serverCard.company_name ?? snapshot?.companyName,
-        logoUrl: serverCard.logo_url ?? snapshot?.logoUrl,
-        // Ensure minimal required fields exist to avoid runtime errors downstream
-        backData: snapshot?.backData ?? {
-          description: `Unknown Card Type: ${serverCard.card_type}`,
+        ...(concreteCardDataFromSnapshot ?? {}),
+        ...commonData,
+        type: snapshot.card_type as CardType,
+        backData: (concreteCardDataFromSnapshot as any)?.backData ?? {
+          description: `Unknown Card Type: ${snapshot.card_type}`,
         },
       };
-      // This cast is necessary because we cannot guarantee conformance
       return fallbackCard as unknown as DisplayableCard;
     }
   }
@@ -122,19 +108,19 @@ export default function CollectionClientPage({
   const [cardToConfirmDelete, setCardToConfirmDelete] =
     useState<ClientCollectedCard | null>(null);
   const { toast } = useToast();
-  const supabase = createClient();
 
   useEffect(() => {
-    // console.log(
-    //   "[CollectionClientPage] Initial server cards received:",
-    //   initialCollectedCards
-    // );
+    // Optional: Log initial cards or perform other setup
+    // console.log("[CollectionClientPage] Initial cards from server:", initialCollectedCards);
   }, [initialCollectedCards]);
 
-  const handleToggleFlipCard = useCallback((collectedCardId: string) => {
+  const handleToggleFlipCard = useCallback((displayableCardId: string) => {
+    // displayableCardId is snapshot_id. ClientCollectedCard has snapshot_id.
     setCollectedCards((prev) =>
       prev.map((cc) =>
-        cc.id === collectedCardId ? { ...cc, isFlipped: !cc.isFlipped } : cc
+        cc.snapshot_id === displayableCardId
+          ? { ...cc, isFlipped: !cc.isFlipped }
+          : cc
       )
     );
   }, []);
@@ -145,46 +131,77 @@ export default function CollectionClientPage({
 
   const confirmDeletion = useCallback(async () => {
     if (!cardToConfirmDelete) return;
-    const { error } = await supabase
-      .from("user_collected_cards")
-      .delete()
-      .eq("id", cardToConfirmDelete.id);
 
-    if (error) {
+    try {
+      // cardToConfirmDelete.user_collection_id is the ID of the row in user_collections table
+      const response = await fetch(
+        `/api/collections/remove/${cardToConfirmDelete.user_collection_id}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (!response.ok) {
+        const errorResult = await response.json();
+        throw new Error(
+          errorResult.error ||
+            `Failed to remove card (status ${response.status})`
+        );
+      }
+
+      setCollectedCards((prev) =>
+        prev.filter(
+          (cc) =>
+            cc.user_collection_id !== cardToConfirmDelete.user_collection_id
+        )
+      );
       toast({
-        title: "Deletion Failed",
+        title: "Card Removed",
+        description: `${
+          cardToConfirmDelete.card_snapshot_data.company_name ||
+          cardToConfirmDelete.card_snapshot_data.symbol
+        } removed from your collection.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Removal Failed",
         description: error.message,
         variant: "destructive",
       });
-    } else {
-      setCollectedCards((prev) =>
-        prev.filter((cc) => cc.id !== cardToConfirmDelete.id)
-      );
-      toast({
-        title: "Card Deleted",
-        description: `${
-          cardToConfirmDelete.company_name || cardToConfirmDelete.symbol
-        } removed from your collection.`,
-      });
+    } finally {
+      setCardToConfirmDelete(null);
     }
-    setCardToConfirmDelete(null);
-  }, [cardToConfirmDelete, supabase, toast]);
+  }, [cardToConfirmDelete, toast]);
 
   const cancelDeletion = useCallback(() => {
     setCardToConfirmDelete(null);
   }, []);
 
   const collectedCardSocialInteractions = useCallback(
-    (collectedCard: ClientCollectedCard): BaseCardSocialInteractions => ({
-      // Define interactions if needed
-    }),
-    []
+    (
+      clientCard: ClientCollectedCard
+    ): BaseCardSocialInteractions | undefined => {
+      // Interactions on the collection page might differ.
+      // For now, perhaps no "Save" (it's already saved to collection).
+      // "Like" could still be relevant (liking the global snapshot).
+      // "Comment" could be added here.
+      // This needs further design based on desired UX for collected items.
+      return {
+        // Example:
+        // onLike: async () => {
+        //   const snapshotId = clientCard.snapshot_id;
+        //   // call /api/snapshots/like with snapshotId
+        //   toast({title: "Liked from collection!"});
+        // },
+      };
+    },
+    [toast] // Add dependencies if interactions are implemented
   );
 
   if (collectedCards.length === 0) {
     return (
       <p className="text-center text-muted-foreground mt-10">
-        Your card collection is empty. Go capture some cards!
+        Your card collection is empty. Go capture some cards from the workspace!
       </p>
     );
   }
@@ -198,65 +215,68 @@ export default function CollectionClientPage({
             clientCard.isFlipped
           );
 
-          const collectedCardActionContext: CardActionContext = {
-            id: clientCard.id,
-            symbol: clientCard.symbol,
-            type: clientCard.card_type,
-            companyName: clientCard.company_name,
-            logoUrl: clientCard.logo_url,
+          const cardActionContext: CardActionContext = {
+            id: displayableCardForGameCard.id, // This is snapshot_id
+            symbol: displayableCardForGameCard.symbol,
+            type: displayableCardForGameCard.type,
+            companyName: displayableCardForGameCard.companyName,
+            logoUrl: displayableCardForGameCard.logoUrl,
+            websiteUrl: (displayableCardForGameCard as ProfileCardData)
+              .staticData?.website,
           };
 
-          // Add a check for the fallback case from adaptServerToDisplayable
-          // to prevent rendering potentially broken cards fully.
           if (
             !displayableCardForGameCard ||
             (displayableCardForGameCard.type !== "price" &&
               displayableCardForGameCard.type !== "profile")
           ) {
-            console.warn(
-              "Skipping render for card with unhandled or fallback type:",
-              clientCard
-            );
-            // Optionally render a placeholder or skip entirely
             return (
               <div
-                key={clientCard.id}
+                key={clientCard.user_collection_id}
                 className="p-4 border border-dashed rounded-lg text-xs text-muted-foreground">
-                Unsupported Card Type: {clientCard.card_type} <br />
-                ID: {clientCard.id}
+                Unsupported Card Type: {clientCard.card_snapshot_data.card_type}{" "}
+                <br />
+                Collection ID: {clientCard.user_collection_id}
               </div>
             );
           }
 
           return (
             <div
-              key={clientCard.id}
+              key={clientCard.user_collection_id} // React key is the user_collection_id
               className="flex flex-col items-center space-y-2">
               <GameCard
-                card={displayableCardForGameCard}
-                onToggleFlip={() => handleToggleFlipCard(clientCard.id)}
+                card={displayableCardForGameCard} // .id here is snapshot_id
+                onToggleFlip={() =>
+                  handleToggleFlipCard(displayableCardForGameCard.id)
+                } // pass snapshot_id
                 onDeleteCardRequest={() => {
                   /* Deletion handled by button below */
                 }}
                 socialInteractions={collectedCardSocialInteractions(clientCard)}
-                priceSpecificInteractions={undefined}
-                profileSpecificInteractions={undefined}
-                onHeaderIdentityClick={undefined}
+                // Pass other specific interactions if defined for collection view
               />
               <div className="text-center w-full px-1">
                 <p className="text-xs text-muted-foreground">
-                  Captured:{" "}
+                  Collected:{" "}
                   {format(new Date(clientCard.captured_at), "MMM d, yy HH:mm")}
                 </p>
+                {clientCard.user_notes && (
+                  <p
+                    className="text-xs text-muted-foreground italic mt-0.5 line-clamp-2"
+                    title={clientCard.user_notes}>
+                    Notes: {clientCard.user_notes}
+                  </p>
+                )}
                 <div className="flex justify-center space-x-2 mt-1">
                   <Button
                     variant="ghost"
                     size="sm"
                     className="text-destructive hover:text-destructive hover:bg-destructive/10"
                     onClick={() => requestDeleteCard(clientCard)}
-                    title="Delete from Collection">
+                    title="Remove from Collection">
                     <Trash2 size={14} />{" "}
-                    <span className="ml-1 hidden sm:inline">Delete</span>
+                    <span className="ml-1 hidden sm:inline">Remove</span>
                   </Button>
                 </div>
               </div>
@@ -271,11 +291,13 @@ export default function CollectionClientPage({
           onOpenChange={(open) => !open && cancelDeletion()}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete Collected Card?</AlertDialogTitle>
+              <AlertDialogTitle>Remove From Collection?</AlertDialogTitle>
               <AlertDialogDescription>
                 Are you sure you want to remove this card (
-                {cardToConfirmDelete.company_name || cardToConfirmDelete.symbol}
-                ) from your collection? This action cannot be undone.
+                {cardToConfirmDelete.card_snapshot_data.company_name ||
+                  cardToConfirmDelete.card_snapshot_data.symbol}
+                ) from your collection? This will not delete likes or comments
+                on the underlying snapshot made by others.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -285,7 +307,7 @@ export default function CollectionClientPage({
               <AlertDialogAction
                 onClick={confirmDeletion}
                 className="bg-destructive hover:bg-destructive/90">
-                Delete
+                Remove
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
