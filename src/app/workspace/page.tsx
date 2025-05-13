@@ -6,11 +6,14 @@ import { format } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
 import { createClient } from "@/lib/supabase/client";
 
-import { AddCardForm } from "@/components/workspace/AddCardForm";
+import {
+  AddCardForm,
+  type AddCardFormValues,
+} from "@/components/workspace/AddCardForm";
 import { StockDataHandler } from "@/components/workspace/StockDataHandler";
 import { useWorkspaceManager } from "@/hooks/useWorkspaceManager";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, RefreshCw } from "lucide-react";
+import { PlusCircle, RefreshCw, Loader2 } from "lucide-react"; // Added Loader2
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,21 +30,23 @@ import ActiveCardsSection from "@/components/game/ActiveCardsSection";
 import type {
   CombinedQuoteData,
   MarketStatusDisplayHook,
-  // ProfileDBRow, // Not directly used in this component, but by hooks/handlers
 } from "@/hooks/useStockData";
+import type { CardActionContext } from "@/components/game/cards/base-card/base-card.types";
+import type { ProfileCardInteractionCallbacks } from "@/components/game/cards/profile-card/profile-card.types";
 
 export default function WorkspacePage() {
   const { user, isLoading: isAuthLoading } = useAuth(); // Get auth loading state
   const supabase = createClient();
 
-  // State to prevent hydration mismatch for client-side initialized data
+  // State to prevent hydration mismatch
   const [hasMounted, setHasMounted] = useState(false);
   useEffect(() => {
     setHasMounted(true);
   }, []);
 
-  // isPremium should only be considered final after auth is loaded and component is mounted
-  const isPremium =
+  // Determine isPremium only after mount and auth is resolved
+  // For server render and initial client render before mount/auth, assume not premium
+  const isPremiumUser =
     hasMounted && !isAuthLoading
       ? user?.app_metadata?.is_premium ?? false
       : false;
@@ -56,7 +61,7 @@ export default function WorkspacePage() {
     processLiveQuote,
     processStaticProfileUpdate,
     uniqueSymbolsInWorkspace,
-  } = useWorkspaceManager({ supabase, isPremiumUser: isPremium }); // Pass stable isPremium
+  } = useWorkspaceManager({ supabase, isPremiumUser }); // Pass the derived isPremium
 
   const [marketStatuses, setMarketStatuses] = useState<
     Record<
@@ -91,18 +96,46 @@ export default function WorkspacePage() {
     setIsClearConfirmOpen(false);
   };
 
-  // Determine effective activeCards length only after mount to match server's initial empty state
+  const handleRequestPriceCard = useCallback(
+    (context: CardActionContext) => {
+      const values: AddCardFormValues = {
+        symbol: context.symbol,
+        cardType: "price",
+      };
+      addCardToWorkspace(values);
+    },
+    [addCardToWorkspace]
+  );
+
+  const profileInteractions: ProfileCardInteractionCallbacks = {
+    onRequestPriceCard: handleRequestPriceCard,
+    // Add other profile interactions if defined in WorkspacePage
+  };
+
+  // Use effectiveActiveCardsLength for conditional rendering to ensure server and client match initially
   const effectiveActiveCardsLength = hasMounted ? activeCards.length : 0;
+
+  // Initial loading UI before mount or while auth is resolving
+  if (!hasMounted || isAuthLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-4 text-lg text-muted-foreground">
+          Loading Workspace...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-10">
       <div className="px-2 sm:px-4 pt-4 flex flex-col sm:flex-row justify-between items-center gap-3">
         <h1 className="text-xl sm:text-2xl font-semibold">My Workspace</h1>
+        {/* Conditional rendering for header buttons based on client-side state */}
         <div className="flex gap-2 items-center" style={{ minHeight: "32px" }}>
           {" "}
-          {/* Ensure min-height for layout consistency */}
-          {/* Only render these buttons after mount and auth state is resolved */}
-          {hasMounted && !isAuthLoading && effectiveActiveCardsLength > 0 && (
+          {/* minHeight to prevent layout shift */}
+          {effectiveActiveCardsLength > 0 && (
             <Button
               variant="outline"
               size="sm"
@@ -111,85 +144,75 @@ export default function WorkspacePage() {
               <RefreshCw className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Clear All
             </Button>
           )}
-          {hasMounted &&
-            !isAuthLoading &&
-            (effectiveActiveCardsLength > 0 || isPremium) && (
-              <AddCardForm
-                onAddCard={addCardToWorkspace}
-                existingCards={activeCards} // Pass actual activeCards for logic
-                isPremiumUser={isPremium}
-                lockedSymbolForRegularUser={workspaceSymbolForRegularUser}
-              />
-            )}
+          {(effectiveActiveCardsLength > 0 || isPremiumUser) && (
+            <AddCardForm
+              onAddCard={addCardToWorkspace}
+              existingCards={activeCards}
+              isPremiumUser={isPremiumUser}
+              lockedSymbolForRegularUser={workspaceSymbolForRegularUser}
+            />
+          )}
         </div>
       </div>
 
-      {/* Conditionally render StockDataHandlers only after mount to avoid issues with uniqueSymbolsInWorkspace */}
-      {hasMounted &&
-        uniqueSymbolsInWorkspace.map((s) => (
-          <StockDataHandler
-            key={`handler-${s}`}
-            symbol={s}
-            onQuoteReceived={processLiveQuote}
-            onStaticProfileUpdate={processStaticProfileUpdate}
-            onMarketStatusChange={handleMarketStatusChange}
-          />
-        ))}
+      {/* Render StockDataHandlers only after mount */}
+      {uniqueSymbolsInWorkspace.map((s) => (
+        <StockDataHandler
+          key={`handler-${s}`}
+          symbol={s}
+          onQuoteReceived={processLiveQuote}
+          onStaticProfileUpdate={processStaticProfileUpdate}
+          onMarketStatusChange={handleMarketStatusChange}
+        />
+      ))}
 
-      {/* Conditionally render Market Status Display */}
-      {hasMounted && effectiveActiveCardsLength > 0 && (
-        <div className="px-2 sm:px-4 text-center py-2 bg-card border text-card-foreground rounded-md text-xs sm:text-sm shadow max-h-48 overflow-y-auto">
-          <h3 className="font-semibold mb-1 text-sm">Market Data Status:</h3>
-          {uniqueSymbolsInWorkspace.map((s) => {
-            const statusInfo = marketStatuses[s];
-            if (!statusInfo && !isAddingCardInProgress)
+      {/* Render Market Status Display only if there are symbols */}
+      {effectiveActiveCardsLength > 0 &&
+        uniqueSymbolsInWorkspace.length > 0 && (
+          <div className="px-2 sm:px-4 text-center py-2 bg-card border text-card-foreground rounded-md text-xs sm:text-sm shadow max-h-48 overflow-y-auto">
+            <h3 className="font-semibold mb-1 text-sm">Market Data Status:</h3>
+            {uniqueSymbolsInWorkspace.map((s) => {
+              const statusInfo = marketStatuses[s];
+              if (!statusInfo && !isAddingCardInProgress)
+                return (
+                  <p
+                    key={`status-${s}`}
+                    className="text-xs text-muted-foreground">
+                    {s}: Initializing stream...
+                  </p>
+                );
+              if (!statusInfo && isAddingCardInProgress) return null;
               return (
-                <p
-                  key={`status-${s}`}
-                  className="text-xs text-muted-foreground">
-                  {s}: Initializing stream...
-                </p>
-              );
-            if (!statusInfo && isAddingCardInProgress) return null;
-            return (
-              <div key={`status-${s}`} className="text-xs mb-0.5">
-                <strong>{s}:</strong> {statusInfo.status}
-                {statusInfo.message && (
-                  <span className="italic text-muted-foreground">
-                    {" "}
-                    ({String(statusInfo.message)})
-                  </span>
-                )}
-                {statusInfo.timestamp &&
-                  !isNaN(new Date(statusInfo.timestamp * 1000).getTime()) && (
-                    <span className="block text-muted-foreground/80">
-                      Last: {format(new Date(statusInfo.timestamp * 1000), "p")}
+                <div key={`status-${s}`} className="text-xs mb-0.5">
+                  <strong>{s}:</strong> {statusInfo.status}
+                  {statusInfo.message && (
+                    <span className="italic text-muted-foreground">
+                      {" "}
+                      ({String(statusInfo.message)})
                     </span>
                   )}
-              </div>
-            );
-          })}
-          {Object.keys(marketStatuses).length === 0 &&
-            uniqueSymbolsInWorkspace.length > 0 &&
-            !isAddingCardInProgress && (
-              <p className="text-xs text-muted-foreground">
-                Awaiting data streams for active symbols...
-              </p>
-            )}
-        </div>
-      )}
+                  {statusInfo.timestamp &&
+                    !isNaN(new Date(statusInfo.timestamp * 1000).getTime()) && (
+                      <span className="block text-muted-foreground/80">
+                        Last:{" "}
+                        {format(new Date(statusInfo.timestamp * 1000), "p")}
+                      </span>
+                    )}
+                </div>
+              );
+            })}
+            {Object.keys(marketStatuses).length === 0 &&
+              uniqueSymbolsInWorkspace.length > 0 &&
+              !isAddingCardInProgress && (
+                <p className="text-xs text-muted-foreground">
+                  Awaiting data streams for active symbols...
+                </p>
+              )}
+          </div>
+        )}
 
       <div className="px-2 sm:px-0">
-        {/* Conditional rendering for empty state vs. active cards section */}
-        {!hasMounted || isAuthLoading ? (
-          // Initial loading state (matches server if everything else is empty)
-          <div className="text-center py-16 sm:py-20">
-            <p className="text-lg text-muted-foreground">
-              Loading Workspace...
-            </p>
-          </div>
-        ) : effectiveActiveCardsLength === 0 && !isAddingCardInProgress ? (
-          // Empty state shown only after mount and if truly empty
+        {effectiveActiveCardsLength === 0 && !isAddingCardInProgress ? (
           <div className="text-center py-16 sm:py-20">
             <RefreshCw
               size={48}
@@ -201,8 +224,8 @@ export default function WorkspacePage() {
             </p>
             <AddCardForm
               onAddCard={addCardToWorkspace}
-              existingCards={activeCards} // Pass actual activeCards
-              isPremiumUser={isPremium}
+              existingCards={activeCards}
+              isPremiumUser={isPremiumUser}
               lockedSymbolForRegularUser={null}
               triggerButton={
                 <Button size="lg">
@@ -210,7 +233,7 @@ export default function WorkspacePage() {
                 </Button>
               }
             />
-            {!isPremium && (
+            {!isPremiumUser && (
               <p className="text-xs text-muted-foreground mt-3">
                 (You can add one symbol at a time. Clear workspace to change
                 symbol.)
@@ -218,15 +241,14 @@ export default function WorkspacePage() {
             )}
           </div>
         ) : (
-          // Active cards section
           <ActiveCardsSection
             activeCards={activeCards}
             setActiveCards={setActiveCards}
+            profileSpecificInteractions={profileInteractions}
           />
         )}
       </div>
 
-      {/* Clear Workspace Confirmation Dialog */}
       <AlertDialog
         open={isClearConfirmOpen}
         onOpenChange={setIsClearConfirmOpen}>

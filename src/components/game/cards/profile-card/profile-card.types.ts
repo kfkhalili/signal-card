@@ -1,12 +1,11 @@
 // src/components/game/cards/profile-card/profile-card.types.ts
 import type {
   BaseCardData,
-  BaseCardBackData, // Import BaseCardBackData directly
+  BaseCardBackData,
   CardActionContext,
 } from "../base-card/base-card.types";
 import type { PriceCardFaceData } from "../price-card/price-card.types";
 
-// Static data primarily from 'profiles' table
 export interface ProfileCardStaticData {
   readonly db_id: string;
   readonly sector?: string | null;
@@ -38,20 +37,16 @@ export type ProfileCardLiveData = Partial<
     | "dayLow"
     | "timestamp"
     | "volume"
-    | "yearHigh"
-    | "yearLow"
+    // yearHigh and yearLow are typically not part of profile live data,
+    // but can be if your CombinedQuoteData includes them for profiles too.
   >
 >;
-
-// ProfileCardBackDataType REMOVED as it was identical to BaseCardBackData
 
 export interface ProfileCardData extends BaseCardData {
   readonly type: "profile";
   readonly staticData: ProfileCardStaticData;
   liveData: ProfileCardLiveData;
-
-  // Use BaseCardBackData directly
-  readonly backData: BaseCardBackData;
+  readonly backData: BaseCardBackData; // Generic card type description
 }
 
 export interface ProfileCardInteractionCallbacks {
@@ -60,5 +55,6 @@ export interface ProfileCardInteractionCallbacks {
     fieldType: "sector" | "industry" | "exchange",
     value: string
   ) => void;
-  readonly onShowFullPriceCard?: (context: CardActionContext) => void;
+  // Renamed from onShowFullPriceCard
+  readonly onRequestPriceCard?: (context: CardActionContext) => void; // <<< RENAMED
 }

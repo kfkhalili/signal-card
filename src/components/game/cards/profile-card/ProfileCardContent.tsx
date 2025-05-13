@@ -9,19 +9,19 @@ import type {
   ProfileCardInteractionCallbacks,
 } from "./profile-card.types";
 import {
+  ExternalLink,
   Users,
   CalendarDays,
   Building,
   TrendingUp,
   UserCheck,
   Info,
-  // ExternalLink, // No longer needed here as logo is the link
 } from "lucide-react";
 import { getFlagEmoji, getCountryName } from "@/lib/utils";
 import {
   SectorIconDisplay,
   type SectorName,
-} from "@/components/workspace/SectorIconDisplay"; // Ensure path is correct
+} from "@/components/workspace/SectorIconDisplay";
 import {
   Tooltip,
   TooltipContent,
@@ -49,19 +49,47 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
   ({ cardData, isBackFace, interactionCallbacks }) => {
     const { staticData, liveData, symbol, companyName } = cardData;
 
-    // Event Handlers
-    // handleWebsiteClick is no longer needed here as the logo in BaseCard handles it.
-    // The onWebsiteClick from interactionCallbacks would be triggered by BaseCard if needed.
+    // Debugging log for interactionCallbacks
+    if (!isBackFace) {
+      // Only log for the front face where the price click is relevant
+      console.log(
+        `[ProfileCardContent - ${symbol} FRONT] Received interactionCallbacks:`,
+        interactionCallbacks
+      );
+      if (interactionCallbacks) {
+        console.log(
+          `[ProfileCardContent - ${symbol} FRONT] interactionCallbacks.onRequestPriceCard:`,
+          interactionCallbacks.onRequestPriceCard
+        );
+        console.log(
+          `[ProfileCardContent - ${symbol} FRONT] Is price item interactive?:`,
+          !!interactionCallbacks.onRequestPriceCard
+        );
+      }
+    }
+
+    const handleWebsiteClick = (e: React.MouseEvent | React.KeyboardEvent) => {
+      if (staticData.website && interactionCallbacks?.onWebsiteClick) {
+        e.stopPropagation();
+        interactionCallbacks.onWebsiteClick(staticData.website);
+      }
+    };
 
     const handlePriceNavigate = (e: React.MouseEvent | React.KeyboardEvent) => {
-      if (interactionCallbacks?.onShowFullPriceCard) {
+      if (interactionCallbacks?.onRequestPriceCard) {
         e.stopPropagation();
-        interactionCallbacks.onShowFullPriceCard({
+        interactionCallbacks.onRequestPriceCard({
           id: cardData.id,
           symbol,
           type: cardData.type,
           companyName,
+          websiteUrl: staticData.website,
         });
+      } else {
+        // This else block is for debugging - if it's not clickable, this will log
+        console.warn(
+          `[ProfileCardContent - ${symbol}] handlePriceNavigate called, but onRequestPriceCard is not available.`
+        );
       }
     };
 
@@ -93,7 +121,7 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
             {taglineSource && (
               <p
                 className="text-muted-foreground leading-tight line-clamp-5"
-                style={{ minHeight: "6.25em" }} // Approx 5 lines for text-xs leading-tight
+                style={{ minHeight: "6.25em" }}
                 title={taglineSource || undefined}>
                 {taglineSource}
               </p>
@@ -112,6 +140,7 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
                   staticData.sector ? ` (Sector: ${staticData.sector})` : ""
                 }`}
                 baseClassName="flex items-center min-w-0 gap-1.5"
+                interactiveClassName="hover:text-primary cursor-pointer" // Added cursor-pointer
                 aria-label={`Filter by industry: ${
                   staticData.industry || "N/A"
                 }`}>
@@ -165,11 +194,12 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
           <div className="px-0 pt-1">
             <div className="flex justify-between items-center text-xs mb-0.5">
               <ClickableDataItem
-                isInteractive={!!interactionCallbacks?.onShowFullPriceCard}
+                isInteractive={!!interactionCallbacks?.onRequestPriceCard}
                 onClickHandler={handlePriceNavigate}
                 baseClassName="py-0.5"
-                interactiveClassName="hover:text-primary"
-                aria-label={`View financial details for ${symbol}`}>
+                // Ensure cursor-pointer is part of interactive class for visual feedback
+                interactiveClassName="hover:text-primary cursor-pointer"
+                aria-label={`Request Price Card for ${symbol}`}>
                 <div className="flex items-center">
                   <TrendingUp size={14} className="mr-1 shrink-0" />
                   <span className="font-semibold text-sm">
@@ -180,8 +210,6 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
                   </span>
                 </div>
               </ClickableDataItem>
-
-              {/* Placeholder for spacing if needed, as website link is removed */}
               <div></div>
             </div>
             <div className="flex flex-wrap gap-0.5 justify-end">
@@ -213,6 +241,7 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
     } else {
       // --- BACK FACE ---
       // No company description snippet on the back.
+      // cardData.backData.description holds generic card type info, not rendered here.
       return (
         <div
           data-testid={`profile-card-back-${symbol}`}

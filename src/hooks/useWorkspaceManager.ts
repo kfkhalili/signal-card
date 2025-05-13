@@ -13,6 +13,7 @@ import type {
   DisplayableLivePriceCard,
 } from "@/components/game/types";
 import type { AddCardFormValues } from "@/components/workspace/AddCardForm";
+import type { CardType } from "@/components/game/cards/base-card/base-card.types";
 import type { PriceCardData } from "@/components/game/cards/price-card/price-card.types";
 import type {
   ProfileCardData,
@@ -20,19 +21,18 @@ import type {
   ProfileCardStaticData,
 } from "@/components/game/cards/profile-card/profile-card.types";
 
-// Utility functions for creating card data
 import { createDisplayableProfileCardFromDB } from "@/components/game/cards/profile-card/profileCardUtils";
 import {
   createPriceCardFaceDataFromQuote,
   createPriceCardBackDataFromQuote,
   createDisplayablePriceCard,
 } from "@/components/game/cards/price-card/priceCardUtils";
-// This is the function in question - ensure the path and export are correct in its source file
+
 import { calculateDynamicCardRarity } from "@/components/game/rarityCalculator";
 import { rehydrateCardFromStorage } from "@/components/game/cardRehydration";
 import type { CombinedQuoteData, ProfileDBRow } from "@/hooks/useStockData";
-import type { LiveQuoteIndicatorDBRow } from "@/lib/supabase/realtime-service";
 import { format, parseISO } from "date-fns";
+import { LiveQuoteIndicatorDBRow } from "@/lib/supabase/realtime-service";
 
 const INITIAL_ACTIVE_CARDS: DisplayableCard[] = [];
 const WORKSPACE_LOCAL_STORAGE_KEY = "finSignal-mainWorkspace-v1";
@@ -215,19 +215,29 @@ export function useWorkspaceManager({
 
   const addCardToWorkspace = useCallback(
     async (values: AddCardFormValues) => {
-      setIsAddingCardInProgress(true);
-      let { symbol, cardType } = values;
+      // <<< --- ADD DEBUG LOG HERE --- >>>
+      console.log(
+        "[useWorkspaceManager] addCardToWorkspace called with values:",
+        values
+      );
 
+      setIsAddingCardInProgress(true);
+      let { symbol, cardType } = values; // cardType here comes from AddCardFormValues
+
+      // This logic correctly overrides for regular users if symbol is locked
       if (!isPremiumUser && workspaceSymbolForRegularUser) {
         symbol = workspaceSymbolForRegularUser;
       }
-      if (!isPremiumUser) {
-        cardType = "profile";
-      }
+      // For regular users, cardType from AddCardForm is already 'profile' if symbol is locked.
+      // If they click the price on profile card, 'price' is passed in `values`.
+      // We should respect the `cardType` from `values` if it's 'price' for this specific interaction.
+      // The AddCardForm itself handles locking cardType to 'profile' for general additions by regular users.
+      // So, no override of cardType here is needed if values.cardType is already 'price'.
 
       const cardExists = activeCards.some(
         (card) => card.symbol === symbol && card.type === cardType
       );
+
       if (cardExists) {
         setTimeout(
           () =>
@@ -272,6 +282,7 @@ export function useWorkspaceManager({
             );
           }
         } else if (cardType === "price") {
+          // This block should execute
           const { data: quoteData, error: quoteError } = await supabase
             .from("live_quote_indicators")
             .select("*")
@@ -441,7 +452,7 @@ export function useWorkspaceManager({
               },
             };
           },
-          undefined // No creator function for PriceCard in processLiveQuote
+          undefined
         );
 
         if (priceResult.cardChangedOrAdded) {
@@ -481,7 +492,6 @@ export function useWorkspaceManager({
           (c) => c.symbol === quoteData.symbol && c.type === "profile"
         );
         if (existingProfileCardIndex !== -1) {
-          // Use the imported function here
           const newProfileLiveData = createPriceCardFaceDataFromQuote(
             quoteData,
             apiTimestampMillis
