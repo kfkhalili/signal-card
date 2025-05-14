@@ -52,7 +52,6 @@ export const RarityDisplay: React.FC<RarityDisplayProps> = ({
 
   return (
     <div className={cn("text-center", className)}>
-      {" "}
       {/* Default text-center, can be overridden by className */}
       <Badge
         variant={getRarityBadgeVariant(rarity)}

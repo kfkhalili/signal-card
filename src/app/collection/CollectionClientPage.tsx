@@ -234,7 +234,7 @@ export default function CollectionClientPage({
               <div
                 key={clientCard.user_collection_id}
                 className="p-4 border border-dashed rounded-lg text-xs text-muted-foreground">
-                Unsupported Card Type: {clientCard.card_snapshot_data.card_type}{" "}
+                Unsupported Card Type: {clientCard.card_snapshot_data.card_type}
                 <br />
                 Collection ID: {clientCard.user_collection_id}
               </div>
@@ -258,7 +258,7 @@ export default function CollectionClientPage({
               />
               <div className="text-center w-full px-1">
                 <p className="text-xs text-muted-foreground">
-                  Collected:{" "}
+                  Collected:
                   {format(new Date(clientCard.captured_at), "MMM d, yy HH:mm")}
                 </p>
                 {clientCard.user_notes && (
@@ -275,7 +275,7 @@ export default function CollectionClientPage({
                     className="text-destructive hover:text-destructive hover:bg-destructive/10"
                     onClick={() => requestDeleteCard(clientCard)}
                     title="Remove from Collection">
-                    <Trash2 size={14} />{" "}
+                    <Trash2 size={14} />
                     <span className="ml-1 hidden sm:inline">Remove</span>
                   </Button>
                 </div>

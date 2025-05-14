@@ -32,6 +32,7 @@ interface BaseCardProps {
   className?: string;
   innerCardClassName?: string;
   children?: React.ReactNode;
+  isLikedByCurrentUser?: boolean;
 }
 
 const outerStyle: React.CSSProperties = {
@@ -45,15 +46,15 @@ const cardSurfaceBaseStyle: React.CSSProperties = {
   left: 0,
   width: "100%",
   height: "100%",
-  backfaceVisibility: "hidden",
-  WebkitBackfaceVisibility: "hidden",
+  backfaceVisibility: "hidden", // Hide the back of the element when facing away
+  WebkitBackfaceVisibility: "hidden", // For Safari
   display: "flex",
   flexDirection: "column",
   cursor: "pointer",
 };
 
 const backFaceTransformStyle: React.CSSProperties = {
-  transform: "rotateY(180deg)",
+  transform: "rotateY(180deg)", // This rotates the entire back surface
 };
 
 const BaseCard: React.FC<BaseCardProps> = ({
@@ -70,6 +71,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
   className,
   innerCardClassName,
   children,
+  isLikedByCurrentUser,
 }) => {
   const {
     symbol,
@@ -79,12 +81,13 @@ const BaseCard: React.FC<BaseCardProps> = ({
     type: cardType,
   } = cardContext;
 
+  // This style flips the entire inner card container
   const innerCardDynamicStyles: React.CSSProperties = {
     position: "relative",
     width: "100%",
     height: "100%",
     transition: "transform 0.7s cubic-bezier(0.4, 0.0, 0.2, 1)",
-    transformStyle: "preserve-3d",
+    transformStyle: "preserve-3d", // Crucial for children to exist in 3D space
     transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
   };
 
@@ -227,8 +230,8 @@ const BaseCard: React.FC<BaseCardProps> = ({
   const RarityReasonOnBackHeader = rarityReason ? (
     <div
       className="absolute top-3 sm:top-4 left-3 sm:left-4 md:left-5 pr-8 sm:pr-10 md:pr-12 max-w-[calc(100%-40px-1rem)] pointer-events-none"
-      style={{ transform: "rotateY(180deg)" }} // Counter-rotate the reason text so it's readable
-    >
+      // This style counter-rotates the text content so it's readable on the back.
+      style={{ transform: "rotateY(180deg)" }}>
       <p className="text-xs font-medium text-muted-foreground leading-tight text-left line-clamp-3">
         {currentRarity && currentRarity !== RARITY_LEVELS.COMMON && (
           <span className="font-semibold text-primary italic">
@@ -304,27 +307,29 @@ const BaseCard: React.FC<BaseCardProps> = ({
   const renderSocialBar = (isBackFace: boolean) => {
     if (!socialInteractions) return null;
 
-    // The wrapper div for SocialBar gets counter-rotated on the back face
-    // This aligns its coordinate system for correct hit testing.
+    // This style is crucial: it counter-rotates the SocialBar's container on the back face.
+    // This aligns its coordinate system with the screen for correct hit testing.
     const wrapperStyle: React.CSSProperties = isBackFace
       ? { transform: "rotateY(180deg)" }
       : {};
 
     return (
       <div
-        style={wrapperStyle} // Apply counter-rotation to the wrapper
+        style={wrapperStyle} // Apply counter-rotation to this wrapper div
         className={cn(
           "transition-all duration-300 ease-in-out z-10 mt-auto shrink-0",
           "opacity-0 group-hover:opacity-100",
           "translate-y-full group-hover:translate-y-0"
         )}
         onClick={(e) => e.stopPropagation()}
-        data-interactive-child="true">
+        data-interactive-child="true" // Prevents card flip when clicking the bar's padding
+      >
         <SocialBar
           interactions={socialInteractions}
           cardContext={cardContext}
-          // Pass isFlipped to SocialBar so it can counter-rotate its *content* (icons)
+          // isFlipped tells SocialBar its content (icons) needs visual correction
           isFlipped={isBackFace}
+          isLikedByCurrentUser={isLikedByCurrentUser}
         />
       </div>
     );
@@ -387,8 +392,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
           <div className="flex-grow overflow-y-auto relative p-3 sm:p-4 md:px-5 md:pb-5 md:pt-2">
             {faceContent}
           </div>
-          {renderSocialBar(false)}{" "}
-          {/* isFlipped is false for front face SocialBar */}
+          {renderSocialBar(false)}
         </ShadCard>
 
         {/* Card Back Face */}
@@ -411,8 +415,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
           <div className="flex-grow overflow-y-auto relative p-3 sm:p-4 md:px-5 md:pb-5 md:pt-2">
             {backContent}
           </div>
-          {renderSocialBar(true)}{" "}
-          {/* isFlipped is true for back face SocialBar */}
+          {renderSocialBar(true)}
         </ShadCard>
       </div>
       {children}

@@ -186,7 +186,6 @@ export default function WorkspacePage() {
                 <strong>{s}:</strong> {statusInfo.status}
                 {statusInfo.message && (
                   <span className="italic text-muted-foreground">
-                    {" "}
                     ({String(statusInfo.message)})
                   </span>
                 )}

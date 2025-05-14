@@ -9,6 +9,8 @@ export interface DisplayableCardState {
   isFlipped: boolean;
   currentRarity?: string | null;
   rarityReason?: string | null;
+  isLikedByCurrentUser?: boolean; // New: Has the current user liked this snapshot?
+  currentUserLikeId?: string; // New: The ID of the like record in snapshot_likes table
 }
 
 export type DisplayableCard = ConcreteCardData & DisplayableCardState;

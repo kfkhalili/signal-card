@@ -89,7 +89,6 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
       {cards.length === 0 ? (
         // This empty state might be better handled by WorkspacePage if this component is purely for displaying cards
         <div className="flex items-center justify-center h-[calc(100vh-15rem)]">
-          {" "}
           {/* Adjusted height */}
           <p className="text-muted-foreground text-center py-10">
             No cards in the workspace. Add one to get started!

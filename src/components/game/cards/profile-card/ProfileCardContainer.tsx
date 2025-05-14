@@ -12,23 +12,20 @@ import type {
 import { ProfileCardContent } from "./ProfileCardContent";
 
 interface ProfileCardContainerProps {
-  cardData: ProfileCardData; // This now includes currentRarity and rarityReason
+  cardData: ProfileCardData;
   isFlipped: boolean;
   onFlip: () => void;
-
   cardContext: CardActionContext;
   socialInteractions?: BaseCardSocialInteractions;
   onDeleteRequest?: (context: CardActionContext) => void;
   onHeaderIdentityClick?: (context: CardActionContext) => void;
   specificInteractions?: ProfileCardInteractionCallbacks;
-
-  // Pass through rarity to BaseCard
   currentRarity?: string | null;
   rarityReason?: string | null;
-
   className?: string;
   innerCardClassName?: string;
   children?: React.ReactNode;
+  isLikedByCurrentUser?: boolean; // Added prop
 }
 
 export const ProfileCardContainer: React.FC<ProfileCardContainerProps> =
@@ -38,8 +35,8 @@ export const ProfileCardContainer: React.FC<ProfileCardContainerProps> =
       isFlipped,
       onFlip,
       cardContext,
-      currentRarity, // Receive prop
-      rarityReason, // Receive prop
+      currentRarity,
+      rarityReason,
       socialInteractions,
       onDeleteRequest,
       onHeaderIdentityClick,
@@ -47,10 +44,11 @@ export const ProfileCardContainer: React.FC<ProfileCardContainerProps> =
       className,
       innerCardClassName,
       children,
+      isLikedByCurrentUser, // Destructure added prop
     }) => {
       const faceContentForBaseCard = (
         <ProfileCardContent
-          cardData={cardData} // ProfileCardContent will now NOT render rarity itself
+          cardData={cardData}
           isBackFace={false}
           interactionCallbacks={specificInteractions}
         />
@@ -71,13 +69,15 @@ export const ProfileCardContainer: React.FC<ProfileCardContainerProps> =
           backContent={backContentForBaseCard}
           onFlip={onFlip}
           cardContext={cardContext}
-          currentRarity={currentRarity} // Pass to BaseCard
-          rarityReason={rarityReason} // Pass to BaseCard
+          currentRarity={currentRarity}
+          rarityReason={rarityReason}
           socialInteractions={socialInteractions}
           onDeleteRequest={onDeleteRequest}
           onHeaderClick={onHeaderIdentityClick}
           className={className}
-          innerCardClassName={innerCardClassName}>
+          innerCardClassName={innerCardClassName}
+          isLikedByCurrentUser={isLikedByCurrentUser} // Pass prop to BaseCard
+        >
           {children}
         </BaseCard>
       );

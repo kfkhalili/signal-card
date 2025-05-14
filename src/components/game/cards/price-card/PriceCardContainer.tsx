@@ -20,23 +20,20 @@ type PriceSpecificInteractions = Pick<
 >;
 
 interface PriceCardContainerProps {
-  cardData: PriceCardData; // This now includes currentRarity and rarityReason
+  cardData: PriceCardData;
   isFlipped: boolean;
   onFlip: () => void;
-
   cardContext: CardActionContext;
   socialInteractions?: BaseCardSocialInteractions;
   onDeleteRequest?: (context: CardActionContext) => void;
   onHeaderIdentityClick?: (context: CardActionContext) => void;
   priceSpecificInteractions?: PriceSpecificInteractions;
-
-  // Pass through rarity to BaseCard
   currentRarity?: string | null;
   rarityReason?: string | null;
-
   className?: string;
   innerCardClassName?: string;
   children?: React.ReactNode;
+  isLikedByCurrentUser?: boolean; // Added prop
 }
 
 export const PriceCardContainer = React.memo<PriceCardContainerProps>(
@@ -45,8 +42,8 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
     isFlipped,
     onFlip,
     cardContext,
-    currentRarity, // Receive prop
-    rarityReason, // Receive prop
+    currentRarity,
+    rarityReason,
     socialInteractions,
     onDeleteRequest,
     onHeaderIdentityClick,
@@ -54,10 +51,11 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
     className,
     innerCardClassName,
     children,
+    isLikedByCurrentUser, // Destructure added prop
   }) => {
     const faceContentForBaseCard = (
       <PriceCardContent
-        cardData={cardData} // PriceCardContent will now NOT render rarity itself
+        cardData={cardData}
         isBackFace={false}
         onSmaClick={priceSpecificInteractions?.onPriceCardSmaClick}
         onRangeContextClick={
@@ -89,13 +87,15 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
         backContent={backContentForBaseCard}
         onFlip={onFlip}
         cardContext={cardContext}
-        currentRarity={currentRarity} // Pass to BaseCard
-        rarityReason={rarityReason} // Pass to BaseCard
+        currentRarity={currentRarity}
+        rarityReason={rarityReason}
         socialInteractions={socialInteractions}
         onDeleteRequest={onDeleteRequest}
         onHeaderClick={onHeaderIdentityClick}
         className={className}
-        innerCardClassName={innerCardClassName}>
+        innerCardClassName={innerCardClassName}
+        isLikedByCurrentUser={isLikedByCurrentUser} // Pass prop to BaseCard
+      >
         {children}
       </BaseCard>
     );

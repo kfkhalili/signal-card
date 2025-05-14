@@ -3,7 +3,6 @@ import React from "react";
 import type {
   DisplayableCard,
   DisplayableCardState,
-  // ConcreteCardData, // Not directly used here
 } from "@/components/game/types";
 import type {
   PriceCardData,
@@ -11,7 +10,7 @@ import type {
 } from "./cards/price-card/price-card.types";
 import type {
   ProfileCardData,
-  ProfileCardInteractionCallbacks as ProfileCardSpecificInteractions, // Renamed for clarity
+  ProfileCardInteractionCallbacks as ProfileCardSpecificInteractions,
 } from "./cards/profile-card/profile-card.types";
 import type {
   CardActionContext,
@@ -25,7 +24,6 @@ import { cn } from "@/lib/utils";
 import { XIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
-// Aliases for more specific displayable card types
 type DisplayableLivePriceCardWithState = PriceCardData & DisplayableCardState;
 type DisplayableUserProfileCardWithState = ProfileCardData &
   DisplayableCardState;
@@ -39,12 +37,12 @@ type PriceSpecificInteractionsForContainer = Pick<
 >;
 
 interface GameCardProps {
-  readonly card: DisplayableCard; // This is ConcreteCardData & DisplayableCardState
+  readonly card: DisplayableCard;
   readonly onToggleFlip: (id: string) => void;
   readonly onDeleteCardRequest: (id: string) => void;
   readonly socialInteractions?: BaseCardSocialInteractions;
   readonly priceSpecificInteractions?: PriceSpecificInteractionsForContainer;
-  readonly profileSpecificInteractions?: ProfileCardSpecificInteractions; // Use renamed type
+  readonly profileSpecificInteractions?: ProfileCardSpecificInteractions;
   readonly onHeaderIdentityClick?: (context: CardActionContext) => void;
 }
 
@@ -57,6 +55,11 @@ const GameCard: React.FC<GameCardProps> = ({
   profileSpecificInteractions,
   onHeaderIdentityClick,
 }) => {
+  // Log the received card prop, specifically its liked state
+  console.log(
+    `[GameCard] RENDER for ${card.symbol} (ID: ${card.id}): isLikedByCurrentUser = ${card.isLikedByCurrentUser}`
+  );
+
   const handleFlip = () => onToggleFlip(card.id);
 
   const handleDeleteAction = (context: CardActionContext) => {
@@ -71,16 +74,14 @@ const GameCard: React.FC<GameCardProps> = ({
     logoUrl: cardLogoUrl,
     currentRarity: cardCurrentRarity,
     rarityReason: cardRarityReason,
+    isLikedByCurrentUser,
   } = card;
 
-  // Determine websiteUrl based on card type
   let websiteUrlForContext: string | null | undefined = null;
   if (card.type === "profile") {
-    // Access staticData if it's a ProfileCard
-    const profileCardData = card as ProfileCardData; // Cast to access staticData
+    const profileCardData = card as ProfileCardData;
     websiteUrlForContext = profileCardData.staticData?.website;
   }
-  // For PriceCard, websiteUrlForContext will remain null/undefined unless populated otherwise
 
   const cardContextForBaseCard: CardActionContext = {
     id: cardId,
@@ -88,90 +89,55 @@ const GameCard: React.FC<GameCardProps> = ({
     type: cardTypeActual as CardType,
     companyName: cardCompanyName ?? null,
     logoUrl: cardLogoUrl ?? null,
-    websiteUrl: websiteUrlForContext ?? null, // <<< POPULATE websiteUrl
+    websiteUrl: websiteUrlForContext ?? null,
   };
 
   const cardWrapperClassName = "w-full aspect-[63/88] relative";
+
+  const commonContainerProps = {
+    isFlipped: card.isFlipped,
+    onFlip: handleFlip,
+    cardContext: cardContextForBaseCard,
+    currentRarity: cardCurrentRarity,
+    rarityReason: cardRarityReason,
+    socialInteractions: socialInteractions,
+    onDeleteRequest: handleDeleteAction,
+    onHeaderIdentityClick: onHeaderIdentityClick,
+    className: cardWrapperClassName,
+    isLikedByCurrentUser: isLikedByCurrentUser,
+  };
 
   switch (card.type) {
     case "price":
       const priceCard = card as DisplayableLivePriceCardWithState;
       return (
         <PriceCardContainer
+          {...commonContainerProps}
           cardData={priceCard}
-          isFlipped={priceCard.isFlipped}
-          onFlip={handleFlip}
-          cardContext={cardContextForBaseCard} // Pass the enriched context
-          currentRarity={priceCard.currentRarity}
-          rarityReason={priceCard.rarityReason}
-          socialInteractions={socialInteractions}
-          onDeleteRequest={handleDeleteAction}
           priceSpecificInteractions={priceSpecificInteractions}
-          onHeaderIdentityClick={onHeaderIdentityClick}
-          className={cardWrapperClassName}
         />
       );
     case "profile":
       const profileCard = card as DisplayableUserProfileCardWithState;
       return (
         <ProfileCardContainer
+          {...commonContainerProps}
           cardData={profileCard}
-          isFlipped={profileCard.isFlipped}
-          onFlip={handleFlip}
-          cardContext={cardContextForBaseCard} // Pass the enriched context
-          currentRarity={profileCard.currentRarity}
-          rarityReason={profileCard.rarityReason}
-          socialInteractions={socialInteractions}
-          onDeleteRequest={handleDeleteAction}
           specificInteractions={profileSpecificInteractions}
-          onHeaderIdentityClick={onHeaderIdentityClick}
-          className={cardWrapperClassName}
         />
       );
     default:
-      console.warn(
-        "Rendering fallback for unhandled card type:",
-        cardTypeActual,
-        card
-      );
       return (
-        <div
-          className={cn(
-            cardWrapperClassName,
-            "p-4 border border-dashed border-muted-foreground/50 rounded-2xl bg-muted/20 text-muted-foreground",
-            "flex flex-col items-center justify-center shadow-lg relative"
-          )}>
-          <button
-            onClick={() => handleDeleteAction(cardContextForBaseCard)}
-            title="Delete Card"
-            aria-label={`Delete ${
-              cardContextForBaseCard.symbol || "unknown"
-            } card`}
-            className={cn(/* ... styles ... */)}
-            data-interactive-child="true">
-            <XIcon size={16} strokeWidth={2.5} />
-          </button>
-          <p className="font-semibold text-sm text-foreground">
-            Unsupported Card
-          </p>
-          <p className="text-xs mt-1">ID: {cardId}</p>
-          <p className="text-xs">Type: {cardTypeActual}</p>
-          <p className="text-xs">Symbol: {cardSymbol}</p>
-          {cardCurrentRarity && cardCurrentRarity !== "Common" && (
-            <div className="mt-2 text-center border-t border-muted-foreground/20 pt-2 w-full">
-              <Badge variant="outline" className="text-xs">
-                {cardCurrentRarity}
-              </Badge>
-              {cardRarityReason && (
-                <p className="text-xs mt-0.5 text-muted-foreground/80">
-                  {cardRarityReason}
-                </p>
-              )}
-            </div>
-          )}
+        <div className={cn(cardWrapperClassName, "p-4 border border-dashed")}>
+          Unsupported Card Type: {cardTypeActual}
         </div>
       );
   }
 };
 
-export default GameCard;
+// If GameCard is memoized, ensure the comparison function handles 'card' prop changes correctly.
+// For now, let's assume it's not memoized or React.memo is used without custom compare,
+// relying on the parent passing a new 'card' object reference.
+export default React.memo(GameCard); // Example of memoization
+// If using React.memo, ensure that when a card's 'isLikedByCurrentUser' state changes,
+// the 'card' object reference itself is new. Our .map in ActiveCardsSection should do this.
