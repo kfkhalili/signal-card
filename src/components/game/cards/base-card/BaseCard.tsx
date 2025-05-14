@@ -40,21 +40,22 @@ const outerStyle: React.CSSProperties = {
   position: "relative",
 };
 
+// Base style for card surfaces, always display: flex
 const cardSurfaceBaseStyle: React.CSSProperties = {
   position: "absolute",
   top: 0,
   left: 0,
   width: "100%",
   height: "100%",
-  backfaceVisibility: "hidden", // Hide the back of the element when facing away
+  backfaceVisibility: "hidden",
   WebkitBackfaceVisibility: "hidden", // For Safari
   display: "flex",
   flexDirection: "column",
-  cursor: "pointer",
+  cursor: "pointer", // For the main card flip interaction
 };
 
 const backFaceTransformStyle: React.CSSProperties = {
-  transform: "rotateY(180deg)", // This rotates the entire back surface
+  transform: "rotateY(180deg)",
 };
 
 const BaseCard: React.FC<BaseCardProps> = ({
@@ -81,13 +82,12 @@ const BaseCard: React.FC<BaseCardProps> = ({
     type: cardType,
   } = cardContext;
 
-  // This style flips the entire inner card container
   const innerCardDynamicStyles: React.CSSProperties = {
     position: "relative",
     width: "100%",
     height: "100%",
     transition: "transform 0.7s cubic-bezier(0.4, 0.0, 0.2, 1)",
-    transformStyle: "preserve-3d", // Crucial for children to exist in 3D space
+    transformStyle: "preserve-3d",
     transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
   };
 
@@ -216,22 +216,24 @@ const BaseCard: React.FC<BaseCardProps> = ({
     <div
       className={cn("invisible", headerWrapperClassNames)}
       aria-hidden="true">
+      {/* Content structure mirrors actualIdentityHeaderElement for layout consistency */}
       <div className="flex justify-between items-start">
         <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0 mr-2 sm:mr-3">
-          <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10"></div>
+          <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10"></div>{" "}
+          {/* Placeholder for logo area */}
         </div>
         <div
           className="min-w-0 max-w-[calc(100%-3rem-12px)] sm:max-w-[calc(100%-3.5rem-12px)] md:max-w-[calc(100%-4rem-12px)]"
-          style={{ minHeight: "4.25rem" }}></div>
+          style={{ minHeight: "4.25rem" }} // Match height of ClickableDataItem
+        >
+          {/* Placeholder for title/symbol area, content not strictly needed if invisible */}
+        </div>
       </div>
     </div>
   );
 
   const RarityReasonOnBackHeader = rarityReason ? (
-    <div
-      className="absolute top-3 sm:top-4 left-3 sm:left-4 md:left-5 pr-8 sm:pr-10 md:pr-12 max-w-[calc(100%-40px-1rem)] pointer-events-none"
-      // This style counter-rotates the text content so it's readable on the back.
-      style={{ transform: "rotateY(180deg)" }}>
+    <div className="absolute top-3 sm:top-4 left-3 sm:left-4 md:left-5 pr-8 sm:pr-10 md:pr-12 max-w-[calc(100%-40px-1rem)] pointer-events-none">
       <p className="text-xs font-medium text-muted-foreground leading-tight text-left line-clamp-3">
         {currentRarity && currentRarity !== RARITY_LEVELS.COMMON && (
           <span className="font-semibold text-primary italic">
@@ -304,37 +306,6 @@ const BaseCard: React.FC<BaseCardProps> = ({
     );
   };
 
-  const renderSocialBar = (isBackFace: boolean) => {
-    if (!socialInteractions) return null;
-
-    // This style is crucial: it counter-rotates the SocialBar's container on the back face.
-    // This aligns its coordinate system with the screen for correct hit testing.
-    const wrapperStyle: React.CSSProperties = isBackFace
-      ? { transform: "rotateY(180deg)" }
-      : {};
-
-    return (
-      <div
-        style={wrapperStyle} // Apply counter-rotation to this wrapper div
-        className={cn(
-          "transition-all duration-300 ease-in-out z-10 mt-auto shrink-0",
-          "opacity-0 group-hover:opacity-100",
-          "translate-y-full group-hover:translate-y-0"
-        )}
-        onClick={(e) => e.stopPropagation()}
-        data-interactive-child="true" // Prevents card flip when clicking the bar's padding
-      >
-        <SocialBar
-          interactions={socialInteractions}
-          cardContext={cardContext}
-          // isFlipped tells SocialBar its content (icons) needs visual correction
-          isFlipped={isBackFace}
-          isLikedByCurrentUser={isLikedByCurrentUser}
-        />
-      </div>
-    );
-  };
-
   const handleCardFlipInteraction = (
     e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>
   ) => {
@@ -366,6 +337,32 @@ const BaseCard: React.FC<BaseCardProps> = ({
     }
   };
 
+  // Define the SocialBar JSX. It will be conditionally rendered.
+  // The `debugFaceName` prop is crucial for logging.
+  const socialBarContent = (faceName: "front" | "back") =>
+    socialInteractions ? (
+      <div
+        className={cn(
+          "transition-all duration-300 ease-in-out z-10 mt-auto shrink-0",
+          "opacity-0 group-hover:opacity-100",
+          "translate-y-full group-hover:translate-y-0",
+          // Explicitly control pointer events for the social bar's container based on face visibility
+          (faceName === "front" && isFlipped) ||
+            (faceName === "back" && !isFlipped)
+            ? "pointer-events-none" // Hidden social bar wrapper is not interactive
+            : "pointer-events-auto" // Visible social bar wrapper is interactive
+        )}
+        data-interactive-child="true">
+        <SocialBar
+          interactions={socialInteractions}
+          cardContext={cardContext}
+          isLikedByCurrentUser={isLikedByCurrentUser}
+          debugFaceName={faceName} // Pass the correct face name
+          // className="border-t border-transparent group-hover:border-border/20 pt-1.5" // Optional styling
+        />
+      </div>
+    ) : null;
+
   return (
     <div style={outerStyle} className={cn("group", className)}>
       <div
@@ -374,48 +371,64 @@ const BaseCard: React.FC<BaseCardProps> = ({
         data-testid="base-card-inner">
         {/* Card Front Face */}
         <ShadCard
-          style={cardSurfaceBaseStyle}
-          className="card-face-wrapper overflow-hidden rounded-2xl shadow-lg"
-          onClick={handleCardFlipInteraction}
-          onKeyDown={handleCardFlipInteraction}
+          style={{
+            ...cardSurfaceBaseStyle,
+            // CRITICAL: Control pointer events for the entire face
+            pointerEvents: isFlipped ? "none" : "auto",
+          }}
+          className={cn(
+            "card-face-wrapper overflow-hidden rounded-2xl shadow-lg"
+          )}
+          onClick={!isFlipped ? handleCardFlipInteraction : undefined} // Only allow flip if front is visible
+          onKeyDown={!isFlipped ? handleCardFlipInteraction : undefined}
           role="button"
-          tabIndex={0}
+          tabIndex={!isFlipped ? 0 : -1}
           aria-label={
             isFlipped
               ? `Show ${symbol} front details`
               : `Show ${symbol} back details`
           }
-          aria-pressed={isFlipped}>
+          aria-pressed={isFlipped}
+          aria-hidden={isFlipped} // Hide front face from assistive tech when flipped
+        >
           {deleteButtonElement}
           {actualIdentityHeaderElement}
           {RarityIconOnFront()}
           <div className="flex-grow overflow-y-auto relative p-3 sm:p-4 md:px-5 md:pb-5 md:pt-2">
             {faceContent}
           </div>
-          {renderSocialBar(false)}
+          {socialBarContent("front")} {/* Pass "front" */}
         </ShadCard>
 
         {/* Card Back Face */}
         <ShadCard
-          style={{ ...cardSurfaceBaseStyle, ...backFaceTransformStyle }}
-          className="card-back-wrapper overflow-hidden rounded-2xl shadow-lg"
-          onClick={handleCardFlipInteraction}
-          onKeyDown={handleCardFlipInteraction}
+          style={{
+            ...cardSurfaceBaseStyle,
+            ...backFaceTransformStyle,
+            // CRITICAL: Control pointer events for the entire face
+            pointerEvents: isFlipped ? "auto" : "none",
+          }}
+          className={cn(
+            "card-back-wrapper overflow-hidden rounded-2xl shadow-lg"
+          )}
+          onClick={isFlipped ? handleCardFlipInteraction : undefined} // Only allow flip if back is visible
+          onKeyDown={isFlipped ? handleCardFlipInteraction : undefined}
           role="button"
-          tabIndex={-1}
+          tabIndex={isFlipped ? 0 : -1}
           aria-label={
             isFlipped
               ? `Show ${symbol} front details`
               : `Show ${symbol} back details`
           }
-          aria-hidden={!isFlipped}>
+          aria-hidden={!isFlipped} // Hide back face from assistive tech when not flipped
+        >
           {deleteButtonElement}
           {headerPlaceholderElementForBack}
           {RarityReasonOnBackHeader}
           <div className="flex-grow overflow-y-auto relative p-3 sm:p-4 md:px-5 md:pb-5 md:pt-2">
             {backContent}
           </div>
-          {renderSocialBar(true)}
+          {socialBarContent("back")} {/* Pass "back" */}
         </ShadCard>
       </div>
       {children}
