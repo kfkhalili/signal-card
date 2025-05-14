@@ -133,7 +133,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
         alt={`${companyName || symbol} logo`}
         fill
         sizes="(max-width: 640px) 28px, (max-width: 768px) 32px, 40px"
-        className="object-contain rounded drop-shadow-lg"
+        className="object-contain rounded"
         unoptimized={!logoUrl.startsWith("/")}
         priority
       />
