@@ -6,11 +6,11 @@ import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
-  LogIn,
   LogOut,
   LayoutDashboard, // For Workspace
-  Library, // For Collection (or Briefcase, FolderKanban, etc.)
-  Loader2, // For loading indicator
+  Library, // For Collection
+  History, // New Icon for History
+  Loader2,
 } from "lucide-react";
 
 const NavLinkItem: React.FC<{
@@ -50,8 +50,6 @@ const HeaderComponent: React.FC = () => {
         <nav className="flex items-center space-x-1 sm:space-x-2">
           {isLoading ? (
             <div className="flex items-center justify-center h-9 w-24 px-3">
-              {" "}
-              {/* Matches Button size="sm" approx. */}
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               <span className="ml-2 text-sm text-muted-foreground">
                 Loading...
@@ -69,10 +67,16 @@ const HeaderComponent: React.FC = () => {
                 href="/collection"
                 title="My Collection"
                 icon={Library}
-                text="My Collection"
+                text="Collection"
+              />
+              <NavLinkItem
+                href="/history"
+                title="Signal History"
+                icon={History}
+                text="History"
               />
 
-              {user.email && ( // Only render span if email exists
+              {user.email && (
                 <span
                   className="text-xs sm:text-sm text-muted-foreground hidden md:inline truncate max-w-[100px] lg:max-w-[150px]"
                   title={user.email}>
@@ -90,18 +94,10 @@ const HeaderComponent: React.FC = () => {
             </>
           ) : (
             <>
-              <Button
-                asChild
-                variant="default"
-                size="sm" // Changed from lg to sm
-              >
+              <Button asChild variant="default" size="sm">
                 <Link href="/auth#auth-sign-up">Sign Up</Link>
               </Button>
-              <Button
-                asChild
-                variant="secondary"
-                size="sm" // Changed from lg to sm
-              >
+              <Button asChild variant="secondary" size="sm">
                 <Link href="/auth#auth-sign-in">Login</Link>
               </Button>
             </>
@@ -112,5 +108,4 @@ const HeaderComponent: React.FC = () => {
   );
 };
 
-// Memoize the component to prevent re-renders if props/context haven't changed
 export default React.memo(HeaderComponent);

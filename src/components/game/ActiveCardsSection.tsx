@@ -1,6 +1,9 @@
 // src/components/game/ActiveCardsSection.tsx
-import React, { useCallback, useState, useMemo, useEffect } from "react"; // Added useEffect
-import type { DisplayableCard } from "./types";
+"use client";
+
+import React, { useCallback, useState, useMemo, useEffect } from "react";
+import { usePathname } from "next/navigation";
+import type { DisplayableCard, ConcreteCardData } from "./types";
 import { ActiveCards as ActiveCardsPresentational } from "./ActiveCards";
 import { useToast as useAppToast } from "@/hooks/use-toast";
 import type {
@@ -10,34 +13,37 @@ import type {
 } from "./cards/base-card/base-card.types";
 import { getPriceCardInteractionHandlers } from "./cards/price-card/priceCardInteractions";
 import { getProfileCardInteractionHandlers } from "./cards/profile-card/profileCardInteractions";
-import type { ProfileCardInteractionCallbacks } from "./cards/profile-card/profile-card.types";
-import type { PriceCardInteractionCallbacks } from "./cards/price-card/price-card.types";
+import type {
+  ProfileCardInteractionCallbacks,
+  ProfileCardData,
+} from "./cards/profile-card/profile-card.types"; // Import ProfileCardData
+import type {
+  PriceCardInteractionCallbacks,
+  PriceCardData,
+} from "./cards/price-card/price-card.types"; // Import PriceCardData
 import { useAuth } from "@/contexts/AuthContext";
 import { CommentDialog } from "@/components/comments/CommentDialog";
+import type { DisplayableCardState } from "./types"; // Import DisplayableCardState
 
-import type { PriceCardData as APIPriceCardData } from "@/components/game/cards/price-card/price-card.types";
-import type { ProfileCardData as APIProfileCardData } from "@/components/game/cards/profile-card/profile-card.types";
-
-type APICardDataSnapshot = APIPriceCardData | APIProfileCardData;
-
-interface EnsureSnapshotRequestBody {
+export interface EnsureSnapshotRequestBody {
   cardType: APICardType;
   symbol: string;
   companyName?: string | null;
   logoUrl?: string | null;
-  cardDataSnapshot: APICardDataSnapshot;
+  cardDataSnapshot: ConcreteCardData;
   rarityLevel?: string | null;
   rarityReason?: string | null;
 }
 
-interface SnapshotEnsureResponse {
+export interface SnapshotEnsureResponse {
   snapshot: {
     id: string;
   };
   isNew: boolean;
+  raceCondition?: boolean;
 }
 
-interface LikeApiResponse {
+export interface LikeApiResponse {
   like: {
     id: string;
     snapshot_id: string;
@@ -79,6 +85,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
 }) => {
   const { toast } = useAppToast();
   const { user, isLoading: isLoadingAuth } = useAuth();
+  const pathname = usePathname();
 
   const [cardIdToConfirmDelete, setCardIdToConfirmDelete] = useState<
     string | null
@@ -88,14 +95,15 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
   const [commentingCardInfo, setCommentingCardInfo] =
     useState<CommentingCardInfo | null>(null);
 
-  // Log when activeCards prop changes to see its content
   useEffect(() => {
     console.debug(
       "[ActiveCardsSection] activeCards prop updated:",
       activeCards.map((c) => ({
         id: c.id,
         symbol: c.symbol,
+        type: c.type,
         liked: c.isLikedByCurrentUser,
+        rarity: c.currentRarity,
       }))
     );
   }, [activeCards]);
@@ -120,23 +128,80 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
 
   const ensureGlobalSnapshot = useCallback(
     async (card: DisplayableCard): Promise<string | null> => {
+      // Destructure DisplayableCardState properties to exclude them from the core snapshot data
+      // and to use currentRarity and rarityReason directly.
       const {
         isFlipped,
         currentRarity,
         rarityReason,
         isLikedByCurrentUser,
         currentUserLikeId,
-        ...cardDataForSnapshot
+        ...restOfCardData
       } = card;
+
+      let actualCardDataSnapshot: ConcreteCardData;
+
+      // Use card.type (which comes from DisplayableCard) for discrimination
+      if (card.type === "price") {
+        // 'restOfCardData' should now be PriceCardData, but cast for type safety
+        // This ensures that 'actualCardDataSnapshot' conforms to PriceCardData structure
+        const priceCardData = restOfCardData as Omit<
+          PriceCardData,
+          keyof DisplayableCardState
+        >;
+        actualCardDataSnapshot = {
+          id: priceCardData.id,
+          type: "price",
+          symbol: priceCardData.symbol,
+          createdAt: priceCardData.createdAt,
+          companyName: priceCardData.companyName,
+          logoUrl: priceCardData.logoUrl,
+          faceData: priceCardData.faceData,
+          backData: priceCardData.backData,
+          // Ensure no DisplayableCardState properties are accidentally included
+        };
+      } else if (card.type === "profile") {
+        // 'restOfCardData' should now be ProfileCardData, cast for type safety
+        const profileCardData = restOfCardData as Omit<
+          ProfileCardData,
+          keyof DisplayableCardState
+        >;
+        actualCardDataSnapshot = {
+          id: profileCardData.id,
+          type: "profile",
+          symbol: profileCardData.symbol,
+          createdAt: profileCardData.createdAt,
+          companyName: profileCardData.companyName,
+          logoUrl: profileCardData.logoUrl,
+          staticData: profileCardData.staticData,
+          liveData: profileCardData.liveData,
+          backData: profileCardData.backData,
+          websiteUrl: profileCardData.websiteUrl,
+          // Ensure no DisplayableCardState properties are accidentally included
+        };
+      } else {
+        // This 'else' block is for types not explicitly handled.
+        // 'card.type' will correctly refer to the type property of the 'card' parameter.
+        const unknownCardType = (card as any).type; // Use 'any' for logging the potentially unknown type
+        console.error("Unknown card type for snapshot:", unknownCardType);
+        toast({
+          title: "Snapshot Error",
+          description: `Unknown card type: ${unknownCardType}. Cannot create snapshot.`,
+          variant: "destructive",
+        });
+        return null;
+      }
+
       const requestBody: EnsureSnapshotRequestBody = {
-        cardType: card.type as APICardType,
+        cardType: card.type, // This is from DisplayableCard, so it's "price" | "profile" | ...
         symbol: card.symbol,
         companyName: card.companyName,
         logoUrl: card.logoUrl,
-        cardDataSnapshot: cardDataForSnapshot as APICardDataSnapshot,
-        rarityLevel: currentRarity,
-        rarityReason: rarityReason,
+        cardDataSnapshot: actualCardDataSnapshot, // This is now strictly ConcreteCardData
+        rarityLevel: currentRarity, // From the destructuring of 'card'
+        rarityReason: rarityReason, // From the destructuring of 'card'
       };
+
       try {
         const response = await fetch("/api/snapshots/ensure", {
           method: "POST",
@@ -181,15 +246,11 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
         return;
       }
       const cardToToggleLike = activeCards[cardIndex];
-      console.debug(
-        `[ActiveCardsSection] handleLikeOrUnlikeCard for ${cardToToggleLike.symbol}. Current liked state: ${cardToToggleLike.isLikedByCurrentUser}`
-      );
 
       const snapshotId = await ensureGlobalSnapshot(cardToToggleLike);
       if (!snapshotId) return;
 
       if (cardToToggleLike.isLikedByCurrentUser) {
-        // --- UNLIKE ---
         try {
           const unlikeResponse = await fetch("/api/snapshots/like", {
             method: "DELETE",
@@ -197,7 +258,6 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
             body: JSON.stringify({ snapshotId }),
           });
           if (!unlikeResponse.ok && unlikeResponse.status !== 404) {
-            // Allow 404 for "already unliked"
             const errorResult = await unlikeResponse.json();
             throw new Error(
               errorResult.error ||
@@ -208,8 +268,8 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
             title: "Unliked!",
             description: `You unliked ${cardToToggleLike.symbol}.`,
           });
-          setActiveCards((prev) => {
-            const newCards = prev.map((c, idx) =>
+          setActiveCards((prev) =>
+            prev.map((c, idx) =>
               idx === cardIndex
                 ? {
                     ...c,
@@ -217,13 +277,8 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
                     currentUserLikeId: undefined,
                   }
                 : c
-            );
-            console.debug(
-              `[ActiveCardsSection] After UNLIKE, card ${context.symbol} state:`,
-              newCards[cardIndex]?.isLikedByCurrentUser
-            );
-            return newCards;
-          });
+            )
+          );
         } catch (error: any) {
           toast({
             title: "Unlike Failed",
@@ -232,7 +287,6 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
           });
         }
       } else {
-        // --- LIKE ---
         try {
           const likeResponse = await fetch("/api/snapshots/like", {
             method: "POST",
@@ -240,7 +294,6 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
             body: JSON.stringify({ snapshotId }),
           });
           const likeResult = (await likeResponse.json()) as LikeApiResponse;
-
           if (
             !likeResponse.ok &&
             !(likeResponse.status === 200 && likeResult.isAlreadyLiked)
@@ -250,28 +303,21 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
                 `Failed to like (status ${likeResponse.status})`
             );
           }
-
-          const likeId = likeResult.like?.id;
           toast({
             title: "Liked!",
             description: `You liked ${cardToToggleLike.symbol}.`,
           });
-          setActiveCards((prev) => {
-            const newCards = prev.map((c, idx) =>
+          setActiveCards((prev) =>
+            prev.map((c, idx) =>
               idx === cardIndex
                 ? {
                     ...c,
                     isLikedByCurrentUser: true,
-                    currentUserLikeId: likeId,
+                    currentUserLikeId: likeResult.like?.id,
                   }
                 : c
-            );
-            console.debug(
-              `[ActiveCardsSection] After LIKE, card ${context.symbol} state:`,
-              newCards[cardIndex]?.isLikedByCurrentUser
-            );
-            return newCards;
-          });
+            )
+          );
         } catch (error: any) {
           toast({
             title: "Like Failed",
@@ -370,7 +416,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
       }
       toast({
         title: "Loading Comments...",
-        description: `Fetching details for ${cardForComment.symbol}...`,
+        description: `Workspaceing details for ${cardForComment.symbol}...`,
       });
       const snapshotId = await ensureGlobalSnapshot(cardForComment);
       if (snapshotId) {
@@ -396,13 +442,83 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
       onLike: handleLikeOrUnlikeCard,
       onComment: handleCommentClick,
       onSave: handleCaptureCardToCollection,
-      onShare: (ctx) => toast({ title: "Share Action (Not Implemented)" }),
+      onShare: async (context: CardActionContext) => {
+        const cardToShare = activeCards.find((c) => c.id === context.id);
+        if (!cardToShare) {
+          toast({
+            title: "Error",
+            description: "Card not found for sharing.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        toast({
+          title: "Generating Share Link...",
+          description: `Please wait for ${cardToShare.symbol}.`,
+        });
+        const snapshotId = await ensureGlobalSnapshot(cardToShare);
+
+        if (snapshotId) {
+          const baseUrl =
+            typeof window !== "undefined" ? window.location.origin : "";
+          const shareUrl = `${baseUrl}/history/${cardToShare.symbol.toLowerCase()}/${cardToShare.type.toLowerCase()}?highlight_snapshot=${snapshotId}`;
+
+          try {
+            await navigator.clipboard.writeText(shareUrl);
+            toast({
+              title: "Link Copied!",
+              description: (
+                <div className="flex flex-col gap-1">
+                  <span>Share link copied to clipboard.</span>
+                  <input
+                    type="text"
+                    value={shareUrl}
+                    readOnly
+                    className="mt-1 p-1 text-xs bg-muted border border-border rounded w-full"
+                    onFocus={(e) => e.target.select()}
+                  />
+                </div>
+              ),
+              duration: 10000,
+            });
+          } catch (err) {
+            console.error("Failed to copy share link:", err);
+            toast({
+              title: "Share Link (Manual Copy)",
+              description: (
+                <div className="flex flex-col gap-1">
+                  <span>Please copy this link:</span>
+                  <input
+                    type="text"
+                    value={shareUrl}
+                    readOnly
+                    className="mt-1 p-1 text-xs bg-muted border border-border rounded w-full"
+                    onFocus={(e) => e.target.select()}
+                  />
+                </div>
+              ),
+              duration: 15000,
+              variant: "default",
+            });
+          }
+        } else {
+          toast({
+            title: "Share Error",
+            description: "Could not generate share link.",
+            variant: "destructive",
+          });
+        }
+      },
     }),
     [
       handleLikeOrUnlikeCard,
       handleCommentClick,
       handleCaptureCardToCollection,
       toast,
+      activeCards,
+      ensureGlobalSnapshot,
+      pathname,
     ]
   );
 
@@ -416,7 +532,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
   return (
     <>
       <ActiveCardsPresentational
-        cards={activeCards} // This prop will trigger the useEffect above when it changes
+        cards={activeCards}
         onToggleFlipCard={(id: string) =>
           setActiveCards((prev) =>
             prev.map((c) =>
