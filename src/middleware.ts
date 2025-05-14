@@ -61,7 +61,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
   // Redirect logic for protected routes
   if (!user && !(pathname.startsWith("/auth") || pathname === "/")) {
-    console.log(
+    console.debug(
       `[Middleware] Redirect condition met: No user, and path is "${pathname}". Redirecting to /auth.`
     );
     const url = request.nextUrl.clone();
