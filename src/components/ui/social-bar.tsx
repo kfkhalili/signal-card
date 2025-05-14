@@ -1,25 +1,40 @@
-// src/app/components/ui/social-bar.tsx
+// src/components/ui/social-bar.tsx
 import React from "react";
-import { ThumbsUp, MessageCircle, Bookmark, Share2 } from "lucide-react";
+import {
+  ThumbsUp,
+  MessageCircle,
+  Bookmark,
+  Share2,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "../../lib/utils";
 import type {
   CardActionContext,
   BaseCardSocialInteractions,
-} from "@/components/game/cards/base-card/base-card.types"; // Adjust path as needed
+} from "@/components/game/cards/base-card/base-card.types";
 
 interface SocialBarProps {
   cardContext: CardActionContext;
   interactions?: BaseCardSocialInteractions;
   className?: string;
+  isFlipped?: boolean; // True if the SocialBar's direct parent was counter-rotated
+}
+
+interface ButtonConfig {
+  key: string;
+  action?: (context: CardActionContext) => void;
+  Icon: LucideIcon;
+  title: string;
 }
 
 export const SocialBar: React.FC<SocialBarProps> = ({
   cardContext,
   interactions,
   className,
+  isFlipped, // This prop now indicates that the content needs to be un-mirrored
 }) => {
   if (!interactions) {
-    return null; // Don't render if no interaction callbacks are provided
+    return null;
   }
 
   const iconSize = 18;
@@ -28,58 +43,62 @@ export const SocialBar: React.FC<SocialBarProps> = ({
 
   const handleInteraction = (
     e: React.MouseEvent,
-    action?: (context: CardActionContext) => void
+    actionCallback?: (context: CardActionContext) => void
   ) => {
-    e.stopPropagation(); // Prevent card flip
-    action?.(cardContext);
+    e.stopPropagation();
+    actionCallback?.(cardContext);
   };
+
+  // DOM order of buttons is always the same
+  const buttonConfigs: ButtonConfig[] = [
+    { key: "like", action: interactions.onLike, Icon: ThumbsUp, title: "Like" },
+    {
+      key: "comment",
+      action: interactions.onComment,
+      Icon: MessageCircle,
+      title: "Comment",
+    },
+    { key: "save", action: interactions.onSave, Icon: Bookmark, title: "Save" },
+    {
+      key: "share",
+      action: interactions.onShare,
+      Icon: Share2,
+      title: "Share",
+    },
+  ].filter((config) => !!config.action) as ButtonConfig[];
+
+  // Style to apply to each button's content (icon + text if any) if the bar is flipped
+  const contentStyle: React.CSSProperties = isFlipped
+    ? { transform: "rotateY(180deg)" }
+    : {};
 
   return (
     <div
       className={cn(
-        // Removed "border-t" from this div's className
         "shrink-0 p-1 flex justify-around items-center text-muted-foreground",
         className
       )}
-      onClick={(e) => e.stopPropagation()} // Prevent clicks on the bar itself from flipping the card
+      onClick={(e) => e.stopPropagation()}
       role="toolbar"
       aria-label="Social actions">
-      {interactions.onLike && (
+      {buttonConfigs.map((config) => (
         <button
-          onClick={(e) => handleInteraction(e, interactions.onLike)}
-          title="Like"
+          key={config.key}
+          onClick={(e) => handleInteraction(e, config.action)}
+          title={config.title}
           className={cn(buttonBaseClass)}
-          aria-label={`Like ${cardContext.symbol} card`}>
-          <ThumbsUp size={iconSize} aria-hidden="true" />
+          aria-label={`${config.title} ${
+            cardContext.symbol || cardContext.companyName || "card"
+          }`}>
+          {/* Apply counter-rotation to the icon (and any text) if the bar is flipped */}
+          <span
+            style={contentStyle}
+            className="flex items-center justify-center">
+            <config.Icon size={iconSize} aria-hidden="true" />
+            {/* If you had text labels next to icons, they'd go in this span too */}
+          </span>
         </button>
-      )}
-      {interactions.onComment && (
-        <button
-          onClick={(e) => handleInteraction(e, interactions.onComment)}
-          title="Comment"
-          className={cn(buttonBaseClass)}
-          aria-label={`Comment on ${cardContext.symbol} card`}>
-          <MessageCircle size={iconSize} aria-hidden="true" />
-        </button>
-      )}
-      {interactions.onSave && (
-        <button
-          onClick={(e) => handleInteraction(e, interactions.onSave)}
-          title="Save"
-          className={cn(buttonBaseClass)}
-          aria-label={`Save ${cardContext.symbol} card`}>
-          <Bookmark size={iconSize} aria-hidden="true" />
-        </button>
-      )}
-      {interactions.onShare && (
-        <button
-          onClick={(e) => handleInteraction(e, interactions.onShare)}
-          title="Share"
-          className={cn(buttonBaseClass)}
-          aria-label={`Share ${cardContext.symbol} card`}>
-          <Share2 size={iconSize} aria-hidden="true" />
-        </button>
-      )}
+      ))}
     </div>
   );
 };
