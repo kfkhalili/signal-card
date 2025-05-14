@@ -119,7 +119,8 @@ export default function AuthPage() {
               sign_in: {
                 email_label: "Email address",
                 password_label: "Password",
-                button_label: "Login",
+                button_label: "Log in",
+                link_text: "Already have an account? Log in",
               },
               sign_up: {
                 email_label: "Email address",
