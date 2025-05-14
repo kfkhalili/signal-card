@@ -1,4 +1,4 @@
-# **App Name**: FinSignal Game
+# **App Name**: MarketEcho
 
 ## Core Features:
 

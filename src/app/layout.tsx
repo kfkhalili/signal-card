@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FinSignal Game",
+  title: "MarketEcho",
   description: "Financial Signal Card Game MVP Prototype",
 };
 
