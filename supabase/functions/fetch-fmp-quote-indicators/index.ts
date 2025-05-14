@@ -82,7 +82,7 @@ const SYMBOLS_TO_PROCESS: string[] = [
   "BTC",
 ];
 
-console.log(
+console.debug(
   `Function "fetch-fmp-quote-indicators" up and running for symbols: ${SYMBOLS_TO_PROCESS.join(
     ", "
   )}`
@@ -111,7 +111,7 @@ async function fetchAndProcessSymbol(
     // If `/stable/quote` returns an array even for one symbol, we take the first element.
     // If it returns a single object, the .json() parsing will handle it.
     const quoteUrl = `https://financialmodelingprep.com/stable/quote?symbol=${symbol}&apikey=${fmpApiKey}`; // Or other appropriate FMP endpoint
-    console.log(
+    console.debug(
       `Fetching quote for ${symbol} from: ${censorApiKey(quoteUrl, fmpApiKey)}`
     );
 
@@ -152,7 +152,7 @@ async function fetchAndProcessSymbol(
         `Invalid core numeric data or timestamp in quote for ${quoteData.symbol}. Price: ${quoteData.price}, Timestamp: ${quoteData.timestamp}`
       );
     }
-    console.log(
+    console.debug(
       `Processing data for ${quoteData.symbol}: Price=${quoteData.price}`
     );
 
@@ -247,7 +247,7 @@ async function fetchAndProcessSymbol(
         `Supabase upsert failed for ${recordToUpsert.symbol}: ${upsertError.message}`
       );
     }
-    console.log(`Successfully upserted data for ${recordToUpsert.symbol}.`);
+    console.debug(`Successfully upserted data for ${recordToUpsert.symbol}.`);
     return {
       symbol: recordToUpsert.symbol,
       success: true,

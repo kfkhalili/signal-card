@@ -56,7 +56,7 @@ const GameCard: React.FC<GameCardProps> = ({
   onHeaderIdentityClick,
 }) => {
   // Log the received card prop, specifically its liked state
-  console.log(
+  console.debug(
     `[GameCard] RENDER for ${card.symbol} (ID: ${card.id}): isLikedByCurrentUser = ${card.isLikedByCurrentUser}`
   );
 

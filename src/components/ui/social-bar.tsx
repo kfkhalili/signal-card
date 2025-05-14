@@ -54,12 +54,12 @@ export const SocialBar: React.FC<SocialBarProps> = ({
   debugFaceName, // Use this for logging
 }) => {
   // Log when the component renders for a specific face
-  console.log(
+  console.debug(
     `[SocialBar] Rendering for face: ${debugFaceName}, Card: ${cardContext.symbol}`
   );
 
   if (!interactions) {
-    console.log(
+    console.debug(
       `[SocialBar] No interactions object provided for ${debugFaceName} of ${cardContext.symbol}.`
     );
     return null;
@@ -79,10 +79,10 @@ export const SocialBar: React.FC<SocialBarProps> = ({
     actionCallback: (context: CardActionContext) => void
   ): void => {
     event.stopPropagation(); // Crucial: prevent card flip
-    console.log(
+    console.debug(
       `[SocialBar-${debugFaceName}] Click detected on button: ${buttonKey} (Card: ${cardContext.symbol})`
     );
-    console.log(
+    console.debug(
       `[SocialBar-${debugFaceName}] Executing action for ${buttonKey}...`
     );
     actionCallback(cardContext);
@@ -115,14 +115,19 @@ export const SocialBar: React.FC<SocialBarProps> = ({
   const buttonConfigs: ActionableButtonConfig[] = rawButtonConfigs.filter(
     (config): config is ActionableButtonConfig => {
       if (!config.action) {
-        // console.log(`[SocialBar-${debugFaceName}] Filtering out button '${config.key}' due to missing action for ${cardContext.symbol}.`);
+        console.debug(
+          `[SocialBar-${debugFaceName}] Filtering out button '${config.key}' due to missing action for ${cardContext.symbol}.`
+        );
       }
       return !!config.action;
     }
   );
 
   // Log the order of buttons that will be rendered
-  // console.log(`[SocialBar-${debugFaceName}] Effective button order for ${cardContext.symbol}:`, buttonConfigs.map(b => b.key).join(', '));
+  console.debug(
+    `[SocialBar-${debugFaceName}] Effective button order for ${cardContext.symbol}:`,
+    buttonConfigs.map((b) => b.key).join(", ")
+  );
 
   // SocialBar assumes it's rendered in a correctly oriented context by its parent (BaseCard).
   // Therefore, no self-transformation or icon-specific transformation is needed here.
@@ -135,7 +140,7 @@ export const SocialBar: React.FC<SocialBarProps> = ({
       className={cn("shrink-0 p-1 flex justify-around items-center", className)}
       onClick={(e) => {
         // This log helps see if clicks on the bar's padding are caught
-        console.log(
+        console.debug(
           `[SocialBar-${debugFaceName}] Click on SocialBar container padding (Card: ${cardContext.symbol})`
         );
         e.stopPropagation();

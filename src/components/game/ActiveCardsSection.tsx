@@ -90,7 +90,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
 
   // Log when activeCards prop changes to see its content
   useEffect(() => {
-    console.log(
+    console.debug(
       "[ActiveCardsSection] activeCards prop updated:",
       activeCards.map((c) => ({
         id: c.id,
@@ -181,7 +181,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
         return;
       }
       const cardToToggleLike = activeCards[cardIndex];
-      console.log(
+      console.debug(
         `[ActiveCardsSection] handleLikeOrUnlikeCard for ${cardToToggleLike.symbol}. Current liked state: ${cardToToggleLike.isLikedByCurrentUser}`
       );
 
@@ -218,7 +218,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
                   }
                 : c
             );
-            console.log(
+            console.debug(
               `[ActiveCardsSection] After UNLIKE, card ${context.symbol} state:`,
               newCards[cardIndex]?.isLikedByCurrentUser
             );
@@ -266,7 +266,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
                   }
                 : c
             );
-            console.log(
+            console.debug(
               `[ActiveCardsSection] After LIKE, card ${context.symbol} state:`,
               newCards[cardIndex]?.isLikedByCurrentUser
             );

@@ -181,7 +181,7 @@ export function useStockData({
     let profileSubActive = true;
 
     const fetchInitialProfileAndSubscribe = async () => {
-      console.log(
+      console.debug(
         `useStockData (${symbol}): Fetching initial profile & subscribing...`
       );
       try {
@@ -245,7 +245,7 @@ export function useStockData({
             filter: `symbol=eq.${symbol}`,
           },
           (payload: RealtimePostgresChangesPayload<ProfileDBRow>) => {
-            console.log(
+            console.debug(
               `useStockData (${symbol}): Realtime update for 'profiles' table:`,
               payload.new
             );
@@ -266,7 +266,7 @@ export function useStockData({
         )
         .subscribe((status, err) => {
           if (!isMountedRef.current || !profileSubActive) return;
-          console.log(
+          console.debug(
             `useStockData (${symbol}): Profile channel status: ${status}`,
             err || ""
           );
@@ -284,7 +284,7 @@ export function useStockData({
     return () => {
       profileSubActive = false;
       if (profileChannelUnsubscribeRef.current) {
-        console.log(
+        console.debug(
           `useStockData (${symbol}): Cleaning up profile subscription.`
         );
         profileChannelUnsubscribeRef.current();
@@ -371,7 +371,7 @@ export function useStockData({
     /* ... as before ... */
     (status: LiveQuoteSubscriptionStatus, err?: Error) => {
       if (!isMountedRef.current) return;
-      console.log(
+      console.debug(
         `useStockData (${symbol}): Live Quote Channel Status: ${status}`,
         err || ""
       );
@@ -438,7 +438,7 @@ export function useStockData({
     if (!symbol || profileData === undefined) {
       // Wait if profileData is undefined (still loading)
       if (symbol && profileData === undefined) {
-        console.log(
+        console.debug(
           `useStockData (${symbol}): Deferring quote subscription until profile is loaded or confirmed null.`
         );
       }
@@ -448,7 +448,7 @@ export function useStockData({
     let quoteSubActive = true;
 
     const setupQuoteSubscription = async () => {
-      console.log(
+      console.debug(
         `useStockData (${symbol}): Setting up quote subscription (profile available/checked).`
       );
       if (liveQuoteChannelUnsubscribeRef.current) {
@@ -539,7 +539,7 @@ export function useStockData({
     return () => {
       quoteSubActive = false;
       if (liveQuoteChannelUnsubscribeRef.current) {
-        console.log(
+        console.debug(
           `useStockData (${symbol}): Cleaning up quote subscription.`
         );
         liveQuoteChannelUnsubscribeRef.current();

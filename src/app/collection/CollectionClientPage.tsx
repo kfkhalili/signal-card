@@ -109,11 +109,6 @@ export default function CollectionClientPage({
     useState<ClientCollectedCard | null>(null);
   const { toast } = useToast();
 
-  useEffect(() => {
-    // Optional: Log initial cards or perform other setup
-    // console.log("[CollectionClientPage] Initial cards from server:", initialCollectedCards);
-  }, [initialCollectedCards]);
-
   const handleToggleFlipCard = useCallback((displayableCardId: string) => {
     // displayableCardId is snapshot_id. ClientCollectedCard has snapshot_id.
     setCollectedCards((prev) =>

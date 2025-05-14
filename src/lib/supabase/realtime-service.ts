@@ -92,7 +92,7 @@ export function subscribeToQuoteUpdates(
   // The filter for postgres_changes remains on the symbol column
   const topicFilter = `symbol=eq.${symbol}`;
 
-  console.log(
+  console.debug(
     `RealtimeService: Attempting to subscribe to channel ${channelName} for symbol ${symbol}...`
   );
 
@@ -121,7 +121,7 @@ export function subscribeToQuoteUpdates(
 
       switch (status) {
         case "SUBSCRIBED":
-          console.log(
+          console.debug(
             `RealtimeService (${symbol}): Successfully SUBSCRIBED to ${channel.topic}`
           );
           break;
@@ -145,13 +145,13 @@ export function subscribeToQuoteUpdates(
     });
 
   return () => {
-    console.log(
+    console.debug(
       `RealtimeService (${symbol}): Unsubscribing and removing channel ${channel.topic}...`
     );
     supabase
       .removeChannel(channel)
       .then((removeStatus) =>
-        console.log(
+        console.debug(
           `RealtimeService (${symbol}): Channel ${channel.topic} removal status: ${removeStatus}`
         )
       )

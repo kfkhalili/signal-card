@@ -220,7 +220,7 @@ export function useWorkspaceManager({
 
   const addCardToWorkspace = useCallback(
     async (values: AddCardFormValues, options?: AddCardOptions) => {
-      console.log(
+      console.debug(
         "[useWorkspaceManager] addCardToWorkspace called with values:",
         values,
         "and options:",

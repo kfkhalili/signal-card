@@ -46,16 +46,16 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
     // Debugging log for interactionCallbacks
     if (!isBackFace) {
       // Only log for the front face where the price click is relevant
-      console.log(
+      console.debug(
         `[ProfileCardContent - ${symbol} FRONT] Received interactionCallbacks:`,
         interactionCallbacks
       );
       if (interactionCallbacks) {
-        console.log(
+        console.debug(
           `[ProfileCardContent - ${symbol} FRONT] interactionCallbacks.onRequestPriceCard:`,
           interactionCallbacks.onRequestPriceCard
         );
-        console.log(
+        console.debug(
           `[ProfileCardContent - ${symbol} FRONT] Is price item interactive?:`,
           !!interactionCallbacks.onRequestPriceCard
         );
