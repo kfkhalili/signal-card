@@ -11,12 +11,12 @@ export async function GET(request: Request) {
 
   if (code) {
     // createClient() from lib/supabase/server.ts should be synchronous
-    const supabase = createClient(); // supabase is now SupabaseClient, not Promise<SupabaseClient>
+    const supabase = await createClient(); // supabase is now SupabaseClient, not Promise<SupabaseClient>
 
     // Await the promise from exchangeCodeForSession
     // TypeScript will infer the type of 'response' based on the method's signature.
     // Or you can explicitly type it using a manually defined interface like CodeExchangeResponse if needed.
-    const response = await (await supabase).auth.exchangeCodeForSession(code);
+    const response = await supabase.auth.exchangeCodeForSession(code);
     // 'response' will have a 'data' object and an 'error' object.
 
     if (!response.error) {

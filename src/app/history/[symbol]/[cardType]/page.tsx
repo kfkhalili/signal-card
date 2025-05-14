@@ -22,15 +22,14 @@ export interface CardSnapshotFromDB {
   first_seen_at: string; // ISO string
   // Add other fields from card_snapshots if needed, like like_count, comment_count if you implement those directly on the table
 }
-
 interface SignalHistoryPageProps {
-  params: {
+  params: Promise<{
     symbol: string;
     cardType: string;
-  };
-  searchParams: {
+  }>;
+  searchParams: Promise<{
     highlight_snapshot?: string;
-  };
+  }>;
 }
 
 export default async function SignalHistoryPage({
@@ -38,8 +37,10 @@ export default async function SignalHistoryPage({
   searchParams,
 }: SignalHistoryPageProps) {
   const supabase = await createClient();
-  const symbol = params.symbol.toUpperCase();
-  const cardType = params.cardType.toLowerCase() as APICardType;
+  const { symbol: symbolParam, cardType: cardTypeParam } = await params;
+  const symbol = symbolParam?.toUpperCase();
+  const cardType = cardTypeParam.toLowerCase() as APICardType;
+  const { highlight_snapshot } = await searchParams;
 
   if (cardType !== "price" && cardType !== "profile") {
     notFound();
@@ -123,9 +124,7 @@ export default async function SignalHistoryPage({
           <SnapshotHistoryItem
             key={snapshot.id}
             snapshot={snapshot}
-            isHighlighted={
-              searchParams.highlight_snapshot === snapshot.id.toString()
-            }
+            isHighlighted={highlight_snapshot === snapshot.id.toString()}
           />
         ))}
       </div>

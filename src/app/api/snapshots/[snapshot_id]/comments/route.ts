@@ -3,9 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     snapshot_id: string; // This is the card_snapshots.id (UUID)
-  };
+  }>;
 }
 
 // This interface describes a row as returned by our new view
@@ -40,7 +40,7 @@ export interface CommentWithAuthorResponse {
 
 export async function GET(request: Request, { params }: RouteParams) {
   const supabase = await createClient();
-  const snapshotId = (await params).snapshot_id;
+  const { snapshot_id: snapshotId } = await params;
 
   if (!snapshotId) {
     return NextResponse.json(

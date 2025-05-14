@@ -3,9 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     id: string; // This is the user_collections.id (UUID)
-  };
+  }>;
 }
 
 export async function DELETE(request: Request, { params }: RouteParams) {
@@ -21,7 +21,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
     );
   }
 
-  const userCollectionsEntryId = params.id;
+  const { id: userCollectionsEntryId } = await params;
 
   if (!userCollectionsEntryId) {
     return NextResponse.json(
