@@ -33,7 +33,11 @@ interface PriceCardContainerProps {
   className?: string;
   innerCardClassName?: string;
   children?: React.ReactNode;
-  isLikedByCurrentUser?: boolean; // Added prop
+  isLikedByCurrentUser?: boolean;
+  // Add count props
+  likeCount?: number;
+  commentCount?: number;
+  collectionCount?: number;
 }
 
 export const PriceCardContainer = React.memo<PriceCardContainerProps>(
@@ -51,7 +55,11 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
     className,
     innerCardClassName,
     children,
-    isLikedByCurrentUser, // Destructure added prop
+    isLikedByCurrentUser,
+    // Destructure count props
+    likeCount,
+    commentCount,
+    collectionCount,
   }) => {
     const faceContentForBaseCard = (
       <PriceCardContent
@@ -94,8 +102,11 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
         onHeaderClick={onHeaderIdentityClick}
         className={className}
         innerCardClassName={innerCardClassName}
-        isLikedByCurrentUser={isLikedByCurrentUser} // Pass prop to BaseCard
-      >
+        isLikedByCurrentUser={isLikedByCurrentUser}
+        // Pass count props to BaseCard
+        likeCount={likeCount}
+        commentCount={commentCount}
+        collectionCount={collectionCount}>
         {children}
       </BaseCard>
     );

@@ -1,8 +1,12 @@
 // src/components/game/GameCard.tsx
+// "use client"; // This component is already a client component
+
 import React from "react";
 import type {
   DisplayableCard,
-  DisplayableCardState,
+  // Ensure these types are correctly defined or imported if used for casting
+  // DisplayableLivePriceCardWithState,
+  // DisplayableUserProfileCardWithState
 } from "@/components/game/types";
 import type {
   PriceCardData,
@@ -21,12 +25,16 @@ import type {
 import { PriceCardContainer } from "./cards/price-card/PriceCardContainer";
 import { ProfileCardContainer } from "@/components/game/cards/profile-card/ProfileCardContainer";
 import { cn } from "@/lib/utils";
-import { XIcon } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+// import { XIcon } from "lucide-react"; // Not used directly here
+// import { Badge } from "@/components/ui/badge"; // Not used directly here
 
-type DisplayableLivePriceCardWithState = PriceCardData & DisplayableCardState;
-type DisplayableUserProfileCardWithState = ProfileCardData &
-  DisplayableCardState;
+// Type aliases for specific card structures with state
+type DisplayableLivePriceCardWithState = PriceCardData & {
+  isFlipped: boolean /* other state fields */;
+};
+type DisplayableUserProfileCardWithState = ProfileCardData & {
+  isFlipped: boolean /* other state fields */;
+};
 
 type PriceSpecificInteractionsForContainer = Pick<
   PriceCardInteractionCallbacks,
@@ -44,6 +52,10 @@ interface GameCardProps {
   readonly priceSpecificInteractions?: PriceSpecificInteractionsForContainer;
   readonly profileSpecificInteractions?: ProfileCardSpecificInteractions;
   readonly onHeaderIdentityClick?: (context: CardActionContext) => void;
+  // Count props
+  likeCount?: number;
+  commentCount?: number;
+  collectionCount?: number;
 }
 
 const GameCard: React.FC<GameCardProps> = ({
@@ -54,10 +66,13 @@ const GameCard: React.FC<GameCardProps> = ({
   priceSpecificInteractions,
   profileSpecificInteractions,
   onHeaderIdentityClick,
+  likeCount, // Destructure count props
+  commentCount,
+  collectionCount,
 }) => {
-  // Log the received card prop, specifically its liked state
-  console.debug(
-    `[GameCard] RENDER for ${card.symbol} (ID: ${card.id}): isLikedByCurrentUser = ${card.isLikedByCurrentUser}`
+  // ADD THIS LOG
+  console.log(
+    `[GameCard ${card.symbol}] Rendering. Props: likeCount=${likeCount}, commentCount=${commentCount}, collectionCount=${collectionCount}, card.isLikedByCurrentUser=${card.isLikedByCurrentUser}`
   );
 
   const handleFlip = () => onToggleFlip(card.id);
@@ -69,7 +84,7 @@ const GameCard: React.FC<GameCardProps> = ({
   const {
     id: cardId,
     symbol: cardSymbol,
-    type: cardTypeActual,
+    type: cardTypeActual, // This is the 'type' from ConcreteCardData
     companyName: cardCompanyName,
     logoUrl: cardLogoUrl,
     currentRarity: cardCurrentRarity,
@@ -79,6 +94,7 @@ const GameCard: React.FC<GameCardProps> = ({
 
   let websiteUrlForContext: string | null | undefined = null;
   if (card.type === "profile") {
+    // Cast to ProfileCardData to access staticData safely
     const profileCardData = card as ProfileCardData;
     websiteUrlForContext = profileCardData.staticData?.website;
   }
@@ -86,7 +102,7 @@ const GameCard: React.FC<GameCardProps> = ({
   const cardContextForBaseCard: CardActionContext = {
     id: cardId,
     symbol: cardSymbol,
-    type: cardTypeActual as CardType,
+    type: cardTypeActual as CardType, // Cast if CardType from base-card.types is more restrictive
     companyName: cardCompanyName ?? null,
     logoUrl: cardLogoUrl ?? null,
     websiteUrl: websiteUrlForContext ?? null,
@@ -105,6 +121,10 @@ const GameCard: React.FC<GameCardProps> = ({
     onHeaderIdentityClick: onHeaderIdentityClick,
     className: cardWrapperClassName,
     isLikedByCurrentUser: isLikedByCurrentUser,
+    // Pass counts down
+    likeCount: likeCount,
+    commentCount: commentCount,
+    collectionCount: collectionCount,
   };
 
   switch (card.type) {
@@ -127,17 +147,14 @@ const GameCard: React.FC<GameCardProps> = ({
         />
       );
     default:
+      // Fallback for unknown card types
+      const unknownType = (card as any).type;
       return (
         <div className={cn(cardWrapperClassName, "p-4 border border-dashed")}>
-          Unsupported Card Type: {cardTypeActual}
+          Unsupported Card Type: {unknownType || "Unknown"}
         </div>
       );
   }
 };
 
-// If GameCard is memoized, ensure the comparison function handles 'card' prop changes correctly.
-// For now, let's assume it's not memoized or React.memo is used without custom compare,
-// relying on the parent passing a new 'card' object reference.
-export default React.memo(GameCard); // Example of memoization
-// If using React.memo, ensure that when a card's 'isLikedByCurrentUser' state changes,
-// the 'card' object reference itself is new. Our .map in ActiveCardsSection should do this.
+export default React.memo(GameCard);

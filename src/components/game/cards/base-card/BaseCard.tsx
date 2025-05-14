@@ -1,4 +1,6 @@
 // src/components/game/cards/base-card/BaseCard.tsx
+// "use client"; // This component is already a client component
+
 import React from "react";
 import { Card as ShadCard, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -33,6 +35,10 @@ interface BaseCardProps {
   innerCardClassName?: string;
   children?: React.ReactNode;
   isLikedByCurrentUser?: boolean;
+  // Count props
+  likeCount?: number;
+  commentCount?: number;
+  collectionCount?: number;
 }
 
 const outerStyle: React.CSSProperties = {
@@ -40,7 +46,6 @@ const outerStyle: React.CSSProperties = {
   position: "relative",
 };
 
-// Base style for card surfaces, always display: flex
 const cardSurfaceBaseStyle: React.CSSProperties = {
   position: "absolute",
   top: 0,
@@ -48,10 +53,10 @@ const cardSurfaceBaseStyle: React.CSSProperties = {
   width: "100%",
   height: "100%",
   backfaceVisibility: "hidden",
-  WebkitBackfaceVisibility: "hidden", // For Safari
+  WebkitBackfaceVisibility: "hidden",
   display: "flex",
   flexDirection: "column",
-  cursor: "pointer", // For the main card flip interaction
+  cursor: "pointer",
 };
 
 const backFaceTransformStyle: React.CSSProperties = {
@@ -73,7 +78,15 @@ const BaseCard: React.FC<BaseCardProps> = ({
   innerCardClassName,
   children,
   isLikedByCurrentUser,
+  likeCount,
+  commentCount,
+  collectionCount,
 }) => {
+  // ADD THIS LOG
+  console.log(
+    `[BaseCard ${cardContext.symbol}] Rendering. Props: likeCount=${likeCount}, commentCount=${commentCount}, collectionCount=${collectionCount}, isLikedByCurrentUser=${isLikedByCurrentUser}`
+  );
+
   const {
     symbol,
     companyName,
@@ -134,8 +147,8 @@ const BaseCard: React.FC<BaseCardProps> = ({
         fill
         sizes="(max-width: 640px) 28px, (max-width: 768px) 32px, 40px"
         className="object-contain rounded"
-        unoptimized={!logoUrl.startsWith("/")}
-        priority
+        onError={(e) => (e.currentTarget.style.display = "none")} // Basic error handling for image
+        priority={false} // Generally false unless it's LCP
       />
     </div>
   ) : null;
@@ -216,18 +229,13 @@ const BaseCard: React.FC<BaseCardProps> = ({
     <div
       className={cn("invisible", headerWrapperClassNames)}
       aria-hidden="true">
-      {/* Content structure mirrors actualIdentityHeaderElement for layout consistency */}
       <div className="flex justify-between items-start">
         <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0 mr-2 sm:mr-3">
-          <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10"></div>{" "}
-          {/* Placeholder for logo area */}
+          <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10"></div>
         </div>
         <div
           className="min-w-0 max-w-[calc(100%-3rem-12px)] sm:max-w-[calc(100%-3.5rem-12px)] md:max-w-[calc(100%-4rem-12px)]"
-          style={{ minHeight: "4.25rem" }} // Match height of ClickableDataItem
-        >
-          {/* Placeholder for title/symbol area, content not strictly needed if invisible */}
-        </div>
+          style={{ minHeight: "4.25rem" }}></div>
       </div>
     </div>
   );
@@ -275,6 +283,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
       return (
         <div className="px-3 sm:px-4 md:px-5 py-1.5 h-[26px] sm:h-[28px]"></div>
       );
+
     const tooltipContent = (
       <>
         <p className="font-semibold">{currentRarity}</p>
@@ -337,8 +346,6 @@ const BaseCard: React.FC<BaseCardProps> = ({
     }
   };
 
-  // Define the SocialBar JSX. It will be conditionally rendered.
-  // The `debugFaceName` prop is crucial for logging.
   const socialBarContent = (faceName: "front" | "back") =>
     socialInteractions ? (
       <div
@@ -346,19 +353,20 @@ const BaseCard: React.FC<BaseCardProps> = ({
           "transition-all duration-300 ease-in-out z-10 mt-auto shrink-0",
           "opacity-0 group-hover:opacity-100",
           "translate-y-full group-hover:translate-y-0",
-          // Explicitly control pointer events for the social bar's container based on face visibility
           (faceName === "front" && isFlipped) ||
             (faceName === "back" && !isFlipped)
-            ? "pointer-events-none" // Hidden social bar wrapper is not interactive
-            : "pointer-events-auto" // Visible social bar wrapper is interactive
+            ? "pointer-events-none"
+            : "pointer-events-auto"
         )}
         data-interactive-child="true">
         <SocialBar
           interactions={socialInteractions}
           cardContext={cardContext}
           isLikedByCurrentUser={isLikedByCurrentUser}
-          debugFaceName={faceName} // Pass the correct face name
-          // className="border-t border-transparent group-hover:border-border/20 pt-1.5" // Optional styling
+          debugFaceName={faceName}
+          likeCount={likeCount}
+          commentCount={commentCount}
+          collectionCount={collectionCount}
         />
       </div>
     ) : null;
@@ -369,17 +377,15 @@ const BaseCard: React.FC<BaseCardProps> = ({
         style={innerCardDynamicStyles}
         className={cn(innerCardClassName)}
         data-testid="base-card-inner">
-        {/* Card Front Face */}
         <ShadCard
           style={{
             ...cardSurfaceBaseStyle,
-            // CRITICAL: Control pointer events for the entire face
             pointerEvents: isFlipped ? "none" : "auto",
           }}
           className={cn(
             "card-face-wrapper overflow-hidden rounded-2xl shadow-lg"
           )}
-          onClick={!isFlipped ? handleCardFlipInteraction : undefined} // Only allow flip if front is visible
+          onClick={!isFlipped ? handleCardFlipInteraction : undefined}
           onKeyDown={!isFlipped ? handleCardFlipInteraction : undefined}
           role="button"
           tabIndex={!isFlipped ? 0 : -1}
@@ -389,29 +395,26 @@ const BaseCard: React.FC<BaseCardProps> = ({
               : `Show ${symbol} back details`
           }
           aria-pressed={isFlipped}
-          aria-hidden={isFlipped} // Hide front face from assistive tech when flipped
-        >
+          aria-hidden={isFlipped}>
           {deleteButtonElement}
           {actualIdentityHeaderElement}
           {RarityIconOnFront()}
           <div className="flex-grow overflow-y-auto relative p-3 sm:p-4 md:px-5 md:pb-5 md:pt-2">
             {faceContent}
           </div>
-          {socialBarContent("front")} {/* Pass "front" */}
+          {socialBarContent("front")}
         </ShadCard>
 
-        {/* Card Back Face */}
         <ShadCard
           style={{
             ...cardSurfaceBaseStyle,
             ...backFaceTransformStyle,
-            // CRITICAL: Control pointer events for the entire face
             pointerEvents: isFlipped ? "auto" : "none",
           }}
           className={cn(
             "card-back-wrapper overflow-hidden rounded-2xl shadow-lg"
           )}
-          onClick={isFlipped ? handleCardFlipInteraction : undefined} // Only allow flip if back is visible
+          onClick={isFlipped ? handleCardFlipInteraction : undefined}
           onKeyDown={isFlipped ? handleCardFlipInteraction : undefined}
           role="button"
           tabIndex={isFlipped ? 0 : -1}
@@ -420,15 +423,14 @@ const BaseCard: React.FC<BaseCardProps> = ({
               ? `Show ${symbol} front details`
               : `Show ${symbol} back details`
           }
-          aria-hidden={!isFlipped} // Hide back face from assistive tech when not flipped
-        >
+          aria-hidden={!isFlipped}>
           {deleteButtonElement}
           {headerPlaceholderElementForBack}
           {RarityReasonOnBackHeader}
           <div className="flex-grow overflow-y-auto relative p-3 sm:p-4 md:px-5 md:pb-5 md:pt-2">
             {backContent}
           </div>
-          {socialBarContent("back")} {/* Pass "back" */}
+          {socialBarContent("back")}
         </ShadCard>
       </div>
       {children}

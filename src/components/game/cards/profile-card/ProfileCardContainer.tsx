@@ -25,7 +25,11 @@ interface ProfileCardContainerProps {
   className?: string;
   innerCardClassName?: string;
   children?: React.ReactNode;
-  isLikedByCurrentUser?: boolean; // Added prop
+  isLikedByCurrentUser?: boolean;
+  // Add count props
+  likeCount?: number;
+  commentCount?: number;
+  collectionCount?: number;
 }
 
 export const ProfileCardContainer: React.FC<ProfileCardContainerProps> =
@@ -44,7 +48,11 @@ export const ProfileCardContainer: React.FC<ProfileCardContainerProps> =
       className,
       innerCardClassName,
       children,
-      isLikedByCurrentUser, // Destructure added prop
+      isLikedByCurrentUser,
+      // Destructure count props
+      likeCount,
+      commentCount,
+      collectionCount,
     }) => {
       const faceContentForBaseCard = (
         <ProfileCardContent
@@ -76,8 +84,11 @@ export const ProfileCardContainer: React.FC<ProfileCardContainerProps> =
           onHeaderClick={onHeaderIdentityClick}
           className={className}
           innerCardClassName={innerCardClassName}
-          isLikedByCurrentUser={isLikedByCurrentUser} // Pass prop to BaseCard
-        >
+          isLikedByCurrentUser={isLikedByCurrentUser}
+          // Pass count props to BaseCard
+          likeCount={likeCount}
+          commentCount={commentCount}
+          collectionCount={collectionCount}>
           {children}
         </BaseCard>
       );

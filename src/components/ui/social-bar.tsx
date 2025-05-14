@@ -1,4 +1,6 @@
 // src/components/ui/social-bar.tsx
+// "use client"; // This component is already a client component
+
 import React from "react";
 import {
   ThumbsUp,
@@ -6,8 +8,6 @@ import {
   Bookmark,
   Share2,
   type LucideProps,
-  // Use a more specific import if Icon type clashes elsewhere
-  // type Icon as LucideIconType,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import type {
@@ -16,7 +16,6 @@ import type {
 } from "@/components/game/cards/base-card/base-card.types";
 import type { ForwardRefExoticComponent, RefAttributes } from "react";
 
-// More specific type for Lucide icons
 type SpecificLucideIcon = ForwardRefExoticComponent<
   Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>
 >;
@@ -26,24 +25,27 @@ interface SocialBarProps {
   interactions?: BaseCardSocialInteractions;
   className?: string;
   isLikedByCurrentUser?: boolean;
-  debugFaceName: "front" | "back"; // For logging
+  debugFaceName: "front" | "back";
+  likeCount?: number;
+  commentCount?: number;
+  collectionCount?: number;
 }
 
-// For initial configuration, action can be undefined
 interface RawButtonConfig {
   key: string;
   action?: (context: CardActionContext) => void;
   Icon: SpecificLucideIcon;
   title: string;
   isActive?: boolean;
+  count?: number;
 }
 
-// After filtering, action is guaranteed
 interface ActionableButtonConfig extends Omit<RawButtonConfig, "action"> {
   action: (context: CardActionContext) => void;
-  Icon: SpecificLucideIcon; // Ensure Icon is part of the final type
-  title: string; // Ensure title is part of the final type
-  isActive?: boolean; // Ensure isActive is part of the final type
+  Icon: SpecificLucideIcon;
+  title: string;
+  isActive?: boolean;
+  count?: number;
 }
 
 export const SocialBar: React.FC<SocialBarProps> = ({
@@ -51,11 +53,14 @@ export const SocialBar: React.FC<SocialBarProps> = ({
   interactions,
   className,
   isLikedByCurrentUser,
-  debugFaceName, // Use this for logging
+  debugFaceName,
+  likeCount = 0,
+  commentCount = 0,
+  collectionCount = 0,
 }) => {
-  // Log when the component renders for a specific face
-  console.debug(
-    `[SocialBar] Rendering for face: ${debugFaceName}, Card: ${cardContext.symbol}`
+  // ADD THIS LOG
+  console.log(
+    `[SocialBar ${cardContext.symbol} ${debugFaceName}] Rendering. Props: likeCount=${likeCount}, commentCount=${commentCount}, collectionCount=${collectionCount}, isLikedByCurrentUser=${isLikedByCurrentUser}`
   );
 
   if (!interactions) {
@@ -65,9 +70,9 @@ export const SocialBar: React.FC<SocialBarProps> = ({
     return null;
   }
 
-  const iconSize: number = 18;
+  const iconSize: number = 16;
   const buttonBaseClass: string =
-    "flex items-center space-x-1.5 p-1.5 text-xs rounded-md transition-colors duration-150 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1";
+    "flex items-center space-x-1 p-1.5 text-xs rounded-md transition-colors duration-150 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1";
   const likeButtonClass: string = isLikedByCurrentUser
     ? "text-primary font-semibold"
     : "text-muted-foreground hover:text-primary";
@@ -75,16 +80,10 @@ export const SocialBar: React.FC<SocialBarProps> = ({
 
   const handleInteraction = (
     event: React.MouseEvent,
-    buttonKey: string, // Pass the key for logging
+    buttonKey: string,
     actionCallback: (context: CardActionContext) => void
   ): void => {
-    event.stopPropagation(); // Crucial: prevent card flip
-    console.debug(
-      `[SocialBar-${debugFaceName}] Click detected on button: ${buttonKey} (Card: ${cardContext.symbol})`
-    );
-    console.debug(
-      `[SocialBar-${debugFaceName}] Executing action for ${buttonKey}...`
-    );
+    event.stopPropagation();
     actionCallback(cardContext);
   };
 
@@ -95,14 +94,22 @@ export const SocialBar: React.FC<SocialBarProps> = ({
       Icon: ThumbsUp,
       title: "Like",
       isActive: isLikedByCurrentUser,
+      count: likeCount,
     },
     {
       key: "comment",
       action: interactions.onComment,
       Icon: MessageCircle,
       title: "Comment",
+      count: commentCount,
     },
-    { key: "save", action: interactions.onSave, Icon: Bookmark, title: "Save" },
+    {
+      key: "save",
+      action: interactions.onSave,
+      Icon: Bookmark,
+      title: "Save to Collection",
+      count: collectionCount,
+    },
     {
       key: "share",
       action: interactions.onShare,
@@ -111,26 +118,10 @@ export const SocialBar: React.FC<SocialBarProps> = ({
     },
   ];
 
-  // Ensure that we only try to render buttons that have an action.
   const buttonConfigs: ActionableButtonConfig[] = rawButtonConfigs.filter(
-    (config): config is ActionableButtonConfig => {
-      if (!config.action) {
-        console.debug(
-          `[SocialBar-${debugFaceName}] Filtering out button '${config.key}' due to missing action for ${cardContext.symbol}.`
-        );
-      }
-      return !!config.action;
-    }
+    (config): config is ActionableButtonConfig => !!config.action
   );
 
-  // Log the order of buttons that will be rendered
-  console.debug(
-    `[SocialBar-${debugFaceName}] Effective button order for ${cardContext.symbol}:`,
-    buttonConfigs.map((b) => b.key).join(", ")
-  );
-
-  // SocialBar assumes it's rendered in a correctly oriented context by its parent (BaseCard).
-  // Therefore, no self-transformation or icon-specific transformation is needed here.
   const containerStyle: React.CSSProperties = {};
   const iconStyle: React.CSSProperties = {};
 
@@ -138,18 +129,12 @@ export const SocialBar: React.FC<SocialBarProps> = ({
     <div
       style={containerStyle}
       className={cn("shrink-0 p-1 flex justify-around items-center", className)}
-      onClick={(e) => {
-        // This log helps see if clicks on the bar's padding are caught
-        console.debug(
-          `[SocialBar-${debugFaceName}] Click on SocialBar container padding (Card: ${cardContext.symbol})`
-        );
-        e.stopPropagation();
-      }}
+      onClick={(e) => e.stopPropagation()}
       role="toolbar"
       aria-label={`Social actions for ${debugFaceName} of ${cardContext.symbol}`}>
       {buttonConfigs.map((config, index) => (
         <button
-          key={`${config.key}-${debugFaceName}`} // Make key unique per face instance
+          key={`${config.key}-${debugFaceName}`}
           onClick={(e) => handleInteraction(e, config.key, config.action)}
           title={config.title}
           className={cn(
@@ -158,7 +143,7 @@ export const SocialBar: React.FC<SocialBarProps> = ({
           )}
           aria-pressed={config.key === "like" ? config.isActive : undefined}
           aria-label={`${config.title} for ${cardContext.symbol} on ${debugFaceName} face (DOM index ${index})`}
-          data-button-key={config.key} // For easier inspection
+          data-button-key={config.key}
           data-face-name={debugFaceName}>
           <span style={iconStyle} className="flex items-center justify-center">
             <config.Icon
@@ -175,6 +160,32 @@ export const SocialBar: React.FC<SocialBarProps> = ({
               )}
             />
           </span>
+          {(config.count !== undefined && config.count > 0) ||
+          (config.key === "like" && config.count !== undefined) ? (
+            <span
+              className={cn(
+                "ml-0.5 font-medium text-[11px]", // Made text slightly smaller
+                {
+                  "text-primary":
+                    config.key === "like" &&
+                    isLikedByCurrentUser &&
+                    config.count > 0,
+                },
+                {
+                  "text-muted-foreground":
+                    (config.key !== "like" ||
+                      !isLikedByCurrentUser ||
+                      config.count === 0) &&
+                    config.count > 0,
+                },
+                {
+                  "text-muted-foreground/70":
+                    config.count === 0 && config.key === "like",
+                }
+              )}>
+              {config.count}
+            </span>
+          ) : null}
         </button>
       ))}
     </div>

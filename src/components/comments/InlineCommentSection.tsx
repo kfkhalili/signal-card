@@ -27,10 +27,12 @@ type CommentFormValues = z.infer<typeof commentFormSchema>;
 
 interface InlineCommentSectionProps {
   snapshotId: string;
+  onCommentPosted?: () => void; // New optional callback
 }
 
 export const InlineCommentSection: React.FC<InlineCommentSectionProps> = ({
   snapshotId,
+  onCommentPosted,
 }) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [isLoadingComments, setIsLoadingComments] = useState<boolean>(false);
@@ -109,6 +111,7 @@ export const InlineCommentSection: React.FC<InlineCommentSectionProps> = ({
       setComments((prevComments) => [...prevComments, newComment]);
       form.reset();
       toast({ title: "Comment Posted!", variant: "default" });
+      onCommentPosted?.(); // Call the callback
     } catch (error: any) {
       toast({
         title: "Error Posting Comment",
