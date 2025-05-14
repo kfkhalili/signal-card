@@ -89,19 +89,10 @@ export const SectorIconDisplay: React.FC<SectorIconDisplayProps> = ({
   const displaySectorName = sector || "N/A";
 
   return (
-    <TooltipProvider delayDuration={100}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div
-            className={cn("flex items-center", className)}
-            aria-label={`Sector: ${displaySectorName}`}>
-            <IconComponent size={iconSize} className="shrink-0" />
-          </div>
-        </TooltipTrigger>
-        <TooltipContent side="top">
-          <p>{displaySectorName}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <div
+      className={cn("flex items-center", className)}
+      aria-label={`Sector: ${displaySectorName}`}>
+      <IconComponent size={iconSize} className="shrink-0" />
+    </div>
   );
 };

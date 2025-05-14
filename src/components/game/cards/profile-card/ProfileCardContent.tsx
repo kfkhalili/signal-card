@@ -22,12 +22,6 @@ import {
   SectorIconDisplay,
   type SectorName,
 } from "@/components/workspace/SectorIconDisplay";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 // Helper function to truncate text
 const truncateText = (
@@ -120,7 +114,7 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
           <ShadCardContent className="pt-1 pb-1 px-0 space-y-1.5 flex-grow">
             {taglineSource && (
               <p
-                className="text-muted-foreground leading-tight line-clamp-7"
+                className="text-muted-foreground text-sm leading-tight line-clamp-7"
                 style={{ minHeight: "6.25em" }}
                 title={taglineSource || undefined}>
                 {taglineSource}
@@ -140,7 +134,7 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
                   staticData.sector ? ` (Sector: ${staticData.sector})` : ""
                 }`}
                 baseClassName="flex items-center min-w-0 gap-1.5"
-                interactiveClassName="hover:text-primary cursor-pointer" // Added cursor-pointer
+                interactiveClassName="hover:text-primary cursor-pointer"
                 aria-label={`Filter by industry: ${
                   staticData.industry || "N/A"
                 }`}>
@@ -154,27 +148,16 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
               </ClickableDataItem>
 
               {staticData.country && (
-                <TooltipProvider delayDuration={100}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div
-                        className="flex items-center gap-1.5 pt-0.5 cursor-default"
-                        aria-label={`Country: ${fullCountryName}`}>
-                        <span className="text-base leading-none">
-                          {countryFlag}
-                        </span>
-                        <span
-                          className="truncate text-foreground"
-                          title={fullCountryName}>
-                          {truncateText(fullCountryName, 20)}
-                        </span>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="text-xs">
-                      <p>{fullCountryName}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <div
+                  className="flex items-center gap-1.5 pt-0.5 cursor-default"
+                  aria-label={`Country: ${fullCountryName}`}>
+                  <span className="text-base leading-none">{countryFlag}</span>
+                  <span
+                    className="truncate text-foreground"
+                    title={fullCountryName}>
+                    {fullCountryName}
+                  </span>
+                </div>
               )}
 
               {staticData.formatted_full_time_employees && (
