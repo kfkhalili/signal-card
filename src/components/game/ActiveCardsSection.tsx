@@ -6,7 +6,7 @@ import { useToast as useAppToast } from "@/hooks/use-toast";
 import type {
   BaseCardSocialInteractions,
   CardActionContext,
-  CardType as APICardType, // Renaming for clarity if local CardType exists
+  CardType as APICardType,
 } from "./cards/base-card/base-card.types";
 import { getPriceCardInteractionHandlers } from "./cards/price-card/priceCardInteractions";
 import { getProfileCardInteractionHandlers } from "./cards/profile-card/profileCardInteractions";
@@ -14,7 +14,9 @@ import type { ProfileCardInteractionCallbacks } from "./cards/profile-card/profi
 import type { PriceCardInteractionCallbacks } from "./cards/price-card/price-card.types";
 import { useAuth } from "@/contexts/AuthContext";
 
-// Types needed for API request bodies (mirroring those in the API routes)
+// Import the new CommentDialog
+import { CommentDialog } from "@/components/comments/CommentDialog"; // Adjust path if necessary
+
 import type { PriceCardData as APIPriceCardData } from "@/components/game/cards/price-card/price-card.types";
 import type { ProfileCardData as APIProfileCardData } from "@/components/game/cards/profile-card/profile-card.types";
 
@@ -33,7 +35,6 @@ interface EnsureSnapshotRequestBody {
 interface SnapshotEnsureResponse {
   snapshot: {
     id: string; // This is the snapshot_id
-    // include other fields if needed from card_snapshots
   };
   isNew: boolean;
 }
@@ -54,6 +55,12 @@ interface ActiveCardsSectionProps {
   onHeaderIdentityClick?: (context: CardActionContext) => void;
 }
 
+interface CommentingCardInfo {
+  snapshotId: string;
+  symbol: string;
+  name?: string | null;
+}
+
 const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
   activeCards,
   setActiveCards,
@@ -67,6 +74,12 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
   const [cardIdToConfirmDelete, setCardIdToConfirmDelete] = useState<
     string | null
   >(null);
+
+  // State for Comment Dialog
+  const [isCommentDialogOpen, setIsCommentDialogOpen] =
+    useState<boolean>(false);
+  const [commentingCardInfo, setCommentingCardInfo] =
+    useState<CommentingCardInfo | null>(null);
 
   const handleDeleteRequest = useCallback((cardId: string): void => {
     setCardIdToConfirmDelete(cardId);
@@ -93,56 +106,45 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
     setCardIdToConfirmDelete(null);
   }, []);
 
-  // Helper to get a snapshot_id by ensuring the snapshot exists globally
-  const ensureGlobalSnapshot = async (
-    card: DisplayableCard
-  ): Promise<string | null> => {
-    const { isFlipped, currentRarity, rarityReason, ...cardDataForSnapshot } =
-      card;
-
-    const requestBody: EnsureSnapshotRequestBody = {
-      cardType: card.type as APICardType,
-      symbol: card.symbol,
-      companyName: card.companyName,
-      logoUrl: card.logoUrl,
-      cardDataSnapshot: cardDataForSnapshot as APICardDataSnapshot,
-      rarityLevel: currentRarity,
-      rarityReason: rarityReason,
-    };
-
-    try {
-      const response = await fetch("/api/snapshots/ensure", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
-      });
-      const result = (await response.json()) as SnapshotEnsureResponse;
-      if (!response.ok) {
-        throw new Error(
-          (result as any).error ||
-            `Failed to ensure snapshot (status ${response.status})`
-        );
+  const ensureGlobalSnapshot = useCallback(
+    async (card: DisplayableCard): Promise<string | null> => {
+      const { isFlipped, currentRarity, rarityReason, ...cardDataForSnapshot } =
+        card;
+      const requestBody: EnsureSnapshotRequestBody = {
+        cardType: card.type as APICardType,
+        symbol: card.symbol,
+        companyName: card.companyName,
+        logoUrl: card.logoUrl,
+        cardDataSnapshot: cardDataForSnapshot as APICardDataSnapshot,
+        rarityLevel: currentRarity,
+        rarityReason: rarityReason,
+      };
+      try {
+        const response = await fetch("/api/snapshots/ensure", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody),
+        });
+        const result = (await response.json()) as SnapshotEnsureResponse;
+        if (!response.ok) {
+          throw new Error(
+            (result as any).error ||
+              `Failed to ensure snapshot (status ${response.status})`
+          );
+        }
+        return result.snapshot.id;
+      } catch (error: any) {
+        console.error("Error ensuring global snapshot:", error);
+        toast({
+          title: "Snapshot Error",
+          description: error.message || "Could not process card snapshot.",
+          variant: "destructive",
+        });
+        return null;
       }
-      if (result.isNew) {
-        console.log(
-          `Global snapshot created for ${card.symbol}: ${result.snapshot.id}`
-        );
-      } else {
-        console.log(
-          `Existing global snapshot found for ${card.symbol}: ${result.snapshot.id}`
-        );
-      }
-      return result.snapshot.id;
-    } catch (error: any) {
-      console.error("Error ensuring global snapshot:", error);
-      toast({
-        title: "Snapshot Error",
-        description: error.message || "Could not process card snapshot.",
-        variant: "destructive",
-      });
-      return null;
-    }
-  };
+    },
+    [toast]
+  );
 
   const handleLikeCard = useCallback(
     async (context: CardActionContext) => {
@@ -158,7 +160,6 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
         });
         return;
       }
-
       const cardToLike = activeCards.find((c) => c.id === context.id);
       if (!cardToLike) {
         toast({
@@ -168,15 +169,12 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
         });
         return;
       }
-
       toast({
         title: "Processing Like...",
         description: `Preparing ${cardToLike.symbol}...`,
       });
       const snapshotId = await ensureGlobalSnapshot(cardToLike);
-
-      if (!snapshotId) return; // Error handled by ensureGlobalSnapshot
-
+      if (!snapshotId) return;
       try {
         const likeResponse = await fetch("/api/snapshots/like", {
           method: "POST",
@@ -184,7 +182,6 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
           body: JSON.stringify({ snapshotId }),
         });
         const likeResult = await likeResponse.json();
-
         if (
           !likeResponse.ok &&
           !(likeResponse.status === 200 && likeResult.isAlreadyLiked)
@@ -194,7 +191,6 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
               `Failed to like snapshot (status ${likeResponse.status})`
           );
         }
-
         if (likeResult.isAlreadyLiked) {
           toast({
             title: "Already Liked",
@@ -232,7 +228,6 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
         });
         return;
       }
-
       const cardToCollect = activeCards.find((c) => c.id === context.id);
       if (!cardToCollect) {
         toast({
@@ -242,26 +237,19 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
         });
         return;
       }
-
       toast({
         title: "Collecting Card...",
         description: `Saving ${cardToCollect.symbol} to your collection...`,
       });
       const snapshotId = await ensureGlobalSnapshot(cardToCollect);
-
-      if (!snapshotId) return; // Error handled by ensureGlobalSnapshot
-
+      if (!snapshotId) return;
       try {
-        // Now, explicitly add this snapshotId to the user's collection
         const addResponse = await fetch("/api/collections/add", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            snapshotId /*, userNotes: "Optional notes here" */,
-          }),
+          body: JSON.stringify({ snapshotId }),
         });
         const addResult = await addResponse.json();
-
         if (
           !addResponse.ok &&
           !(
@@ -274,7 +262,6 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
               `Failed to add to collection (status ${addResponse.status})`
           );
         }
-
         if (addResult.message?.includes("already in collection")) {
           toast({
             title: "Already Collected",
@@ -298,28 +285,60 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
     [activeCards, user, isLoadingAuth, toast, ensureGlobalSnapshot]
   );
 
+  const handleCommentClick = useCallback(
+    async (context: CardActionContext) => {
+      if (!user) {
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to comment.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const cardForComment = activeCards.find((c) => c.id === context.id);
+      if (!cardForComment) {
+        toast({
+          title: "Error",
+          description: "Card not found to comment on.",
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({
+        title: "Loading Comments...",
+        description: `Fetching details for ${cardForComment.symbol}...`,
+      });
+      const snapshotId = await ensureGlobalSnapshot(cardForComment);
+      if (snapshotId) {
+        setCommentingCardInfo({
+          snapshotId,
+          symbol: cardForComment.symbol,
+          name: cardForComment.companyName,
+        });
+        setIsCommentDialogOpen(true);
+      } else {
+        toast({
+          title: "Error",
+          description: "Could not prepare comment section for this card.",
+          variant: "destructive",
+        });
+      }
+    },
+    [user, activeCards, toast, ensureGlobalSnapshot]
+  );
+
   const socialInteractionsForCards: BaseCardSocialInteractions = useMemo(
     () => ({
       onLike: handleLikeCard,
-      onComment: (ctx) => {
-        // Placeholder for future comment functionality
-        toast({
-          title: "Comment (Not Implemented)",
-          description: `Commenting on ${ctx.symbol}... This feature is coming soon!`,
-        });
-        // When implemented:
-        // 1. const card = activeCards.find(c => c.id === ctx.id);
-        // 2. if (card) { const snapshotId = await ensureGlobalSnapshot(card); }
-        // 3. if (snapshotId) { /* Open comment modal, then POST to /api/snapshots/comment */ }
-      },
-      onSave: handleCaptureCardToCollection, // This is the "Collect" action
+      onComment: handleCommentClick, // Use the new handler
+      onSave: handleCaptureCardToCollection,
       onShare: (ctx) =>
         toast({
           title: "Share Action (Not Implemented)",
           description: `Shared ${ctx.symbol}.`,
         }),
     }),
-    [toast, handleCaptureCardToCollection, handleLikeCard, activeCards] // ensureGlobalSnapshot removed, it's called within handlers
+    [toast, handleCaptureCardToCollection, handleLikeCard, handleCommentClick]
   );
 
   const finalPriceSpecificInteractions =
@@ -330,22 +349,40 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
     useMemo(() => getProfileCardInteractionHandlers(toast), [toast]);
 
   return (
-    <ActiveCardsPresentational
-      cards={activeCards}
-      onToggleFlipCard={(id: string) =>
-        setActiveCards((prev) =>
-          prev.map((c) => (c.id === id ? { ...c, isFlipped: !c.isFlipped } : c))
-        )
-      }
-      onDeleteCardRequest={handleDeleteRequest}
-      socialInteractions={socialInteractionsForCards}
-      priceSpecificInteractions={finalPriceSpecificInteractions}
-      profileSpecificInteractions={finalProfileSpecificInteractions}
-      onHeaderIdentityClick={onHeaderIdentityClick}
-      cardIdToConfirmDelete={cardIdToConfirmDelete}
-      onConfirmDeletion={confirmDeletion}
-      onCancelDeletion={cancelDeletion}
-    />
+    <>
+      <ActiveCardsPresentational
+        cards={activeCards}
+        onToggleFlipCard={(id: string) =>
+          setActiveCards((prev) =>
+            prev.map((c) =>
+              c.id === id ? { ...c, isFlipped: !c.isFlipped } : c
+            )
+          )
+        }
+        onDeleteCardRequest={handleDeleteRequest}
+        socialInteractions={socialInteractionsForCards}
+        priceSpecificInteractions={finalPriceSpecificInteractions}
+        profileSpecificInteractions={finalProfileSpecificInteractions}
+        onHeaderIdentityClick={onHeaderIdentityClick}
+        cardIdToConfirmDelete={cardIdToConfirmDelete}
+        onConfirmDeletion={confirmDeletion}
+        onCancelDeletion={cancelDeletion}
+      />
+      {commentingCardInfo && (
+        <CommentDialog
+          isOpen={isCommentDialogOpen}
+          onOpenChange={(isOpen) => {
+            setIsCommentDialogOpen(isOpen);
+            if (!isOpen) {
+              setCommentingCardInfo(null); // Reset when dialog closes
+            }
+          }}
+          snapshotId={commentingCardInfo.snapshotId}
+          cardSymbol={commentingCardInfo.symbol}
+          cardName={commentingCardInfo.name}
+        />
+      )}
+    </>
   );
 };
 
