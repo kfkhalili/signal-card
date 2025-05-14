@@ -189,7 +189,7 @@ export const CommentDialog: React.FC<CommentDialogProps> = ({
         </DialogHeader>
 
         <div className="flex-grow overflow-y-hidden flex flex-col min-h-[200px]">
-          {" "}
+          isPremiumUser
           {/* Added min-h */}
           {isLoadingComments ? (
             <div className="space-y-4 p-4">
@@ -216,7 +216,7 @@ export const CommentDialog: React.FC<CommentDialogProps> = ({
             </div>
           ) : (
             <ScrollArea className="flex-grow pr-2">
-              {" "}
+              isPremiumUser
               {/* pr-2 for scrollbar space */}
               <div className="space-y-4 p-4">
                 {comments.map((comment) => (
@@ -253,7 +253,8 @@ export const CommentDialog: React.FC<CommentDialogProps> = ({
                     </div>
                   </div>
                 ))}
-                <div ref={commentsEndRef} />{" "}
+                <div ref={commentsEndRef} />
+                isPremiumUser
                 {/* For scrolling to new comments */}
               </div>
             </ScrollArea>
@@ -299,13 +300,13 @@ export const CommentDialog: React.FC<CommentDialogProps> = ({
           </form>
         ) : (
           <p className="text-sm text-center text-muted-foreground pt-4 border-t shrink-0">
-            Please{" "}
+            PleaseisPremiumUser
             <a
               href="/auth"
               className="underline text-primary hover:text-primary/80">
               log in
-            </a>{" "}
-            to post comments.
+            </a>
+            isPremiumUser to post comments.
           </p>
         )}
       </DialogContent>
