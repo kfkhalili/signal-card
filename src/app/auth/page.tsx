@@ -3,8 +3,8 @@
 
 import { createClient } from "../../lib/supabase/client";
 import { Auth } from "@supabase/auth-ui-react";
-import { ThemeSupa } from "@supabase/auth-ui-shared"; // Keep ThemeSupa as a base
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { ThemeSupa } from "@supabase/auth-ui-shared";
+import { useRouter } from "next/navigation"; // Removed usePathname, useSearchParams
 import { useEffect, useState, useCallback } from "react";
 
 type AuthViewType =
@@ -17,8 +17,6 @@ type AuthViewType =
 export default function AuthPage() {
   const supabase = createClient();
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
   const [authView, setAuthView] = useState<AuthViewType>("sign_in");
 
   const updateViewFromHash = useCallback(() => {
@@ -40,7 +38,9 @@ export default function AuthPage() {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (event === "SIGNED_IN") {
-          const nextUrl = searchParams.get("next") || "/";
+          // Access search params directly from window.location on client
+          const nextUrl =
+            new URLSearchParams(window.location.search).get("next") || "/";
           router.push(nextUrl);
           router.refresh();
         }
@@ -50,7 +50,9 @@ export default function AuthPage() {
     const checkSession = async () => {
       const { data } = await supabase.auth.getSession();
       if (data.session) {
-        const nextUrl = searchParams.get("next") || "/";
+        // Access search params directly from window.location on client
+        const nextUrl =
+          new URLSearchParams(window.location.search).get("next") || "/";
         router.push(nextUrl);
         router.refresh();
       }
@@ -63,7 +65,10 @@ export default function AuthPage() {
       authListener?.subscription.unsubscribe();
       window.removeEventListener("hashchange", updateViewFromHash);
     };
-  }, [pathname, searchParams, supabase, router, updateViewFromHash]);
+    // Removed pathname and searchParams from dependencies, as they are no longer top-level states here.
+    // router and supabase are stable or correctly handled by React.
+    // updateViewFromHash is memoized and stable.
+  }, [supabase, router, updateViewFromHash]);
 
   // console.log("[AuthPage] Rendering with authView:", authView, "and key:", authView);
 
