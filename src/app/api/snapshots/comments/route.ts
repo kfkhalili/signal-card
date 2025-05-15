@@ -8,8 +8,8 @@ interface CreateCommentRequestBody {
   parentCommentId?: string | null; // For threaded replies
 }
 
-// Define a more specific type for the comment with author details for the response
-interface CommentWithAuthor {
+// Updated: Simplified response structure for a newly created comment
+interface NewCommentResponse {
   id: string;
   user_id: string;
   snapshot_id: string;
@@ -17,12 +17,9 @@ interface CommentWithAuthor {
   comment_text: string;
   created_at: string;
   updated_at: string;
-  author: {
-    // Assuming 'profiles' table linked to auth.users has these
-    id: string; // user_id from profiles table
-    username?: string | null; // or display_name, full_name
-    avatar_url?: string | null;
-  } | null; // Author could be null if profile not found or not selected
+  // Author details are removed from immediate POST response for simplicity
+  // The client can use the user_id and existing auth context for the new comment,
+  // or the GET endpoint will provide full author details on subsequent fetches.
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -50,14 +47,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     if (commentText.length > 1000) {
-      // Example limit
       return NextResponse.json(
         { error: "Comment text is too long (max 1000 characters)." },
         { status: 400 }
       );
     }
 
-    // Verify snapshotId exists in card_snapshots
+    // Verify snapshotId exists (optional, FK constraint should handle it but good for early error)
     const { data: snapshotExists, error: snapshotCheckError } = await supabase
       .from("card_snapshots")
       .select("id")
@@ -78,14 +74,14 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
-    // Verify parentCommentId exists and belongs to the same snapshot if provided
+    // Parent comment validation (if applicable) remains the same...
     if (parentCommentId) {
       const { data: parentCommentExists, error: parentCheckError } =
         await supabase
           .from("snapshot_comments")
           .select("id")
           .eq("id", parentCommentId)
-          .eq("snapshot_id", snapshotId) // Ensure parent is for the same snapshot
+          .eq("snapshot_id", snapshotId)
           .maybeSingle();
       if (parentCheckError) {
         console.error("Error checking parent comment:", parentCheckError);
@@ -107,6 +103,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       }
     }
 
+    // Insert the new comment
     const { data: newCommentData, error: insertError } = await supabase
       .from("snapshot_comments")
       .insert({
@@ -116,6 +113,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         parent_comment_id: parentCommentId || null,
       })
       .select(
+        // Select only fields from snapshot_comments table
         `
         id,
         user_id,
@@ -123,21 +121,10 @@ export async function POST(request: Request): Promise<NextResponse> {
         parent_comment_id,
         comment_text,
         created_at,
-        updated_at,
-        author: user_profiles (
-            id,
-            username,
-            avatar_url
-        )
+        updated_at
       `
       )
       .single();
-    // Note on `profiles!inner`: This assumes a 'profiles' table with a FK relationship
-    // from snapshot_comments.user_id to profiles.id (which is auth.users.id).
-    // And that 'profiles' table has 'username' and 'avatar_url'.
-    // If your user profile table is named differently or if the join is optional (LEFT JOIN),
-    // adjust the select statement. Using `!inner` ensures a profile must exist.
-    // If `profiles` might not exist for a user, use `author: profiles ( ... )` (outer join).
 
     if (insertError) {
       console.error("Error inserting comment:", insertError);
@@ -147,8 +134,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
-    // Explicitly cast to our desired response type for the comment
-    const typedNewComment = newCommentData as unknown as CommentWithAuthor;
+    // The newCommentData will now be of NewCommentResponse type (or very close)
+    const typedNewComment = newCommentData as NewCommentResponse;
 
     return NextResponse.json(
       { comment: typedNewComment, message: "Comment posted successfully!" },

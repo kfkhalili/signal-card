@@ -1,5 +1,5 @@
 // src/components/ui/social-bar.tsx
-// "use client"; // This component is already a client component
+"use client";
 
 import React from "react";
 import {
@@ -58,15 +58,11 @@ export const SocialBar: React.FC<SocialBarProps> = ({
   commentCount = 0,
   collectionCount = 0,
 }) => {
-  // ADD THIS LOG
   console.log(
     `[SocialBar ${cardContext.symbol} ${debugFaceName}] Rendering. Props: likeCount=${likeCount}, commentCount=${commentCount}, collectionCount=${collectionCount}, isLikedByCurrentUser=${isLikedByCurrentUser}`
   );
 
   if (!interactions) {
-    console.debug(
-      `[SocialBar] No interactions object provided for ${debugFaceName} of ${cardContext.symbol}.`
-    );
     return null;
   }
 
@@ -115,6 +111,7 @@ export const SocialBar: React.FC<SocialBarProps> = ({
       action: interactions.onShare,
       Icon: Share2,
       title: "Share",
+      // No count for shares
     },
   ];
 
@@ -160,24 +157,26 @@ export const SocialBar: React.FC<SocialBarProps> = ({
               )}
             />
           </span>
-          {(config.count !== undefined && config.count > 0) ||
-          (config.key === "like" && config.count !== undefined) ? (
+          {/* Updated condition to show counts */}
+          {config.count !== undefined &&
+          (config.key === "like" || config.count > 0) ? (
             <span
               className={cn(
-                "ml-0.5 font-medium text-[11px]", // Made text slightly smaller
+                "ml-0.5 font-medium text-[11px]",
+                // Specific styling for like button count when active
                 {
                   "text-primary":
                     config.key === "like" &&
                     isLikedByCurrentUser &&
                     config.count > 0,
                 },
+                // General styling for other counts if > 0, or like count if not active but > 0
                 {
                   "text-muted-foreground":
-                    (config.key !== "like" ||
-                      !isLikedByCurrentUser ||
-                      config.count === 0) &&
+                    (config.key !== "like" || !isLikedByCurrentUser) &&
                     config.count > 0,
                 },
+                // Styling for like count when it's 0
                 {
                   "text-muted-foreground/70":
                     config.count === 0 && config.key === "like",
