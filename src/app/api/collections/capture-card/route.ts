@@ -2,66 +2,18 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import type { CardType } from "@/components/game/cards/base-card/base-card.types";
-import type { PriceCardData } from "@/components/game/cards/price-card/price-card.types";
-import type {
-  ProfileCardData,
-  ProfileCardStaticData,
-  ProfileCardLiveData,
-} from "@/components/game/cards/profile-card/profile-card.types";
-import crypto from "crypto";
-
-// Define the union type for card data snapshots more clearly
-type CardDataSnapshot = PriceCardData | ProfileCardData;
+import { generateStateHash, type CardDataForHashing } from "@/lib/cardUtils";
 
 interface CaptureCardRequestBody {
   cardType: CardType;
   symbol: string;
   companyName?: string | null;
   logoUrl?: string | null;
-  cardDataSnapshot: CardDataSnapshot; // This is the ConcreteCardData
+  cardDataSnapshot: CardDataForHashing; // This is the ConcreteCardData
   sourceCardId?: string;
   // Rarity information determined by the client for the live state
   currentRarity?: string | null;
   rarityReason?: string | null;
-}
-
-// Function to generate a consistent hash for a card's key state
-function generateStateHash(
-  cardType: CardType,
-  snapshot: CardDataSnapshot
-): string {
-  let keyDataString = `${cardType}:${snapshot.symbol}`;
-
-  if (snapshot.type === "price") {
-    const priceCard = snapshot as PriceCardData;
-    keyDataString += `:${priceCard.faceData.price?.toFixed(4)}`;
-    keyDataString += `:${priceCard.faceData.changePercentage?.toFixed(4)}`;
-    keyDataString += `:${priceCard.faceData.volume}`;
-    keyDataString += `:${priceCard.faceData.dayHigh?.toFixed(4)}`;
-    keyDataString += `:${priceCard.faceData.dayLow?.toFixed(4)}`;
-    keyDataString += `:${priceCard.backData.sma50d?.toFixed(4)}`;
-    keyDataString += `:${priceCard.backData.sma200d?.toFixed(4)}`;
-  } else if (snapshot.type === "profile") {
-    const profileCard = snapshot as ProfileCardData;
-    keyDataString += `:${
-      (profileCard.staticData as ProfileCardStaticData).industry
-    }`;
-    keyDataString += `:${
-      (profileCard.staticData as ProfileCardStaticData).sector
-    }`;
-    keyDataString += `:${
-      (profileCard.staticData as ProfileCardStaticData).country
-    }`;
-    keyDataString += `:${
-      (profileCard.staticData as ProfileCardStaticData).profile_last_updated
-    }`;
-    if (profileCard.liveData) {
-      const liveData = profileCard.liveData as ProfileCardLiveData;
-      keyDataString += `:${liveData.price?.toFixed(4)}`;
-      keyDataString += `:${liveData.volume}`;
-    }
-  }
-  return crypto.createHash("md5").update(keyDataString).digest("hex");
 }
 
 export async function POST(request: Request) {
@@ -86,7 +38,7 @@ export async function POST(request: Request) {
       logoUrl,
       cardDataSnapshot,
       sourceCardId,
-      currentRarity, // Directly use this from the body
+      currentRarity,
       rarityReason, // Directly use this from the body
     } = body;
 
@@ -102,8 +54,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const stateHash = generateStateHash(cardType, cardDataSnapshot);
-
+    const stateHash = generateStateHash(
+      cardType,
+      symbol,
+      cardDataSnapshot,
+      currentRarity,
+      rarityReason
+    );
     const { data: existingByHash, error: hashCheckError } = await supabase
       .from("user_collected_cards")
       .select("id, captured_at")
