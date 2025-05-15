@@ -1,5 +1,5 @@
 // src/components/game/cards/base-card/BaseCard.tsx
-// "use client"; // This component is already a client component
+"use client";
 
 import React from "react";
 import { Card as ShadCard, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import Image from "next/image";
 import type {
   CardActionContext,
   BaseCardSocialInteractions,
+  CardType, // Assuming CardType is 'price' | 'profile'
 } from "./base-card.types";
 import { SocialBar } from "@/components/ui/social-bar";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
@@ -35,7 +36,7 @@ interface BaseCardProps {
   innerCardClassName?: string;
   children?: React.ReactNode;
   isLikedByCurrentUser?: boolean;
-  // Count props
+  isSavedByCurrentUser?: boolean;
   likeCount?: number;
   commentCount?: number;
   collectionCount?: number;
@@ -43,7 +44,7 @@ interface BaseCardProps {
 
 const outerStyle: React.CSSProperties = {
   perspective: "1000px",
-  position: "relative",
+  position: "relative", // Needed for absolute positioning of inner card
 };
 
 const cardSurfaceBaseStyle: React.CSSProperties = {
@@ -53,10 +54,10 @@ const cardSurfaceBaseStyle: React.CSSProperties = {
   width: "100%",
   height: "100%",
   backfaceVisibility: "hidden",
-  WebkitBackfaceVisibility: "hidden",
+  WebkitBackfaceVisibility: "hidden", // For Safari
   display: "flex",
   flexDirection: "column",
-  cursor: "pointer",
+  cursor: "pointer", // For the main card flip interaction
 };
 
 const backFaceTransformStyle: React.CSSProperties = {
@@ -78,13 +79,13 @@ const BaseCard: React.FC<BaseCardProps> = ({
   innerCardClassName,
   children,
   isLikedByCurrentUser,
+  isSavedByCurrentUser,
   likeCount,
   commentCount,
   collectionCount,
 }) => {
-  // ADD THIS LOG
   console.log(
-    `[BaseCard ${cardContext.symbol}] Rendering. Props: likeCount=${likeCount}, commentCount=${commentCount}, collectionCount=${collectionCount}, isLikedByCurrentUser=${isLikedByCurrentUser}`
+    `[BaseCard ${cardContext.symbol}] Rendering. Props: likeCount=${likeCount}, commentCount=${commentCount}, collectionCount=${collectionCount}, isLiked=${isLikedByCurrentUser}, isSaved=${isSavedByCurrentUser}`
   );
 
   const {
@@ -92,11 +93,11 @@ const BaseCard: React.FC<BaseCardProps> = ({
     companyName,
     logoUrl,
     websiteUrl,
-    type: cardType,
+    type: cardType, // cardContext.type is CardType ('price' | 'profile')
   } = cardContext;
 
   const innerCardDynamicStyles: React.CSSProperties = {
-    position: "relative",
+    position: "relative", // Changed from absolute to relative as outerStyle is relative
     width: "100%",
     height: "100%",
     transition: "transform 0.7s cubic-bezier(0.4, 0.0, 0.2, 1)",
@@ -105,7 +106,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
   };
 
   const handleDeleteClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
+    e.stopPropagation(); // Prevent card flip
     onDeleteRequest?.(cardContext);
   };
 
@@ -118,9 +119,10 @@ const BaseCard: React.FC<BaseCardProps> = ({
         "absolute top-1 right-1 z-30 p-1 flex items-center justify-center transition-all",
         "text-muted-foreground/60 hover:text-destructive rounded-full hover:bg-destructive/10",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
-        "opacity-0 group-hover:opacity-100 duration-200 ease-in-out"
+        "opacity-0 group-hover:opacity-100 duration-200 ease-in-out" // Show on group hover
       )}
-      data-interactive-child="true">
+      data-interactive-child="true" // Mark as interactive to prevent flip
+    >
       <XIcon size={16} strokeWidth={2.5} />
     </button>
   ) : null;
@@ -131,7 +133,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
       | React.KeyboardEvent<HTMLDivElement>
   ) => {
     if (onHeaderClick) {
-      event.stopPropagation();
+      event.stopPropagation(); // Prevent card flip
       onHeaderClick(cardContext);
     }
   };
@@ -145,29 +147,34 @@ const BaseCard: React.FC<BaseCardProps> = ({
         src={logoUrl}
         alt={`${companyName || symbol} logo`}
         fill
-        sizes="(max-width: 640px) 28px, (max-width: 768px) 32px, 40px"
+        sizes="(max-width: 640px) 28px, (max-width: 768px) 32px, 40px" // Example sizes
         className="object-contain rounded"
-        onError={(e) => (e.currentTarget.style.display = "none")} // Basic error handling for image
-        priority={false} // Generally false unless it's LCP
+        onError={(e) => (e.currentTarget.style.display = "none")} // Basic error handling
+        priority={false} // Generally false unless it's LCP for the specific page view
       />
     </div>
-  ) : null;
+  ) : (
+    // Placeholder if no logoUrl, to maintain layout
+    <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 shrink-0 bg-muted rounded-full flex items-center justify-center text-muted-foreground text-sm">
+      {symbol ? symbol.charAt(0) : "?"}
+    </div>
+  );
 
   const clickableLogoElement =
-    logoUrl && websiteUrl ? (
+    logoUrl && websiteUrl ? ( // Only make it a link if websiteUrl is present
       <a
         href={websiteUrl}
         target="_blank"
         rel="noopener noreferrer"
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()} // Prevent card flip
         className="cursor-pointer hover:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-full"
         aria-label={`Visit ${companyName || symbol} website`}
-        data-interactive-child="true"
+        data-interactive-child="true" // Mark as interactive
         title={`Visit ${companyName || symbol} website`}>
         {logoImageElement}
       </a>
     ) : (
-      logoImageElement
+      logoImageElement // Render just the image/placeholder if no websiteUrl
     );
 
   const identityHeaderContent = (
@@ -180,17 +187,17 @@ const BaseCard: React.FC<BaseCardProps> = ({
         onClickHandler={onHeaderClick ? handleHeaderTextClick : undefined}
         className={cn(
           "text-right min-w-0 max-w-[calc(100%-3rem-12px)] sm:max-w-[calc(100%-3.5rem-12px)] md:max-w-[calc(100%-4rem-12px)]",
-          "flex flex-col justify-center"
+          "flex flex-col justify-center" // Ensure vertical centering if needed
         )}
-        style={{ minHeight: "4.25rem" }}
+        style={{ minHeight: "4.25rem" }} // Consistent height for the text block
         aria-label={
           onHeaderClick
             ? `View details for ${companyName || symbol}`
             : undefined
         }
-        data-interactive-child={!!onHeaderClick}
+        data-interactive-child={!!onHeaderClick} // Mark as interactive
         data-testid="header-text-clickable">
-        <CardTitle
+        <CardTitle // This is a div from shadcn, not a heading element by default
           className={cn(
             "text-sm sm:text-base md:text-lg font-semibold leading-tight line-clamp-2 text-right"
           )}
@@ -198,16 +205,22 @@ const BaseCard: React.FC<BaseCardProps> = ({
           {companyName || symbol}
         </CardTitle>
         <div className="h-[1.1em] sm:h-[1.2em] md:h-[1.25em] flex items-end justify-end">
-          {companyName && (
+          {companyName && ( // Show symbol only if companyName is also present
             <p
               className="text-xs sm:text-sm text-muted-foreground truncate leading-tight pt-[1px] sm:pt-[2px]"
               title={symbol}>
               ({symbol})
             </p>
           )}
+          {/* Optionally, show card type if no company name, e.g., for generic price cards */}
           {!companyName && cardType === "price" && (
-            <p className="text-xs sm:text-sm text-muted-foreground leading-tight pt-[1px] sm:pt-[2px]">
-              Quote
+            <p className="text-xs sm:text-sm text-muted-foreground leading-tight pt-[1px] sm:pt-[2px] capitalize">
+              {cardType} Quote
+            </p>
+          )}
+          {!companyName && cardType === "profile" && (
+            <p className="text-xs sm:text-sm text-muted-foreground leading-tight pt-[1px] sm:pt-[2px] capitalize">
+              {symbol} Profile
             </p>
           )}
         </div>
@@ -218,27 +231,33 @@ const BaseCard: React.FC<BaseCardProps> = ({
   const actualIdentityHeaderElement = (
     <div
       className={cn(
-        "flex justify-between items-start",
+        "flex justify-between items-start", // Ensure items align to start for consistent logo/text height
         headerWrapperClassNames
       )}>
       {identityHeaderContent}
     </div>
   );
 
-  const headerPlaceholderElementForBack = (
-    <div
-      className={cn("invisible", headerWrapperClassNames)}
-      aria-hidden="true">
-      <div className="flex justify-between items-start">
-        <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0 mr-2 sm:mr-3">
-          <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10"></div>
+  const headerPlaceholderElementForBack = // For layout consistency on the back face
+    (
+      <div
+        className={cn("invisible", headerWrapperClassNames)} // Same padding and min-height
+        aria-hidden="true">
+        {/* Mimic structure for height calculation */}
+        <div className="flex justify-between items-start">
+          <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0 mr-2 sm:mr-3">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10"></div>{" "}
+            {/* Placeholder for logo area */}
+          </div>
+          <div
+            className="min-w-0 max-w-[calc(100%-3rem-12px)] sm:max-w-[calc(100%-3.5rem-12px)] md:max-w-[calc(100%-4rem-12px)]"
+            style={{ minHeight: "4.25rem" }} // Match height of ClickableDataItem
+          >
+            {/* Content not strictly needed as it's invisible */}
+          </div>
         </div>
-        <div
-          className="min-w-0 max-w-[calc(100%-3rem-12px)] sm:max-w-[calc(100%-3.5rem-12px)] md:max-w-[calc(100%-4rem-12px)]"
-          style={{ minHeight: "4.25rem" }}></div>
       </div>
-    </div>
-  );
+    );
 
   const RarityReasonOnBackHeader = rarityReason ? (
     <div className="absolute top-3 sm:top-4 left-3 sm:left-4 md:left-5 pr-8 sm:pr-10 md:pr-12 max-w-[calc(100%-40px-1rem)] pointer-events-none">
@@ -255,12 +274,13 @@ const BaseCard: React.FC<BaseCardProps> = ({
 
   const RarityIconOnFront = () => {
     if (!currentRarity || currentRarity === RARITY_LEVELS.COMMON) {
+      // Return a div with same padding/height to maintain layout consistency
       return (
         <div className="px-3 sm:px-4 md:px-5 py-1.5 h-[26px] sm:h-[28px]"></div>
       );
     }
     let IconComponent: React.ElementType | null = null;
-    let iconColor = "text-muted-foreground";
+    let iconColor = "text-muted-foreground"; // Default color
     switch (currentRarity) {
       case RARITY_LEVELS.UNCOMMON:
         IconComponent = Sparkle;
@@ -282,7 +302,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
     if (!IconComponent)
       return (
         <div className="px-3 sm:px-4 md:px-5 py-1.5 h-[26px] sm:h-[28px]"></div>
-      );
+      ); // Fallback for layout
 
     const tooltipContent = (
       <>
@@ -296,6 +316,8 @@ const BaseCard: React.FC<BaseCardProps> = ({
     );
     return (
       <div className="px-3 sm:px-4 md:px-5 py-1.5 text-right h-[26px] sm:h-[28px] flex items-center justify-end">
+        {" "}
+        {/* Ensures consistent height */}
         <TooltipProvider delayDuration={100}>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -318,29 +340,33 @@ const BaseCard: React.FC<BaseCardProps> = ({
   const handleCardFlipInteraction = (
     e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>
   ) => {
+    // Check if the click originated from an interactive child element
     let target = e.target as HTMLElement;
     while (target && target !== (e.currentTarget as HTMLElement)) {
       if (
-        target.dataset.interactiveChild === "true" ||
+        target.dataset.interactiveChild === "true" || // Check for our custom data attribute
         ["BUTTON", "A", "INPUT", "TEXTAREA", "SELECT"].includes(
           target.tagName
-        ) ||
-        target.getAttribute("role") === "button" ||
-        target.closest("[data-radix-interactive]")
+        ) || // Standard interactive elements
+        target.getAttribute("role") === "button" || // ARIA role
+        target.closest("[data-radix-interactive]") // For Radix UI components
       ) {
-        return;
+        return; // Don't flip if click was on an interactive child
       }
       target = target.parentElement as HTMLElement;
     }
+
+    // Proceed with flip if not on an interactive child
     if (e.type === "click") {
       onFlip();
     } else if (e.type === "keydown") {
       const keyboardEvent = e as React.KeyboardEvent<HTMLDivElement>;
+      // Only flip on Enter/Space if the card itself is focused (not an inner element)
       if (
         (keyboardEvent.key === "Enter" || keyboardEvent.key === " ") &&
         document.activeElement === e.currentTarget
       ) {
-        keyboardEvent.preventDefault();
+        keyboardEvent.preventDefault(); // Prevent default space scroll
         onFlip();
       }
     }
@@ -350,33 +376,40 @@ const BaseCard: React.FC<BaseCardProps> = ({
     socialInteractions ? (
       <div
         className={cn(
-          "transition-all duration-300 ease-in-out z-10 mt-auto shrink-0",
-          "opacity-0 group-hover:opacity-100",
-          "translate-y-full group-hover:translate-y-0",
+          "transition-all duration-300 ease-in-out z-10 mt-auto shrink-0", // mt-auto pushes to bottom
+          "opacity-0 group-hover:opacity-100", // Controlled by group hover
+          "translate-y-full group-hover:translate-y-0", // Slide in effect
+          // Pointer events for the social bar wrapper
           (faceName === "front" && isFlipped) ||
             (faceName === "back" && !isFlipped)
-            ? "pointer-events-none"
-            : "pointer-events-auto"
+            ? "pointer-events-none" // Hidden social bar wrapper is not interactive
+            : "pointer-events-auto" // Visible social bar wrapper is interactive
         )}
-        data-interactive-child="true">
+        data-interactive-child="true" // Mark social bar itself as interactive
+      >
         <SocialBar
           interactions={socialInteractions}
           cardContext={cardContext}
           isLikedByCurrentUser={isLikedByCurrentUser}
+          isSavedByCurrentUser={isSavedByCurrentUser}
           debugFaceName={faceName}
           likeCount={likeCount}
           commentCount={commentCount}
           collectionCount={collectionCount}
+          // className="border-t border-transparent group-hover:border-border/20 pt-1.5" // Optional styling
         />
       </div>
     ) : null;
 
   return (
     <div style={outerStyle} className={cn("group", className)}>
+      {" "}
+      {/* 'group' for hover effects on children */}
       <div
         style={innerCardDynamicStyles}
-        className={cn(innerCardClassName)}
+        className={cn(innerCardClassName)} // Allows custom styling for the flipping element
         data-testid="base-card-inner">
+        {/* Card Front Face */}
         <ShadCard
           style={{
             ...cardSurfaceBaseStyle,
@@ -384,27 +417,30 @@ const BaseCard: React.FC<BaseCardProps> = ({
           }}
           className={cn(
             "card-face-wrapper overflow-hidden rounded-2xl shadow-lg"
-          )}
+          )} // Base styling for a card face
           onClick={!isFlipped ? handleCardFlipInteraction : undefined}
           onKeyDown={!isFlipped ? handleCardFlipInteraction : undefined}
-          role="button"
-          tabIndex={!isFlipped ? 0 : -1}
+          role="button" // Make it keyboard accessible for flipping
+          tabIndex={!isFlipped ? 0 : -1} // Focusable only when visible
           aria-label={
             isFlipped
               ? `Show ${symbol} front details`
               : `Show ${symbol} back details`
           }
-          aria-pressed={isFlipped}
-          aria-hidden={isFlipped}>
+          aria-pressed={isFlipped} // Indicates if the "back" (flipped state) is active
+          aria-hidden={isFlipped} // Hide from assistive tech when not visible
+        >
           {deleteButtonElement}
           {actualIdentityHeaderElement}
           {RarityIconOnFront()}
+          {/* Main content area for the front face */}
           <div className="flex-grow overflow-y-auto relative p-3 sm:p-4 md:px-5 md:pb-5 md:pt-2">
             {faceContent}
           </div>
           {socialBarContent("front")}
         </ShadCard>
 
+        {/* Card Back Face */}
         <ShadCard
           style={{
             ...cardSurfaceBaseStyle,
@@ -413,7 +449,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
           }}
           className={cn(
             "card-back-wrapper overflow-hidden rounded-2xl shadow-lg"
-          )}
+          )} // Base styling for a card face
           onClick={isFlipped ? handleCardFlipInteraction : undefined}
           onKeyDown={isFlipped ? handleCardFlipInteraction : undefined}
           role="button"
@@ -424,16 +460,18 @@ const BaseCard: React.FC<BaseCardProps> = ({
               : `Show ${symbol} back details`
           }
           aria-hidden={!isFlipped}>
-          {deleteButtonElement}
-          {headerPlaceholderElementForBack}
+          {deleteButtonElement} {/* Also show delete on back if needed */}
+          {headerPlaceholderElementForBack} {/* Maintain layout consistency */}
           {RarityReasonOnBackHeader}
+          {/* Main content area for the back face */}
           <div className="flex-grow overflow-y-auto relative p-3 sm:p-4 md:px-5 md:pb-5 md:pt-2">
             {backContent}
           </div>
           {socialBarContent("back")}
         </ShadCard>
       </div>
-      {children}
+      {children}{" "}
+      {/* For potential overlays or absolute positioned elements outside the flip */}
     </div>
   );
 };

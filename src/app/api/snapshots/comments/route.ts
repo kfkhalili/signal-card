@@ -9,6 +9,9 @@ interface CreateCommentRequestBody {
 }
 
 // Updated: Simplified response structure for a newly created comment
+// This avoids complex joins in the POST response.
+// The GET endpoint (/api/snapshots/[snapshot_id]/comments) which uses the
+// 'snapshot_comments_with_author_details' view will provide full author details.
 interface NewCommentResponse {
   id: string;
   user_id: string;
@@ -17,9 +20,6 @@ interface NewCommentResponse {
   comment_text: string;
   created_at: string;
   updated_at: string;
-  // Author details are removed from immediate POST response for simplicity
-  // The client can use the user_id and existing auth context for the new comment,
-  // or the GET endpoint will provide full author details on subsequent fetches.
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -39,13 +39,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     const body = (await request.json()) as CreateCommentRequestBody;
     const { snapshotId, commentText, parentCommentId } = body;
 
+    // Validate input
     if (!snapshotId || !commentText || commentText.trim() === "") {
       return NextResponse.json(
         { error: "Missing snapshotId or commentText." },
         { status: 400 }
       );
     }
-
     if (commentText.length > 1000) {
       return NextResponse.json(
         { error: "Comment text is too long (max 1000 characters)." },
@@ -63,7 +63,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (snapshotCheckError) {
       console.error("Error checking snapshot for comment:", snapshotCheckError);
       return NextResponse.json(
-        { error: `Database error: ${snapshotCheckError.message}` },
+        {
+          error: `Database error checking snapshot: ${snapshotCheckError.message}`,
+        },
         { status: 500 }
       );
     }
@@ -74,7 +76,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
-    // Parent comment validation (if applicable) remains the same...
+    // Parent comment validation (if applicable)
     if (parentCommentId) {
       const { data: parentCommentExists, error: parentCheckError } =
         await supabase
@@ -113,7 +115,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         parent_comment_id: parentCommentId || null,
       })
       .select(
-        // Select only fields from snapshot_comments table
+        // Select only fields directly from the snapshot_comments table
         `
         id,
         user_id,
@@ -129,12 +131,11 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (insertError) {
       console.error("Error inserting comment:", insertError);
       return NextResponse.json(
-        { error: `Database error: ${insertError.message}` },
+        { error: `Database error inserting comment: ${insertError.message}` },
         { status: 500 }
       );
     }
 
-    // The newCommentData will now be of NewCommentResponse type (or very close)
     const typedNewComment = newCommentData as NewCommentResponse;
 
     return NextResponse.json(
@@ -144,6 +145,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   } catch (error: any) {
     console.error("Error processing comment request:", error);
     if (error instanceof SyntaxError) {
+      // Check for invalid JSON
       return NextResponse.json(
         { error: "Invalid JSON in request body." },
         { status: 400 }

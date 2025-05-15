@@ -1,13 +1,9 @@
 // src/components/game/GameCard.tsx
-// "use client"; // This component is already a client component
+// "use client";
 
 import React from "react";
-import type {
-  DisplayableCard,
-  // Ensure these types are correctly defined or imported if used for casting
-  // DisplayableLivePriceCardWithState,
-  // DisplayableUserProfileCardWithState
-} from "@/components/game/types";
+// ... (other imports as before) ...
+import type { DisplayableCard } from "@/components/game/types";
 import type {
   PriceCardData,
   PriceCardInteractionCallbacks,
@@ -25,10 +21,7 @@ import type {
 import { PriceCardContainer } from "./cards/price-card/PriceCardContainer";
 import { ProfileCardContainer } from "@/components/game/cards/profile-card/ProfileCardContainer";
 import { cn } from "@/lib/utils";
-// import { XIcon } from "lucide-react"; // Not used directly here
-// import { Badge } from "@/components/ui/badge"; // Not used directly here
 
-// Type aliases for specific card structures with state
 type DisplayableLivePriceCardWithState = PriceCardData & {
   isFlipped: boolean /* other state fields */;
 };
@@ -52,10 +45,11 @@ interface GameCardProps {
   readonly priceSpecificInteractions?: PriceSpecificInteractionsForContainer;
   readonly profileSpecificInteractions?: ProfileCardSpecificInteractions;
   readonly onHeaderIdentityClick?: (context: CardActionContext) => void;
-  // Count props
+
   likeCount?: number;
   commentCount?: number;
   collectionCount?: number;
+  isSavedByCurrentUser?: boolean; // New prop
 }
 
 const GameCard: React.FC<GameCardProps> = ({
@@ -66,13 +60,13 @@ const GameCard: React.FC<GameCardProps> = ({
   priceSpecificInteractions,
   profileSpecificInteractions,
   onHeaderIdentityClick,
-  likeCount, // Destructure count props
+  likeCount,
   commentCount,
   collectionCount,
+  isSavedByCurrentUser, // Destructure
 }) => {
-  // ADD THIS LOG
   console.log(
-    `[GameCard ${card.symbol}] Rendering. Props: likeCount=${likeCount}, commentCount=${commentCount}, collectionCount=${collectionCount}, card.isLikedByCurrentUser=${card.isLikedByCurrentUser}`
+    `[GameCard ${card.symbol}] Rendering. Props: likeCount=${likeCount}, commentCount=${commentCount}, collectionCount=${collectionCount}, card.isLiked=${card.isLikedByCurrentUser}, isSaved=${isSavedByCurrentUser}`
   );
 
   const handleFlip = () => onToggleFlip(card.id);
@@ -84,7 +78,7 @@ const GameCard: React.FC<GameCardProps> = ({
   const {
     id: cardId,
     symbol: cardSymbol,
-    type: cardTypeActual, // This is the 'type' from ConcreteCardData
+    type: cardTypeActual,
     companyName: cardCompanyName,
     logoUrl: cardLogoUrl,
     currentRarity: cardCurrentRarity,
@@ -94,7 +88,6 @@ const GameCard: React.FC<GameCardProps> = ({
 
   let websiteUrlForContext: string | null | undefined = null;
   if (card.type === "profile") {
-    // Cast to ProfileCardData to access staticData safely
     const profileCardData = card as ProfileCardData;
     websiteUrlForContext = profileCardData.staticData?.website;
   }
@@ -102,7 +95,7 @@ const GameCard: React.FC<GameCardProps> = ({
   const cardContextForBaseCard: CardActionContext = {
     id: cardId,
     symbol: cardSymbol,
-    type: cardTypeActual as CardType, // Cast if CardType from base-card.types is more restrictive
+    type: cardTypeActual as CardType,
     companyName: cardCompanyName ?? null,
     logoUrl: cardLogoUrl ?? null,
     websiteUrl: websiteUrlForContext ?? null,
@@ -121,7 +114,7 @@ const GameCard: React.FC<GameCardProps> = ({
     onHeaderIdentityClick: onHeaderIdentityClick,
     className: cardWrapperClassName,
     isLikedByCurrentUser: isLikedByCurrentUser,
-    // Pass counts down
+    isSavedByCurrentUser: isSavedByCurrentUser, // Pass down
     likeCount: likeCount,
     commentCount: commentCount,
     collectionCount: collectionCount,
@@ -147,7 +140,6 @@ const GameCard: React.FC<GameCardProps> = ({
         />
       );
     default:
-      // Fallback for unknown card types
       const unknownType = (card as any).type;
       return (
         <div className={cn(cardWrapperClassName, "p-4 border border-dashed")}>
