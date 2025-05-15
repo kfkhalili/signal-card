@@ -19,7 +19,7 @@ export function getProfileCardInteractionHandlers(
         description: `Filter by ${fieldType}: ${value} (Not implemented).`,
       });
     },
-    onShowFullPriceCard: (context: CardActionContext): void => {
+    onRequestPriceCard: (context: CardActionContext): void => {
       // Added block body
       toast({
         title: "Navigation Action",

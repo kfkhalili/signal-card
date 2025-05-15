@@ -56,5 +56,5 @@ export interface ProfileCardInteractionCallbacks {
     value: string
   ) => void;
   // Renamed from onShowFullPriceCard
-  readonly onRequestPriceCard?: (context: CardActionContext) => void; // <<< RENAMED
+  readonly onRequestPriceCard?: (context: CardActionContext) => void;
 }
