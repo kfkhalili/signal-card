@@ -1,6 +1,6 @@
 // src/hooks/useStockData.ts
 import { useState, useEffect, useCallback, useRef } from "react";
-import { createClient } from "../lib/supabase/client";
+import { createSupabaseBrowserClient } from "../lib/supabase/client";
 import type {
   SupabaseClient,
   RealtimeChannel,
@@ -163,7 +163,9 @@ export function useStockData({
   const liveQuoteChannelUnsubscribeRef = useRef<(() => void) | null>(null);
   const profileChannelUnsubscribeRef = useRef<(() => void) | null>(null);
   const isMountedRef = useRef<boolean>(true);
-  const supabaseClientRef = useRef<SupabaseClient>(createClient());
+  const supabaseClientRef = useRef<SupabaseClient>(
+    createSupabaseBrowserClient()
+  );
 
   useEffect(() => {
     isMountedRef.current = true;

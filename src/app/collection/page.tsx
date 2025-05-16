@@ -1,5 +1,5 @@
 // src/app/collection/page.tsx
-import { createClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import CollectionClientPage from "./CollectionClientPage";
@@ -30,7 +30,7 @@ export interface ServerFetchedCollectedCard {
 }
 
 export default async function CollectionPage() {
-  const supabase = await createClient();
+  const supabase = await createSupabaseServerClient();
 
   const {
     data: { user },

@@ -19,7 +19,7 @@ import type {
 } from "@/components/game/cards/base-card/base-card.types";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { createClient } from "@/lib/supabase/client";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 // Assuming LikeApiResponse is defined elsewhere or as:
 interface LikeApiResponse {
@@ -99,7 +99,7 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
 
   const { toast } = useToast();
   const { user } = useAuth();
-  const supabase = useMemo(() => createClient(), []);
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
   useEffect(() => {
     if (isHighlighted && itemRef.current) {

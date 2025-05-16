@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { format } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
-import { createClient } from "@/lib/supabase/client";
+import createSupabaseBrowserClient from "@/lib/supabase/client";
 
 import {
   AddCardForm,
@@ -37,7 +37,7 @@ import type { ProfileCardInteractionCallbacks } from "@/components/game/cards/pr
 
 export default function WorkspacePage() {
   const { user, isLoading: isAuthLoading } = useAuth();
-  const supabase = createClient();
+  const supabase = createSupabaseBrowserClient();
 
   const [hasMounted, setHasMounted] = useState(false);
   useEffect(() => {

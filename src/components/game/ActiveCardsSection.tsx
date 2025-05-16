@@ -21,7 +21,7 @@ import type { ProfileCardInteractionCallbacks } from "./cards/profile-card/profi
 import type { PriceCardInteractionCallbacks } from "./cards/price-card/price-card.types";
 import { useAuth } from "@/contexts/AuthContext";
 import { CommentDialog } from "@/components/comments/CommentDialog";
-import { createClient } from "@/lib/supabase/client"; // For client-side calls
+import { createSupabaseBrowserClient } from "@/lib/supabase/client"; // For client-side calls
 
 // API Types (ensure these are accurate or imported from a shared location)
 export interface EnsureSnapshotRequestBody {
@@ -88,7 +88,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
   const { toast } = useAppToast();
   const { user, isLoading: isLoadingAuth } = useAuth();
   const pathname = usePathname();
-  const supabase = useMemo(() => createClient(), []);
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
   const [cardIdToConfirmDelete, setCardIdToConfirmDelete] = useState<
     string | null

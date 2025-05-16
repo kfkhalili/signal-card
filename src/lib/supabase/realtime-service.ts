@@ -1,5 +1,5 @@
 // src/lib/supabase/realtime-service.ts
-import { createClient } from "./client";
+import { createSupabaseBrowserClient } from "./client";
 import type {
   RealtimeChannel,
   RealtimePostgresChangesPayload,
@@ -75,7 +75,7 @@ let supabaseClientInstance: SupabaseClient | null = null;
 
 function getSupabaseClient(): SupabaseClient {
   if (!supabaseClientInstance) {
-    supabaseClientInstance = createClient();
+    supabaseClientInstance = createSupabaseBrowserClient();
   }
   return supabaseClientInstance;
 }
