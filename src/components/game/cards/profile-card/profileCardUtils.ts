@@ -1,6 +1,6 @@
 // src/components/game/cards/profile-card/profileCardUtils.ts
 import { format, parseISO } from "date-fns";
-import type { ProfileDBRow } from "@/hooks/useStockData";
+import type { ProfileDBRow } from "@/hooks/useStockData"; // Added import
 import type { DisplayableCardState } from "@/components/game/types";
 import type {
   ProfileCardData,
@@ -8,18 +8,19 @@ import type {
 } from "./profile-card.types";
 import type { BaseCardBackData } from "../base-card/base-card.types";
 
-export function createDisplayableProfileCardFromDB(
+// Copied and adapted from useWorkspaceManager.ts
+export function transformProfileDBRowToStaticData(
   dbData: ProfileDBRow
-): ProfileCardData & DisplayableCardState {
-  const staticData: ProfileCardStaticData = {
+): ProfileCardStaticData {
+  return {
     db_id: dbData.id,
     sector: dbData.sector,
     industry: dbData.industry,
     country: dbData.country,
     exchange_full_name: dbData.exchange_full_name,
     website: dbData.website,
-    description: dbData.description, // Full company description
-    short_description: dbData.short_description, // Company's short description
+    description: dbData.description,
+    short_description: dbData.short_description,
     ceo: dbData.ceo,
     full_address: [
       dbData.address,
@@ -43,14 +44,21 @@ export function createDisplayableProfileCardFromDB(
     is_adr: dbData.is_adr,
     is_fund: dbData.is_fund,
   };
+}
 
-  // Generic description for the Profile Card type itself
+export function createDisplayableProfileCardFromDB(
+  dbData: ProfileDBRow
+): ProfileCardData & DisplayableCardState {
+  // Uses the newly co-located transformProfileDBRowToStaticData
+  const staticData: ProfileCardStaticData =
+    transformProfileDBRowToStaticData(dbData);
+
   const cardTypeDescription = `Provides an overview of ${
     dbData.company_name || dbData.symbol
   }'s company profile, including sector, industry, and key operational highlights.`;
 
   const cardBackData: BaseCardBackData = {
-    description: cardTypeDescription, // This is the generic description of the card type
+    description: cardTypeDescription,
   };
 
   return {
@@ -60,10 +68,9 @@ export function createDisplayableProfileCardFromDB(
     companyName: dbData.company_name,
     logoUrl: dbData.image,
     createdAt: Date.now(),
-    staticData, // Contains company's short_description and full description
-    liveData: {}, // Initial empty live data
-    backData: cardBackData, // Contains the generic card type description
+    staticData,
+    liveData: {},
+    backData: cardBackData,
     isFlipped: false,
-    // currentRarity and rarityReason will be calculated and added when it becomes a live DisplayableCard
   };
 }

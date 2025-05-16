@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useToast } from "@/hooks/use-toast";
 import useLocalStorage from "@/hooks/use-local-storage";
+import { transformProfileDBRowToStaticData } from "@/components/game/cards/profile-card/profileCardUtils";
 
 // Types and Utils
 import type {
@@ -13,12 +14,10 @@ import type {
   DisplayableLivePriceCard,
 } from "@/components/game/types";
 import type { AddCardFormValues } from "@/components/workspace/AddCardForm"; // Ensure path is correct
-import type { CardType } from "@/components/game/cards/base-card/base-card.types";
 import type { PriceCardData } from "@/components/game/cards/price-card/price-card.types";
 import type {
   ProfileCardData,
   ProfileCardLiveData,
-  ProfileCardStaticData,
 } from "@/components/game/cards/profile-card/profile-card.types";
 
 import { createDisplayableProfileCardFromDB } from "@/components/game/cards/profile-card/profileCardUtils";
@@ -32,7 +31,6 @@ import { calculateDynamicCardRarity } from "@/components/game/rarityCalculator";
 import { rehydrateCardFromStorage } from "@/components/game/cardRehydration";
 import type { CombinedQuoteData, ProfileDBRow } from "@/hooks/useStockData";
 import { LiveQuoteIndicatorDBRow } from "@/lib/supabase/realtime-service";
-import { format, parseISO } from "date-fns";
 
 const INITIAL_ACTIVE_CARDS: DisplayableCard[] = [];
 const WORKSPACE_LOCAL_STORAGE_KEY = "finSignal-mainWorkspace-v1";
@@ -174,45 +172,6 @@ export function useWorkspaceManager({
         updatedCards: newCardsArray,
         cardChangedOrAdded,
         finalCard: finalDisplayableCard,
-      };
-    },
-    []
-  );
-
-  const transformProfileDBRowToStaticData = useCallback(
-    (dbData: ProfileDBRow): ProfileCardStaticData => {
-      return {
-        db_id: dbData.id,
-        sector: dbData.sector,
-        industry: dbData.industry,
-        country: dbData.country,
-        exchange_full_name: dbData.exchange_full_name,
-        website: dbData.website,
-        description: dbData.description,
-        short_description: dbData.short_description,
-        ceo: dbData.ceo,
-        full_address: [
-          dbData.address,
-          dbData.city,
-          dbData.state,
-          dbData.zip,
-          dbData.country,
-        ]
-          .filter(Boolean)
-          .join(", "),
-        phone: dbData.phone,
-        formatted_full_time_employees:
-          dbData.full_time_employees?.toLocaleString(),
-        profile_last_updated: dbData.modified_at
-          ? format(parseISO(dbData.modified_at), "MMM d, yy")
-          : undefined,
-        currency: dbData.currency,
-        formatted_ipo_date: dbData.ipo_date
-          ? format(parseISO(dbData.ipo_date), "MMMM d, yy")
-          : undefined,
-        is_etf: dbData.is_etf,
-        is_adr: dbData.is_adr,
-        is_fund: dbData.is_fund,
       };
     },
     []
