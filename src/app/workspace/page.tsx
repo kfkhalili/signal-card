@@ -59,7 +59,7 @@ export default function WorkspacePage() {
     processLiveQuote,
     processStaticProfileUpdate,
     uniqueSymbolsInWorkspace,
-  } = useWorkspaceManager({ supabase, isPremiumUser });
+  } = useWorkspaceManager({ isPremiumUser });
 
   const [marketStatuses, setMarketStatuses] = useState<
     Record<

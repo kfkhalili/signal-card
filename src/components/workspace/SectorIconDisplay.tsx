@@ -3,39 +3,20 @@
 
 import React from "react";
 import {
-  Home,
   Building2,
   HeartPulse,
-  Stethoscope,
   Shapes,
-  Factory,
   ShoppingCart,
-  Car,
   Flame,
-  Zap,
   Cog,
-  Wrench,
   Lightbulb,
-  PlugZap,
   Landmark,
-  DollarSign,
   Shield,
-  Store,
   Cpu,
-  Laptop,
-  MessageCircle,
   Wifi,
   Briefcase,
-  Info,
   type LucideIcon,
-  HelpCircle,
 } from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 export type SectorName =

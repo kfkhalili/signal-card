@@ -2,14 +2,12 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { useToast } from "@/hooks/use-toast";
 import useLocalStorage from "@/hooks/use-local-storage";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client"; // Ensure this import
 
 import type {
   DisplayableCard,
-  ConcreteCardData, // Keep for updateOrAddCard
   DisplayableLivePriceCard,
 } from "@/components/game/types";
 import type { AddCardFormValues } from "@/components/workspace/AddCardForm";
@@ -47,8 +45,6 @@ const INITIAL_ACTIVE_CARDS: DisplayableCard[] = [];
 const WORKSPACE_LOCAL_STORAGE_KEY = "finSignal-mainWorkspace-v1";
 
 interface UseWorkspaceManagerProps {
-  // Supabase client can be created within the hook if not passed
-  // supabase: SupabaseClient;
   isPremiumUser: boolean;
 }
 

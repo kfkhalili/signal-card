@@ -1,13 +1,9 @@
 // src/components/game/ActiveCardsSection.tsx
 "use client";
 
-import React, { useCallback, useState, useMemo, useEffect } from "react";
+import React, { useCallback, useState, useMemo } from "react";
 import { usePathname } from "next/navigation";
-import type {
-  DisplayableCard,
-  ConcreteCardData,
-  DisplayableCardState,
-} from "./types";
+import type { DisplayableCard, ConcreteCardData } from "./types";
 import { ActiveCards as ActiveCardsPresentational } from "./ActiveCards";
 import { useToast as useAppToast } from "@/hooks/use-toast";
 import type {

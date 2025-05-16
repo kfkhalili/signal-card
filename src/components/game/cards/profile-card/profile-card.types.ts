@@ -35,6 +35,8 @@ export type ProfileCardLiveData = Partial<
     | "changePercentage"
     | "dayHigh"
     | "dayLow"
+    | "yearHigh"
+    | "yearLow"
     | "timestamp"
     | "volume"
     // yearHigh and yearLow are typically not part of profile live data,

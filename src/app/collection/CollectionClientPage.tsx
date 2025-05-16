@@ -4,10 +4,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import type { ServerFetchedCollectedCard } from "./page"; // Uses new type from page.tsx
 import GameCard from "@/components/game/GameCard";
-import type {
-  DisplayableCard,
-  ConcreteCardData,
-} from "@/components/game/types";
+import type { DisplayableCard } from "@/components/game/types";
 import type {
   CardActionContext,
   BaseCardSocialInteractions,
