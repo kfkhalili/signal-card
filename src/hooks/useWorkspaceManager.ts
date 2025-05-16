@@ -5,22 +5,23 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useToast } from "@/hooks/use-toast";
 import useLocalStorage from "@/hooks/use-local-storage";
-import { transformProfileDBRowToStaticData } from "@/components/game/cards/profile-card/profileCardUtils";
 
 // Types and Utils
 import type {
   DisplayableCard,
-  ConcreteCardData,
   DisplayableLivePriceCard,
 } from "@/components/game/types";
-import type { AddCardFormValues } from "@/components/workspace/AddCardForm"; // Ensure path is correct
+import type { AddCardFormValues } from "@/components/workspace/AddCardForm";
 import type { PriceCardData } from "@/components/game/cards/price-card/price-card.types";
 import type {
   ProfileCardData,
   ProfileCardLiveData,
 } from "@/components/game/cards/profile-card/profile-card.types";
 
-import { createDisplayableProfileCardFromDB } from "@/components/game/cards/profile-card/profileCardUtils";
+import {
+  createDisplayableProfileCardFromDB,
+  transformProfileDBRowToStaticData,
+} from "@/components/game/cards/profile-card/profileCardUtils";
 import {
   createPriceCardFaceDataFromQuote,
   createPriceCardBackDataFromQuote,
@@ -31,6 +32,10 @@ import { calculateDynamicCardRarity } from "@/components/game/rarityCalculator";
 import { rehydrateCardFromStorage } from "@/components/game/cardRehydration";
 import type { CombinedQuoteData, ProfileDBRow } from "@/hooks/useStockData";
 import { LiveQuoteIndicatorDBRow } from "@/lib/supabase/realtime-service";
+import { format, parseISO } from "date-fns";
+
+// Import the extracted utility
+import { updateOrAddCard } from "@/lib/workspaceUtils"; // Adjust path if needed
 
 const INITIAL_ACTIVE_CARDS: DisplayableCard[] = [];
 const WORKSPACE_LOCAL_STORAGE_KEY = "finSignal-mainWorkspace-v1";
@@ -40,9 +45,8 @@ interface UseWorkspaceManagerProps {
   isPremiumUser: boolean;
 }
 
-// Options for addCardToWorkspace
 interface AddCardOptions {
-  requestingCardId?: string; // ID of the card that triggered this request
+  requestingCardId?: string;
 }
 
 export function useWorkspaceManager({
@@ -86,96 +90,8 @@ export function useWorkspaceManager({
     return Array.from(symbols);
   }, [activeCards]);
 
-  const updateOrAddCardInternal = useCallback(
-    <SpecificConcreteCardData extends ConcreteCardData, NewExternalDataType>(
-      prevCards: DisplayableCard[],
-      symbolToUpdate: string,
-      cardType: SpecificConcreteCardData["type"],
-      newExternalData: NewExternalDataType,
-      updateConcreteLogic: (
-        existingConcreteData: SpecificConcreteCardData | undefined,
-        externalData: NewExternalDataType,
-        existingDisplayableCard?: DisplayableCard
-      ) => SpecificConcreteCardData,
-      newDisplayableCardCreator?: (
-        concreteData: SpecificConcreteCardData
-      ) => DisplayableCard
-    ): {
-      updatedCards: DisplayableCard[];
-      cardChangedOrAdded: boolean;
-      finalCard?: DisplayableCard;
-    } => {
-      let cardChangedOrAdded = false;
-      const newCardsArray = [...prevCards];
-      const existingCardIndex = newCardsArray.findIndex(
-        (c) => c.symbol === symbolToUpdate && c.type === cardType
-      );
-      const existingDisplayableCard =
-        existingCardIndex !== -1 ? newCardsArray[existingCardIndex] : undefined;
-
-      const existingConcreteCardData = existingDisplayableCard as
-        | SpecificConcreteCardData
-        | undefined;
-
-      const updatedConcreteCardData = updateConcreteLogic(
-        existingConcreteCardData,
-        newExternalData,
-        existingDisplayableCard
-      );
-
-      const { rarity: newRarity, reason: newRarityReason } =
-        calculateDynamicCardRarity({
-          ...updatedConcreteCardData,
-          isFlipped: existingDisplayableCard?.isFlipped || false,
-        } as DisplayableCard);
-
-      let finalDisplayableCard: DisplayableCard;
-
-      if (existingDisplayableCard) {
-        const oldDataStringForCompare = JSON.stringify(
-          existingConcreteCardData
-        );
-        const newDataStringForCompare = JSON.stringify(updatedConcreteCardData);
-
-        if (
-          oldDataStringForCompare !== newDataStringForCompare ||
-          existingDisplayableCard.currentRarity !== newRarity ||
-          existingDisplayableCard.rarityReason !== newRarityReason
-        ) {
-          cardChangedOrAdded = true;
-          finalDisplayableCard = {
-            ...existingDisplayableCard,
-            ...updatedConcreteCardData,
-            currentRarity: newRarity,
-            rarityReason: newRarityReason,
-          };
-          newCardsArray[existingCardIndex] = finalDisplayableCard;
-        } else {
-          finalDisplayableCard = existingDisplayableCard;
-        }
-      } else if (newDisplayableCardCreator) {
-        const newBaseDisplayable = newDisplayableCardCreator(
-          updatedConcreteCardData
-        );
-        finalDisplayableCard = {
-          ...newBaseDisplayable,
-          currentRarity: newRarity,
-          rarityReason: newRarityReason,
-        };
-        newCardsArray.push(finalDisplayableCard);
-        cardChangedOrAdded = true;
-      } else {
-        return { updatedCards: prevCards, cardChangedOrAdded: false };
-      }
-
-      return {
-        updatedCards: newCardsArray,
-        cardChangedOrAdded,
-        finalCard: finalDisplayableCard,
-      };
-    },
-    []
-  );
+  // The local definition of updateOrAddCardInternal is removed.
+  // We now use the imported `updateOrAddCard` function.
 
   const addCardToWorkspace = useCallback(
     async (values: AddCardFormValues, options?: AddCardOptions) => {
@@ -396,13 +312,12 @@ export function useWorkspaceManager({
       }
     },
     [
-      activeCards,
+      activeCards, // Dependency because it's read for existingCardIndex and profileCardForSymbol
       supabase,
       toast,
       isPremiumUser,
       workspaceSymbolForRegularUser,
       setActiveCards,
-      updateOrAddCardInternal,
     ]
   );
 
@@ -420,10 +335,8 @@ export function useWorkspaceManager({
         let cardsOverallNeedUpdate = false;
         let currentCardsState = [...prevActiveCards];
 
-        const priceResult = updateOrAddCardInternal<
-          PriceCardData,
-          CombinedQuoteData
-        >(
+        // Use the imported updateOrAddCard for PriceCard
+        const priceResult = updateOrAddCard<PriceCardData, CombinedQuoteData>(
           currentCardsState,
           quoteData.symbol,
           "price",
@@ -437,7 +350,7 @@ export function useWorkspaceManager({
               typedExistingConcrete?.faceData.timestamp &&
               apiTimestampMillis < typedExistingConcrete.faceData.timestamp
             ) {
-              return typedExistingConcrete;
+              return typedExistingConcrete; // Stale data, keep existing
             }
             const newFaceData = createPriceCardFaceDataFromQuote(
               newQuoteData,
@@ -469,8 +382,11 @@ export function useWorkspaceManager({
                 ...newBackSpecificData,
               },
             };
-          },
-          undefined
+          }
+          // No newDisplayableCardCreator needed here as processLiveQuote only updates existing cards
+          // or relies on addCardToWorkspace to have created a shell.
+          // If it needs to *create* a price card from scratch if not present, then a creator would be needed.
+          // For now, assuming it only updates.
         );
 
         if (priceResult.cardChangedOrAdded) {
@@ -481,7 +397,7 @@ export function useWorkspaceManager({
             | undefined;
           if (
             finalPriceCard &&
-            prevActiveCards.find((c) => c.id === finalPriceCard.id) &&
+            prevActiveCards.find((c) => c.id === finalPriceCard.id) && // Ensure it was an update to an existing card
             source === "realtime" &&
             finalPriceCard.faceData.price != null
           ) {
@@ -494,7 +410,7 @@ export function useWorkspaceManager({
                   )} (${
                     finalPriceCard.faceData.changePercentage?.toFixed(2) ??
                     "N/A"
-                  }) ${
+                  }%) ${
                     finalPriceCard.currentRarity &&
                     finalPriceCard.currentRarity !== "Common"
                       ? `Rarity: ${finalPriceCard.currentRarity}`
@@ -506,6 +422,7 @@ export function useWorkspaceManager({
           }
         }
 
+        // Update ProfileCard's liveData part
         const existingProfileCardIndex = currentCardsState.findIndex(
           (c) => c.symbol === quoteData.symbol && c.type === "profile"
         );
@@ -513,8 +430,10 @@ export function useWorkspaceManager({
           const newProfileLiveData = createPriceCardFaceDataFromQuote(
             quoteData,
             apiTimestampMillis
-          );
-          const profileResult = updateOrAddCardInternal<
+          ) as ProfileCardLiveData; // Cast needed parts
+
+          // Use the imported updateOrAddCard for ProfileCard live data
+          const profileResult = updateOrAddCard<
             ProfileCardData,
             ProfileCardLiveData
           >(
@@ -522,16 +441,20 @@ export function useWorkspaceManager({
             quoteData.symbol,
             "profile",
             newProfileLiveData,
-            (existingConcrete, newLiveData) => {
-              const typedExistingConcrete = existingConcrete as ProfileCardData;
+            (existingConcrete, newLiveData, existingDisplayable) => {
+              const typedExistingConcrete = existingConcrete as ProfileCardData; // Should always exist if index found
               if (
                 source === "realtime" &&
                 typedExistingConcrete.liveData.timestamp &&
                 apiTimestampMillis < typedExistingConcrete.liveData.timestamp
               ) {
-                return typedExistingConcrete;
+                return typedExistingConcrete; // Stale data
               }
-              return { ...typedExistingConcrete, liveData: newLiveData };
+              // Ensure we only update liveData and preserve staticData and other fields
+              return {
+                ...typedExistingConcrete,
+                liveData: { ...typedExistingConcrete.liveData, ...newLiveData },
+              };
             }
           );
           if (profileResult.cardChangedOrAdded) {
@@ -542,13 +465,14 @@ export function useWorkspaceManager({
         return cardsOverallNeedUpdate ? currentCardsState : prevActiveCards;
       });
     },
-    [setActiveCards, updateOrAddCardInternal, toast]
+    [setActiveCards, toast] // updateOrAddCard is a stable import, no longer from useCallback scope
   );
 
   const processStaticProfileUpdate = useCallback(
     (updatedProfileDBRow: ProfileDBRow) => {
       setActiveCards((prevActiveCards) => {
-        const result = updateOrAddCardInternal<ProfileCardData, ProfileDBRow>(
+        // Use the imported updateOrAddCard
+        const result = updateOrAddCard<ProfileCardData, ProfileDBRow>(
           prevActiveCards,
           updatedProfileDBRow.symbol,
           "profile",
@@ -557,11 +481,18 @@ export function useWorkspaceManager({
             const typedExistingConcrete = existingConcrete as
               | ProfileCardData
               | undefined;
+            // This function expects to update an existing card.
+            // If it's not found, it should have been added by addCardToWorkspace first.
             if (!typedExistingConcrete) {
-              console.warn(
-                `Profile card for ${newProfileDBData.symbol} not found for static update.`
-              );
-              return existingConcrete || ({} as ProfileCardData);
+              if (process.env.NODE_ENV === "development") {
+                console.warn(
+                  `Profile card for ${newProfileDBData.symbol} not found for static update. This might indicate an issue if an update was expected.`
+                );
+              }
+              // Attempt to create it from scratch if it's absolutely missing.
+              // This mirrors logic in createDisplayableProfileCardFromDB but might need adjustment
+              // if existingDisplayable state (like isFlipped) is crucial.
+              return createDisplayableProfileCardFromDB(newProfileDBData);
             }
             const newStaticData =
               transformProfileDBRowToStaticData(newProfileDBData);
@@ -570,14 +501,11 @@ export function useWorkspaceManager({
               companyName: newProfileDBData.company_name,
               logoUrl: newProfileDBData.image,
               staticData: newStaticData,
+              // Ensure backData description is logical, e.g., generic for profile
               backData: {
-                ...typedExistingConcrete.backData,
-                description:
-                  newProfileDBData.description ||
-                  existingDisplayable?.backData.description ||
-                  `Profile for ${
-                    newProfileDBData.company_name || newProfileDBData.symbol
-                  }.`,
+                description: `Provides an overview of ${
+                  newProfileDBData.company_name || newProfileDBData.symbol
+                }'s company profile...`, // Or preserve existing if more specific
               },
             };
           }
@@ -595,12 +523,7 @@ export function useWorkspaceManager({
           : prevActiveCards;
       });
     },
-    [
-      setActiveCards,
-      updateOrAddCardInternal,
-      transformProfileDBRowToStaticData,
-      toast,
-    ]
+    [setActiveCards, toast] // updateOrAddCard is a stable import
   );
 
   const clearWorkspace = useCallback(() => {
