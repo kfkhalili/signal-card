@@ -92,9 +92,11 @@ export function subscribeToQuoteUpdates(
   // The filter for postgres_changes remains on the symbol column
   const topicFilter = `symbol=eq.${symbol}`;
 
-  console.debug(
-    `RealtimeService: Attempting to subscribe to channel ${channelName} for symbol ${symbol}...`
-  );
+  if (process.env.NODE_ENV === "development") {
+    console.debug(
+      `RealtimeService: Attempting to subscribe to channel ${channelName} for symbol ${symbol}...`
+    );
+  }
 
   const channel: RealtimeChannel = supabase.channel(channelName, {
     config: { broadcast: { ack: true } },
@@ -121,9 +123,11 @@ export function subscribeToQuoteUpdates(
 
       switch (status) {
         case "SUBSCRIBED":
-          console.debug(
-            `RealtimeService (${symbol}): Successfully SUBSCRIBED to ${channel.topic}`
-          );
+          if (process.env.NODE_ENV === "development") {
+            console.debug(
+              `RealtimeService (${symbol}): Successfully SUBSCRIBED to ${channel.topic}`
+            );
+          }
           break;
         case "CHANNEL_ERROR":
           console.error(
@@ -145,16 +149,20 @@ export function subscribeToQuoteUpdates(
     });
 
   return () => {
-    console.debug(
-      `RealtimeService (${symbol}): Unsubscribing and removing channel ${channel.topic}...`
-    );
+    if (process.env.NODE_ENV === "development") {
+      console.debug(
+        `RealtimeService (${symbol}): Unsubscribing and removing channel ${channel.topic}...`
+      );
+    }
     supabase
       .removeChannel(channel)
-      .then((removeStatus) =>
-        console.debug(
-          `RealtimeService (${symbol}): Channel ${channel.topic} removal status: ${removeStatus}`
-        )
-      )
+      .then((removeStatus) => {
+        if (process.env.NODE_ENV === "development") {
+          console.debug(
+            `RealtimeService (${symbol}): Channel ${channel.topic} removal status: ${removeStatus}`
+          );
+        }
+      })
       .catch((error) =>
         console.error(
           `RealtimeService (${symbol}): Error removing channel ${channel.topic}:`,

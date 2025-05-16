@@ -179,12 +179,14 @@ export function useWorkspaceManager({
 
   const addCardToWorkspace = useCallback(
     async (values: AddCardFormValues, options?: AddCardOptions) => {
-      console.debug(
-        "[useWorkspaceManager] addCardToWorkspace called with values:",
-        values,
-        "and options:",
-        options
-      );
+      if (process.env.NODE_ENV === "development") {
+        console.debug(
+          "[useWorkspaceManager] addCardToWorkspace called with values:",
+          values,
+          "and options:",
+          options
+        );
+      }
       setIsAddingCardInProgress(true);
       let { symbol, cardType } = values;
       const requestingCardId = options?.requestingCardId;

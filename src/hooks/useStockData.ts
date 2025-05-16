@@ -183,9 +183,11 @@ export function useStockData({
     let profileSubActive = true;
 
     const fetchInitialProfileAndSubscribe = async () => {
-      console.debug(
-        `useStockData (${symbol}): Fetching initial profile & subscribing...`
-      );
+      if (process.env.NODE_ENV === "development") {
+        console.debug(
+          `useStockData (${symbol}): Fetching initial profile & subscribing...`
+        );
+      }
       try {
         const { data, error } = await supabaseClientRef.current
           .from("profiles")
@@ -247,10 +249,12 @@ export function useStockData({
             filter: `symbol=eq.${symbol}`,
           },
           (payload: RealtimePostgresChangesPayload<ProfileDBRow>) => {
-            console.debug(
-              `useStockData (${symbol}): Realtime update for 'profiles' table:`,
-              payload.new
-            );
+            if (process.env.NODE_ENV === "development") {
+              console.debug(
+                `useStockData (${symbol}): Realtime update for 'profiles' table:`,
+                payload.new
+              );
+            }
             if (!isMountedRef.current || !profileSubActive) return;
             const validationResult = ProfileDBSchema.safeParse(payload.new);
             if (validationResult.success) {
@@ -268,10 +272,12 @@ export function useStockData({
         )
         .subscribe((status, err) => {
           if (!isMountedRef.current || !profileSubActive) return;
-          console.debug(
-            `useStockData (${symbol}): Profile channel status: ${status}`,
-            err || ""
-          );
+          if (process.env.NODE_ENV === "development") {
+            console.debug(
+              `useStockData (${symbol}): Profile channel status: ${status}`,
+              err || ""
+            );
+          }
           // Handle profile channel status if needed (e.g., for specific error UI)
         });
 
@@ -286,9 +292,11 @@ export function useStockData({
     return () => {
       profileSubActive = false;
       if (profileChannelUnsubscribeRef.current) {
-        console.debug(
-          `useStockData (${symbol}): Cleaning up profile subscription.`
-        );
+        if (process.env.NODE_ENV === "development") {
+          console.debug(
+            `useStockData (${symbol}): Cleaning up profile subscription.`
+          );
+        }
         profileChannelUnsubscribeRef.current();
         profileChannelUnsubscribeRef.current = null;
       }
@@ -373,10 +381,12 @@ export function useStockData({
     /* ... as before ... */
     (status: LiveQuoteSubscriptionStatus, err?: Error) => {
       if (!isMountedRef.current) return;
-      console.debug(
-        `useStockData (${symbol}): Live Quote Channel Status: ${status}`,
-        err || ""
-      );
+      if (process.env.NODE_ENV === "development") {
+        console.debug(
+          `useStockData (${symbol}): Live Quote Channel Status: ${status}`,
+          err || ""
+        );
+      }
       switch (status) {
         case "SUBSCRIBED":
           if (lastGoodQuoteRef.current) {
@@ -440,9 +450,11 @@ export function useStockData({
     if (!symbol || profileData === undefined) {
       // Wait if profileData is undefined (still loading)
       if (symbol && profileData === undefined) {
-        console.debug(
-          `useStockData (${symbol}): Deferring quote subscription until profile is loaded or confirmed null.`
-        );
+        if (process.env.NODE_ENV === "development") {
+          console.debug(
+            `useStockData (${symbol}): Deferring quote subscription until profile is loaded or confirmed null.`
+          );
+        }
       }
       return;
     }
@@ -450,9 +462,11 @@ export function useStockData({
     let quoteSubActive = true;
 
     const setupQuoteSubscription = async () => {
-      console.debug(
-        `useStockData (${symbol}): Setting up quote subscription (profile available/checked).`
-      );
+      if (process.env.NODE_ENV === "development") {
+        console.debug(
+          `useStockData (${symbol}): Setting up quote subscription (profile available/checked).`
+        );
+      }
       if (liveQuoteChannelUnsubscribeRef.current) {
         liveQuoteChannelUnsubscribeRef.current();
         liveQuoteChannelUnsubscribeRef.current = null;
@@ -541,9 +555,11 @@ export function useStockData({
     return () => {
       quoteSubActive = false;
       if (liveQuoteChannelUnsubscribeRef.current) {
-        console.debug(
-          `useStockData (${symbol}): Cleaning up quote subscription.`
-        );
+        if (process.env.NODE_ENV === "development") {
+          console.debug(
+            `useStockData (${symbol}): Cleaning up quote subscription.`
+          );
+        }
         liveQuoteChannelUnsubscribeRef.current();
         liveQuoteChannelUnsubscribeRef.current = null;
       }
