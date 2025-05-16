@@ -1,14 +1,22 @@
 // src/components/game/cards/profile-card/profileCardUtils.ts
 import { format, parseISO } from "date-fns";
-import type { ProfileDBRow } from "@/hooks/useStockData"; // Added import
-import type { DisplayableCardState } from "@/components/game/types";
+import type { SupabaseClient } from "@supabase/supabase-js"; // Added
+import type { ToastFunctionType } from "@/hooks/use-toast"; // Added
+import type { ProfileDBRow } from "@/hooks/useStockData";
+import type {
+  DisplayableCard,
+  DisplayableCardState,
+} from "@/components/game/types";
 import type {
   ProfileCardData,
   ProfileCardStaticData,
 } from "./profile-card.types";
 import type { BaseCardBackData } from "../base-card/base-card.types";
+import {
+  registerCardInitializer, // Added
+  type CardInitializationContext, // Added
+} from "@/components/game/cardInitializer.types"; // Adjust path as needed
 
-// Copied and adapted from useWorkspaceManager.ts
 export function transformProfileDBRowToStaticData(
   dbData: ProfileDBRow
 ): ProfileCardStaticData {
@@ -48,8 +56,8 @@ export function transformProfileDBRowToStaticData(
 
 export function createDisplayableProfileCardFromDB(
   dbData: ProfileDBRow
-): ProfileCardData & DisplayableCardState {
-  // Uses the newly co-located transformProfileDBRowToStaticData
+): ProfileCardData & Pick<DisplayableCardState, "isFlipped"> {
+  // More specific return
   const staticData: ProfileCardStaticData =
     transformProfileDBRowToStaticData(dbData);
 
@@ -61,16 +69,72 @@ export function createDisplayableProfileCardFromDB(
     description: cardTypeDescription,
   };
 
-  return {
-    id: `profile-${dbData.symbol}-${Date.now()}`,
+  const concreteCardData: ProfileCardData = {
+    id: `profile-${dbData.symbol}-${Date.now()}`, // Unique ID for workspace instance
     type: "profile",
     symbol: dbData.symbol,
     companyName: dbData.company_name,
     logoUrl: dbData.image,
-    createdAt: Date.now(),
+    createdAt: Date.now(), // Timestamp of creation in the app
     staticData,
-    liveData: {},
+    liveData: {}, // Initial empty live data
     backData: cardBackData,
-    isFlipped: false,
+    websiteUrl: dbData.website, // ensure websiteUrl is part of BaseCardData for ProfileCardData
+  };
+
+  return {
+    ...concreteCardData,
+    isFlipped: false, // Default state for a new card
+    // currentRarity, rarityReason, etc., will be added later by useWorkspaceManager
   };
 }
+
+// --- Card Initializer for ProfileCard ---
+async function initializeProfileCard({
+  symbol,
+  supabase,
+  toast,
+}: CardInitializationContext): Promise<DisplayableCard | null> {
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("symbol", symbol)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (data) {
+      // Use the existing createDisplayableProfileCardFromDB function
+      return createDisplayableProfileCardFromDB(
+        data as ProfileDBRow
+      ) as DisplayableCard;
+    } else {
+      if (toast) {
+        // Check if toast is provided
+        toast({
+          title: "Profile Not Found",
+          description: `No profile data for ${symbol}. Card not added.`,
+          variant: "destructive",
+        });
+      }
+      return null;
+    }
+  } catch (err: any) {
+    if (process.env.NODE_ENV === "development") {
+      console.error(`Error initializing profile card for ${symbol}:`, err);
+    }
+    if (toast) {
+      // Check if toast is provided
+      toast({
+        title: "Error Initializing Profile",
+        description:
+          err.message || `Could not initialize profile for ${symbol}.`,
+        variant: "destructive",
+      });
+    }
+    return null;
+  }
+}
+
+registerCardInitializer("profile", initializeProfileCard);

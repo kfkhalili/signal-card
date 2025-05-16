@@ -84,10 +84,11 @@ const BaseCard: React.FC<BaseCardProps> = ({
   commentCount,
   collectionCount,
 }) => {
-  console.log(
-    `[BaseCard ${cardContext.symbol}] Rendering. Props: likeCount=${likeCount}, commentCount=${commentCount}, collectionCount=${collectionCount}, isLiked=${isLikedByCurrentUser}, isSaved=${isSavedByCurrentUser}`
-  );
-
+  if (process.env.NODE_ENV === "development") {
+    console.debug(
+      `[BaseCard ${cardContext.symbol}] Rendering. Props: likeCount=${likeCount}, commentCount=${commentCount}, collectionCount=${collectionCount}, isLiked=${isLikedByCurrentUser}, isSaved=${isSavedByCurrentUser}`
+    );
+  }
   const {
     symbol,
     companyName,

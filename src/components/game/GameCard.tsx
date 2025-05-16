@@ -65,10 +65,11 @@ const GameCard: React.FC<GameCardProps> = ({
   collectionCount,
   isSavedByCurrentUser, // Destructure
 }) => {
-  console.log(
-    `[GameCard ${card.symbol}] Rendering. Props: likeCount=${likeCount}, commentCount=${commentCount}, collectionCount=${collectionCount}, card.isLiked=${card.isLikedByCurrentUser}, isSaved=${isSavedByCurrentUser}`
-  );
-
+  if (process.env.NODE_ENV === "development") {
+    console.debug(
+      `[GameCard ${card.symbol}] Rendering. Props: likeCount=${likeCount}, commentCount=${commentCount}, collectionCount=${collectionCount}, card.isLiked=${card.isLikedByCurrentUser}, isSaved=${isSavedByCurrentUser}`
+    );
+  }
   const handleFlip = () => onToggleFlip(card.id);
 
   const handleDeleteAction = (context: CardActionContext) => {

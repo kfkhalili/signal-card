@@ -5,10 +5,11 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useToast } from "@/hooks/use-toast";
 import useLocalStorage from "@/hooks/use-local-storage";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client"; // Ensure this import
 
-// Types and Utils
 import type {
   DisplayableCard,
+  ConcreteCardData, // Keep for updateOrAddCard
   DisplayableLivePriceCard,
 } from "@/components/game/types";
 import type { AddCardFormValues } from "@/components/workspace/AddCardForm";
@@ -25,23 +26,29 @@ import {
 import {
   createPriceCardFaceDataFromQuote,
   createPriceCardBackDataFromQuote,
-  createDisplayablePriceCard,
 } from "@/components/game/cards/price-card/priceCardUtils";
 
 import { calculateDynamicCardRarity } from "@/components/game/rarityCalculator";
 import { rehydrateCardFromStorage } from "@/components/game/cardRehydration";
 import type { CombinedQuoteData, ProfileDBRow } from "@/hooks/useStockData";
-import { LiveQuoteIndicatorDBRow } from "@/lib/supabase/realtime-service";
-import { format, parseISO } from "date-fns";
 
-// Import the extracted utility
-import { updateOrAddCard } from "@/lib/workspaceUtils"; // Adjust path if needed
+// Import the initializer registry and getter
+import {
+  getCardInitializer,
+  type CardInitializationContext,
+} from "@/components/game/cardInitializer.types";
+// Import to execute registrations (MUST BE DONE ONCE, e.g. here or in a top-level app file)
+import "@/components/game/cards/initializers";
+
+// Import the extracted utility for updating/adding cards
+import { updateOrAddCard } from "@/lib/workspaceUtils";
 
 const INITIAL_ACTIVE_CARDS: DisplayableCard[] = [];
 const WORKSPACE_LOCAL_STORAGE_KEY = "finSignal-mainWorkspace-v1";
 
 interface UseWorkspaceManagerProps {
-  supabase: SupabaseClient;
+  // Supabase client can be created within the hook if not passed
+  // supabase: SupabaseClient;
   isPremiumUser: boolean;
 }
 
@@ -50,10 +57,11 @@ interface AddCardOptions {
 }
 
 export function useWorkspaceManager({
-  supabase,
   isPremiumUser,
 }: UseWorkspaceManagerProps) {
   const { toast } = useToast();
+  // Create Supabase client instance within the hook if not passed as prop
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
   const [initialCardsFromStorage, setCardsInLocalStorage] = useLocalStorage<
     DisplayableCard[]
@@ -90,9 +98,6 @@ export function useWorkspaceManager({
     return Array.from(symbols);
   }, [activeCards]);
 
-  // The local definition of updateOrAddCardInternal is removed.
-  // We now use the imported `updateOrAddCard` function.
-
   const addCardToWorkspace = useCallback(
     async (values: AddCardFormValues, options?: AddCardOptions) => {
       if (process.env.NODE_ENV === "development") {
@@ -104,15 +109,16 @@ export function useWorkspaceManager({
         );
       }
       setIsAddingCardInProgress(true);
-      let { symbol, cardType } = values;
+      let determinedSymbol = values.symbol; // Use a different variable name
+      const cardType = values.cardType;
       const requestingCardId = options?.requestingCardId;
 
       if (!isPremiumUser && workspaceSymbolForRegularUser) {
-        symbol = workspaceSymbolForRegularUser;
+        determinedSymbol = workspaceSymbolForRegularUser;
       }
 
       const existingCardIndex = activeCards.findIndex(
-        (card) => card.symbol === symbol && card.type === cardType
+        (card) => card.symbol === determinedSymbol && card.type === cardType
       );
 
       if (existingCardIndex !== -1) {
@@ -126,7 +132,6 @@ export function useWorkspaceManager({
             const targetCardActualIndex = currentCards.findIndex(
               (c) => c.id === existingCard.id
             );
-
             if (
               sourceCardActualIndex !== -1 &&
               targetCardActualIndex !== -1 &&
@@ -160,8 +165,7 @@ export function useWorkspaceManager({
             () =>
               toast({
                 title: "Card Exists",
-                description: `A ${cardType} card for ${symbol} is already in your workspace.`,
-                variant: "default",
+                description: `A ${cardType} card for ${determinedSymbol} is already in your workspace.`,
               }),
             0
           );
@@ -170,106 +174,44 @@ export function useWorkspaceManager({
         return;
       }
 
+      const initializer = getCardInitializer(cardType);
+      if (!initializer) {
+        if (process.env.NODE_ENV === "development") {
+          console.error(`No initializer found for card type: ${cardType}`);
+        }
+        toast({
+          title: "System Error",
+          description: `Unsupported card type requested: ${cardType}`,
+          variant: "destructive",
+        });
+        setIsAddingCardInProgress(false);
+        return;
+      }
+
       setTimeout(
-        () => toast({ title: `Adding ${symbol} ${cardType} card...` }),
+        () =>
+          toast({ title: `Adding ${determinedSymbol} ${cardType} card...` }),
         0
       );
-      let newCardToAdd: DisplayableCard | null = null;
 
+      let newCardToAdd: DisplayableCard | null = null;
       try {
-        if (cardType === "profile") {
-          const { data, error } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("symbol", symbol)
-            .maybeSingle();
-          if (error) throw error;
-          if (data) {
-            newCardToAdd = createDisplayableProfileCardFromDB(
-              data as ProfileDBRow
-            ) as DisplayableCard;
-          } else {
-            setTimeout(
-              () =>
-                toast({
-                  title: "Profile Not Found",
-                  description: `No profile data for ${symbol}. Card not added.`,
-                  variant: "destructive",
-                }),
-              0
-            );
-          }
-        } else if (cardType === "price") {
-          const { data: quoteData, error: quoteError } = await supabase
-            .from("live_quote_indicators")
-            .select("*")
-            .eq("symbol", symbol)
-            .order("fetched_at", { ascending: false })
-            .limit(1)
-            .single();
-          if (quoteError && quoteError.code !== "PGRST116") {
-            throw quoteError;
-          }
-          if (quoteData) {
-            const profileCardForSymbol = activeCards.find(
-              (c) => c.symbol === symbol && c.type === "profile"
-            );
-            const combinedQuote: CombinedQuoteData = {
-              ...(quoteData as LiveQuoteIndicatorDBRow),
-              companyName: profileCardForSymbol?.companyName ?? null,
-              logoUrl: profileCardForSymbol?.logoUrl ?? null,
-            };
-            newCardToAdd = createDisplayablePriceCard(
-              combinedQuote,
-              combinedQuote.api_timestamp * 1000
-            ) as DisplayableCard;
-          } else {
-            const now = Date.now();
-            const profileCardForSymbol = activeCards.find(
-              (c) => c.symbol === symbol && c.type === "profile"
-            );
-            newCardToAdd = {
-              id: `${symbol}-price-${now}`,
-              type: "price",
-              symbol: symbol,
-              createdAt: now,
-              isFlipped: false,
-              companyName: profileCardForSymbol?.companyName ?? symbol,
-              logoUrl: profileCardForSymbol?.logoUrl ?? null,
-              faceData: {
-                timestamp: now,
-                price: null,
-                dayChange: null,
-                changePercentage: null,
-                dayHigh: null,
-                dayLow: null,
-                dayOpen: null,
-                previousClose: null,
-                volume: null,
-              },
-              backData: {
-                description: `Price data for ${symbol}`,
-                marketCap: null,
-                sma50d: null,
-                sma200d: null,
-              },
-            } as DisplayableLivePriceCard;
-            setTimeout(
-              () =>
-                toast({
-                  title: "Price Card Added (Shell)",
-                  description: `Awaiting live data for ${symbol}.`,
-                  variant: "default",
-                }),
-              0
-            );
-          }
-        }
+        const initContext: CardInitializationContext = {
+          symbol: determinedSymbol,
+          supabase,
+          toast,
+          activeCards, // Pass current activeCards for context if needed by initializers
+        };
+        newCardToAdd = await initializer(initContext);
 
         if (newCardToAdd) {
           const { rarity, reason } = calculateDynamicCardRarity(newCardToAdd);
-          newCardToAdd.currentRarity = rarity;
-          newCardToAdd.rarityReason = reason;
+          // Ensure newCardToAdd is a new object before modifying
+          newCardToAdd = {
+            ...newCardToAdd,
+            currentRarity: rarity,
+            rarityReason: reason,
+          };
 
           setActiveCards((prev) => {
             let updatedCards = [...prev];
@@ -287,32 +229,46 @@ export function useWorkspaceManager({
             }
             return updatedCards;
           });
-          setTimeout(
-            () =>
-              toast({
-                title: "Card Added!",
-                description: `${symbol} ${cardType} card added to workspace.`,
-              }),
-            0
+
+          // Generic success toast, if not handled by specific initializers already (e.g. price shell)
+          // Price card shell initializer already shows a toast.
+          const isPriceCard = newCardToAdd.type === "price";
+          const isPriceCardShell =
+            isPriceCard && !(newCardToAdd as PriceCardData).faceData.price;
+
+          if (!isPriceCardShell) {
+            setTimeout(
+              () =>
+                toast({
+                  title: "Card Added!",
+                  description: `${determinedSymbol} ${cardType} card added to workspace.`,
+                }),
+              0
+            );
+          }
+        }
+        // If newCardToAdd is null, the specific initializer should have shown a toast.
+      } catch (err: any) {
+        // This catch is for unexpected errors during initializer execution or subsequent logic
+        if (process.env.NODE_ENV === "development") {
+          console.error(
+            `Error in addCardToWorkspace for ${cardType} - ${determinedSymbol}:`,
+            err
           );
         }
-      } catch (err: any) {
-        console.error(`Error adding ${cardType} card for ${symbol}:`, err);
-        setTimeout(
-          () =>
-            toast({
-              title: "Error Adding Card",
-              description: err.message || "Could not add card.",
-              variant: "destructive",
-            }),
-          0
-        );
+        toast({
+          title: "Error Adding Card",
+          description:
+            err.message ||
+            `Could not add ${cardType} card due to an unexpected issue.`,
+          variant: "destructive",
+        });
       } finally {
         setIsAddingCardInProgress(false);
       }
     },
     [
-      activeCards, // Dependency because it's read for existingCardIndex and profileCardForSymbol
+      activeCards,
       supabase,
       toast,
       isPremiumUser,
@@ -325,9 +281,11 @@ export function useWorkspaceManager({
     (quoteData: CombinedQuoteData, source: "fetch" | "realtime") => {
       const apiTimestampMillis = quoteData.api_timestamp * 1000;
       if (isNaN(apiTimestampMillis)) {
-        console.warn(
-          `processLiveQuote (${quoteData.symbol}): Invalid API timestamp received.`
-        );
+        if (process.env.NODE_ENV === "development") {
+          console.warn(
+            `processLiveQuote (${quoteData.symbol}): Invalid API timestamp received.`
+          );
+        }
         return;
       }
 
@@ -335,7 +293,6 @@ export function useWorkspaceManager({
         let cardsOverallNeedUpdate = false;
         let currentCardsState = [...prevActiveCards];
 
-        // Use the imported updateOrAddCard for PriceCard
         const priceResult = updateOrAddCard<PriceCardData, CombinedQuoteData>(
           currentCardsState,
           quoteData.symbol,
@@ -350,7 +307,7 @@ export function useWorkspaceManager({
               typedExistingConcrete?.faceData.timestamp &&
               apiTimestampMillis < typedExistingConcrete.faceData.timestamp
             ) {
-              return typedExistingConcrete; // Stale data, keep existing
+              return typedExistingConcrete;
             }
             const newFaceData = createPriceCardFaceDataFromQuote(
               newQuoteData,
@@ -383,10 +340,6 @@ export function useWorkspaceManager({
               },
             };
           }
-          // No newDisplayableCardCreator needed here as processLiveQuote only updates existing cards
-          // or relies on addCardToWorkspace to have created a shell.
-          // If it needs to *create* a price card from scratch if not present, then a creator would be needed.
-          // For now, assuming it only updates.
         );
 
         if (priceResult.cardChangedOrAdded) {
@@ -397,7 +350,7 @@ export function useWorkspaceManager({
             | undefined;
           if (
             finalPriceCard &&
-            prevActiveCards.find((c) => c.id === finalPriceCard.id) && // Ensure it was an update to an existing card
+            prevActiveCards.find((c) => c.id === finalPriceCard.id) &&
             source === "realtime" &&
             finalPriceCard.faceData.price != null
           ) {
@@ -422,7 +375,6 @@ export function useWorkspaceManager({
           }
         }
 
-        // Update ProfileCard's liveData part
         const existingProfileCardIndex = currentCardsState.findIndex(
           (c) => c.symbol === quoteData.symbol && c.type === "profile"
         );
@@ -430,9 +382,8 @@ export function useWorkspaceManager({
           const newProfileLiveData = createPriceCardFaceDataFromQuote(
             quoteData,
             apiTimestampMillis
-          ) as ProfileCardLiveData; // Cast needed parts
+          ) as ProfileCardLiveData;
 
-          // Use the imported updateOrAddCard for ProfileCard live data
           const profileResult = updateOrAddCard<
             ProfileCardData,
             ProfileCardLiveData
@@ -441,16 +392,15 @@ export function useWorkspaceManager({
             quoteData.symbol,
             "profile",
             newProfileLiveData,
-            (existingConcrete, newLiveData, existingDisplayable) => {
-              const typedExistingConcrete = existingConcrete as ProfileCardData; // Should always exist if index found
+            (existingConcrete, newLiveData) => {
+              const typedExistingConcrete = existingConcrete as ProfileCardData;
               if (
                 source === "realtime" &&
                 typedExistingConcrete.liveData.timestamp &&
                 apiTimestampMillis < typedExistingConcrete.liveData.timestamp
               ) {
-                return typedExistingConcrete; // Stale data
+                return typedExistingConcrete;
               }
-              // Ensure we only update liveData and preserve staticData and other fields
               return {
                 ...typedExistingConcrete,
                 liveData: { ...typedExistingConcrete.liveData, ...newLiveData },
@@ -465,34 +415,32 @@ export function useWorkspaceManager({
         return cardsOverallNeedUpdate ? currentCardsState : prevActiveCards;
       });
     },
-    [setActiveCards, toast] // updateOrAddCard is a stable import, no longer from useCallback scope
+    [setActiveCards, toast, supabase] // Added supabase dependency
   );
 
   const processStaticProfileUpdate = useCallback(
     (updatedProfileDBRow: ProfileDBRow) => {
       setActiveCards((prevActiveCards) => {
-        // Use the imported updateOrAddCard
         const result = updateOrAddCard<ProfileCardData, ProfileDBRow>(
           prevActiveCards,
           updatedProfileDBRow.symbol,
           "profile",
           updatedProfileDBRow,
-          (existingConcrete, newProfileDBData, existingDisplayable) => {
+          (existingConcrete, newProfileDBData) => {
             const typedExistingConcrete = existingConcrete as
               | ProfileCardData
               | undefined;
-            // This function expects to update an existing card.
-            // If it's not found, it should have been added by addCardToWorkspace first.
             if (!typedExistingConcrete) {
               if (process.env.NODE_ENV === "development") {
                 console.warn(
-                  `Profile card for ${newProfileDBData.symbol} not found for static update. This might indicate an issue if an update was expected.`
+                  `Profile card for ${newProfileDBData.symbol} not found for static update. Creating new one.`
                 );
               }
-              // Attempt to create it from scratch if it's absolutely missing.
-              // This mirrors logic in createDisplayableProfileCardFromDB but might need adjustment
-              // if existingDisplayable state (like isFlipped) is crucial.
-              return createDisplayableProfileCardFromDB(newProfileDBData);
+              // If a profile card is being updated, it should ideally exist.
+              // If it doesn't, createDisplayableProfileCardFromDB will make a new one.
+              return createDisplayableProfileCardFromDB(
+                newProfileDBData
+              ) as ProfileCardData;
             }
             const newStaticData =
               transformProfileDBRowToStaticData(newProfileDBData);
@@ -501,11 +449,13 @@ export function useWorkspaceManager({
               companyName: newProfileDBData.company_name,
               logoUrl: newProfileDBData.image,
               staticData: newStaticData,
-              // Ensure backData description is logical, e.g., generic for profile
               backData: {
-                description: `Provides an overview of ${
-                  newProfileDBData.company_name || newProfileDBData.symbol
-                }'s company profile...`, // Or preserve existing if more specific
+                // Make sure backData is handled correctly
+                description:
+                  typedExistingConcrete.backData?.description ||
+                  `Profile overview for ${
+                    newProfileDBData.company_name || newProfileDBData.symbol
+                  }`,
               },
             };
           }
@@ -523,7 +473,7 @@ export function useWorkspaceManager({
           : prevActiveCards;
       });
     },
-    [setActiveCards, toast] // updateOrAddCard is a stable import
+    [setActiveCards, toast, supabase] // Added supabase dependency
   );
 
   const clearWorkspace = useCallback(() => {
