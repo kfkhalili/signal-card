@@ -1,15 +1,16 @@
 // src/app/api/collection/capture-card/route.ts
-import { createClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import type { CardType } from "@/components/game/cards/base-card/base-card.types";
-import { generateStateHash, type CardDataForHashing } from "@/lib/cardUtils";
+import { generateStateHash } from "@/lib/cardUtils";
+import { ConcreteCardData } from "@/components/game/types";
 
 interface CaptureCardRequestBody {
   cardType: CardType;
   symbol: string;
   companyName?: string | null;
   logoUrl?: string | null;
-  cardDataSnapshot: CardDataForHashing; // This is the ConcreteCardData
+  cardDataSnapshot: ConcreteCardData;
   sourceCardId?: string;
   // Rarity information determined by the client for the live state
   currentRarity?: string | null;
@@ -17,7 +18,7 @@ interface CaptureCardRequestBody {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

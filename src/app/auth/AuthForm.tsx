@@ -1,7 +1,7 @@
 // src/app/auth/AuthForm.tsx
 "use client";
 
-import { createClient } from "../../lib/supabase/client";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
@@ -15,7 +15,7 @@ type AuthViewType =
   | "magic_link";
 
 export default function AuthForm() {
-  const supabase = createClient();
+  const supabase = createSupabaseBrowserClient();
   const router = useRouter();
   const pathname = usePathname(); // Reactive to path changes
   const searchParams = useSearchParams(); // Reactive to query param changes

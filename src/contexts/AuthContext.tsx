@@ -8,7 +8,7 @@ import React, {
   useContext,
   type ReactNode,
 } from "react";
-import createSupabaseBrowserClient from "../lib/supabase/client";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { Session, User } from "@supabase/supabase-js";
 import { SupabaseClient } from "@supabase/supabase-js";
 

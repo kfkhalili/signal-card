@@ -1,5 +1,5 @@
 // src/app/api/snapshots/comments/route.ts
-import { createClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
 interface CreateCommentRequestBody {
@@ -23,7 +23,7 @@ interface NewCommentResponse {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const supabase = await createClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

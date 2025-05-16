@@ -1,6 +1,6 @@
 // src/app/history/page.tsx
 
-import { createClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { HistorySelectionForm } from "@/components/comments/HistorySelectionForm";
 import {
   Card,
@@ -17,7 +17,7 @@ export interface SymbolAndTypes {
 }
 
 async function getAvailableHistorySelections(): Promise<SymbolAndTypes[]> {
-  const supabase = await createClient();
+  const supabase = await createSupabaseServerClient();
 
   // Fetch all relevant symbol and card_type combinations
   // This is less efficient than an RPC for very large datasets, but will work.

@@ -1,6 +1,6 @@
 // src/app/api/snapshots/like/route.ts
 // We can add the DELETE handler to the existing like route file.
-import { createClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
 interface LikeSnapshotRequestBody {
@@ -9,7 +9,7 @@ interface LikeSnapshotRequestBody {
 
 // POST handler (existing - for Liking)
 export async function POST(request: Request): Promise<NextResponse> {
-  const supabase = await createClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -122,7 +122,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
 // DELETE handler (New - for Unliking)
 export async function DELETE(request: Request): Promise<NextResponse> {
-  const supabase = await createClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

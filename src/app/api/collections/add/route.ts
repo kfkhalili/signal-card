@@ -1,5 +1,5 @@
 // src/app/api/collections/add/route.ts
-import { createClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
 interface AddToCollectionRequestBody {
@@ -8,7 +8,7 @@ interface AddToCollectionRequestBody {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

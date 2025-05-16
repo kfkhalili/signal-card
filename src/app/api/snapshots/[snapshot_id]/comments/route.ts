@@ -1,5 +1,5 @@
 // src/app/api/snapshots/[snapshot_id]/comments/route.ts
-import { createClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
 interface RouteParams {
@@ -39,7 +39,7 @@ export interface CommentWithAuthorResponse {
 }
 
 export async function GET(request: Request, { params }: RouteParams) {
-  const supabase = await createClient();
+  const supabase = await createSupabaseServerClient();
   const { snapshot_id: snapshotId } = await params;
 
   if (!snapshotId) {

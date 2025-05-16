@@ -1,5 +1,5 @@
 // src/app/api/collections/remove/[id]/route.ts
-import { createClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
 interface RouteParams {
@@ -9,7 +9,7 @@ interface RouteParams {
 }
 
 export async function DELETE(request: Request, { params }: RouteParams) {
-  const supabase = await createClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { format } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
-import createSupabaseBrowserClient from "@/lib/supabase/client";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 import {
   AddCardForm,

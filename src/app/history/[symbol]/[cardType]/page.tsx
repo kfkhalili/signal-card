@@ -1,6 +1,6 @@
 // src/app/history/[symbol]/[cardType]/page.tsx
 
-import { createClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SnapshotHistoryItem } from "@/components/history/SnapshotHistoryItem";
@@ -133,14 +133,14 @@ async function getSnapshotsWithCounts(
   const resolvedSnapshotsWithCounts = await Promise.all(
     snapshotsWithCountsPromises
   );
-  return resolvedSnapshotsWithCounts as CardSnapshotFromDB[]; // Cast to the full type
+  return resolvedSnapshotsWithCounts as CardSnapshotFromDB[];
 }
 
 export default async function SignalHistoryPage({
   params,
   searchParams,
 }: SignalHistoryPageProps) {
-  const supabase = createClient(); // Server-side Supabase client
+  const supabase = createSupabaseServerClient();
   const { symbol: symbolParam, cardType: cardTypeParam } = await params;
   const symbol = symbolParam.toUpperCase();
   // Ensure cardType is one of the expected values, otherwise notFound
