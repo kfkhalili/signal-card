@@ -4,59 +4,47 @@
 import React, { useEffect } from "react";
 import {
   useStockData,
-  type CombinedQuoteData,
-  type MarketStatusDisplayHook,
+  type DerivedMarketStatus,
   type ProfileDBRow,
 } from "@/hooks/useStockData";
+import type { LiveQuoteIndicatorDBRow } from "@/lib/supabase/realtime-service";
+import type { ExchangeMarketStatusRecord } from "@/types/market.types";
 
 interface StockDataHandlerProps {
   symbol: string;
   onQuoteReceived: (
-    quoteData: CombinedQuoteData,
+    quoteData: LiveQuoteIndicatorDBRow,
     source: "fetch" | "realtime"
   ) => void;
   onStaticProfileUpdate: (updatedProfile: ProfileDBRow) => void;
   onMarketStatusChange?: (
     symbol: string,
-    status: MarketStatusDisplayHook,
-    message: string | null,
-    timestamp: number | null
+    status: DerivedMarketStatus,
+    message: string | null
   ) => void;
 }
 
-export const StockDataHandler: React.FC<StockDataHandlerProps> = React.memo(
-  ({
-    symbol,
-    onQuoteReceived,
-    onStaticProfileUpdate,
-    onMarketStatusChange,
-  }) => {
-    const { marketStatus, marketStatusMessage, lastApiTimestamp } =
-      useStockData({
-        symbol: symbol,
-        onQuoteReceived: onQuoteReceived,
-        onStaticProfileUpdate: onStaticProfileUpdate,
-      });
+export const StockDataHandler: React.FC<StockDataHandlerProps> = ({
+  symbol,
+  onQuoteReceived,
+  onStaticProfileUpdate,
+  onMarketStatusChange,
+}) => {
+  // if (process.env.NODE_ENV === 'development') {
+  //   console.log(`[StockDataHandler ${symbol}] Rendering. Type of onQuoteReceived prop: ${typeof onQuoteReceived}`);
+  // }
 
-    useEffect(() => {
-      if (onMarketStatusChange) {
-        onMarketStatusChange(
-          symbol,
-          marketStatus,
-          marketStatusMessage,
-          lastApiTimestamp
-        );
-      }
-    }, [
-      symbol,
-      marketStatus,
-      marketStatusMessage,
-      lastApiTimestamp,
-      onMarketStatusChange,
-    ]);
+  const { derivedMarketStatus, marketStatusMessage } = useStockData({
+    symbol: symbol,
+    onLiveQuoteUpdate: onQuoteReceived,
+    onProfileUpdate: onStaticProfileUpdate,
+  });
 
-    return null; // This component is for side effects (data fetching) and doesn't render UI
-  }
-);
+  useEffect(() => {
+    if (onMarketStatusChange) {
+      onMarketStatusChange(symbol, derivedMarketStatus, marketStatusMessage);
+    }
+  }, [symbol, derivedMarketStatus, marketStatusMessage, onMarketStatusChange]);
 
-StockDataHandler.displayName = "StockDataHandler";
+  return null;
+};

@@ -1,6 +1,4 @@
-// src/app/components/game/cards/price-card/price-card.types.ts
-// import type { CardType } from "../base-card/base-card.types"; // Not directly used here if types are specific
-
+// src/components/game/cards/price-card/price-card.types.ts
 import { BaseCardBackData, BaseCardData } from "../base-card/base-card.types";
 
 export interface PriceCardFaceData {
@@ -27,13 +25,12 @@ export interface PriceCardData extends BaseCardData {
   readonly type: "price";
   readonly faceData: PriceCardFaceData;
   readonly backData: PriceCardSpecificBackData;
+  readonly exchange_code?: string | null; // <<<< ------ ADD THIS LINE
 }
-
-// PriceCardSnapshotData and PriceCardSnapshotSpecificBackData removed
 
 export interface PriceCardInteractionCallbacks {
   readonly onPriceCardSmaClick?: (
-    cardData: PriceCardData, // Remains PriceCardData
+    cardData: PriceCardData,
     smaPeriod: 50 | 200,
     smaValue: number
   ) => void;

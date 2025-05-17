@@ -57,11 +57,11 @@ const GameCard: React.FC<GameCardProps> = ({
   collectionCount,
   isSavedByCurrentUser,
 }) => {
-  if (process.env.NODE_ENV === "development") {
-    console.debug(
-      `[GameCard ${card.symbol}] Rendering with type ${card.type}. ID: ${card.id}, isLiked=${card.isLikedByCurrentUser}, isSaved=${isSavedByCurrentUser}`
-    );
-  }
+  // if (process.env.NODE_ENV === "development") {
+  //   console.debug(
+  //     `[GameCard ${card.symbol}] Rendering with type ${card.type}. ID: ${card.id}, isLiked=${card.isLikedByCurrentUser}, isSaved=${isSavedByCurrentUser}`
+  //   );
+  // }
 
   const handleFlip = React.useCallback(() => {
     onToggleFlip(card.id);

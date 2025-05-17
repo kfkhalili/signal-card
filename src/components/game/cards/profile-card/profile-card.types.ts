@@ -6,27 +6,30 @@ import type {
 } from "../base-card/base-card.types";
 import type { PriceCardFaceData } from "../price-card/price-card.types";
 
+// Defines the static, less frequently changing data specific to a profile.
 export interface ProfileCardStaticData {
-  readonly db_id: string;
+  readonly db_id: string; // ID from your 'profiles' table
   readonly sector?: string | null;
   readonly industry?: string | null;
-  readonly country?: string | null;
-  readonly exchange_full_name?: string | null;
+  readonly country?: string | null; // e.g., "US"
+  readonly exchange?: string | null; // e.g., "NASDAQ", "NYSE" - Short exchange code
+  readonly exchange_full_name?: string | null; // e.g., "Nasdaq Stock Market"
   readonly website?: string | null;
   readonly description?: string | null;
   readonly short_description?: string | null;
   readonly ceo?: string | null;
   readonly full_address?: string | null;
   readonly phone?: string | null;
-  readonly profile_last_updated?: string | null;
+  readonly profile_last_updated?: string | null; // Formatted date string, or ISO string
   readonly currency?: string | null;
-  readonly formatted_ipo_date?: string | null;
+  readonly formatted_ipo_date?: string | null; // Formatted date string, or ISO string
   readonly formatted_full_time_employees?: string | null;
   readonly is_etf?: boolean | null;
   readonly is_adr?: boolean | null;
   readonly is_fund?: boolean | null;
 }
 
+// Defines the live, frequently updated data for a ProfileCard (typically a subset of price data)
 export type ProfileCardLiveData = Partial<
   Pick<
     PriceCardFaceData,
@@ -39,24 +42,25 @@ export type ProfileCardLiveData = Partial<
     | "yearLow"
     | "timestamp"
     | "volume"
-    // yearHigh and yearLow are typically not part of profile live data,
-    // but can be if your CombinedQuoteData includes them for profiles too.
+    | "dayOpen"
+    | "previousClose"
   >
 >;
 
+// Main interface for the complete ProfileCard data structure
 export interface ProfileCardData extends BaseCardData {
   readonly type: "profile";
-  readonly staticData: ProfileCardStaticData;
-  liveData: ProfileCardLiveData;
-  readonly backData: BaseCardBackData; // Generic card type description
+  readonly staticData: ProfileCardStaticData; // Correctly references the dedicated static data interface
+  liveData: ProfileCardLiveData; // Mutable part for live updates
+  readonly backData: BaseCardBackData; // Holds generic description for the card type
+  // websiteUrl is inherited from BaseCardData; its value typically comes from staticData.website
 }
 
 export interface ProfileCardInteractionCallbacks {
   readonly onWebsiteClick?: (websiteUrl: string) => void;
   readonly onFilterByField?: (
-    fieldType: "sector" | "industry" | "exchange",
+    fieldType: "sector" | "industry" | "exchange", // 'exchange' here might refer to 'exchange_full_name' or 'exchange' short code
     value: string
   ) => void;
-  // Renamed from onShowFullPriceCard
   readonly onRequestPriceCard?: (context: CardActionContext) => void;
 }

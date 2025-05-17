@@ -4,42 +4,34 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import useLocalStorage from "@/hooks/use-local-storage";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client"; // Ensure this import
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 import type {
   DisplayableCard,
-  DisplayableLivePriceCard,
+  ConcreteCardData,
 } from "@/components/game/types";
 import type { AddCardFormValues } from "@/components/workspace/AddCardForm";
 import type { PriceCardData } from "@/components/game/cards/price-card/price-card.types";
-import type {
-  ProfileCardData,
-  ProfileCardLiveData,
-} from "@/components/game/cards/profile-card/profile-card.types";
-
-import {
-  createDisplayableProfileCardFromDB,
-  transformProfileDBRowToStaticData,
-} from "@/components/game/cards/profile-card/profileCardUtils";
-import {
-  createPriceCardFaceDataFromQuote,
-  createPriceCardBackDataFromQuote,
-} from "@/components/game/cards/price-card/priceCardUtils";
+import type { ProfileCardData } from "@/components/game/cards/profile-card/profile-card.types";
 
 import { calculateDynamicCardRarity } from "@/components/game/rarityCalculator";
 import { rehydrateCardFromStorage } from "@/components/game/cardRehydration";
-import type { CombinedQuoteData, ProfileDBRow } from "@/hooks/useStockData";
+import type { ProfileDBRow } from "@/hooks/useStockData";
+import type { LiveQuoteIndicatorDBRow } from "@/lib/supabase/realtime-service";
+import type { ExchangeMarketStatusRecord } from "@/types/market.types";
 
-// Import the initializer registry and getter
 import {
   getCardInitializer,
   type CardInitializationContext,
 } from "@/components/game/cardInitializer.types";
-// Import to execute registrations (MUST BE DONE ONCE, e.g. here or in a top-level app file)
 import "@/components/game/cards/initializers";
 
-// Import the extracted utility for updating/adding cards
-import { updateOrAddCard } from "@/lib/workspaceUtils";
+import {
+  getCardUpdateHandler,
+  type CardUpdateContext,
+  type CardUpdateEventType,
+} from "@/components/game/cardUpdateHandler.types";
+import "@/components/game/cards/updateHandlerInitializer";
 
 const INITIAL_ACTIVE_CARDS: DisplayableCard[] = [];
 const WORKSPACE_LOCAL_STORAGE_KEY = "finSignal-mainWorkspace-v1";
@@ -56,7 +48,6 @@ export function useWorkspaceManager({
   isPremiumUser,
 }: UseWorkspaceManagerProps) {
   const { toast } = useToast();
-  // Create Supabase client instance within the hook if not passed as prop
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
   const [initialCardsFromStorage, setCardsInLocalStorage] = useLocalStorage<
@@ -75,6 +66,10 @@ export function useWorkspaceManager({
     useState<string | null>(null);
   const [isAddingCardInProgress, setIsAddingCardInProgress] =
     useState<boolean>(false);
+
+  const [exchangeStatuses, setExchangeStatuses] = useState<
+    Record<string, ExchangeMarketStatusRecord>
+  >({});
 
   useEffect(() => {
     if (!isPremiumUser && activeCards.length > 0) {
@@ -96,16 +91,8 @@ export function useWorkspaceManager({
 
   const addCardToWorkspace = useCallback(
     async (values: AddCardFormValues, options?: AddCardOptions) => {
-      if (process.env.NODE_ENV === "development") {
-        console.debug(
-          "[useWorkspaceManager] addCardToWorkspace called with values:",
-          values,
-          "and options:",
-          options
-        );
-      }
       setIsAddingCardInProgress(true);
-      let determinedSymbol = values.symbol; // Use a different variable name
+      let determinedSymbol = values.symbol;
       const cardType = values.cardType;
       const requestingCardId = options?.requestingCardId;
 
@@ -172,9 +159,6 @@ export function useWorkspaceManager({
 
       const initializer = getCardInitializer(cardType);
       if (!initializer) {
-        if (process.env.NODE_ENV === "development") {
-          console.error(`No initializer found for card type: ${cardType}`);
-        }
         toast({
           title: "System Error",
           description: `Unsupported card type requested: ${cardType}`,
@@ -196,13 +180,12 @@ export function useWorkspaceManager({
           symbol: determinedSymbol,
           supabase,
           toast,
-          activeCards, // Pass current activeCards for context if needed by initializers
+          activeCards,
         };
         newCardToAdd = await initializer(initContext);
 
         if (newCardToAdd) {
           const { rarity, reason } = calculateDynamicCardRarity(newCardToAdd);
-          // Ensure newCardToAdd is a new object before modifying
           newCardToAdd = {
             ...newCardToAdd,
             currentRarity: rarity,
@@ -215,22 +198,19 @@ export function useWorkspaceManager({
               const sourceIndex = updatedCards.findIndex(
                 (c) => c.id === requestingCardId
               );
-              if (sourceIndex !== -1) {
+              if (sourceIndex !== -1)
                 updatedCards.splice(sourceIndex + 1, 0, newCardToAdd!);
-              } else {
-                updatedCards.push(newCardToAdd!);
-              }
+              else updatedCards.push(newCardToAdd!);
             } else {
               updatedCards.push(newCardToAdd!);
             }
             return updatedCards;
           });
 
-          // Generic success toast, if not handled by specific initializers already (e.g. price shell)
-          // Price card shell initializer already shows a toast.
           const isPriceCard = newCardToAdd.type === "price";
           const isPriceCardShell =
-            isPriceCard && !(newCardToAdd as PriceCardData).faceData.price;
+            isPriceCard &&
+            (newCardToAdd as PriceCardData).faceData.price === null;
 
           if (!isPriceCardShell) {
             setTimeout(
@@ -243,20 +223,10 @@ export function useWorkspaceManager({
             );
           }
         }
-        // If newCardToAdd is null, the specific initializer should have shown a toast.
       } catch (err: any) {
-        // This catch is for unexpected errors during initializer execution or subsequent logic
-        if (process.env.NODE_ENV === "development") {
-          console.error(
-            `Error in addCardToWorkspace for ${cardType} - ${determinedSymbol}:`,
-            err
-          );
-        }
         toast({
           title: "Error Adding Card",
-          description:
-            err.message ||
-            `Could not add ${cardType} card due to an unexpected issue.`,
+          description: err.message || `Could not add ${cardType} card.`,
           variant: "destructive",
         });
       } finally {
@@ -273,203 +243,182 @@ export function useWorkspaceManager({
     ]
   );
 
-  const processLiveQuote = useCallback(
-    (quoteData: CombinedQuoteData, source: "fetch" | "realtime") => {
-      const apiTimestampMillis = quoteData.api_timestamp * 1000;
-      if (isNaN(apiTimestampMillis)) {
-        if (process.env.NODE_ENV === "development") {
-          console.warn(
-            `processLiveQuote (${quoteData.symbol}): Invalid API timestamp received.`
-          );
-        }
-        return;
-      }
+  const handleLiveQuoteUpdate = useCallback(
+    (leanQuoteData: LiveQuoteIndicatorDBRow, source: "fetch" | "realtime") => {
+      // if (process.env.NODE_ENV === 'development') {
+      //   console.log(`[useWorkspaceManager] handleLiveQuoteUpdate for ${leanQuoteData.symbol}. Source: ${source}. Price: ${leanQuoteData.current_price}`, JSON.stringify(leanQuoteData));
+      // }
+
+      const updateContext: CardUpdateContext = { toast };
+      const eventType: CardUpdateEventType = "LIVE_QUOTE_UPDATE";
 
       setActiveCards((prevActiveCards) => {
-        let cardsOverallNeedUpdate = false;
-        let currentCardsState = [...prevActiveCards];
+        let overallChanged = false;
+        const updatedCards = prevActiveCards.map((card) => {
+          if (card.symbol === leanQuoteData.symbol) {
+            const handler = getCardUpdateHandler(card.type, eventType);
+            if (handler) {
+              const {
+                isFlipped,
+                currentRarity,
+                rarityReason,
+                isLikedByCurrentUser,
+                currentUserLikeId,
+                likeCount,
+                commentCount,
+                collectionCount,
+                isSavedByCurrentUser,
+                ...concreteCardData
+              } = card;
 
-        const priceResult = updateOrAddCard<PriceCardData, CombinedQuoteData>(
-          currentCardsState,
-          quoteData.symbol,
-          "price",
-          quoteData,
-          (existingConcrete, newQuoteData, existingDisplayable) => {
-            const typedExistingConcrete = existingConcrete as
-              | PriceCardData
-              | undefined;
-            if (
-              source === "realtime" &&
-              typedExistingConcrete?.faceData.timestamp &&
-              apiTimestampMillis < typedExistingConcrete.faceData.timestamp
-            ) {
-              return typedExistingConcrete;
-            }
-            const newFaceData = createPriceCardFaceDataFromQuote(
-              newQuoteData,
-              apiTimestampMillis
-            );
-            const newBackSpecificData =
-              createPriceCardBackDataFromQuote(newQuoteData);
-            return {
-              id:
-                typedExistingConcrete?.id ||
-                `${newQuoteData.symbol}-price-${Date.now()}`,
-              type: "price",
-              symbol: newQuoteData.symbol,
-              createdAt: typedExistingConcrete?.createdAt || Date.now(),
-              companyName:
-                newQuoteData.companyName ??
-                typedExistingConcrete?.companyName ??
-                existingDisplayable?.companyName,
-              logoUrl:
-                newQuoteData.logoUrl ??
-                typedExistingConcrete?.logoUrl ??
-                existingDisplayable?.logoUrl,
-              faceData: newFaceData,
-              backData: {
-                description:
-                  typedExistingConcrete?.backData.description ||
-                  existingDisplayable?.backData.description ||
-                  `Price data for ${newQuoteData.symbol}`,
-                ...newBackSpecificData,
-              },
-            };
-          }
-        );
+              const updatedConcreteData = handler(
+                concreteCardData as ConcreteCardData,
+                leanQuoteData,
+                card,
+                updateContext
+              );
 
-        if (priceResult.cardChangedOrAdded) {
-          currentCardsState = priceResult.updatedCards;
-          cardsOverallNeedUpdate = true;
-          const finalPriceCard = priceResult.finalCard as
-            | DisplayableLivePriceCard
-            | undefined;
-          if (
-            finalPriceCard &&
-            prevActiveCards.find((c) => c.id === finalPriceCard.id) &&
-            source === "realtime" &&
-            finalPriceCard.faceData.price != null
-          ) {
-            setTimeout(
-              () =>
-                toast({
-                  title: `Live Update: ${finalPriceCard.symbol}`,
-                  description: `$${finalPriceCard.faceData.price?.toFixed(
-                    2
-                  )} (${
-                    finalPriceCard.faceData.changePercentage?.toFixed(2) ??
-                    "N/A"
-                  }%) ${
-                    finalPriceCard.currentRarity &&
-                    finalPriceCard.currentRarity !== "Common"
-                      ? `Rarity: ${finalPriceCard.currentRarity}`
-                      : ""
-                  }`,
-                }),
-              0
-            );
-          }
-        }
+              if (updatedConcreteData !== concreteCardData) {
+                const tempForRarityCalc = {
+                  ...updatedConcreteData,
+                  isFlipped,
+                } as DisplayableCard;
+                const { rarity: newRarity, reason: newRarityReason } =
+                  calculateDynamicCardRarity(tempForRarityCalc);
 
-        const existingProfileCardIndex = currentCardsState.findIndex(
-          (c) => c.symbol === quoteData.symbol && c.type === "profile"
-        );
-        if (existingProfileCardIndex !== -1) {
-          const newProfileLiveData = createPriceCardFaceDataFromQuote(
-            quoteData,
-            apiTimestampMillis
-          ) as ProfileCardLiveData;
+                if (
+                  JSON.stringify(updatedConcreteData) !==
+                    JSON.stringify(concreteCardData) ||
+                  newRarity !== currentRarity ||
+                  newRarityReason !== rarityReason
+                ) {
+                  overallChanged = true;
+                  const newCard = {
+                    ...card,
+                    ...(updatedConcreteData as any),
+                    currentRarity: newRarity,
+                    rarityReason: newRarityReason,
+                  };
 
-          const profileResult = updateOrAddCard<
-            ProfileCardData,
-            ProfileCardLiveData
-          >(
-            currentCardsState,
-            quoteData.symbol,
-            "profile",
-            newProfileLiveData,
-            (existingConcrete, newLiveData) => {
-              const typedExistingConcrete = existingConcrete as ProfileCardData;
-              if (
-                source === "realtime" &&
-                typedExistingConcrete.liveData.timestamp &&
-                apiTimestampMillis < typedExistingConcrete.liveData.timestamp
-              ) {
-                return typedExistingConcrete;
+                  if (
+                    newCard.type === "price" &&
+                    source === "realtime" &&
+                    (newCard as PriceCardData).faceData.price !== null
+                  ) {
+                    const oldPrice = (card as PriceCardData).faceData.price;
+                    const newPrice = (newCard as PriceCardData).faceData.price;
+                    if (oldPrice !== newPrice) {
+                      // setTimeout( // Toasting can be noisy for frequent updates
+                      //   () =>
+                      //     toast({
+                      //       title: `Live Update: ${newCard.symbol}`,
+                      //       description: `$${newPrice?.toFixed(2)} (${
+                      //         (
+                      //           newCard as PriceCardData
+                      //         ).faceData.changePercentage?.toFixed(2) ?? "N/A"
+                      //       }%) ${
+                      //         newCard.currentRarity &&
+                      //         newCard.currentRarity !== "Common"
+                      //           ? `Rarity: ${newCard.currentRarity}`
+                      //           : ""
+                      //       }`,
+                      //     }),
+                      //   0
+                      // );
+                    }
+                  }
+                  return newCard;
+                }
               }
-              return {
-                ...typedExistingConcrete,
-                liveData: { ...typedExistingConcrete.liveData, ...newLiveData },
-              };
             }
-          );
-          if (profileResult.cardChangedOrAdded) {
-            currentCardsState = profileResult.updatedCards;
-            cardsOverallNeedUpdate = true;
           }
-        }
-        return cardsOverallNeedUpdate ? currentCardsState : prevActiveCards;
+          return card;
+        });
+        return overallChanged ? updatedCards : prevActiveCards;
       });
     },
-    [setActiveCards, toast, supabase] // Added supabase dependency
+    [setActiveCards, toast]
   );
 
-  const processStaticProfileUpdate = useCallback(
+  const handleStaticProfileUpdate = useCallback(
     (updatedProfileDBRow: ProfileDBRow) => {
+      const updateContext: CardUpdateContext = { toast };
+      const eventType: CardUpdateEventType = "STATIC_PROFILE_UPDATE";
+
       setActiveCards((prevActiveCards) => {
-        const result = updateOrAddCard<ProfileCardData, ProfileDBRow>(
-          prevActiveCards,
-          updatedProfileDBRow.symbol,
-          "profile",
-          updatedProfileDBRow,
-          (existingConcrete, newProfileDBData) => {
-            const typedExistingConcrete = existingConcrete as
-              | ProfileCardData
-              | undefined;
-            if (!typedExistingConcrete) {
-              if (process.env.NODE_ENV === "development") {
-                console.warn(
-                  `Profile card for ${newProfileDBData.symbol} not found for static update. Creating new one.`
-                );
+        let overallChanged = false;
+        const updatedCards = prevActiveCards.map((card) => {
+          if (card.symbol === updatedProfileDBRow.symbol) {
+            const universalHandler = getCardUpdateHandler(card.type, eventType);
+            if (universalHandler) {
+              const {
+                isFlipped,
+                currentRarity,
+                rarityReason,
+                isLikedByCurrentUser,
+                currentUserLikeId,
+                likeCount,
+                commentCount,
+                collectionCount,
+                isSavedByCurrentUser,
+                ...concreteCardData
+              } = card;
+              const updatedConcreteData = universalHandler(
+                concreteCardData as ConcreteCardData,
+                updatedProfileDBRow,
+                card,
+                updateContext
+              );
+              if (updatedConcreteData !== concreteCardData) {
+                const tempForRarityCalc = {
+                  ...updatedConcreteData,
+                  isFlipped,
+                } as DisplayableCard;
+                const { rarity: newRarity, reason: newRarityReason } =
+                  calculateDynamicCardRarity(tempForRarityCalc);
+                if (
+                  JSON.stringify(updatedConcreteData) !==
+                    JSON.stringify(concreteCardData) ||
+                  newRarity !== currentRarity ||
+                  newRarityReason !== rarityReason
+                ) {
+                  overallChanged = true;
+                  if (card.type === "profile") {
+                    setTimeout(
+                      () =>
+                        toast({
+                          title: `Profile Updated: ${updatedProfileDBRow.symbol}`,
+                          description: "Company details have been refreshed.",
+                        }),
+                      0
+                    );
+                  }
+                  return {
+                    ...card,
+                    ...(updatedConcreteData as any),
+                    currentRarity: newRarity,
+                    rarityReason: newRarityReason,
+                  };
+                }
               }
-              // If a profile card is being updated, it should ideally exist.
-              // If it doesn't, createDisplayableProfileCardFromDB will make a new one.
-              return createDisplayableProfileCardFromDB(
-                newProfileDBData
-              ) as ProfileCardData;
             }
-            const newStaticData =
-              transformProfileDBRowToStaticData(newProfileDBData);
-            return {
-              ...typedExistingConcrete,
-              companyName: newProfileDBData.company_name,
-              logoUrl: newProfileDBData.image,
-              staticData: newStaticData,
-              backData: {
-                // Make sure backData is handled correctly
-                description:
-                  typedExistingConcrete.backData?.description ||
-                  `Profile overview for ${
-                    newProfileDBData.company_name || newProfileDBData.symbol
-                  }`,
-              },
-            };
           }
-        );
-        if (result.cardChangedOrAdded) {
-          setTimeout(() => {
-            toast({
-              title: `Profile Updated: ${updatedProfileDBRow.symbol}`,
-              description: "Company details have been refreshed.",
-            });
-          }, 0);
-        }
-        return result.cardChangedOrAdded
-          ? result.updatedCards
-          : prevActiveCards;
+          return card;
+        });
+        return overallChanged ? updatedCards : prevActiveCards;
       });
     },
-    [setActiveCards, toast, supabase] // Added supabase dependency
+    [setActiveCards, toast]
+  );
+
+  const handleExchangeStatusUpdate = useCallback(
+    (status: ExchangeMarketStatusRecord) => {
+      setExchangeStatuses((prev) => ({
+        ...prev,
+        [status.exchange_code]: status,
+      }));
+    },
+    []
   );
 
   const clearWorkspace = useCallback(() => {
@@ -491,6 +440,19 @@ export function useWorkspaceManager({
     setWorkspaceSymbolForRegularUser,
   ]);
 
+  const stockDataCallbacks = useMemo(
+    () => ({
+      onProfileUpdate: handleStaticProfileUpdate,
+      onLiveQuoteUpdate: handleLiveQuoteUpdate,
+      onExchangeStatusUpdate: handleExchangeStatusUpdate,
+    }),
+    [
+      handleStaticProfileUpdate,
+      handleLiveQuoteUpdate,
+      handleExchangeStatusUpdate,
+    ]
+  );
+
   return {
     activeCards,
     setActiveCards,
@@ -498,8 +460,8 @@ export function useWorkspaceManager({
     isAddingCardInProgress,
     addCardToWorkspace,
     clearWorkspace,
-    processLiveQuote,
-    processStaticProfileUpdate,
+    stockDataCallbacks,
     uniqueSymbolsInWorkspace,
+    exchangeStatuses,
   };
 }

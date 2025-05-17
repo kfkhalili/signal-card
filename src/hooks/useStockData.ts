@@ -1,5 +1,5 @@
 // src/hooks/useStockData.ts
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type {
   SupabaseClient,
@@ -10,22 +10,21 @@ import {
   subscribeToQuoteUpdates as subscribeToLiveQuoteIndicators,
   type LiveQuotePayload,
   type SubscriptionStatus as LiveQuoteSubscriptionStatus,
-  type LiveQuoteIndicatorDBRow, // This type MUST use `exchange?: string | null;`
-  LiveQuoteIndicatorDBSchema, // This Zod schema MUST use `exchange: z.string().nullable().optional();`
-} from "@/lib/supabase/realtime-service"; // Assuming this file is updated
+  type LiveQuoteIndicatorDBRow,
+  LiveQuoteIndicatorDBSchema,
+} from "@/lib/supabase/realtime-service";
 import { z } from "zod";
 import type {
   ExchangeMarketStatusRecord,
   FmpMarketHoliday,
 } from "@/types/market.types";
 
-// ProfileDBRow and Schema
 export interface ProfileDBRow {
   id: string;
   symbol: string;
   company_name?: string | null;
   image?: string | null;
-  exchange?: string | null; // This is the exchange code (e.g., "NASDAQ", "NYSE") from FMP
+  exchange?: string | null;
   sector?: string | null;
   industry?: string | null;
   website?: string | null;
@@ -67,22 +66,22 @@ export const ProfileDBSchema = z.object({
   symbol: z.string(),
   company_name: z.string().nullable().optional(),
   image: z.string().url().nullable().optional(),
-  exchange: z.string().trim().min(1).nullable().optional(), // Key for linking
+  exchange: z.string().trim().min(1).nullable().optional(),
   sector: z.string().nullable().optional(),
   industry: z.string().nullable().optional(),
   website: z.string().url().nullable().optional(),
   description: z.string().nullable().optional(),
   short_description: z.string().nullable().optional(),
-  country: z.string().nullable().optional(),
+  country: z.string().max(2).nullable().optional(),
   price: z.number().nullable().optional(),
-  market_cap: z.number().nullable().optional(),
+  market_cap: z.number().int().nullable().optional(),
   beta: z.number().nullable().optional(),
   last_dividend: z.number().nullable().optional(),
   range: z.string().nullable().optional(),
   change: z.number().nullable().optional(),
   change_percentage: z.number().nullable().optional(),
-  volume: z.number().nullable().optional(),
-  average_volume: z.number().nullable().optional(),
+  volume: z.number().int().nullable().optional(),
+  average_volume: z.number().int().nullable().optional(),
   currency: z.string().max(3).nullable().optional(),
   cik: z.string().nullable().optional(),
   isin: z.string().nullable().optional(),
@@ -107,14 +106,14 @@ export const ProfileDBSchema = z.object({
 });
 
 export const ExchangeMarketStatusDBSchema = z.object({
-  exchange_code: z.string(), // This is the PK in exchange_market_status
+  exchange_code: z.string(),
   name: z.string().nullable().optional(),
   opening_time_local: z.string().nullable().optional(),
   closing_time_local: z.string().nullable().optional(),
   timezone: z.string(),
-  is_market_open: z.boolean(),
+  is_market_open: z.boolean().nullable(),
   status_message: z.string().nullable().optional(),
-  current_day_is_holiday: z.boolean().nullable().optional(),
+  current_day_is_holiday: z.boolean().nullable(),
   current_holiday_name: z.string().nullable().optional(),
   raw_holidays_json: z.custom<FmpMarketHoliday[]>().nullable().optional(),
   last_fetched_at: z.string().refine((val) => !isNaN(new Date(val).getTime()), {
@@ -135,7 +134,10 @@ export type DerivedMarketStatus =
 interface UseStockDataProps {
   symbol: string;
   onProfileUpdate?: (profile: ProfileDBRow) => void;
-  onLiveQuoteUpdate?: (quote: LiveQuoteIndicatorDBRow) => void;
+  onLiveQuoteUpdate?: (
+    quote: LiveQuoteIndicatorDBRow,
+    source: "fetch" | "realtime"
+  ) => void;
   onExchangeStatusUpdate?: (status: ExchangeMarketStatusRecord) => void;
 }
 
@@ -150,6 +152,8 @@ export function useStockData({
   onLiveQuoteUpdate,
   onExchangeStatusUpdate,
 }: UseStockDataProps): UseStockDataReturn {
+  const instanceIdRef = useRef(Math.random().toString(36).substring(2, 7));
+
   const [profileData, setProfileData] = useState<ProfileDBRow | null>(null);
   const [latestQuote, setLatestQuote] =
     useState<LiveQuoteIndicatorDBRow | null>(null);
@@ -165,13 +169,14 @@ export function useStockData({
   const supabaseClientRef = useRef<SupabaseClient>(
     createSupabaseBrowserClient()
   );
-  const isMountedRef = useRef<boolean>(true);
+  const isMountedRef = useRef<boolean>(false);
 
   const profileChannelRef = useRef<RealtimeChannel | null>(null);
   const liveQuoteUnsubscribeRef = useRef<(() => void) | null>(null);
   const exchangeStatusChannelRef = useRef<RealtimeChannel | null>(null);
 
   const currentSubscribedExchangeCode = useRef<string | null>(null);
+  const exchangeStatusRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -182,28 +187,36 @@ export function useStockData({
           .removeChannel(profileChannelRef.current)
           .catch((err) =>
             console.error(
-              `[useStockData ${symbol}] Error removing profile channel:`,
+              `[useStockData ${symbol} - ${instanceIdRef.current}] Error removing profile channel:`,
               err
             )
           );
+        profileChannelRef.current = null;
       }
       if (liveQuoteUnsubscribeRef.current) {
         liveQuoteUnsubscribeRef.current();
+        liveQuoteUnsubscribeRef.current = null;
       }
       if (exchangeStatusChannelRef.current) {
         supabaseClientRef.current
           .removeChannel(exchangeStatusChannelRef.current)
           .catch((err) =>
             console.error(
-              `[useStockData ${symbol}] Error removing exchange status channel for ${currentSubscribedExchangeCode.current}:`,
+              `[useStockData ${symbol} - ${instanceIdRef.current}] Error removing exchange status channel for ${currentSubscribedExchangeCode.current}:`,
               err
             )
           );
+        exchangeStatusChannelRef.current = null;
+      }
+      currentSubscribedExchangeCode.current = null;
+      if (exchangeStatusRetryTimeoutRef.current) {
+        clearTimeout(exchangeStatusRetryTimeoutRef.current);
       }
     };
   }, [symbol]);
 
   useEffect(() => {
+    if (!isMountedRef.current) return;
     if (!symbol) {
       setDerivedMarketStatus("Unknown");
       setMarketStatusMessage("No symbol provided.");
@@ -216,23 +229,38 @@ export function useStockData({
       return;
     }
 
-    const relevantExchangeCode = profileData?.exchange || latestQuote?.exchange; // Use .exchange from quote
+    const relevantExchangeCode = profileData?.exchange || latestQuote?.exchange;
 
-    if (
-      !relevantExchangeCode ||
-      !exchangeStatus ||
-      exchangeStatus.exchange_code !== relevantExchangeCode
-    ) {
-      setDerivedMarketStatus("Connecting");
+    if (!relevantExchangeCode) {
+      setDerivedMarketStatus("Unknown");
       setMarketStatusMessage(
-        relevantExchangeCode
-          ? `Workspaceing market status for ${relevantExchangeCode}...`
-          : `Awaiting exchange info for ${symbol}...`
+        `Exchange information missing for ${symbol}. Cannot determine market status.`
       );
       return;
     }
 
-    if (exchangeStatus.current_day_is_holiday) {
+    if (
+      !exchangeStatus ||
+      exchangeStatus.exchange_code !== relevantExchangeCode
+    ) {
+      if (
+        derivedMarketStatus !== "Connecting" &&
+        derivedMarketStatus !== "Error"
+      ) {
+        setDerivedMarketStatus("Connecting");
+        setMarketStatusMessage(
+          relevantExchangeCode
+            ? `Connecting to market status for ${relevantExchangeCode}...`
+            : `Awaiting exchange info for ${symbol}...`
+        );
+      }
+      return;
+    }
+
+    const isOpen = exchangeStatus.is_market_open ?? false;
+    const isHoliday = exchangeStatus.current_day_is_holiday ?? false;
+
+    if (isHoliday) {
       setDerivedMarketStatus("Holiday");
       setMarketStatusMessage(
         exchangeStatus.status_message ||
@@ -240,7 +268,7 @@ export function useStockData({
             exchangeStatus.current_holiday_name || "Official Holiday"
           })`
       );
-    } else if (exchangeStatus.is_market_open) {
+    } else if (isOpen) {
       if (latestQuote?.api_timestamp) {
         const apiTimeMillis = latestQuote.api_timestamp * 1000;
         const diffMinutes = (Date.now() - apiTimeMillis) / (1000 * 60);
@@ -268,11 +296,16 @@ export function useStockData({
         exchangeStatus.status_message || "Market is Closed."
       );
     }
-  }, [symbol, latestQuote, exchangeStatus, profileData]);
+  }, [symbol, latestQuote, exchangeStatus, profileData, derivedMarketStatus]);
 
   const setupExchangeStatusSubscription = useCallback(
     async (exchangeCodeToSubscribe: string | undefined | null) => {
       if (!isMountedRef.current) return;
+
+      if (exchangeStatusRetryTimeoutRef.current) {
+        clearTimeout(exchangeStatusRetryTimeoutRef.current);
+        exchangeStatusRetryTimeoutRef.current = null;
+      }
 
       if (
         currentSubscribedExchangeCode.current &&
@@ -280,11 +313,7 @@ export function useStockData({
           !exchangeCodeToSubscribe)
       ) {
         if (exchangeStatusChannelRef.current) {
-          if (process.env.NODE_ENV === "development")
-            console.debug(
-              `[useStockData ${symbol}] Removing old exchange status channel for ${currentSubscribedExchangeCode.current}`
-            );
-          supabaseClientRef.current
+          await supabaseClientRef.current
             .removeChannel(exchangeStatusChannelRef.current)
             .catch(console.error);
           exchangeStatusChannelRef.current = null;
@@ -293,18 +322,35 @@ export function useStockData({
         if (isMountedRef.current) setExchangeStatus(null);
       }
 
+      if (!exchangeCodeToSubscribe) {
+        if (
+          currentSubscribedExchangeCode.current &&
+          exchangeStatusChannelRef.current
+        ) {
+          await supabaseClientRef.current
+            .removeChannel(exchangeStatusChannelRef.current)
+            .catch(console.error);
+          exchangeStatusChannelRef.current = null;
+          currentSubscribedExchangeCode.current = null;
+          if (isMountedRef.current) setExchangeStatus(null);
+        }
+        return;
+      }
+
       if (
-        !exchangeCodeToSubscribe ||
-        currentSubscribedExchangeCode.current === exchangeCodeToSubscribe
+        currentSubscribedExchangeCode.current === exchangeCodeToSubscribe &&
+        exchangeStatusChannelRef.current &&
+        exchangeStatusChannelRef.current.state === "joined"
       ) {
         return;
       }
 
       currentSubscribedExchangeCode.current = exchangeCodeToSubscribe;
 
-      if (process.env.NODE_ENV === "development") {
-        console.debug(
-          `[useStockData ${symbol}] Setting up subscription for exchange_market_status: ${exchangeCodeToSubscribe}`
+      if (isMountedRef.current) {
+        setDerivedMarketStatus("Connecting");
+        setMarketStatusMessage(
+          `Workspaceing market status for ${exchangeCodeToSubscribe}...`
         );
       }
 
@@ -312,53 +358,68 @@ export function useStockData({
         const { data, error } = await supabaseClientRef.current
           .from("exchange_market_status")
           .select("*")
-          .eq("exchange_code", exchangeCodeToSubscribe) // Querying by exchange_code
+          .eq("exchange_code", exchangeCodeToSubscribe)
           .single();
 
         if (!isMountedRef.current) return;
 
         if (error && error.code !== "PGRST116") {
-          console.error(
-            `[useStockData ${symbol}] Error fetching initial exchange status for ${exchangeCodeToSubscribe}:`,
-            error
-          );
-          if (isMountedRef.current) setExchangeStatus(null);
+          if (isMountedRef.current) {
+            setExchangeStatus(null);
+            setDerivedMarketStatus("Error");
+            setMarketStatusMessage(
+              `Failed to fetch market status for ${exchangeCodeToSubscribe}.`
+            );
+          }
         } else if (data) {
           const validation = ExchangeMarketStatusDBSchema.safeParse(data);
           if (validation.success) {
             if (isMountedRef.current) {
-              setExchangeStatus(validation.data);
+              setExchangeStatus(validation.data as ExchangeMarketStatusRecord);
               if (onExchangeStatusUpdate)
-                onExchangeStatusUpdate(validation.data);
+                onExchangeStatusUpdate(
+                  validation.data as ExchangeMarketStatusRecord
+                );
             }
           } else {
-            console.error(
-              `[useStockData ${symbol}] Zod validation (initial fetch) for exchange_market_status for ${exchangeCodeToSubscribe} failed:`,
-              validation.error.flatten()
-            );
-            if (isMountedRef.current) setExchangeStatus(null);
+            if (isMountedRef.current) {
+              setExchangeStatus(null);
+              setDerivedMarketStatus("Error");
+              setMarketStatusMessage(
+                `Invalid market status data for ${exchangeCodeToSubscribe}.`
+              );
+            }
           }
         } else {
           if (isMountedRef.current) {
-            console.warn(
-              `[useStockData ${symbol}] No initial exchange status found for ${exchangeCodeToSubscribe}.`
-            );
             setExchangeStatus(null);
           }
         }
       } catch (e) {
         if (isMountedRef.current) {
-          console.error(
-            `[useStockData ${symbol}] Exception fetching initial exchange status for ${exchangeCodeToSubscribe}:`,
-            e
-          );
           setExchangeStatus(null);
+          setDerivedMarketStatus("Error");
+          setMarketStatusMessage(
+            `Exception fetching market status for ${exchangeCodeToSubscribe}.`
+          );
         }
+      }
+
+      if (exchangeStatusChannelRef.current) {
+        await supabaseClientRef.current
+          .removeChannel(exchangeStatusChannelRef.current)
+          .catch((err) =>
+            console.error(
+              `[useStockData ${symbol} - ${instanceIdRef.current}] Error removing old exchangeStatusChannelRef before new sub: `,
+              err
+            )
+          );
+        exchangeStatusChannelRef.current = null;
       }
 
       const channelName = `exchange-status-${exchangeCodeToSubscribe
         .toLowerCase()
-        .replace(/[^a-z0-9_.-]/gi, "-")}`;
+        .replace(/[^a-z0-9_.-]/gi, "-")}-${instanceIdRef.current}`;
       const channel = supabaseClientRef.current
         .channel(channelName)
         .on<ExchangeMarketStatusRecord>(
@@ -372,49 +433,70 @@ export function useStockData({
           (
             payload: RealtimePostgresChangesPayload<ExchangeMarketStatusRecord>
           ) => {
-            if (process.env.NODE_ENV === "development") {
-              console.debug(
-                `[useStockData ${symbol}] Realtime update for exchange_market_status (${exchangeCodeToSubscribe}):`,
-                payload.new
-              );
-            }
             if (!isMountedRef.current) return;
-
-            const newStatus = payload.new;
-            const validation =
-              ExchangeMarketStatusDBSchema.safeParse(newStatus);
+            const validation = ExchangeMarketStatusDBSchema.safeParse(
+              payload.new
+            );
             if (validation.success) {
-              setExchangeStatus(validation.data);
-              if (onExchangeStatusUpdate)
-                onExchangeStatusUpdate(validation.data);
+              if (isMountedRef.current) {
+                setExchangeStatus(
+                  validation.data as ExchangeMarketStatusRecord
+                );
+                if (onExchangeStatusUpdate)
+                  onExchangeStatusUpdate(
+                    validation.data as ExchangeMarketStatusRecord
+                  );
+              }
             } else {
               console.error(
-                `[useStockData ${symbol}] Zod validation (realtime) for exchange_market_status for ${exchangeCodeToSubscribe} failed:`,
-                validation.error.flatten()
+                `[useStockData ${symbol} - ${instanceIdRef.current}] Zod validation (realtime) for exchange_market_status for ${exchangeCodeToSubscribe} failed:`,
+                validation.error.flatten(),
+                "Payload:",
+                payload.new
               );
             }
           }
         )
         .subscribe((status, err) => {
           if (!isMountedRef.current) return;
-          if (process.env.NODE_ENV === "development") {
-            console.debug(
-              `[useStockData ${symbol}] Exchange status channel (${exchangeCodeToSubscribe}) status: ${status}`,
-              err || ""
-            );
-          }
+          const retrySubscription = () => {
+            if (exchangeStatusRetryTimeoutRef.current)
+              clearTimeout(exchangeStatusRetryTimeoutRef.current);
+            exchangeStatusRetryTimeoutRef.current = setTimeout(() => {
+              if (
+                isMountedRef.current &&
+                currentSubscribedExchangeCode.current ===
+                  exchangeCodeToSubscribe
+              ) {
+                setupExchangeStatusSubscription(exchangeCodeToSubscribe);
+              }
+            }, 5000 + Math.random() * 5000);
+          };
+
           if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
             if (isMountedRef.current) {
               setDerivedMarketStatus("Error");
-              setMarketStatusMessage("Market status connection issue.");
+              setMarketStatusMessage(
+                `Market status connection issue for ${exchangeCodeToSubscribe}.`
+              );
+              retrySubscription();
             }
-          } else if (status === "CLOSED" && isMountedRef.current) {
-            console.warn(
-              `[useStockData ${symbol}] Exchange status channel (${exchangeCodeToSubscribe}) closed unexpectedly. Will attempt to resubscribe if exchange code is still relevant.`
-            );
-            // Re-subscription attempt will happen if setupExchangeStatusSubscription is called again
-            // (e.g., if symbol changes or profile/quote provides the exchange code again)
-            // Or, add a more explicit retry mechanism here if needed.
+          } else if (status === "CLOSED") {
+            if (isMountedRef.current) {
+              console.warn(
+                `[useStockData ${symbol} - ${instanceIdRef.current}] Exchange status channel (${exchangeCodeToSubscribe}) closed. Will attempt to re-establish.`
+              );
+              setDerivedMarketStatus("Connecting");
+              setMarketStatusMessage(
+                `Market status for ${exchangeCodeToSubscribe} connection closed. Re-establishing...`
+              );
+              retrySubscription();
+            }
+          } else if (status === "SUBSCRIBED") {
+            if (exchangeStatusRetryTimeoutRef.current) {
+              clearTimeout(exchangeStatusRetryTimeoutRef.current);
+              exchangeStatusRetryTimeoutRef.current = null;
+            }
           }
         });
       exchangeStatusChannelRef.current = channel;
@@ -432,57 +514,77 @@ export function useStockData({
     let profileSubActive = true;
 
     const fetchInitialProfileAndSubscribe = async () => {
-      if (process.env.NODE_ENV === "development") {
-        console.debug(
-          `[useStockData ${symbol}] Fetching initial profile & subscribing...`
-        );
-      }
       try {
         const { data, error } = await supabaseClientRef.current
           .from("profiles")
-          .select("*")
+          .select(
+            "id, symbol, company_name, image, exchange, sector, industry, website, description, short_description, country, price, market_cap, beta, last_dividend, range, change, change_percentage, volume, average_volume, currency, cik, isin, cusip, exchange_full_name, ceo, full_time_employees, phone, address, city, state, zip, ipo_date, default_image, is_etf, is_actively_trading, is_adr, is_fund, modified_at"
+          )
           .eq("symbol", symbol)
           .maybeSingle();
 
-        if (!profileSubActive || !isMountedRef.current) return;
+        if (!profileSubActive || !isMountedRef.current) {
+          return;
+        }
         if (error) throw error;
 
         const validationResult = ProfileDBSchema.safeParse(data);
         if (data && validationResult.success) {
-          setProfileData(validationResult.data);
-          if (onProfileUpdate) onProfileUpdate(validationResult.data);
-          setupExchangeStatusSubscription(validationResult.data.exchange); // Use profile.exchange
+          if (isMountedRef.current) {
+            setProfileData(validationResult.data);
+            if (onProfileUpdate) onProfileUpdate(validationResult.data);
+            if (
+              validationResult.data.exchange &&
+              currentSubscribedExchangeCode.current !==
+                validationResult.data.exchange
+            ) {
+              setupExchangeStatusSubscription(validationResult.data.exchange);
+            } else if (
+              !validationResult.data.exchange &&
+              currentSubscribedExchangeCode.current
+            ) {
+              setupExchangeStatusSubscription(null);
+            }
+          }
         } else {
-          if (data && !validationResult.success)
+          if (data && !validationResult.success && isMountedRef.current) {
             console.error(
-              `[useStockData ${symbol}] Zod validation (initial fetch) for profile failed:`,
-              validationResult.error.flatten()
+              `[useStockData ${symbol} - ${instanceIdRef.current}] Zod validation (initial fetch) for profile failed:`,
+              validationResult.error.flatten(),
+              "Raw data:",
+              data
             );
-          else if (process.env.NODE_ENV === "development")
-            console.warn(
-              `[useStockData ${symbol}] No initial profile data found.`
-            );
-          setProfileData(null);
-          setupExchangeStatusSubscription(null);
+          }
+          if (isMountedRef.current) {
+            setProfileData(null);
+          }
         }
       } catch (err) {
         if (!profileSubActive || !isMountedRef.current) return;
         console.error(
-          `[useStockData ${symbol}] Exception during initial profile fetch:`,
+          `[useStockData ${symbol} - ${instanceIdRef.current}] Exception during initial profile fetch:`,
           err
         );
-        setProfileData(null);
-        setupExchangeStatusSubscription(null);
+        if (isMountedRef.current) {
+          setProfileData(null);
+        }
       }
 
-      if (profileChannelRef.current)
-        supabaseClientRef.current
+      if (profileChannelRef.current) {
+        await supabaseClientRef.current
           .removeChannel(profileChannelRef.current)
-          .catch(console.error);
+          .catch((err) =>
+            console.error(
+              `[useStockData ${symbol} - ${instanceIdRef.current}] Error removing old profileChannelRef before new sub: `,
+              err
+            )
+          );
+        profileChannelRef.current = null;
+      }
 
       const channelName = `profile-${symbol
         .toLowerCase()
-        .replace(/[^a-z0-9_.-]/gi, "-")}`;
+        .replace(/[^a-z0-9_.-]/gi, "-")}-${instanceIdRef.current}`;
       const channel = supabaseClientRef.current
         .channel(channelName)
         .on<ProfileDBRow>(
@@ -494,38 +596,47 @@ export function useStockData({
             filter: `symbol=eq.${symbol}`,
           },
           (payload: RealtimePostgresChangesPayload<ProfileDBRow>) => {
-            if (process.env.NODE_ENV === "development")
-              console.debug(
-                `[useStockData ${symbol}] Realtime 'profiles' update:`,
-                payload.new
-              );
             if (!isMountedRef.current || !profileSubActive) return;
-
             const validation = ProfileDBSchema.safeParse(payload.new);
             if (validation.success) {
-              setProfileData(validation.data);
-              if (onProfileUpdate) onProfileUpdate(validation.data);
-              if (
-                validation.data.exchange !==
-                currentSubscribedExchangeCode.current
-              ) {
-                setupExchangeStatusSubscription(validation.data.exchange); // Use profile.exchange
+              if (isMountedRef.current) {
+                setProfileData(validation.data);
+                if (onProfileUpdate) onProfileUpdate(validation.data);
+                if (
+                  validation.data.exchange &&
+                  validation.data.exchange !==
+                    currentSubscribedExchangeCode.current
+                ) {
+                  setupExchangeStatusSubscription(validation.data.exchange);
+                } else if (
+                  !validation.data.exchange &&
+                  currentSubscribedExchangeCode.current
+                ) {
+                  setupExchangeStatusSubscription(null);
+                }
               }
             } else {
               console.error(
-                `[useStockData ${symbol}] Zod validation (realtime) for 'profiles' failed:`,
-                validation.error.flatten()
+                `[useStockData ${symbol} - ${instanceIdRef.current}] Zod validation (realtime) for 'profiles' failed:`,
+                validation.error.flatten(),
+                "Payload:",
+                payload.new
               );
             }
           }
         )
         .subscribe((status, err) => {
-          if (!isMountedRef.current || !profileSubActive) return;
-          if (process.env.NODE_ENV === "development")
-            console.debug(
-              `[useStockData ${symbol}] Profile channel status: ${status}`,
-              err || ""
+          // Intentionally sparse logging for profile channel status unless erroring
+          if (
+            status === "CHANNEL_ERROR" &&
+            isMountedRef.current &&
+            profileSubActive
+          ) {
+            console.error(
+              `[useStockData ${symbol} - ${instanceIdRef.current}] Profile channel error:`,
+              err
             );
+          }
         });
       profileChannelRef.current = channel;
     };
@@ -537,7 +648,12 @@ export function useStockData({
       if (profileChannelRef.current) {
         supabaseClientRef.current
           .removeChannel(profileChannelRef.current)
-          .catch(console.error);
+          .catch((err) =>
+            console.error(
+              `[useStockData ${symbol} - ${instanceIdRef.current}] Error removing profile channel in cleanup:`,
+              err
+            )
+          );
         profileChannelRef.current = null;
       }
     };
@@ -551,12 +667,10 @@ export function useStockData({
     let quoteSubActive = true;
 
     const setupQuoteSub = async () => {
-      if (process.env.NODE_ENV === "development") {
-        console.debug(
-          `[useStockData ${symbol}] Setting up live_quote_indicators subscription.`
-        );
+      if (liveQuoteUnsubscribeRef.current) {
+        liveQuoteUnsubscribeRef.current();
+        liveQuoteUnsubscribeRef.current = null;
       }
-      if (liveQuoteUnsubscribeRef.current) liveQuoteUnsubscribeRef.current();
 
       try {
         const { data, error } = await supabaseClientRef.current
@@ -567,43 +681,57 @@ export function useStockData({
           .limit(1)
           .single();
 
-        if (!quoteSubActive || !isMountedRef.current) return;
+        if (!quoteSubActive || !isMountedRef.current) {
+          return;
+        }
 
         if (error && error.code !== "PGRST116") {
-          console.error(
-            `[useStockData ${symbol}] Error fetching initial quote:`,
-            error
-          );
-          setLatestQuote(null);
+          if (isMountedRef.current) setLatestQuote(null);
         } else if (data) {
           const validation = LiveQuoteIndicatorDBSchema.safeParse(data);
           if (validation.success) {
-            setLatestQuote(validation.data);
-            if (onLiveQuoteUpdate) onLiveQuoteUpdate(validation.data);
-            // Use quote.exchange here
-            if (
-              validation.data.exchange &&
-              currentSubscribedExchangeCode.current !== validation.data.exchange
-            ) {
-              setupExchangeStatusSubscription(validation.data.exchange);
+            if (isMountedRef.current) {
+              setLatestQuote(validation.data);
+              if (onLiveQuoteUpdate) {
+                onLiveQuoteUpdate(validation.data, "fetch");
+              }
+              if (
+                validation.data.exchange &&
+                currentSubscribedExchangeCode.current !==
+                  validation.data.exchange
+              ) {
+                setupExchangeStatusSubscription(validation.data.exchange);
+              } else if (
+                !validation.data.exchange &&
+                currentSubscribedExchangeCode.current &&
+                !profileData?.exchange
+              ) {
+                setupExchangeStatusSubscription(null);
+              }
             }
           } else {
-            console.error(
-              `[useStockData ${symbol}] Zod validation (initial fetch) for live_quote_indicators failed:`,
-              validation.error.flatten()
-            );
-            setLatestQuote(null);
+            if (isMountedRef.current) {
+              console.error(
+                `[useStockData ${symbol} - ${instanceIdRef.current}] Zod validation (initial fetch) for live_quote_indicators failed:`,
+                validation.error.flatten(),
+                "Raw data:",
+                data
+              );
+              setLatestQuote(null);
+            }
           }
         } else {
-          setLatestQuote(null);
+          if (isMountedRef.current) {
+            setLatestQuote(null);
+          }
         }
       } catch (e) {
         if (isMountedRef.current && quoteSubActive) {
           console.error(
-            `[useStockData ${symbol}] Exception fetching initial quote:`,
+            `[useStockData ${symbol} - ${instanceIdRef.current}] Exception fetching initial quote:`,
             e
           );
-          setLatestQuote(null);
+          if (isMountedRef.current) setLatestQuote(null);
         }
       }
 
@@ -617,21 +745,31 @@ export function useStockData({
             !payload.new
           )
             return;
-          const newQuote = payload.new as LiveQuoteIndicatorDBRow;
-          const validation = LiveQuoteIndicatorDBSchema.safeParse(newQuote);
+
+          const validation = LiveQuoteIndicatorDBSchema.safeParse(payload.new);
           if (validation.success) {
-            setLatestQuote(validation.data);
-            if (onLiveQuoteUpdate) onLiveQuoteUpdate(validation.data);
-            // Use quote.exchange here
-            if (
-              validation.data.exchange &&
-              currentSubscribedExchangeCode.current !== validation.data.exchange
-            ) {
-              setupExchangeStatusSubscription(validation.data.exchange);
+            if (isMountedRef.current) {
+              setLatestQuote(validation.data);
+              if (onLiveQuoteUpdate) {
+                onLiveQuoteUpdate(validation.data, "realtime");
+              }
+              if (
+                validation.data.exchange &&
+                currentSubscribedExchangeCode.current !==
+                  validation.data.exchange
+              ) {
+                setupExchangeStatusSubscription(validation.data.exchange);
+              } else if (
+                !validation.data.exchange &&
+                currentSubscribedExchangeCode.current &&
+                !profileData?.exchange
+              ) {
+                setupExchangeStatusSubscription(null);
+              }
             }
           } else {
             console.error(
-              `[useStockData ${symbol}] Zod validation (realtime) for live_quote_indicators failed:`,
+              `[useStockData ${symbol} - ${instanceIdRef.current}] Zod validation (realtime) for live_quote_indicators failed:`,
               validation.error.flatten(),
               "Payload:",
               payload.new
@@ -640,25 +778,18 @@ export function useStockData({
         },
         (status: LiveQuoteSubscriptionStatus, err?: Error) => {
           if (!isMountedRef.current || !quoteSubActive) return;
-          if (process.env.NODE_ENV === "development") {
-            console.debug(
-              `[useStockData ${symbol}] Live quote channel status: ${status}`,
-              err || ""
-            );
-          }
           if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
             if (isMountedRef.current) {
               setDerivedMarketStatus("Error");
-              setMarketStatusMessage("Live quote connection issue.");
+              setMarketStatusMessage(
+                `Live quote connection issue for ${symbol}. Retrying...`
+              );
             }
           } else if (status === "CLOSED" && isMountedRef.current) {
-            console.warn(
-              `[useStockData ${symbol}] Live quote channel closed unexpectedly.`
-            );
             if (isMountedRef.current) {
               setDerivedMarketStatus("Connecting");
               setMarketStatusMessage(
-                "Live quote connection interrupted. Reconnecting..."
+                `Live quote for ${symbol} connection interrupted. Attempting to reconnect...`
               );
             }
           }
@@ -674,7 +805,7 @@ export function useStockData({
         liveQuoteUnsubscribeRef.current = null;
       }
     };
-  }, [symbol, onLiveQuoteUpdate, setupExchangeStatusSubscription]);
+  }, [symbol, onLiveQuoteUpdate, setupExchangeStatusSubscription, profileData]);
 
   return { derivedMarketStatus, marketStatusMessage };
 }

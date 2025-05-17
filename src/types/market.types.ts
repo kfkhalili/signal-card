@@ -1,8 +1,7 @@
 // src/types/market.types.ts
 export interface FmpMarketHoliday {
-  // If you want to type the raw_holidays_json
   year: number;
-  [holidayName: string]: string | number;
+  [holidayName: string]: string | number; // Date string (YYYY-MM-DD) or year number
 }
 
 export interface ExchangeMarketStatusRecord {
@@ -15,6 +14,6 @@ export interface ExchangeMarketStatusRecord {
   status_message?: string | null;
   current_day_is_holiday?: boolean | null;
   current_holiday_name?: string | null;
-  raw_holidays_json?: FmpMarketHoliday[] | null;
+  raw_holidays_json?: FmpMarketHoliday[] | null; // Changed to FmpMarketHoliday[]
   last_fetched_at: string; // ISO string
 }

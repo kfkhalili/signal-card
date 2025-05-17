@@ -4,7 +4,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { format } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 import {
   AddCardForm,
@@ -27,17 +26,13 @@ import {
 
 import "@/components/game/cards/rehydrators";
 import ActiveCardsSection from "@/components/game/ActiveCardsSection";
-import type {
-  CombinedQuoteData,
-  MarketStatusDisplayHook,
-  // ProfileDBRow, // Not directly used here
-} from "@/hooks/useStockData";
+import type { DerivedMarketStatus } from "@/hooks/useStockData";
 import type { CardActionContext } from "@/components/game/cards/base-card/base-card.types";
 import type { ProfileCardInteractionCallbacks } from "@/components/game/cards/profile-card/profile-card.types";
+import type { PriceCardInteractionCallbacks } from "@/components/game/cards/price-card/price-card.types";
 
 export default function WorkspacePage() {
   const { user, isLoading: isAuthLoading } = useAuth();
-  const supabase = createSupabaseBrowserClient();
 
   const [hasMounted, setHasMounted] = useState(false);
   useEffect(() => {
@@ -56,8 +51,7 @@ export default function WorkspacePage() {
     isAddingCardInProgress,
     addCardToWorkspace,
     clearWorkspace,
-    processLiveQuote,
-    processStaticProfileUpdate,
+    stockDataCallbacks,
     uniqueSymbolsInWorkspace,
   } = useWorkspaceManager({ isPremiumUser });
 
@@ -65,24 +59,18 @@ export default function WorkspacePage() {
     Record<
       string,
       {
-        status: MarketStatusDisplayHook;
+        status: DerivedMarketStatus;
         message: string | null;
-        timestamp: number | null;
       }
     >
   >({});
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState<boolean>(false);
 
   const handleMarketStatusChange = useCallback(
-    (
-      symbol: string,
-      status: MarketStatusDisplayHook,
-      message: string | null,
-      timestamp: number | null
-    ) => {
+    (symbol: string, status: DerivedMarketStatus, message: string | null) => {
       setMarketStatuses((prev) => ({
         ...prev,
-        [symbol]: { status, message, timestamp },
+        [symbol]: { status, message },
       }));
     },
     []
@@ -118,8 +106,15 @@ export default function WorkspacePage() {
 
   const profileInteractions: ProfileCardInteractionCallbacks = {
     onRequestPriceCard: handleRequestPriceCard,
-    // Add other interactions like onWebsiteClick, onFilterByField here if needed
   };
+
+  const priceSpecificInteractions: Pick<
+    PriceCardInteractionCallbacks,
+    | "onPriceCardSmaClick"
+    | "onPriceCardRangeContextClick"
+    | "onPriceCardOpenPriceClick"
+    | "onPriceCardGenerateDailyPerformanceSignal"
+  > = {};
 
   if (!hasMounted || isAuthLoading) {
     return (
@@ -131,6 +126,16 @@ export default function WorkspacePage() {
       </div>
     );
   }
+
+  // if (process.env.NODE_ENV === 'development') {
+  //   console.log("[WorkspacePage] Rendering. stockDataCallbacks object:", stockDataCallbacks);
+  //   if (stockDataCallbacks) {
+  //     console.log("[WorkspacePage] typeof stockDataCallbacks.onLiveQuoteUpdate:", typeof stockDataCallbacks.onLiveQuoteUpdate);
+  //     console.log("[WorkspacePage] typeof stockDataCallbacks.onProfileUpdate:", typeof stockDataCallbacks.onProfileUpdate);
+  //   } else {
+  //     console.log("[WorkspacePage] stockDataCallbacks is undefined or null!");
+  //   }
+  // }
 
   return (
     <div className="space-y-6 pb-10">
@@ -157,15 +162,20 @@ export default function WorkspacePage() {
         </div>
       </div>
 
-      {uniqueSymbolsInWorkspace.map((s) => (
-        <StockDataHandler
-          key={`handler-${s}`}
-          symbol={s}
-          onQuoteReceived={processLiveQuote}
-          onStaticProfileUpdate={processStaticProfileUpdate}
-          onMarketStatusChange={handleMarketStatusChange}
-        />
-      ))}
+      {uniqueSymbolsInWorkspace.map((s) => {
+        if (!stockDataCallbacks) {
+          return null;
+        }
+        return (
+          <StockDataHandler
+            key={`handler-${s}`}
+            symbol={s}
+            onQuoteReceived={stockDataCallbacks.onLiveQuoteUpdate}
+            onStaticProfileUpdate={stockDataCallbacks.onProfileUpdate}
+            onMarketStatusChange={handleMarketStatusChange}
+          />
+        );
+      })}
 
       {activeCards.length > 0 && uniqueSymbolsInWorkspace.length > 0 && (
         <div className="px-2 sm:px-4 text-center py-2 bg-card border text-card-foreground rounded-md text-xs sm:text-sm shadow max-h-48 overflow-y-auto">
@@ -181,6 +191,8 @@ export default function WorkspacePage() {
                 </p>
               );
             if (!statusInfo && isAddingCardInProgress) return null;
+            if (!statusInfo) return null;
+
             return (
               <div key={`status-${s}`} className="text-xs mb-0.5">
                 <strong>{s}:</strong> {statusInfo.status}
@@ -189,12 +201,6 @@ export default function WorkspacePage() {
                     ({String(statusInfo.message)})
                   </span>
                 )}
-                {statusInfo.timestamp &&
-                  !isNaN(new Date(statusInfo.timestamp * 1000).getTime()) && (
-                    <span className="block text-muted-foreground/80">
-                      Last: {format(new Date(statusInfo.timestamp * 1000), "p")}
-                    </span>
-                  )}
               </div>
             );
           })}
@@ -242,7 +248,8 @@ export default function WorkspacePage() {
             activeCards={activeCards}
             setActiveCards={setActiveCards}
             profileSpecificInteractions={profileInteractions}
-            onHeaderIdentityClick={handleRequestProfileCard} // For clicking any card header
+            priceSpecificInteractions={priceSpecificInteractions}
+            onHeaderIdentityClick={handleRequestProfileCard}
           />
         )}
       </div>

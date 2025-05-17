@@ -26,14 +26,14 @@ export default function AuthForm() {
   // which should be triggered by Next.js Link navigations, even for hash-only changes.
   useEffect(() => {
     const currentHash = window.location.hash;
-    if (process.env.NODE_ENV === "development") {
-      console.debug(
-        "[AuthForm] useEffect[pathname, searchParams] - Hash:",
-        currentHash,
-        "Pathname:",
-        pathname
-      );
-    }
+    // if (process.env.NODE_ENV === "development") {
+    //   console.debug(
+    //     "[AuthForm] useEffect[pathname, searchParams] - Hash:",
+    //     currentHash,
+    //     "Pathname:",
+    //     pathname
+    //   );
+    // }
 
     let newView: AuthViewType = "sign_in"; // Default view
     if (currentHash === "#auth-sign-up") {
@@ -45,9 +45,9 @@ export default function AuthForm() {
     // Only update state if the determined view is different from the current state
     // This prevents potential infinite loops if the effect runs multiple times with the same hash
     if (authView !== newView) {
-      if (process.env.NODE_ENV === "development") {
-        console.debug("[AuthForm] Setting authView from effect to:", newView);
-      }
+      // if (process.env.NODE_ENV === "development") {
+      //   console.debug("[AuthForm] Setting authView from effect to:", newView);
+      // }
       setAuthView(newView);
     }
   }, [pathname, searchParams, authView]); // include authView to prevent loops if set to same value
@@ -56,12 +56,12 @@ export default function AuthForm() {
   useEffect(() => {
     const handleDirectHashChange = () => {
       const directHash = window.location.hash;
-      if (process.env.NODE_ENV === "development") {
-        console.debug(
-          "[AuthForm] 'hashchange' event. Direct Hash:",
-          directHash
-        );
-      }
+      // if (process.env.NODE_ENV === "development") {
+      //   console.debug(
+      //     "[AuthForm] 'hashchange' event. Direct Hash:",
+      //     directHash
+      //   );
+      // }
       let freshNewView: AuthViewType = "sign_in";
       if (directHash === "#auth-sign-up") {
         freshNewView = "sign_up";
@@ -71,12 +71,12 @@ export default function AuthForm() {
 
       setAuthView((prev) => {
         if (prev !== freshNewView) {
-          if (process.env.NODE_ENV === "development") {
-            console.debug(
-              "[AuthForm] Setting authView from hashchange listener to:",
-              freshNewView
-            );
-          }
+          // if (process.env.NODE_ENV === "development") {
+          //   console.debug(
+          //     "[AuthForm] Setting authView from hashchange listener to:",
+          //     freshNewView
+          //   );
+          // }
           return freshNewView;
         }
         return prev;
@@ -122,14 +122,14 @@ export default function AuthForm() {
     };
   }, [supabase, router, searchParams]); // searchParams is now a dependency here too
 
-  if (process.env.NODE_ENV === "development") {
-    console.debug(
-      "[AuthForm] Rendering with authView:",
-      authView,
-      "and key:",
-      authView
-    );
-  }
+  // if (process.env.NODE_ENV === "development") {
+  //   console.debug(
+  //     "[AuthForm] Rendering with authView:",
+  //     authView,
+  //     "and key:",
+  //     authView
+  //   );
+  // }
 
   return (
     // The parent div in src/app/auth/page.tsx handles the styling like max-width, padding, bg-card etc.

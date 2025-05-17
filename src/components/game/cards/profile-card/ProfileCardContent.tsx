@@ -23,7 +23,6 @@ import {
   type SectorName,
 } from "@/components/workspace/SectorIconDisplay";
 
-// Helper function to truncate text
 const truncateText = (
   text: string | null | undefined,
   maxLength: number
@@ -43,34 +42,11 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
   ({ cardData, isBackFace, interactionCallbacks }) => {
     const { staticData, liveData, symbol, companyName } = cardData;
 
-    // Debugging log for interactionCallbacks
-    if (!isBackFace) {
-      if (process.env.NODE_ENV === "development") {
-        console.debug(
-          `[ProfileCardContent - ${symbol} FRONT] Received interactionCallbacks:`,
-          interactionCallbacks
-        );
-      }
-      if (interactionCallbacks) {
-        if (process.env.NODE_ENV === "development") {
-          console.debug(
-            `[ProfileCardContent - ${symbol} FRONT] interactionCallbacks.onRequestPriceCard:`,
-            interactionCallbacks.onRequestPriceCard
-          );
-          console.debug(
-            `[ProfileCardContent - ${symbol} FRONT] Is price item interactive?:`,
-            !!interactionCallbacks.onRequestPriceCard
-          );
-        }
-      }
-    }
-
-    const handleWebsiteClick = (e: React.MouseEvent | React.KeyboardEvent) => {
-      if (staticData.website && interactionCallbacks?.onWebsiteClick) {
-        e.stopPropagation();
-        interactionCallbacks.onWebsiteClick(staticData.website);
-      }
-    };
+    // if (!isBackFace && process.env.NODE_ENV === 'development') {
+    //   console.log(`[ProfileCardContent ${symbol} FRONT] Rendering. CardData:`, JSON.stringify(cardData));
+    //   console.log(`[ProfileCardContent ${symbol} FRONT] LiveData for rendering:`, JSON.stringify(liveData));
+    //   console.log(`[ProfileCardContent ${symbol} FRONT] LiveData.price for rendering:`, liveData?.price);
+    // }
 
     const handlePriceNavigate = (e: React.MouseEvent | React.KeyboardEvent) => {
       if (interactionCallbacks?.onRequestPriceCard) {
@@ -80,13 +56,8 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
           symbol,
           type: cardData.type,
           companyName,
-          websiteUrl: staticData.website,
+          websiteUrl: staticData?.website,
         });
-      } else {
-        // This else block is for debugging - if it's not clickable, this will log
-        console.warn(
-          `[ProfileCardContent - ${symbol}] handlePriceNavigate called, but onRequestPriceCard is not available.`
-        );
       }
     };
 
@@ -101,12 +72,11 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
       }
     };
 
-    // --- FRONT FACE ---
     if (!isBackFace) {
       const taglineSource =
-        staticData.short_description || staticData.description;
-      const countryFlag = getFlagEmoji(staticData.country);
-      const fullCountryName = staticData.country
+        staticData?.short_description || staticData?.description;
+      const countryFlag = getFlagEmoji(staticData?.country);
+      const fullCountryName = staticData?.country
         ? getCountryName(staticData.country)
         : "N/A";
 
@@ -128,29 +98,29 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
               <ClickableDataItem
                 isInteractive={
                   !!interactionCallbacks?.onFilterByField &&
-                  !!staticData.industry
+                  !!staticData?.industry
                 }
                 onClickHandler={(e) =>
-                  handleFilterClick(e, "industry", staticData.industry)
+                  handleFilterClick(e, "industry", staticData?.industry)
                 }
-                title={`Industry: ${staticData.industry || "N/A"}${
-                  staticData.sector ? ` (Sector: ${staticData.sector})` : ""
+                title={`Industry: ${staticData?.industry || "N/A"}${
+                  staticData?.sector ? ` (Sector: ${staticData.sector})` : ""
                 }`}
                 baseClassName="flex items-center min-w-0 gap-1.5"
                 interactiveClassName="hover:text-primary cursor-pointer"
                 aria-label={`Filter by industry: ${
-                  staticData.industry || "N/A"
+                  staticData?.industry || "N/A"
                 }`}>
                 <SectorIconDisplay
-                  sector={staticData.sector as SectorName}
+                  sector={staticData?.sector as SectorName}
                   iconSize={14}
                 />
                 <span className="truncate text-foreground">
-                  {truncateText(staticData.industry, 28)}
+                  {truncateText(staticData?.industry, 28)}
                 </span>
               </ClickableDataItem>
 
-              {staticData.country && (
+              {staticData?.country && (
                 <div
                   className="flex items-center gap-1.5 pt-0.5 cursor-default"
                   aria-label={`Country: ${fullCountryName}`}>
@@ -163,7 +133,7 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
                 </div>
               )}
 
-              {staticData.formatted_full_time_employees && (
+              {staticData?.formatted_full_time_employees && (
                 <div
                   className="flex items-center text-muted-foreground min-w-0 pt-0.5"
                   title={`${staticData.formatted_full_time_employees} employees`}>
@@ -176,44 +146,42 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
             </div>
           </ShadCardContent>
 
-          {/* Footer Area: Links & Flags */}
           <div className="px-0 pt-1">
             <div className="flex justify-between items-center text-xs mb-0.5">
               <ClickableDataItem
                 isInteractive={!!interactionCallbacks?.onRequestPriceCard}
                 onClickHandler={handlePriceNavigate}
                 baseClassName="py-0.5"
-                // Ensure cursor-pointer is part of interactive class for visual feedback
                 interactiveClassName="hover:text-primary cursor-pointer"
                 aria-label={`Request Price Card for ${symbol}`}>
                 <div className="flex items-center">
                   <TrendingUp size={14} className="mr-1 shrink-0" />
                   <span className="font-semibold text-sm">
-                    {staticData.currency === "USD"
+                    {staticData?.currency === "USD"
                       ? "$"
-                      : staticData.currency || "$"}
-                    {liveData.price?.toFixed(2) ?? "N/A"}
+                      : staticData?.currency || "$"}
+                    {liveData?.price?.toFixed(2) ?? "N/A"}
                   </span>
                 </div>
               </ClickableDataItem>
               <div></div>
             </div>
             <div className="flex flex-wrap gap-0.5 justify-end">
-              {staticData.is_etf && (
+              {staticData?.is_etf && (
                 <Badge
                   variant="outline"
                   className="px-1 py-0 text-[9px] leading-tight">
                   ETF
                 </Badge>
               )}
-              {staticData.is_adr && (
+              {staticData?.is_adr && (
                 <Badge
                   variant="outline"
                   className="px-1 py-0 text-[9px] leading-tight">
                   ADR
                 </Badge>
               )}
-              {staticData.is_fund && (
+              {staticData?.is_fund && (
                 <Badge
                   variant="outline"
                   className="px-1 py-0 text-[9px] leading-tight">
@@ -225,9 +193,6 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
         </div>
       );
     } else {
-      // --- BACK FACE ---
-      // No company description snippet on the back.
-      // cardData.backData.description holds generic card type info, not rendered here.
       return (
         <div
           data-testid={`profile-card-back-${symbol}`}
@@ -237,7 +202,7 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
               Company Highlights
             </h4>
             <div className="space-y-1">
-              {staticData.ceo && (
+              {staticData?.ceo && (
                 <div
                   className="flex items-start min-w-0"
                   title={`CEO: ${staticData.ceo}`}>
@@ -255,7 +220,7 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
                   </div>
                 </div>
               )}
-              {staticData.formatted_ipo_date && (
+              {staticData?.formatted_ipo_date && (
                 <div
                   className="flex items-start min-w-0"
                   title={`IPO: ${staticData.formatted_ipo_date}`}>
@@ -273,7 +238,7 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
                   </div>
                 </div>
               )}
-              {staticData.exchange_full_name && (
+              {staticData?.exchange_full_name && (
                 <ClickableDataItem
                   isInteractive={
                     !!interactionCallbacks?.onFilterByField &&
@@ -307,7 +272,7 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
             </div>
           </ShadCardContent>
           <div className="px-0 pt-0.5 text-center">
-            {staticData.profile_last_updated && (
+            {staticData?.profile_last_updated && (
               <p className="text-[9px] text-muted-foreground/80 leading-tight">
                 Profile as of: {staticData.profile_last_updated}
               </p>

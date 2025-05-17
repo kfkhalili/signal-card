@@ -5,9 +5,9 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
 
-  if (process.env.NODE_ENV === "development") {
-    console.debug(`[Middleware] Auth logic executing for path: ${pathname}`);
-  }
+  // if (process.env.NODE_ENV === "development") {
+  //   console.debug(`[Middleware] Auth logic executing for path: ${pathname}`);
+  // }
 
   let supabaseResponse = NextResponse.next({
     request,
@@ -51,29 +51,29 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     error: getUserError,
   } = await supabase.auth.getUser();
 
-  if (process.env.NODE_ENV === "development") {
-    console.debug(
-      "[Middleware] User object from supabase.auth.getUser():",
-      user
-    );
-  }
+  // if (process.env.NODE_ENV === "development") {
+  //   console.debug(
+  //     "[Middleware] User object from supabase.auth.getUser():",
+  //     user
+  //   );
+  // }
 
-  if (getUserError) {
-    if (process.env.NODE_ENV === "development") {
-      console.debug(
-        "[Middleware] Error from supabase.auth.getUser() (this might be expected if no session):",
-        getUserError.message
-      );
-    }
-  }
+  // if (getUserError) {
+  //   if (process.env.NODE_ENV === "development") {
+  //     console.debug(
+  //       "[Middleware] Error from supabase.auth.getUser() (this might be expected if no session):",
+  //       getUserError.message
+  //     );
+  //   }
+  // }
 
   // Redirect logic for protected routes
   if (!user && !(pathname.startsWith("/auth") || pathname === "/")) {
-    if (process.env.NODE_ENV === "development") {
-      console.debug(
-        `[Middleware] Redirect condition met: No user, and path is "${pathname}". Redirecting to /auth.`
-      );
-    }
+    // if (process.env.NODE_ENV === "development") {
+    //   console.debug(
+    //     `[Middleware] Redirect condition met: No user, and path is "${pathname}". Redirecting to /auth.`
+    //   );
+    // }
     const url = request.nextUrl.clone();
     url.pathname = "/auth";
     url.searchParams.set("message", "Please log in to access this page.");
