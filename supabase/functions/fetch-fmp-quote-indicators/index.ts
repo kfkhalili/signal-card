@@ -2,76 +2,60 @@
 import {
   createClient,
   SupabaseClient,
-} from "https://esm.sh/@supabase/supabase-js@2.49.4";
+} from "https://esm.sh/@supabase/supabase-js@2.49.4"; // Or your project's current version
 
-const corsHeaders = {
+const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
 
-interface FmpMarketHours {
-  openingHour: string;
-  closingHour: string;
-}
-
-interface FmpMarketHoliday {
-  year: number;
-  [holidayName: string]: string | number;
-}
-
-interface FmpMarketStatus {
-  stockExchangeName: string;
-  stockMarketHours: FmpMarketHours;
-  stockMarketHolidays: FmpMarketHoliday[];
-  isTheStockMarketOpen: boolean;
-  isTheEuronextMarketOpen?: boolean;
-  isTheForexMarketOpen?: boolean;
-  isTheCryptoMarketOpen?: boolean;
-}
-
+// Interface for FMP Quote Data (matches your Edge Function's current FmpQuoteData)
 interface FmpQuoteData {
   symbol: string;
-  name: string;
+  name?: string; // Optional, as it's primarily in profiles table
   price: number;
-  changePercentage?: number | null;
+  changesPercentage?: number | null; // FMP uses 'changesPercentage' sometimes
+  changePercentage?: number | null; // And sometimes 'changePercentage'
   change: number;
   volume: number;
   dayLow: number;
   dayHigh: number;
   yearHigh?: number | null;
   yearLow?: number | null;
-  marketCap: number;
+  marketCap: number | null;
   priceAvg50?: number | null;
   priceAvg200?: number | null;
-  exchange?: string;
+  exchange?: string; // This is the key for linking to exchange_market_status
   open: number;
   previousClose: number;
-  timestamp: number;
+  timestamp: number; // Unix timestamp (seconds) from FMP
 }
 
+// Interface for the record to be upserted into your live_quote_indicators table
+// This now matches your DDL *after* the proposed alterations.
 interface LiveQuoteIndicatorRecord {
+  // id: string; // Not needed for upsert if using symbol as conflict target
   symbol: string;
   current_price: number;
   change_percentage?: number | null;
-  day_change: number;
-  day_low: number;
-  day_high: number;
-  year_high?: number | null;
-  year_low?: number | null;
-  market_cap: number;
-  day_open: number;
-  previous_close: number;
-  api_timestamp: number;
-  volume: number;
+  day_change: number | null; // Made nullable to match DDL more closely if FMP `change` can be null
+  volume: number | null; // Made nullable
+  day_low: number | null; // Made nullable
+  day_high: number | null; // Made nullable
+  market_cap: number | null; // bigint in DDL maps to number, can be null
+  day_open: number | null; // Made nullable
+  previous_close: number | null; // Made nullable
+  api_timestamp: number; // bigint in DDL, from FMP (seconds)
   sma_50d?: number | null;
   sma_200d?: number | null;
-  fetched_at: string;
-  is_market_open: boolean;
-  market_status_message: string;
-  market_exchange_name: string;
+  fetched_at: string; // ISO string for timestamptz
+  year_high?: number | null;
+  year_low?: number | null;
+  exchange?: string | null; // New column to store FMP's 'exchange'
 }
 
+// Symbols to process - keep this list updated or fetch dynamically
 const SYMBOLS_TO_PROCESS: string[] = [
   "AAPL",
   "MSFT",
@@ -79,11 +63,13 @@ const SYMBOLS_TO_PROCESS: string[] = [
   "TSLA",
   "NVDA",
   "AMD",
-  "BTC",
+  "BTCUSD",
+  "ETHUSD",
+  "ADAUSD",
 ];
 
 console.log(
-  `Function "fetch-fmp-quote-indicators" up and running for symbols: ${SYMBOLS_TO_PROCESS.join(
+  `Function "fetch-fmp-quote-indicators" (schema-aligned) up and running for symbols: ${SYMBOLS_TO_PROCESS.join(
     ", "
   )}`
 );
@@ -91,7 +77,7 @@ console.log(
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
-  return "An unknown error occurred";
+  return "An unknown error occurred.";
 }
 
 function censorApiKey(url: string, apiKey: string | undefined): string {
@@ -100,237 +86,239 @@ function censorApiKey(url: string, apiKey: string | undefined): string {
   return url.replace(apiKeyPattern, "$1[CENSORED_API_KEY]$3");
 }
 
-async function fetchAndProcessSymbol(
-  symbol: string,
+async function fetchAndProcessSymbolQuote(
+  symbolToRequest: string, // The symbol we intend to fetch
   fmpApiKey: string,
   supabaseAdmin: SupabaseClient
 ): Promise<{ symbol: string; success: boolean; message: string }> {
   try {
-    // 1. Fetch Quote Data for the individual symbol
-    // Ensure you are using the correct FMP endpoint.
-    // If `/stable/quote` returns an array even for one symbol, we take the first element.
-    // If it returns a single object, the .json() parsing will handle it.
-    const quoteUrl = `https://financialmodelingprep.com/stable/quote?symbol=${symbol}&apikey=${fmpApiKey}`; // Or other appropriate FMP endpoint
+    // FMP's /api/v3/quote/ endpoint is good for single or multiple symbols
+    // FMP's /api/v3/quote-short/ is also an option for fewer fields
+    const quoteUrl = `https://financialmodelingprep.com/api/v3/quote/${symbolToRequest}?apikey=${fmpApiKey}`;
 
-    console.log(
-      `Fetching quote for ${symbol} from: ${censorApiKey(quoteUrl, fmpApiKey)}`
-    );
+    if (Deno.env.get("ENV_CONTEXT") === "DEV") {
+      console.log(
+        `Workspaceing quote for ${symbolToRequest} from: ${censorApiKey(
+          quoteUrl,
+          fmpApiKey
+        )}`
+      );
+    }
 
     const quoteResponse = await fetch(quoteUrl);
     if (!quoteResponse.ok) {
       throw new Error(
-        `Failed to fetch quote data for ${symbol}: ${
+        `Failed to fetch quote data for ${symbolToRequest}: ${
           quoteResponse.status
         } ${await quoteResponse.text()}`
       );
     }
 
-    // FMP's /stable/quote (and /api/v3/quote/) typically returns an array, even for a single symbol.
-    const fmpQuoteArray: FmpQuoteData[] = await quoteResponse.json();
-    if (!Array.isArray(fmpQuoteArray) || fmpQuoteArray.length === 0) {
-      throw new Error(`No quote data array from FMP for ${symbol}.`);
-    }
-    const quoteData = fmpQuoteArray[0];
-    if (!quoteData) {
-      throw new Error(`Empty quote data object from FMP for ${symbol}.`);
-    }
-    // Ensure the symbol in the response matches the requested symbol, in case of any API nuances
-    if (quoteData.symbol.toUpperCase() !== symbol.toUpperCase()) {
-      console.warn(
-        `FMP returned data for ${quoteData.symbol} when ${symbol} was requested. Proceeding with FMP's symbol.`
-      );
-      // Or throw an error: throw new Error(`FMP returned data for ${quoteData.symbol} when ${symbol} was requested.`);
+    const fmpQuoteResult: FmpQuoteData[] | FmpQuoteData =
+      await quoteResponse.json();
+    let quoteData: FmpQuoteData;
+
+    // FMP /quote/SYMBOL typically returns an array even for one symbol.
+    if (Array.isArray(fmpQuoteResult)) {
+      if (fmpQuoteResult.length === 0) {
+        throw new Error(
+          `No quote data array returned from FMP for ${symbolToRequest}.`
+        );
+      }
+      quoteData = fmpQuoteResult[0];
+    } else if (typeof fmpQuoteResult === "object" && fmpQuoteResult !== null) {
+      // Handle cases where FMP might return a single object if URL was /api/v3/quote/SYMBOL directly
+      quoteData = fmpQuoteResult;
+    } else {
+      throw new Error(`Unexpected FMP response format for ${symbolToRequest}.`);
     }
 
+    if (!quoteData || !quoteData.symbol) {
+      throw new Error(
+        `Empty or invalid quote data object from FMP for ${symbolToRequest}. Payload: ${JSON.stringify(
+          quoteData
+        )}`
+      );
+    }
+
+    // Use the symbol returned by FMP as it might be canonical (e.g., BTCUSD vs BTC-USD)
+    const actualFmpSymbol = quoteData.symbol;
+
+    // Basic validation for essential numeric fields and timestamp
     if (
-      typeof quoteData.price !== "number" ||
-      typeof quoteData.change !== "number" ||
-      typeof quoteData.previousClose !== "number" ||
-      typeof quoteData.timestamp !== "number" ||
+      typeof quoteData.price !== "number" || // price is NOT NULL in your DDL
+      typeof quoteData.timestamp !== "number" || // api_timestamp is NOT NULL
       quoteData.timestamp <= 0
     ) {
       throw new Error(
-        `Invalid core numeric data or timestamp in quote for ${quoteData.symbol}. Price: ${quoteData.price}, Timestamp: ${quoteData.timestamp}`
+        `Invalid essential numeric data or timestamp in quote for ${actualFmpSymbol}. Price: ${quoteData.price}, Timestamp: ${quoteData.timestamp}`
       );
     }
-    console.log(
-      `Processing data for ${quoteData.symbol}: Price=${quoteData.price}`
-    );
-
-    const exchange = quoteData.exchange || "NASDAQ"; // Default to NASDAQ if not provided
-    let marketExchangeName = quoteData.exchange || "NASDAQ";
-
-    const marketStatusUrl = `https://financialmodelingprep.com/api/v3/is-the-market-open?exchange=${exchange}&apikey=${fmpApiKey}`;
-    let isMarketOpen = false;
-    let marketStatusMessage = "Status unknown";
-
-    try {
-      const marketStatusResponse = await fetch(marketStatusUrl);
-      if (marketStatusResponse.ok) {
-        const statusData: FmpMarketStatus = await marketStatusResponse.json();
-        isMarketOpen = statusData.isTheStockMarketOpen;
-        marketExchangeName = statusData.stockExchangeName || exchange;
-        marketStatusMessage = isMarketOpen
-          ? "Market is Open"
-          : `Market is Closed (${marketExchangeName})`;
-
-        if (
-          !isMarketOpen &&
-          statusData.stockMarketHolidays &&
-          statusData.stockMarketHolidays.length > 0
-        ) {
-          const today = new Date();
-          const todayStr = `${today.getFullYear()}-${(today.getMonth() + 1)
-            .toString()
-            .padStart(2, "0")}-${today.getDate().toString().padStart(2, "0")}`;
-
-          for (const yearHolidays of statusData.stockMarketHolidays) {
-            if (yearHolidays.year === today.getFullYear()) {
-              for (const holidayName in yearHolidays) {
-                if (
-                  holidayName !== "year" &&
-                  yearHolidays[holidayName] === todayStr
-                ) {
-                  marketStatusMessage = `Market is Closed (Holiday: ${holidayName
-                    .replace(/([A-Z])/g, " $1")
-                    .trim()})`;
-                  break;
-                }
-              }
-            }
-            if (marketStatusMessage.includes("Holiday")) break;
-          }
-        }
-      } else {
-        const errorText = await marketStatusResponse.text();
-        console.warn(
-          `Failed to fetch market status for ${quoteData.symbol} (exchange: ${exchange}): ${marketStatusResponse.status} ${errorText}`
-        );
-        marketStatusMessage = "Failed to fetch market status";
-      }
-    } catch (statusError) {
-      console.warn(
-        `Error fetching market status for ${
-          quoteData.symbol
-        } (exchange: ${exchange}): ${getErrorMessage(statusError)}`
+    if (Deno.env.get("ENV_CONTEXT") === "DEV") {
+      console.log(
+        `Processing data for ${actualFmpSymbol}: Price=${quoteData.price}, Exchange: ${quoteData.exchange}`
       );
-      marketStatusMessage = "Error fetching market status";
     }
 
+    // Prepare the record for upsert, matching your DDL structure
     const recordToUpsert: LiveQuoteIndicatorRecord = {
-      symbol: quoteData.symbol, // Use symbol from quoteData which might be canonical (e.g. BTCUSD vs BTC)
+      symbol: actualFmpSymbol, // Use symbol from FMP response
       current_price: quoteData.price,
-      change_percentage: quoteData.changePercentage,
-      day_change: quoteData.change,
-      day_low: quoteData.dayLow,
-      day_high: quoteData.dayHigh,
-      year_high: quoteData.yearHigh,
-      year_low: quoteData.yearLow,
-      market_cap: quoteData.marketCap,
-      day_open: quoteData.open,
-      previous_close: quoteData.previousClose,
-      api_timestamp: quoteData.timestamp,
-      volume: quoteData.volume,
-      sma_50d: quoteData.priceAvg50,
-      sma_200d: quoteData.priceAvg200,
+      // Use `changesPercentage` if available, else `changePercentage` (FMP can be inconsistent)
+      change_percentage:
+        quoteData.changesPercentage ?? quoteData.changePercentage ?? null,
+      day_change:
+        typeof quoteData.change === "number" ? quoteData.change : null,
+      day_low: typeof quoteData.dayLow === "number" ? quoteData.dayLow : null,
+      day_high:
+        typeof quoteData.dayHigh === "number" ? quoteData.dayHigh : null,
+      year_high:
+        typeof quoteData.yearHigh === "number" ? quoteData.yearHigh : null,
+      year_low:
+        typeof quoteData.yearLow === "number" ? quoteData.yearLow : null,
+      market_cap:
+        typeof quoteData.marketCap === "number" ? quoteData.marketCap : null,
+      day_open: typeof quoteData.open === "number" ? quoteData.open : null,
+      previous_close:
+        typeof quoteData.previousClose === "number"
+          ? quoteData.previousClose
+          : null,
+      api_timestamp: quoteData.timestamp, // This is seconds from FMP
+      volume: typeof quoteData.volume === "number" ? quoteData.volume : null,
+      sma_50d:
+        typeof quoteData.priceAvg50 === "number" ? quoteData.priceAvg50 : null,
+      sma_200d:
+        typeof quoteData.priceAvg200 === "number"
+          ? quoteData.priceAvg200
+          : null,
       fetched_at: new Date().toISOString(),
-      is_market_open: isMarketOpen,
-      market_status_message: marketStatusMessage,
-      market_exchange_name: marketExchangeName,
+      exchange: quoteData.exchange || null, // Store the exchange code from FMP
     };
 
     const { error: upsertError } = await supabaseAdmin
       .from("live_quote_indicators")
-      .upsert(recordToUpsert, { onConflict: "symbol" }); // onConflict should use the symbol from recordToUpsert
+      .upsert(recordToUpsert, { onConflict: "symbol" }); // Upsert based on the symbol
 
     if (upsertError) {
+      console.error("Supabase upsert error details:", upsertError);
       throw new Error(
         `Supabase upsert failed for ${recordToUpsert.symbol}: ${upsertError.message}`
       );
     }
-    console.log(`Successfully upserted data for ${recordToUpsert.symbol}.`);
+
+    if (Deno.env.get("ENV_CONTEXT") === "DEV") {
+      console.log(
+        `Successfully upserted quote data for ${recordToUpsert.symbol}.`
+      );
+    }
     return {
       symbol: recordToUpsert.symbol,
       success: true,
-      message: `Data processed for ${recordToUpsert.symbol}.`,
+      message: `Quote data processed for ${recordToUpsert.symbol}.`,
     };
   } catch (error) {
     const errorMessage = getErrorMessage(error);
     console.error(
-      `Error processing ${symbol}: ${errorMessage}`,
+      `Error processing quote for ${symbolToRequest}: ${errorMessage}`,
       error instanceof Error ? error.stack : ""
     );
     return {
-      symbol: symbol,
+      symbol: symbolToRequest, // Return the symbol we attempted
       success: false,
-      message: `Failed to process ${symbol}: ${errorMessage}`,
+      message: `Failed to process quote for ${symbolToRequest}: ${errorMessage}`,
     };
   }
 }
 
-Deno.serve(async (req) => {
+// --- Main Deno Serve Function ---
+Deno.serve(async (req: Request) => {
+  // ... (OPTIONS handling and initial env var checks remain the same) ...
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: CORS_HEADERS });
   }
+
+  console.log(
+    "Edge function 'fetch-fmp-quote-indicators' (schema-aligned) invoked at:",
+    new Date().toISOString()
+  );
 
   const fmpApiKey = Deno.env.get("FMP_API_KEY");
   if (!fmpApiKey) {
     console.error("Missing FMP_API_KEY environment variable.");
     return new Response(
-      JSON.stringify({ error: "Missing FMP_API_KEY environment variable." }),
+      JSON.stringify({
+        error: "Server configuration error: Missing FMP API Key.",
+      }),
       {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
         status: 500,
       }
     );
   }
 
-  const symbolsArray = SYMBOLS_TO_PROCESS;
-  if (!symbolsArray || symbolsArray.length === 0) {
-    const errorMsg = "SYMBOLS_TO_PROCESS array is empty.";
-    console.error(errorMsg);
-    return new Response(JSON.stringify({ error: errorMsg }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
-    });
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !supabaseServiceRoleKey) {
+    console.error("Missing Supabase environment variables.");
+    return new Response(
+      JSON.stringify({
+        error: "Server configuration error: Missing Supabase credentials.",
+      }),
+      {
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        status: 500,
+      }
+    );
   }
 
-  const supabaseAdmin = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+  const supabaseAdmin: SupabaseClient = createClient(
+    supabaseUrl,
+    supabaseServiceRoleKey
   );
+
+  const symbolsToFetch = SYMBOLS_TO_PROCESS;
+  if (!symbolsToFetch || symbolsToFetch.length === 0) {
+    return new Response(
+      JSON.stringify({ message: "No symbols configured to process." }),
+      {
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        status: 200,
+      }
+    );
+  }
 
   const results: Array<{ symbol: string; success: boolean; message: string }> =
     [];
-  let overallSuccess = true;
+  let overallSuccessCount = 0;
 
-  // Loop through each symbol and process it individually
-  for (const symbol of symbolsArray) {
-    // Optional: Add a small delay here if you're concerned about hitting FMP rate limits too quickly,
-    // though for a handful of symbols this might not be necessary.
-    // await new Promise(resolve => setTimeout(resolve, 200)); // e.g., 200ms delay
+  for (const symbol of symbolsToFetch) {
+    // Optional: Add delay if needed for FMP rate limits
+    // if (results.length > 0) await new Promise(resolve => setTimeout(resolve, 200)); // 200ms delay between symbols
 
-    const result = await fetchAndProcessSymbol(
+    const result = await fetchAndProcessSymbolQuote(
       symbol,
       fmpApiKey,
       supabaseAdmin
     );
     results.push(result);
-    if (!result.success) {
-      overallSuccess = false;
+    if (result.success) {
+      overallSuccessCount++;
     }
   }
 
+  const allProcessedSuccessfully =
+    overallSuccessCount === symbolsToFetch.length;
+
   return new Response(
     JSON.stringify({
-      message: overallSuccess
-        ? "All symbols processed."
-        : "Some symbols failed to process.",
+      message: allProcessedSuccessfully
+        ? "All symbol quotes processed successfully."
+        : `Processed ${overallSuccessCount}/${symbolsToFetch.length} symbols successfully. Some failures occurred.`,
       results,
     }),
     {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: overallSuccess ? 200 : 207, // 207 Multi-Status if some failed
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      status: allProcessedSuccessfully ? 200 : 207, // 207 Multi-Status if some failures
     }
   );
 });

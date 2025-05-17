@@ -26,9 +26,7 @@ export interface LiveQuoteIndicatorDBRow {
   previous_close?: number | null;
   sma_50d?: number | null;
   sma_200d?: number | null;
-  is_market_open?: boolean | null;
-  market_status_message?: string | null;
-  market_exchange_name?: string | null;
+  exchange?: string | null;
 }
 
 // Updated Zod schema
@@ -50,9 +48,7 @@ export const LiveQuoteIndicatorDBSchema = z.object({
   sma_50d: z.number().nullable().optional(),
   sma_200d: z.number().nullable().optional(),
   volume: z.number().nullable().optional(),
-  is_market_open: z.boolean().nullable().optional(),
-  market_status_message: z.string().nullable().optional(),
-  market_exchange_name: z.string().nullable().optional(),
+  exchange: z.string().nullable().optional(),
 });
 
 export type LiveQuotePayload =
