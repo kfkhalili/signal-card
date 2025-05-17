@@ -68,7 +68,6 @@ graph TD
     User[End User] -->|Interacts via Browser| Frontend[Next.js Frontend on Vercel]
 
     Frontend -->|API Calls, Auth, Realtime Subscriptions| Supabase[Supabase Backend]
-    Supabase -->|Serves Data, Handles Auth| Frontend
 
     subgraph Supabase
         direction LR
@@ -177,7 +176,7 @@ graph TD
 ### 7.4 Detailed Supabase Backend
 
 - **Data Ingestion & Processing:**
-  - Supabase Edge Functions (e.g., `Workspace-fmp-quote-indicators`, `Workspace-all-exchange-market-status`) are scheduled via `pg_cron` to fetch data from the FMP API.
+  - Supabase Edge Functions (e.g., `fetch-fmp-quote-indicators`, `fetch-all-exchange-market-status`) are scheduled via `pg_cron` to fetch data from the FMP API.
   - This data populates core tables like `public.profiles` (company information) and `public.live_quote_indicators` (live market data).
 - **Real-time Data Propagation:** Changes to key tables (e.g., `live_quote_indicators`, `profiles`) are broadcast using Supabase Realtime. The frontend subscribes to these broadcasts (via `realtime-service.ts`) to update Financial Cards dynamically.
 - **Core Application Database Schema:**
