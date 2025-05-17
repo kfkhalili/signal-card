@@ -41,25 +41,252 @@ FinCard Explorer will operate on a freemium model with revenue generated through
 
 ## 7. Technical Architecture & Development Status
 
-The application is currently in the development phase, being built with a modern, robust technology stack:
+The application is currently in the development phase, being built with a modern, robust technology stack. This section provides a deeper overview of its components and interactions.
 
-- **Frontend & UI:** A responsive and interactive user interface is developed using **Next.js (React)** and styled with **Tailwind CSS**. Component development is accelerated using **Shadcn UI**, which provides a set of reusable and customizable components. The entire frontend codebase is written in **TypeScript**.
+### 7.1 Core Technologies
+
+- **Frontend & UI:**
+  - **Framework:** Next.js 15 (App Router, React Server Components & Client Components) for a responsive and interactive user interface.
+  - **Styling:** Tailwind CSS for utility-first styling.
+  - **Component Library:** Shadcn UI, providing reusable and customizable components.
+  - **Language:** TypeScript for type safety across the frontend.
 - **Hosting:** The Next.js application is hosted on **Vercel**.
-- **Backend & Core Data Management:** **Supabase** serves as the comprehensive backend solution, providing the PostgreSQL database, user authentication (via `auth.users` and a linked `public.user_profiles` table for custom profile data), and serverless functions.
-- **External Data Source & Ingestion:**
-  - Primary data is sourced from the **FinancialModelingPrep (FMP) API**.
-  - **Supabase Edge Functions** are scheduled to run at regular intervals (e.g., every X minutes) to fetch data from specific FMP endpoints:
-    - `https://financialmodelingprep.com/stable/profile?symbol={SYMBOL}` populates the `public.profiles` table, storing detailed company information (name, sector, description, financials, etc.).
-    - `https://financialmodelingprep.com/stable/quote?symbol={SYMBOL}` populates the `public.live_quote_indicators` table, storing live market data (current price, change, volume, SMAs, year high/low, etc.).
-    - `https://financialmodelingprep.com/api/v3/is-the-market-open?exchange={EXCHANGE}` is used to enrich the `public.live_quote_indicators` table with market status information (e.g., `is_market_open`, `market_status_message`).
-  - This architecture allows for future expansion to other data providers.
-- **Real-time Data Propagation:** When the `profiles` and `live_quote_indicators` tables are updated by the edge functions, **Supabase Realtime** capabilities broadcast these changes. Clients subscribe to these broadcasts, ensuring Financial Cards in their workspace reflect live data.
-- **Core Application Tables in Supabase:**
-  - `public.card_snapshots`: Stores immutable snapshots of individual card states, including the underlying `card_data_snapshot` (JSONB), calculated `rarity_level`, and `symbol`. This is central to the "save state" and historical tracking features.
-  - `public.snapshot_comments`: Enables threaded user comments on specific `card_snapshots`.
-  - `public.snapshot_likes`: Manages user likes for `card_snapshots`.
-  - `public.user_collections`: Allows users to curate personal collections of their favorite or most relevant `card_snapshots`.
-- **Testing:** A testing strategy incorporating Jest is being implemented.
+- **Backend & Core Data Management:** **Supabase** serves as the comprehensive backend solution, providing:
+  - PostgreSQL Database
+  - User Authentication (via `auth.users` and a linked `public.user_profiles` table)
+  - Serverless Edge Functions (Deno runtime)
+  - Realtime capabilities
+- **External Data Source:** Primary financial data is sourced from the **FinancialModelingPrep (FMP) API**.
+- **Testing:** A testing strategy incorporating Jest with JSDOM is implemented.
+
+### 7.2 Visual Architecture Overview
+
+#### High-Level System Architecture
+
+```mermaid
+graph TD
+    User[End User] -->|Interacts via Browser| Frontend[Next.js Frontend on Vercel]
+
+    Frontend -->|API Calls, Auth, Realtime Subscriptions| Supabase[Supabase Backend]
+    Supabase -->|Serves Data, Handles Auth| Frontend
+
+    subgraph Supabase
+        direction LR
+        Auth[Auth Service]
+        DB[PostgreSQL Database]
+        EdgeFunctions[Edge Functions]
+        Realtime[Realtime Service]
+    end
+
+    EdgeFunctions -->|Fetches Data| FMP_API[FinancialModelingPrep API]
+    FMP_API -->|Returns Financial Data| EdgeFunctions
+    EdgeFunctions -->|Writes Data| DB
+    DB -->|Broadcasts Changes| Realtime
+    Realtime -->|Pushes Updates| Frontend
+```
+
+```mermaid
+sequenceDiagram
+    participant FMP_API as FinancialModelingPrep API
+    participant EdgeFunc as Supabase Edge Function
+    participant SupaTables as Supabase Tables (e.g., profiles, live_quote_indicators)
+    participant SupaRealtime as Supabase Realtime
+    participant ClientApp as Client Application (Next.js Frontend)
+
+    Note over EdgeFunc: Scheduled execution (pg_cron)
+    EdgeFunc->>FMP_API: Request financial data (e.g., quotes, profiles)
+    FMP_API-->>EdgeFunc: Respond with data
+    EdgeFunc->>SupaTables: Upsert fetched data
+    SupaTables-->>SupaRealtime: Database changes trigger realtime events
+    SupaRealtime-->>ClientApp: Broadcast data updates
+    ClientApp->>ClientApp: Update UI with new data (e.g., Financial Cards)
+```
+
+### 7.3 Detailed Frontend Architecture
+
+The frontend, built with Next.js and the App Router, emphasizes a modular and component-driven structure.
+
+- **Directory Structure:** Key directories include `src/app` for routing and page components, `src/components` for UI and game logic, `src/hooks` for reusable stateful logic (e.g., `useWorkspaceManager`, `useStockData`), `src/contexts` for global state (e.g., `AuthContext`), and `src/lib` for utilities and Supabase client setup.
+- **Modular Card System:**
+  - The core of the application revolves around "Financial Cards" located primarily under `src/components/game/cards/`.
+  - `GameCard.tsx` acts as a generic renderer.
+  - `BaseCard.tsx` provides the common UI shell (flippable card, header, social interactions).
+  - Specific card types (e.g., `PriceCard`, `ProfileCard`) extend this system with their own content renderers, data types, and interaction logic.
+  - A set of registries and initializers (`cardInitializer.types.ts`, `cardRenderers.ts`, `cardRehydration.ts`, `cardUpdateHandler.types.ts`) manage the lifecycle and behavior of these cards, allowing for an extensible plugin-like architecture.
+- **State Management:**
+  - Client-side state is managed using a combination of React hooks (`useState`, `useCallback`), custom hooks like `useWorkspaceManager` for the main interactive card area, and `AuthContext` for global authentication state.
+  - `useLocalStorage` hook is employed for persisting workspace card configurations.
+- **API Routes (Next.js Route Handlers):** Located in `src/app/api/`, these handle backend operations like managing user collections, card snapshot creation/management, and handling likes/comments.
+
+#### Frontend Card System Overview
+
+```mermaid
+graph TD
+    subgraph Page & State Management
+        WorkspacePage["Workspace Page (/workspace)"]
+        Hook_WorkspaceManager["useWorkspaceManager (Hook)"]
+        ActiveCardsState["ActiveCards[] (State)"]
+        LocalStorage["Local Storage Persistence"]
+    end
+
+    subgraph Card Rendering & Logic
+        ActiveCardsSection["ActiveCardsSection (Component)"]
+        GameCard["GameCard (Generic Renderer)"]
+        BaseCard["BaseCard (Common UI Shell)"]
+        PriceCardContainer["PriceCardContainer"]
+        ProfileCardContainer["ProfileCardContainer"]
+        OtherCardTypes["... (Other Card Types)"]
+    end
+
+    subgraph Card System Registries
+        CardInitializers["Card Initializer Registry"]
+        CardRenderers["Card Renderer Registry"]
+        CardUpdateHandlers["Card Update Handler Registry"]
+        CardRehydrators["Card Rehydrator Registry"]
+    end
+
+    WorkspacePage --> Hook_WorkspaceManager
+    Hook_WorkspaceManager --> ActiveCardsState
+    Hook_WorkspaceManager --> CardInitializers
+    Hook_WorkspaceManager --> CardRehydrators
+    Hook_WorkspaceManager --> CardUpdateHandlers
+    ActiveCardsState --> LocalStorage
+    Hook_WorkspaceManager --> ActiveCardsSection
+    ActiveCardsSection -->|"For each card in ActiveCardsState"| GameCard
+    GameCard --> CardRenderers
+    CardRenderers --> PriceCardContainer
+    CardRenderers --> ProfileCardContainer
+    CardRenderers --> OtherCardTypes
+    PriceCardContainer --> BaseCard
+    ProfileCardContainer --> BaseCard
+    OtherCardTypes --> BaseCard
+
+    %% Specific card utilities interact with registries
+    subgraph CardTypeSpecificLogic ["Card Type Specific Utilities (e.g., priceCardUtils.ts)"]
+        PriceCardUtils["priceCardUtils.ts"]
+        ProfileCardUtils["profileCardUtils.ts"]
+    end
+    PriceCardUtils --> CardInitializers
+    PriceCardUtils --> CardUpdateHandlers
+    PriceCardUtils --> CardRehydrators
+    ProfileCardUtils --> CardInitializers
+    ProfileCardUtils --> CardUpdateHandlers
+    ProfileCardUtils --> CardRehydrators
+```
+
+### 7.4 Detailed Supabase Backend
+
+- **Data Ingestion & Processing:**
+  - Supabase Edge Functions (e.g., `Workspace-fmp-quote-indicators`, `Workspace-all-exchange-market-status`) are scheduled via `pg_cron` to fetch data from the FMP API.
+  - This data populates core tables like `public.profiles` (company information) and `public.live_quote_indicators` (live market data).
+- **Real-time Data Propagation:** Changes to key tables (e.g., `live_quote_indicators`, `profiles`) are broadcast using Supabase Realtime. The frontend subscribes to these broadcasts (via `realtime-service.ts`) to update Financial Cards dynamically.
+- **Core Application Database Schema:**
+  - `public.card_snapshots`: Stores immutable snapshots of card states (JSONB data, rarity, symbol), crucial for history, sharing, and collections. Uniqueness is enforced by `state_hash`.
+  - `public.snapshot_comments`: Threaded comments on `card_snapshots`.
+  - `public.snapshot_likes`: User likes for `card_snapshots`.
+  - `public.user_collections`: Allows users to curate collections of `card_snapshots`.
+  - `public.user_profiles`: Extends `auth.users` with custom profile data, auto-populated on new user creation.
+  - `public.profiles`: Stores detailed static company information.
+  - `public.live_quote_indicators`: Stores frequently updated market data for symbols.
+  - `public.exchange_market_status`: Stores market status for different exchanges.
+  - Database tables include triggers for actions like updating `modified_at` timestamps (via `moddatetime` extension).
+
+#### Supabase Core Database Schema (Simplified ERD)
+
+```mermaid
+erDiagram
+    "auth.users" {
+        UUID id PK
+        TEXT email
+        TIMESTAMP created_at
+    }
+
+    user_profiles {
+        UUID user_id PK, FK
+        TEXT username
+        TEXT avatar_url
+        TEXT display_name
+    }
+
+    card_snapshots {
+        UUID id PK
+        TEXT symbol
+        TEXT card_type
+        JSONB card_data_snapshot
+        TEXT state_hash UK
+        TEXT rarity_level
+        TIMESTAMP created_at
+    }
+
+    snapshot_comments {
+        UUID id PK
+        UUID snapshot_id FK
+        UUID user_id FK
+        TEXT comment_text
+        UUID parent_comment_id FK
+        TIMESTAMP created_at
+    }
+
+    snapshot_likes {
+        UUID id PK
+        UUID snapshot_id FK
+        UUID user_id FK
+        TIMESTAMP created_at
+    }
+
+    user_collections {
+        UUID id PK
+        UUID user_id FK
+        UUID snapshot_id FK
+        TEXT collection_name
+        TIMESTAMP created_at
+    }
+
+    profiles {
+        TEXT symbol PK
+        TEXT company_name
+        TEXT sector
+        TEXT industry
+        TEXT description
+        TIMESTAMP created_at
+        TIMESTAMP modified_at
+    }
+
+    live_quote_indicators {
+        TEXT symbol PK
+        FLOAT price
+        FLOAT change
+        FLOAT day_low
+        FLOAT day_high
+        BOOLEAN is_market_open
+        TEXT market_status_message
+        TIMESTAMP last_updated
+        TIMESTAMP created_at
+    }
+
+    exchange_market_status {
+        TEXT stock_exchange_name PK
+        BOOLEAN is_the_market_open
+        TEXT market_status_message
+        TIMESTAMP last_checked
+    }
+
+    "auth.users" ||--|| user_profiles : "has one"
+    user_profiles }o--|| snapshot_comments : "authors"
+    user_profiles }o--|| snapshot_likes : "likes"
+    user_profiles }o--|| user_collections : "owns"
+
+    card_snapshots }o--|| snapshot_comments : "has many"
+    card_snapshots }o--|| snapshot_likes : "has many"
+    card_snapshots }o--|| user_collections : "part of many"
+
+    profiles ||--|| live_quote_indicators : "has"
+
+    card_snapshots }o--|| profiles : "relates to"
+    card_snapshots }o--|| live_quote_indicators : "relates to"
+
+    live_quote_indicators }o--|| exchange_market_status : "market status from"
+```
 
 ## 8. Purpose of this Document
 
