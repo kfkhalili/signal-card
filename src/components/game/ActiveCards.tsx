@@ -2,14 +2,14 @@
 "use client";
 
 import React from "react";
-import GameCard from "@/components/game/GameCard"; // Ensure path is correct
-import type { DisplayableCard } from "./types"; // Ensure path is correct
+import GameCard from "@/components/game/GameCard";
+import type { DisplayableCard } from "./types";
 import type {
   BaseCardSocialInteractions,
   CardActionContext,
-} from "./cards/base-card/base-card.types"; // Ensure path is correct
-import type { PriceCardInteractionCallbacks } from "./cards/price-card/price-card.types"; // Ensure path is correct
-import type { ProfileCardInteractionCallbacks } from "./cards/profile-card/profile-card.types"; // Ensure path is correct
+} from "./cards/base-card/base-card.types";
+import type { PriceCardInteractionCallbacks } from "./cards/price-card/price-card.types";
+import type { ProfileCardInteractionCallbacks } from "./cards/profile-card/profile-card.types";
 
 import {
   AlertDialog,
@@ -20,9 +20,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"; // Ensure path is correct
+} from "@/components/ui/alert-dialog";
 
-// Define the shape for price-specific interactions passed to GameCard/PriceCardContainer
 type PriceSpecificInteractionsForContainer = Pick<
   PriceCardInteractionCallbacks,
   | "onPriceCardSmaClick"
@@ -31,20 +30,18 @@ type PriceSpecificInteractionsForContainer = Pick<
   | "onPriceCardGenerateDailyPerformanceSignal"
 >;
 
-// This is the props interface for the presentational component
 interface ActiveCardsProps {
   cards: DisplayableCard[];
   onToggleFlipCard: (id: string) => void;
   onDeleteCardRequest: (id: string) => void;
-
   socialInteractions?: BaseCardSocialInteractions;
   priceSpecificInteractions?: PriceSpecificInteractionsForContainer;
-  profileSpecificInteractions?: ProfileCardInteractionCallbacks; // <<< ADDED THIS PROP
+  profileSpecificInteractions?: ProfileCardInteractionCallbacks;
   onHeaderIdentityClick?: (context: CardActionContext) => void;
-
   cardIdToConfirmDelete: string | null;
   onConfirmDeletion: () => void;
   onCancelDeletion: () => void;
+  isSaveDisabled?: boolean; // New prop
 }
 
 export const ActiveCards: React.FC<ActiveCardsProps> = ({
@@ -53,11 +50,12 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
   onDeleteCardRequest,
   socialInteractions,
   priceSpecificInteractions,
-  profileSpecificInteractions, // Destructure the new prop
+  profileSpecificInteractions,
   onHeaderIdentityClick,
   cardIdToConfirmDelete,
   onConfirmDeletion,
   onCancelDeletion,
+  isSaveDisabled, // Destructure new prop
 }) => {
   const [hasMounted, setHasMounted] = React.useState(false);
   React.useEffect(() => {
@@ -65,7 +63,6 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
   }, []);
 
   if (!hasMounted) {
-    // This helps prevent hydration mismatches if cards are loaded from localStorage
     return (
       <div className="flex-grow p-4 bg-secondary/30 rounded-lg shadow-inner min-h-[400px] flex items-center justify-center">
         <p className="text-muted-foreground text-center py-10">
@@ -77,19 +74,8 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
 
   return (
     <div className="flex-grow p-4 bg-secondary/30 dark:bg-background/30 rounded-lg shadow-inner min-h-screen">
-      {/* Header for the section can be added here if needed, or kept in WorkspacePage */}
-      {/* Example:
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-semibold text-foreground">
-          Active Cards
-        </h2>
-      </div>
-      */}
-
       {cards.length === 0 ? (
-        // This empty state might be better handled by WorkspacePage if this component is purely for displaying cards
         <div className="flex items-center justify-center h-[calc(100vh-15rem)]">
-          {/* Adjusted height */}
           <p className="text-muted-foreground text-center py-10">
             No cards in the workspace. Add one to get started!
           </p>
@@ -102,18 +88,22 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
                 card={card}
                 onToggleFlip={onToggleFlipCard}
                 onDeleteCardRequest={onDeleteCardRequest}
-                socialInteractions={socialInteractions}
+                socialInteractions={
+                  isSaveDisabled && socialInteractions
+                    ? { ...socialInteractions, onSave: undefined }
+                    : socialInteractions
+                }
                 priceSpecificInteractions={priceSpecificInteractions}
-                profileSpecificInteractions={profileSpecificInteractions} // <<< PASSING IT DOWN
+                profileSpecificInteractions={profileSpecificInteractions}
                 onHeaderIdentityClick={onHeaderIdentityClick}
+                isSaveDisabled={isSaveDisabled} // Pass down to GameCard
               />
             </div>
           ))}
         </div>
       )}
 
-      {/* Confirmation Dialog for Deletion */}
-      {cardIdToConfirmDelete && ( // Ensure dialog only renders when needed
+      {cardIdToConfirmDelete && (
         <AlertDialog
           open={!!cardIdToConfirmDelete}
           onOpenChange={(open) => {

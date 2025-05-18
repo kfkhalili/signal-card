@@ -15,12 +15,10 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogClose, // Not explicitly used, but good to have if needed
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Send, MessageCircle } from "lucide-react"; // Added Send icon
 import { formatDistanceToNowStrict } from "date-fns";

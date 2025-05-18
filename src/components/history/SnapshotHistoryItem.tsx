@@ -20,17 +20,24 @@ import type {
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { Database } from "@/lib/supabase/database.types";
 
-// Assuming LikeApiResponse is defined elsewhere or as:
 interface LikeApiResponse {
-  like: { id: string /* ...other fields */ };
+  like: { id: string };
   message: string;
   isAlreadyLiked?: boolean;
 }
 
-// Adapt snapshot to DisplayableCard
+// Use the generated type for the RPC response.
+// If `get_snapshot_social_counts` in database.types.ts has Returns as an array (e.g. `SomeType[]`),
+// then this should be `Database["public"]["Functions"]["get_snapshot_social_counts"]["Returns"][0]` for a single row type,
+// or just use `Database["public"]["Functions"]["get_snapshot_social_counts"]["Returns"]` if you expect an array.
+// Since our function `RETURNS TABLE` with one row, the generated `Returns` is likely `TYPE[]`.
+type SnapshotSocialCountsRPCResponse =
+  Database["public"]["Functions"]["get_snapshot_social_counts"]["Returns"][0];
+
 function adaptSnapshotToDisplayableCard(
-  snapshot: CardSnapshotFromDB, // Includes counts from server
+  snapshot: CardSnapshotFromDB,
   isLikedByCurrentUserState: boolean,
   isSavedByCurrentUserState: boolean,
   currentUserLikeIdState?: string
@@ -43,20 +50,18 @@ function adaptSnapshotToDisplayableCard(
   }
   return {
     ...concreteData,
-    id: snapshot.id, // This is the snapshot_id
+    id: snapshot.id,
     symbol: snapshot.symbol,
     companyName: snapshot.company_name,
     logoUrl: snapshot.logo_url,
     type: snapshot.card_type,
     createdAt: new Date(snapshot.first_seen_at).getTime(),
-    isFlipped: false, // History items are not flipped by default
+    isFlipped: false,
     currentRarity: snapshot.rarity_level,
     rarityReason: snapshot.rarity_reason,
-    // Pass the local state for these UI-affecting properties
     isLikedByCurrentUser: isLikedByCurrentUserState,
     currentUserLikeId: currentUserLikeIdState,
-    isSavedByCurrentUser: isSavedByCurrentUserState, // Pass this down
-    // Global counts come from the snapshot prop directly
+    isSavedByCurrentUser: isSavedByCurrentUserState,
     likeCount: snapshot.like_count,
     commentCount: snapshot.comment_count,
     collectionCount: snapshot.collection_count,
@@ -64,7 +69,7 @@ function adaptSnapshotToDisplayableCard(
 }
 
 interface SnapshotHistoryItemProps {
-  snapshot: CardSnapshotFromDB; // This prop now includes pre-fetched global counts
+  snapshot: CardSnapshotFromDB;
   isHighlighted: boolean;
 }
 
@@ -74,8 +79,6 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
 }) => {
   const itemRef = React.useRef<HTMLDivElement>(null);
   const [showComments, setShowComments] = useState(isHighlighted);
-
-  // Local state for current user's interaction status with *this specific snapshot*
   const [isLikedByCurrentUserLocal, setIsLikedByCurrentUserLocal] =
     useState(false);
   const [currentUserLikeIdLocal, setCurrentUserLikeIdLocal] = useState<
@@ -84,7 +87,6 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
   const [isSavedByCurrentUserLocal, setIsSavedByCurrentUserLocal] =
     useState(false);
 
-  // Local state for counts, initialized from props, can be updated optimistically
   const [likeCountLocal, setLikeCountLocal] = useState<number>(
     snapshot.like_count
   );
@@ -94,11 +96,11 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
   const [collectionCountLocal, setCollectionCountLocal] = useState<number>(
     snapshot.collection_count
   );
-
   const [isLoadingSocialStatus, setIsLoadingSocialStatus] = useState(true);
 
   const { toast } = useToast();
   const { user } = useAuth();
+  // Explicitly type the Supabase client with the generated Database type
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
   useEffect(() => {
@@ -107,7 +109,6 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
     }
   }, [isHighlighted]);
 
-  // Fetch initial like and save status for this specific snapshot and user
   useEffect(() => {
     const fetchSocialStatus = async () => {
       if (!user || !snapshot.id || !supabase) {
@@ -172,9 +173,7 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
   );
 
   const handleLikeOrUnlikeCard = useCallback(async () => {
-    if (!user || isLoadingSocialStatus) {
-      /* ... */ return;
-    }
+    if (!user || isLoadingSocialStatus) return;
 
     const originalIsLiked = isLikedByCurrentUserLocal;
     const originalLikeCount = likeCountLocal;
@@ -185,34 +184,72 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
     );
     if (originalIsLiked) setCurrentUserLikeIdLocal(undefined);
 
-    if (originalIsLiked) {
-      try {
-        const { error } = await supabase
-          .from("snapshot_likes")
-          .delete()
-          .match({ snapshot_id: snapshot.id, user_id: user.id });
-        if (error) throw error;
-        toast({ title: "Unliked!" });
-      } catch (error: any) {
-        toast({ title: "Unlike Failed", variant: "destructive" });
-        setIsLikedByCurrentUserLocal(originalIsLiked);
-        setLikeCountLocal(originalLikeCount);
+    const apiCall = originalIsLiked
+      ? fetch("/api/snapshots/like", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ snapshotId: snapshot.id }),
+        })
+      : fetch("/api/snapshots/like", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ snapshotId: snapshot.id }),
+        });
+    try {
+      const response = await apiCall;
+      const result = (await response.json()) as LikeApiResponse;
+      if (
+        !response.ok &&
+        !(response.status === 200 && result.isAlreadyLiked) &&
+        response.status !== 404
+      ) {
+        throw new Error(
+          (result as any).error ||
+            `Like/Unlike failed (status ${response.status})`
+        );
       }
-    } else {
-      try {
-        const { data: newLike, error } = await supabase
-          .from("snapshot_likes")
-          .insert({ snapshot_id: snapshot.id, user_id: user.id })
-          .select("id")
-          .single();
-        if (error) throw error;
-        toast({ title: "Liked!" });
-        if (newLike) setCurrentUserLikeIdLocal(newLike.id);
-      } catch (error: any) {
-        toast({ title: "Like Failed", variant: "destructive" });
-        setIsLikedByCurrentUserLocal(originalIsLiked);
-        setLikeCountLocal(originalLikeCount);
+      toast({ title: originalIsLiked ? "Unliked!" : "Liked!" });
+      if (!originalIsLiked && result.like) {
+        setCurrentUserLikeIdLocal(result.like.id);
       }
+
+      const { data: rpcResponseData, error: rpcError } = await supabase.rpc(
+        "get_snapshot_social_counts",
+        { p_snapshot_id: snapshot.id }
+      );
+      // `.returns` is not needed here if the client is typed with `Database`
+      // The type will be inferred from `Database["public"]["Functions"]["get_snapshot_social_counts"]["Returns"]`
+
+      if (rpcError) {
+        console.warn("Error refetching counts via RPC:", rpcError.message);
+      } else if (rpcResponseData && rpcResponseData.length > 0) {
+        // rpcResponseData is Database["public"]["Functions"]["get_snapshot_social_counts"]["Returns"]
+        // which is likely SnapshotSocialCountsRPCResponse[]
+        const updatedCounts = rpcResponseData[0]; // Get the first (and only) row
+        if (updatedCounts) {
+          // Check if updatedCounts itself is not null/undefined after indexing
+          setLikeCountLocal(updatedCounts.like_count);
+          setCommentCountLocal(updatedCounts.comment_count);
+          setCollectionCountLocal(updatedCounts.collection_count);
+        } else {
+          console.warn(
+            `RPC get_snapshot_social_counts for ${snapshot.id} returned an empty object in the array.`
+          );
+        }
+      } else if (rpcResponseData && rpcResponseData.length === 0) {
+        console.warn(
+          `RPC get_snapshot_social_counts for ${snapshot.id} returned no data (empty array).`
+        );
+      } else if (!rpcResponseData) {
+        // This case handles if rpcResponseData is null
+        console.warn(
+          `RPC get_snapshot_social_counts for ${snapshot.id} returned null data property.`
+        );
+      }
+    } catch (error: any) {
+      toast({ title: "Action Failed", variant: "destructive" });
+      setIsLikedByCurrentUserLocal(originalIsLiked);
+      setLikeCountLocal(originalLikeCount);
     }
   }, [
     snapshot.id,
@@ -222,113 +259,35 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
     likeCountLocal,
     supabase,
     isLoadingSocialStatus,
-  ]);
-
-  const handleToggleSaveToCollection = useCallback(async () => {
-    if (!user || isLoadingSocialStatus) {
-      /* ... */ return;
-    }
-
-    const originalIsSaved = isSavedByCurrentUserLocal;
-    const originalCollectionCount = collectionCountLocal;
-
-    setIsSavedByCurrentUserLocal(!originalIsSaved);
-    setCollectionCountLocal((prev) =>
-      originalIsSaved ? Math.max(0, prev - 1) : prev + 1
-    );
-
-    if (originalIsSaved) {
-      // Attempt to UN-SAVE
-      toast({ title: "Removing from Collection..." });
-      try {
-        const { error } = await supabase
-          .from("user_collections")
-          .delete()
-          .match({ snapshot_id: snapshot.id, user_id: user.id });
-        if (error) throw error;
-        toast({
-          title: "Removed!",
-          description: `${snapshot.symbol} removed from collection.`,
-        });
-      } catch (error: any) {
-        toast({
-          title: "Removal Failed",
-          description: error.message,
-          variant: "destructive",
-        });
-        setIsSavedByCurrentUserLocal(originalIsSaved); // Revert
-        setCollectionCountLocal(originalCollectionCount); // Revert
-      }
-    } else {
-      // Attempt to SAVE
-      toast({ title: "Saving to Collection..." });
-      try {
-        const { error } = await supabase
-          .from("user_collections")
-          .insert({ snapshot_id: snapshot.id, user_id: user.id });
-        // The API /api/collections/add handles de-duplication with a unique constraint.
-        // If calling that API:
-        // const addResponse = await fetch("/api/collections/add", { /* ... */ });
-        // const addResult = await addResponse.json();
-        // if (!addResponse.ok) throw new Error(addResult.error);
-        if (error) {
-          // This handles unique constraint violation from direct insert gracefully
-          if (error.code === "23505") {
-            // Unique violation
-            toast({
-              title: "Already Saved",
-              description: "This snapshot is already in your collection.",
-            });
-            // Ensure state is correct if it was a race condition
-            setIsSavedByCurrentUserLocal(true);
-            // Count might not need changing if it was already saved
-          } else {
-            throw error;
-          }
-        } else {
-          toast({
-            title: "Collected!",
-            description: `${snapshot.symbol} added to collection.`,
-          });
-        }
-      } catch (error: any) {
-        toast({
-          title: "Collection Failed",
-          description: error.message,
-          variant: "destructive",
-        });
-        setIsSavedByCurrentUserLocal(originalIsSaved); // Revert
-        setCollectionCountLocal(originalCollectionCount); // Revert
-      }
-    }
-  }, [
-    snapshot.id,
-    snapshot.symbol,
-    user,
-    toast,
-    collectionCountLocal,
-    isSavedByCurrentUserLocal,
-    supabase,
-    isLoadingSocialStatus,
+    currentUserLikeIdLocal,
   ]);
 
   const socialInteractionsForSnapshot: BaseCardSocialInteractions = useMemo(
     () => ({
       onLike: handleLikeOrUnlikeCard,
       onComment: (ctx) => setShowComments((prev) => !prev),
-      onSave: handleToggleSaveToCollection, // Use the new toggle function
-      onShare: () => {
-        /* ... share logic ... */
+      onShare: async (context: CardActionContext) => {
+        const baseUrl =
+          typeof window !== "undefined" ? window.location.origin : "";
+        const shareUrl = `${baseUrl}/history/${context.symbol.toLowerCase()}/${context.type.toLowerCase()}?highlight_snapshot=${
+          context.id
+        }`;
+        try {
+          await navigator.clipboard.writeText(shareUrl);
+          toast({
+            title: "Link Copied!",
+            description: "Shareable link copied to clipboard.",
+          });
+        } catch (err) {
+          toast({
+            title: "Could not copy link.",
+            description: "Please copy manually: " + shareUrl,
+            variant: "destructive",
+          });
+        }
       },
     }),
-    [
-      handleLikeOrUnlikeCard,
-      handleToggleSaveToCollection,
-      snapshot.id,
-      snapshot.symbol,
-      snapshot.card_type,
-      toast,
-    ]
+    [handleLikeOrUnlikeCard, toast]
   );
 
   const displayableCard = useMemo(
@@ -347,9 +306,37 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
     ]
   );
 
-  const onCommentPosted = useCallback(() => {
-    setCommentCountLocal((prev) => prev + 1);
-  }, []);
+  const onCommentPosted = useCallback(async () => {
+    const { data: rpcResponseData, error: rpcError } = await supabase.rpc(
+      "get_snapshot_social_counts",
+      { p_snapshot_id: snapshot.id }
+    );
+
+    if (rpcError) {
+      console.warn(
+        "Error refetching counts after comment post:",
+        rpcError.message
+      );
+      setCommentCountLocal((prev) => prev + 1);
+    } else if (rpcResponseData && rpcResponseData.length > 0) {
+      const updatedCounts = rpcResponseData[0];
+      if (updatedCounts) {
+        setLikeCountLocal(updatedCounts.like_count);
+        setCommentCountLocal(updatedCounts.comment_count);
+        setCollectionCountLocal(updatedCounts.collection_count);
+      } else {
+        console.warn(
+          `RPC get_snapshot_social_counts for ${snapshot.id} returned an empty object in array after comment post.`
+        );
+        setCommentCountLocal((prev) => prev + 1);
+      }
+    } else {
+      console.warn(
+        `RPC get_snapshot_social_counts for ${snapshot.id} returned no data after comment post.`
+      );
+      setCommentCountLocal((prev) => prev + 1);
+    }
+  }, [snapshot.id, supabase]);
 
   if (isLoadingSocialStatus && user) {
     return (
@@ -389,18 +376,17 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-1">
           <GameCard
-            card={displayableCard} // This now gets updated isLikedByCurrentUser and isSavedByCurrentUser
+            card={displayableCard}
             onToggleFlip={() =>
               toast({ title: "Flip action is disabled for history items." })
             }
             onDeleteCardRequest={() => {}}
             socialInteractions={socialInteractionsForSnapshot}
-            // Pass local state counts to GameCard
             likeCount={likeCountLocal}
             commentCount={commentCountLocal}
             collectionCount={collectionCountLocal}
-            // Pass local state for save status to GameCard
             isSavedByCurrentUser={isSavedByCurrentUserLocal}
+            isSaveDisabled={true}
           />
         </div>
         {showComments && (

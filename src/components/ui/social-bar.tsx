@@ -32,17 +32,15 @@ interface SocialBarProps {
   collectionCount?: number; // Renamed from bookmarkCount for clarity
 }
 
-// Internal configuration type for buttons
 interface RawButtonConfig {
   key: string;
   action?: (context: CardActionContext) => void;
   Icon: SpecificLucideIcon;
   title: string;
-  isActive?: boolean; // For 'like' and 'save' active state
+  isActive?: boolean;
   count?: number;
 }
 
-// Type for buttons that have a defined action
 interface ActionableButtonConfig extends Omit<RawButtonConfig, "action"> {
   action: (context: CardActionContext) => void;
   Icon: SpecificLucideIcon;
@@ -56,44 +54,39 @@ export const SocialBar: React.FC<SocialBarProps> = ({
   interactions,
   className,
   isLikedByCurrentUser,
-  isSavedByCurrentUser, // Use this for the save icon's active state
+  isSavedByCurrentUser,
   debugFaceName,
   likeCount = 0,
   commentCount = 0,
   collectionCount = 0,
 }) => {
-  // console.log(`[SocialBar ${cardContext.symbol} ${debugFaceName}] Rendering. Props: likeCount=${likeCount}, commentCount=${commentCount}, collectionCount=${collectionCount}, isLiked=${isLikedByCurrentUser}, isSaved=${isSavedByCurrentUser}`);
-
   if (!interactions) {
-    return null; // Don't render if no interactions are provided
+    return null;
   }
 
-  const iconSize: number = 16; // Standard icon size
+  const iconSize: number = 16;
   const buttonBaseClass: string =
     "flex items-center space-x-1 p-1.5 text-xs rounded-md transition-colors duration-150 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1";
 
-  // Determine button classes based on active state
   const likeButtonClass = isLikedByCurrentUser
-    ? "text-primary font-semibold" // Active like
-    : "text-muted-foreground hover:text-primary"; // Inactive like
+    ? "text-primary font-semibold"
+    : "text-muted-foreground hover:text-primary";
 
   const saveButtonClass = isSavedByCurrentUser
-    ? "text-primary font-semibold" // Active save (can be different color, e.g., text-green-600)
-    : "text-muted-foreground hover:text-primary"; // Inactive save
+    ? "text-primary font-semibold"
+    : "text-muted-foreground hover:text-primary";
 
-  const otherButtonClass: string = "text-muted-foreground hover:text-primary"; // For comment, share
+  const otherButtonClass: string = "text-muted-foreground hover:text-primary";
 
-  // Handles click events on social bar buttons
   const handleInteraction = (
     event: React.MouseEvent,
-    buttonKey: string, // For debugging or specific logic
+    buttonKey: string,
     actionCallback: (context: CardActionContext) => void
   ): void => {
-    event.stopPropagation(); // Prevent card flip or other parent events
+    event.stopPropagation();
     actionCallback(cardContext);
   };
 
-  // Configuration for each button in the social bar
   const rawButtonConfigs: RawButtonConfig[] = [
     {
       key: "like",
@@ -108,15 +101,14 @@ export const SocialBar: React.FC<SocialBarProps> = ({
       action: interactions.onComment,
       Icon: MessageCircle,
       title: "Comment",
-      // isActive is not typically used for comments unless it controls a modal state
       count: commentCount,
     },
     {
-      key: "save", // Key for the "Save to Collection" action
+      key: "save",
       action: interactions.onSave,
       Icon: Bookmark,
       title: "Save to Collection",
-      isActive: isSavedByCurrentUser, // Use the prop to determine active state
+      isActive: isSavedByCurrentUser,
       count: collectionCount,
     },
     {
@@ -124,11 +116,9 @@ export const SocialBar: React.FC<SocialBarProps> = ({
       action: interactions.onShare,
       Icon: Share2,
       title: "Share",
-      // No count for shares in this implementation
     },
   ];
 
-  // Filter out buttons that don't have an action defined
   const buttonConfigs: ActionableButtonConfig[] = rawButtonConfigs.filter(
     (config): config is ActionableButtonConfig => !!config.action
   );
@@ -136,86 +126,67 @@ export const SocialBar: React.FC<SocialBarProps> = ({
   return (
     <div
       className={cn("shrink-0 p-1 flex justify-around items-center", className)}
-      onClick={(e) => e.stopPropagation()} // Prevent clicks on padding from bubbling
+      onClick={(e) => e.stopPropagation()}
       role="toolbar"
       aria-label={`Social actions for ${debugFaceName} of ${cardContext.symbol}`}>
-      {buttonConfigs.map((config, index) => (
+      {buttonConfigs.map((config) => (
         <button
           key={`${config.key}-${debugFaceName}`}
           onClick={(e) => handleInteraction(e, config.key, config.action)}
           title={config.title}
           className={cn(
             buttonBaseClass,
-            // Apply specific class based on button key and active state
             config.key === "like"
               ? likeButtonClass
               : config.key === "save"
               ? saveButtonClass
               : otherButtonClass
           )}
-          // aria-pressed for like and save buttons to indicate their toggle state
           aria-pressed={
             config.key === "like" || config.key === "save"
               ? config.isActive
               : undefined
           }
-          data-button-key={config.key} // For easier DOM selection/debugging
+          data-button-key={config.key}
           data-face-name={debugFaceName}>
           <span className="flex items-center justify-center">
             <config.Icon
               size={iconSize}
               aria-hidden="true"
-              // Icon fill based on active state for 'like' and 'save'
               fill={
                 (config.key === "like" || config.key === "save") &&
                 config.isActive
-                  ? "currentColor" // Use current text color for fill
+                  ? "currentColor"
                   : "none"
               }
-              // Adjust stroke width if active for 'like' and 'save'
               strokeWidth={
                 (config.key === "like" || config.key === "save") &&
                 config.isActive
                   ? 2.2
                   : 2
               }
-              // Icon color class, primarily for 'like' and 'save' active state
               className={cn(
                 (config.key === "like" || config.key === "save") &&
                   config.isActive
                   ? "text-primary"
                   : ""
-                // Example for different active save color:
-                // (config.key === 'save' && config.isActive ? "text-green-500" : "")
               )}
             />
           </span>
-          {/* Display count: always for 'like' & 'save' if count is defined, for others if count > 0 */}
-          {config.count !== undefined &&
-          (config.key === "like" ||
-            config.key === "save" ||
-            config.count > 0) ? (
+          {config.count !== undefined && config.count > 0 ? (
             <span
               className={cn(
                 "ml-0.5 font-medium text-[11px]",
-                // Styling for count text based on button type and active state
                 {
                   "text-primary":
                     (config.key === "like" || config.key === "save") &&
-                    config.isActive &&
-                    config.count > 0,
+                    config.isActive,
                 },
                 {
-                  "text-muted-foreground":
-                    !(
-                      (config.key === "like" || config.key === "save") &&
-                      config.isActive
-                    ) && config.count > 0,
-                },
-                {
-                  "text-muted-foreground/70":
-                    config.count === 0 &&
-                    (config.key === "like" || config.key === "save"),
+                  "text-muted-foreground": !(
+                    (config.key === "like" || config.key === "save") &&
+                    config.isActive
+                  ),
                 }
               )}>
               {config.count}

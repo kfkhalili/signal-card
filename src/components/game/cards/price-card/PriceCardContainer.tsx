@@ -34,10 +34,11 @@ interface PriceCardContainerProps {
   innerCardClassName?: string;
   children?: React.ReactNode;
   isLikedByCurrentUser?: boolean;
-  isSavedByCurrentUser?: boolean; // New prop
+  isSavedByCurrentUser?: boolean;
   likeCount?: number;
   commentCount?: number;
   collectionCount?: number;
+  isSaveDisabled?: boolean; // New prop
 }
 
 export const PriceCardContainer = React.memo<PriceCardContainerProps>(
@@ -56,10 +57,11 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
     innerCardClassName,
     children,
     isLikedByCurrentUser,
-    isSavedByCurrentUser, // Destructure
+    isSavedByCurrentUser,
     likeCount,
     commentCount,
     collectionCount,
+    isSaveDisabled, // Destructure
   }) => {
     const faceContentForBaseCard = (
       <PriceCardContent
@@ -103,10 +105,12 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
         className={className}
         innerCardClassName={innerCardClassName}
         isLikedByCurrentUser={isLikedByCurrentUser}
-        isSavedByCurrentUser={isSavedByCurrentUser} // Pass down
+        isSavedByCurrentUser={isSavedByCurrentUser}
         likeCount={likeCount}
         commentCount={commentCount}
-        collectionCount={collectionCount}>
+        collectionCount={collectionCount}
+        isSaveDisabled={isSaveDisabled} /* Pass down */
+      >
         {children}
       </BaseCard>
     );

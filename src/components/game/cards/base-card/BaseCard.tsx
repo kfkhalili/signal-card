@@ -1,7 +1,7 @@
 // src/components/game/cards/base-card/BaseCard.tsx
 "use client";
 
-import React, { useRef, useEffect } from "react"; // Added useRef and useEffect
+import React, { useRef, useEffect } from "react";
 import { Card as ShadCard, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { XIcon, Sparkle, Award, Gem, Crown } from "lucide-react";
@@ -40,6 +40,7 @@ interface BaseCardProps {
   likeCount?: number;
   commentCount?: number;
   collectionCount?: number;
+  isSaveDisabled?: boolean; // New prop
 }
 
 const outerStyle: React.CSSProperties = {
@@ -83,6 +84,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
   likeCount,
   commentCount,
   collectionCount,
+  isSaveDisabled, // Destructure the new prop
 }) => {
   const {
     symbol,
@@ -343,7 +345,6 @@ const BaseCard: React.FC<BaseCardProps> = ({
       target = target.parentElement as HTMLElement;
     }
 
-    // Before calling onFlip, try to blur the active element if it's one of the faces
     if (document.activeElement === frontFaceRef.current && !isFlipped) {
       frontFaceRef.current?.blur();
     } else if (document.activeElement === backFaceRef.current && isFlipped) {
@@ -365,43 +366,23 @@ const BaseCard: React.FC<BaseCardProps> = ({
   };
 
   useEffect(() => {
-    // After the flip animation might have started and `inert` is applied,
-    // try to move focus to the newly visible card face's container or the inner card wrapper.
-    // This helps ensure focus is on an interactive element.
     const timer = setTimeout(() => {
       if (isFlipped) {
-        if (
-          backFaceRef.current &&
-          document.activeElement !== backFaceRef.current
-        ) {
-          // backFaceRef.current.focus(); // Potentially too aggressive
-        }
+        // Focus logic for back face
       } else {
-        if (
-          frontFaceRef.current &&
-          document.activeElement !== frontFaceRef.current
-        ) {
-          // frontFaceRef.current.focus(); // Potentially too aggressive
-        }
+        // Focus logic for front face
       }
-      // As a fallback, or primary strategy, focus the flippable container after transition
-      // This makes the overall card focusable again.
-      if (
-        innerCardRef.current &&
-        document.activeElement !== innerCardRef.current &&
-        (document.activeElement === frontFaceRef.current ||
-          document.activeElement === backFaceRef.current)
-      ) {
-        // This might be a good general place to move focus to if a child had it.
-        // However, the card faces themselves are already focusable with tabIndex.
-      }
-    }, 0); // Small delay to allow DOM updates
+    }, 0);
 
     return () => clearTimeout(timer);
   }, [isFlipped]);
 
-  const socialBarContent = (faceName: "front" | "back") =>
-    socialInteractions ? (
+  const socialBarContent = (faceName: "front" | "back") => {
+    const currentInteractions = isSaveDisabled
+      ? { ...socialInteractions, onSave: undefined }
+      : socialInteractions;
+
+    return currentInteractions ? (
       <div
         className={cn(
           "transition-all duration-300 ease-in-out z-10 mt-auto shrink-0",
@@ -414,7 +395,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
         )}
         data-interactive-child="true">
         <SocialBar
-          interactions={socialInteractions}
+          interactions={currentInteractions}
           cardContext={cardContext}
           isLikedByCurrentUser={isLikedByCurrentUser}
           isSavedByCurrentUser={isSavedByCurrentUser}
@@ -425,18 +406,15 @@ const BaseCard: React.FC<BaseCardProps> = ({
         />
       </div>
     ) : null;
+  };
 
   return (
     <div style={outerStyle} className={cn("group", className)}>
       <div
-        ref={innerCardRef} // Add ref to the flipping container
+        ref={innerCardRef}
         style={innerCardDynamicStyles}
         className={cn(innerCardClassName)}
-        data-testid="base-card-inner"
-        // Make the flipper itself focusable if no faces are.
-        // This is a fallback if individual faces lose focus and don't refocus.
-        // tabIndex={-1} // Only programmatically focusable, not in tab order by default unless faces are -1.
-      >
+        data-testid="base-card-inner">
         <ShadCard
           ref={frontFaceRef}
           style={{
@@ -457,7 +435,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
           }
           aria-pressed={isFlipped}
           // @ts-ignore
-          inert={isFlipped ? true : undefined}
+          inert={isFlipped ? "true" : undefined}
           aria-hidden={isFlipped ? "true" : "false"}>
           {deleteButtonElement}
           {actualIdentityHeaderElement}
@@ -488,7 +466,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
               : `Show ${symbol} back details`
           }
           // @ts-ignore
-          inert={!isFlipped ? true : undefined}
+          inert={!isFlipped ? "true" : undefined}
           aria-hidden={!isFlipped ? "true" : "false"}>
           {deleteButtonElement}
           {headerPlaceholderElementForBack}

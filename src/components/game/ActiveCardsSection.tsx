@@ -70,8 +70,8 @@ interface CommentingCardInfo {
   snapshotId: string;
   symbol: string;
   name?: string | null;
-  workspaceCardId: string; // Added to uniquely identify the card in activeCards
-  type: APICardType; // Added to ensure correct type matching
+  workspaceCardId: string;
+  type: APICardType;
 }
 
 const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
@@ -202,7 +202,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
               .eq("snapshot_id", snapshotId),
             supabase
               .from("user_collections")
-              .select("id", { count: "exact", head: true })
+              .select("id", { count: "exact", head: true }) // Fetching count of user_collections entries for this snapshot
               .eq("snapshot_id", snapshotId),
             currentUserId
               ? supabase
@@ -213,9 +213,9 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
                   .maybeSingle()
               : Promise.resolve({ data: null, error: null }),
             currentUserId
-              ? supabase
+              ? supabase // Check if this user has this snapshot in their collection
                   .from("user_collections")
-                  .select("id")
+                  .select("id") // just need to know if it exists
                   .eq("snapshot_id", snapshotId)
                   .eq("user_id", currentUserId)
                   .maybeSingle()
@@ -254,7 +254,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
           collectionCount: collections.count || 0,
           isLikedByCurrentUser: !!userLike.data,
           currentUserLikeId: userLike.data?.id,
-          isSavedByCurrentUser: !!userSave.data,
+          isSavedByCurrentUser: !!userSave.data, // True if userSave.data exists
         };
       } catch (error) {
         console.error(
@@ -313,7 +313,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
             response.status === 200 &&
             (result as LikeApiResponse).isAlreadyLiked
           ) &&
-          response.status !== 404 // Allow 404 for DELETE if like not found
+          response.status !== 404
         ) {
           throw new Error(
             (result as any).error ||
@@ -334,6 +334,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
             prev.map((c) => (c.id === context.id ? { ...c, ...stats } : c))
           );
         } else {
+          // Fallback optimistic update
           setActiveCards((prev) =>
             prev.map((c) =>
               c.id === context.id
@@ -370,11 +371,11 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
     ]
   );
 
-  const handleCaptureCardToCollection = useCallback(
+  const handleToggleSaveToCollection = useCallback(
     async (context: CardActionContext) => {
       if (isLoadingAuth || !user) {
         toast({
-          title: "Please log in to save cards.",
+          title: "Please log in to manage collections.",
           variant: "destructive",
         });
         return;
@@ -385,69 +386,125 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
         return;
       }
 
-      const cardToCollect = activeCards[cardIndex];
-      const snapshotId = await ensureGlobalSnapshot(cardToCollect);
+      const cardToToggleSave = activeCards[cardIndex];
+      const snapshotId = await ensureGlobalSnapshot(cardToToggleSave);
       if (!snapshotId) return;
 
-      toast({
-        title: "Saving to Collection...",
-        description: `Snapshot for ${cardToCollect.symbol}...`,
-      });
-      try {
-        const addResponse = await fetch("/api/collections/add", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ snapshotId }),
-        });
-        const addResult = await addResponse.json();
-        if (
-          !addResponse.ok &&
-          !(
-            addResponse.status === 200 &&
-            addResult.message?.includes("already in collection")
-          )
-        ) {
-          throw new Error(
-            addResult.error ||
-              `Failed to add to collection (status ${addResponse.status})`
-          );
-        }
+      const originalIsSaved = cardToToggleSave.isSavedByCurrentUser;
 
+      if (originalIsSaved) {
+        // UN-SAVE card from collection
         toast({
-          title: addResult.message?.includes("already in collection")
-            ? "Already Collected"
-            : "Collected!",
-          description: `${cardToCollect.symbol} ${
-            addResult.message?.includes("already in collection")
-              ? "is already"
-              : "added to"
-          } your collection.`,
+          title: "Removing from Collection...",
+          description: `Snapshot for ${cardToToggleSave.symbol}...`,
         });
+        try {
+          // We need the user_collections.id to delete.
+          // Since we don't store it on the activeCard, we first fetch it.
+          const { data: collectionEntry, error: fetchError } = await supabase
+            .from("user_collections")
+            .select("id")
+            .eq("user_id", user.id)
+            .eq("snapshot_id", snapshotId)
+            .single();
 
-        const stats = await fetchSnapshotSocialStats(snapshotId, user.id);
-        if (stats) {
-          setActiveCards((prev) =>
-            prev.map((c) => (c.id === context.id ? { ...c, ...stats } : c))
+          if (fetchError || !collectionEntry) {
+            throw new Error(
+              fetchError?.message ||
+                "Could not find card in collection to remove."
+            );
+          }
+
+          const removeResponse = await fetch(
+            `/api/collections/remove/${collectionEntry.id}`,
+            {
+              method: "DELETE",
+            }
           );
-        } else {
-          setActiveCards((prev) =>
-            prev.map((c) =>
-              c.id === context.id
-                ? {
-                    ...c,
-                    isSavedByCurrentUser: true,
-                    collectionCount: (c.collectionCount || 0) + 1,
-                  }
-                : c
+          const removeResult = await removeResponse.json();
+          if (!removeResponse.ok) {
+            throw new Error(
+              removeResult.error ||
+                `Failed to remove from collection (status ${removeResponse.status})`
+            );
+          }
+          toast({
+            title: "Removed!",
+            description: `${cardToToggleSave.symbol} removed from your collection.`,
+          });
+        } catch (error: any) {
+          toast({
+            title: "Removal Failed",
+            description: error.message,
+            variant: "destructive",
+          });
+          // No optimistic update for removal error, rely on fetchSnapshotSocialStats to correct
+        }
+      } else {
+        // SAVE card to collection
+        toast({
+          title: "Saving to Collection...",
+          description: `Snapshot for ${cardToToggleSave.symbol}...`,
+        });
+        try {
+          const addResponse = await fetch("/api/collections/add", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ snapshotId }),
+          });
+          const addResult = await addResponse.json();
+          if (
+            !addResponse.ok &&
+            !(
+              addResponse.status === 200 &&
+              addResult.message?.includes("already in collection")
             )
-          );
+          ) {
+            throw new Error(
+              addResult.error ||
+                `Failed to add to collection (status ${addResponse.status})`
+            );
+          }
+          toast({
+            title: addResult.message?.includes("already in collection")
+              ? "Already Collected"
+              : "Collected!",
+            description: `${cardToToggleSave.symbol} ${
+              addResult.message?.includes("already in collection")
+                ? "is already"
+                : "added to"
+            } your collection.`,
+          });
+        } catch (error: any) {
+          toast({
+            title: "Collection Failed",
+            description: error.message,
+            variant: "destructive",
+          });
         }
-      } catch (error: any) {
-        toast({
-          title: "Collection Failed",
-          description: error.message,
-          variant: "destructive",
-        });
+      }
+
+      // Always refetch stats to update UI correctly
+      const stats = await fetchSnapshotSocialStats(snapshotId, user.id);
+      if (stats) {
+        setActiveCards((prev) =>
+          prev.map((c) => (c.id === context.id ? { ...c, ...stats } : c))
+        );
+      } else {
+        // Fallback optimistic update (less reliable for counts but ok for boolean)
+        setActiveCards((prev) =>
+          prev.map((c) =>
+            c.id === context.id
+              ? {
+                  ...c,
+                  isSavedByCurrentUser: !originalIsSaved,
+                  collectionCount: originalIsSaved
+                    ? Math.max(0, (c.collectionCount || 1) - 1)
+                    : (c.collectionCount || 0) + 1,
+                }
+              : c
+          )
+        );
       }
     },
     [
@@ -458,6 +515,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
       ensureGlobalSnapshot,
       setActiveCards,
       fetchSnapshotSocialStats,
+      supabase,
     ]
   );
 
@@ -484,8 +542,8 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
           snapshotId,
           symbol: cardForComment.symbol,
           name: cardForComment.companyName,
-          workspaceCardId: cardForComment.id, // Store workspace ID
-          type: cardForComment.type, // Store type
+          workspaceCardId: cardForComment.id,
+          type: cardForComment.type,
         });
         setIsCommentDialogOpen(true);
 
@@ -538,7 +596,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
     () => ({
       onLike: handleLikeOrUnlikeCard,
       onComment: handleCommentClick,
-      onSave: handleCaptureCardToCollection,
+      onSave: handleToggleSaveToCollection, // Use the new toggle save function
       onShare: async (context: CardActionContext) => {
         const cardToShare = activeCards.find((c) => c.id === context.id);
         if (!cardToShare) {
@@ -596,7 +654,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
     [
       handleLikeOrUnlikeCard,
       handleCommentClick,
-      handleCaptureCardToCollection,
+      handleToggleSaveToCollection,
       toast,
       activeCards,
       ensureGlobalSnapshot,
@@ -626,6 +684,9 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
     setCardIdToConfirmDelete(null);
   }, []);
 
+  // Determine if the current page is /history for disabling save
+  const isHistoryPage = pathname.startsWith("/history");
+
   return (
     <>
       <ActiveCardsPresentational
@@ -638,13 +699,21 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
           )
         }
         onDeleteCardRequest={handleDeleteRequest}
-        socialInteractions={socialInteractionsForCards}
+        socialInteractions={
+          isHistoryPage
+            ? {
+                ...socialInteractionsForCards,
+                onSave: undefined, // Disable save on history page
+              }
+            : socialInteractionsForCards
+        }
         priceSpecificInteractions={finalPriceSpecificInteractions}
         profileSpecificInteractions={finalProfileSpecificInteractions}
         onHeaderIdentityClick={onHeaderIdentityClick}
         cardIdToConfirmDelete={cardIdToConfirmDelete}
         onConfirmDeletion={confirmDeletion}
         onCancelDeletion={cancelDeletion}
+        isSaveDisabled={isHistoryPage} // Explicit prop to disable save button rendering
       />
       {commentingCardInfo && (
         <CommentDialog

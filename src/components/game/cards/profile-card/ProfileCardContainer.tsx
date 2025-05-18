@@ -26,10 +26,11 @@ interface ProfileCardContainerProps {
   innerCardClassName?: string;
   children?: React.ReactNode;
   isLikedByCurrentUser?: boolean;
-  isSavedByCurrentUser?: boolean; // New prop
+  isSavedByCurrentUser?: boolean;
   likeCount?: number;
   commentCount?: number;
   collectionCount?: number;
+  isSaveDisabled?: boolean;
 }
 
 export const ProfileCardContainer: React.FC<ProfileCardContainerProps> =
@@ -49,10 +50,11 @@ export const ProfileCardContainer: React.FC<ProfileCardContainerProps> =
       innerCardClassName,
       children,
       isLikedByCurrentUser,
-      isSavedByCurrentUser, // Destructure
+      isSavedByCurrentUser,
       likeCount,
       commentCount,
       collectionCount,
+      isSaveDisabled,
     }) => {
       const faceContentForBaseCard = (
         <ProfileCardContent
@@ -85,10 +87,11 @@ export const ProfileCardContainer: React.FC<ProfileCardContainerProps> =
           className={className}
           innerCardClassName={innerCardClassName}
           isLikedByCurrentUser={isLikedByCurrentUser}
-          isSavedByCurrentUser={isSavedByCurrentUser} // Pass down
+          isSavedByCurrentUser={isSavedByCurrentUser}
           likeCount={likeCount}
           commentCount={commentCount}
-          collectionCount={collectionCount}>
+          collectionCount={collectionCount}
+          isSaveDisabled={isSaveDisabled}>
           {children}
         </BaseCard>
       );
