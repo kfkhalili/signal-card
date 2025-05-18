@@ -5,7 +5,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 
 type AuthViewType =
   | "sign_in"
@@ -91,16 +91,14 @@ export default function AuthForm() {
 
   // useEffect for Supabase auth state changes and initial session check
   useEffect(() => {
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (event === "SIGNED_IN") {
-          // Use the hook's searchParams here, which are reactive
-          const nextUrl = searchParams.get("next") || "/";
-          router.push(nextUrl);
-          router.refresh();
-        }
+    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN") {
+        // Use the hook's searchParams here, which are reactive
+        const nextUrl = searchParams.get("next") || "/";
+        router.push(nextUrl);
+        router.refresh();
       }
-    );
+    });
 
     const checkSession = async () => {
       const { data } = await supabase.auth.getSession();

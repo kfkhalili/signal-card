@@ -1,7 +1,6 @@
 // src/components/game/cardRenderers.ts
 import React from "react";
 import type { CardType } from "@/components/game/cards/base-card/base-card.types";
-import type { DisplayableCard } from "@/components/game/types";
 import type {
   CardActionContext,
   BaseCardSocialInteractions,

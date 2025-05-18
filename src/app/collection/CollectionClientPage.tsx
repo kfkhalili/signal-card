@@ -1,12 +1,11 @@
 // src/app/collection/CollectionClientPage.tsx
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import type { ServerFetchedCollectedCard } from "./page"; // Uses new type from page.tsx
 import GameCard from "@/components/game/GameCard";
 import type { DisplayableCard } from "@/components/game/types";
 import type {
-  CardActionContext,
   BaseCardSocialInteractions,
   CardType,
 } from "@/components/game/cards/base-card/base-card.types";
@@ -206,16 +205,6 @@ export default function CollectionClientPage({
             clientCard,
             clientCard.isFlipped
           );
-
-          const cardActionContext: CardActionContext = {
-            id: displayableCardForGameCard.id, // This is snapshot_id
-            symbol: displayableCardForGameCard.symbol,
-            type: displayableCardForGameCard.type,
-            companyName: displayableCardForGameCard.companyName,
-            logoUrl: displayableCardForGameCard.logoUrl,
-            websiteUrl: (displayableCardForGameCard as ProfileCardData)
-              .staticData?.website,
-          };
 
           if (
             !displayableCardForGameCard ||

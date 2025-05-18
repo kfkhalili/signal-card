@@ -20,7 +20,6 @@ import type {
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { Database } from "@/lib/supabase/database.types";
 
 interface LikeApiResponse {
   like: { id: string };
@@ -33,8 +32,6 @@ interface LikeApiResponse {
 // then this should be `Database["public"]["Functions"]["get_snapshot_social_counts"]["Returns"][0]` for a single row type,
 // or just use `Database["public"]["Functions"]["get_snapshot_social_counts"]["Returns"]` if you expect an array.
 // Since our function `RETURNS TABLE` with one row, the generated `Returns` is likely `TYPE[]`.
-type SnapshotSocialCountsRPCResponse =
-  Database["public"]["Functions"]["get_snapshot_social_counts"]["Returns"][0];
 
 function adaptSnapshotToDisplayableCard(
   snapshot: CardSnapshotFromDB,
@@ -160,18 +157,6 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
     setShowComments((prev) => !prev);
   };
 
-  const cardContextForSnapshot: CardActionContext = useMemo(
-    () => ({
-      id: snapshot.id,
-      symbol: snapshot.symbol,
-      type: snapshot.card_type,
-      companyName: snapshot.company_name,
-      logoUrl: snapshot.logo_url,
-      websiteUrl: (snapshot.card_data_snapshot as any)?.staticData?.website,
-    }),
-    [snapshot]
-  );
-
   const handleLikeOrUnlikeCard = useCallback(async () => {
     if (!user || isLoadingSocialStatus) return;
 
@@ -246,7 +231,7 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
           `RPC get_snapshot_social_counts for ${snapshot.id} returned null data property.`
         );
       }
-    } catch (error: any) {
+    } catch {
       toast({ title: "Action Failed", variant: "destructive" });
       setIsLikedByCurrentUserLocal(originalIsLiked);
       setLikeCountLocal(originalLikeCount);
@@ -265,7 +250,7 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
   const socialInteractionsForSnapshot: BaseCardSocialInteractions = useMemo(
     () => ({
       onLike: handleLikeOrUnlikeCard,
-      onComment: (ctx) => setShowComments((prev) => !prev),
+      onComment: () => setShowComments((prev) => !prev),
       onShare: async (context: CardActionContext) => {
         const baseUrl =
           typeof window !== "undefined" ? window.location.origin : "";
@@ -278,7 +263,7 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
             title: "Link Copied!",
             description: "Shareable link copied to clipboard.",
           });
-        } catch (err) {
+        } catch {
           toast({
             title: "Could not copy link.",
             description: "Please copy manually: " + shareUrl,

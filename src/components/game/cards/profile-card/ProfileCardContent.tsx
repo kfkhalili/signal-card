@@ -3,19 +3,16 @@ import React from "react";
 import { CardContent as ShadCardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
-import { cn } from "@/lib/utils";
 import type {
   ProfileCardData,
   ProfileCardInteractionCallbacks,
 } from "./profile-card.types";
 import {
-  ExternalLink,
   Users,
   CalendarDays,
   Building,
   TrendingUp,
   UserCheck,
-  Info,
 } from "lucide-react";
 import { getFlagEmoji, getCountryName } from "@/lib/utils";
 import {

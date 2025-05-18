@@ -8,7 +8,6 @@ import {
   type ProfileDBRow,
 } from "@/hooks/useStockData";
 import type { LiveQuoteIndicatorDBRow } from "@/lib/supabase/realtime-service";
-import type { ExchangeMarketStatusRecord } from "@/types/market.types";
 
 interface StockDataHandlerProps {
   symbol: string;

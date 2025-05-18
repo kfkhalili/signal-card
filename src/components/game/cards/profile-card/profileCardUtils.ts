@@ -1,12 +1,9 @@
 // src/components/game/cards/profile-card/profileCardUtils.ts
 import { format, parseISO, isValid as isValidDate } from "date-fns";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ToastFunctionType } from "@/hooks/use-toast";
 import type { ProfileDBRow } from "@/hooks/useStockData";
 import type {
   DisplayableCard,
   DisplayableCardState,
-  ConcreteCardData,
 } from "@/components/game/types";
 import type {
   ProfileCardData,
@@ -21,7 +18,6 @@ import {
 import {
   registerCardUpdateHandler,
   type CardUpdateHandler,
-  type CardUpdateContext,
 } from "@/components/game/cardUpdateHandler.types";
 import { createPriceCardFaceDataFromLiveQuote } from "../price-card/priceCardUtils";
 import type { LiveQuoteIndicatorDBRow } from "@/lib/supabase/realtime-service";
@@ -40,7 +36,7 @@ export function transformProfileDBRowToStaticData(
       // If direct parsing fails, try parseISO for full ISO 8601
       try {
         date = parseISO(dateString);
-      } catch (e) {
+      } catch {
         /* Ignore parsing error */
       }
     }
@@ -177,12 +173,7 @@ registerCardInitializer("profile", initializeProfileCard);
 const handleProfileCardLiveQuoteUpdate: CardUpdateHandler<
   ProfileCardData,
   LiveQuoteIndicatorDBRow
-> = (
-  currentProfileCardData,
-  leanQuotePayload,
-  currentDisplayableCard,
-  context
-): ProfileCardData => {
+> = (currentProfileCardData, leanQuotePayload): ProfileCardData => {
   const apiTimestampMillis = leanQuotePayload.api_timestamp * 1000;
 
   if (
@@ -268,12 +259,7 @@ registerCardUpdateHandler(
 const handleProfileCardStaticUpdate: CardUpdateHandler<
   ProfileCardData,
   ProfileDBRow
-> = (
-  currentProfileCardData,
-  profilePayload,
-  currentDisplayableCard,
-  context
-): ProfileCardData => {
+> = (currentProfileCardData, profilePayload): ProfileCardData => {
   const newStaticData = transformProfileDBRowToStaticData(profilePayload);
 
   let changed = false;

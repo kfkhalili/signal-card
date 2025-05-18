@@ -9,7 +9,6 @@ import Image from "next/image";
 import type {
   CardActionContext,
   BaseCardSocialInteractions,
-  CardType,
 } from "./base-card.types";
 import { SocialBar } from "@/components/ui/social-bar";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";

@@ -6,11 +6,6 @@ import type {
 } from "@/components/game/types";
 import type { CardType } from "@/components/game/cards/base-card/base-card.types";
 
-// Import specific payload types that handlers will now receive
-import type { ProfileDBRow } from "@/hooks/useStockData"; // This is still correct for profile updates
-import type { LiveQuoteIndicatorDBRow } from "@/lib/supabase/realtime-service"; // For live quote updates
-import type { ExchangeMarketStatusRecord } from "@/types/market.types"; // For exchange status updates
-
 /**
  * Defines known event types for card data updates.
  */

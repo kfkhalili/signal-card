@@ -96,18 +96,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
 
   const ensureGlobalSnapshot = useCallback(
     async (card: DisplayableCard): Promise<string | null> => {
-      const {
-        isFlipped,
-        currentRarity,
-        rarityReason,
-        isLikedByCurrentUser,
-        currentUserLikeId,
-        likeCount,
-        commentCount,
-        collectionCount,
-        isSavedByCurrentUser,
-        ...restOfCardData
-      } = card;
+      const { currentRarity, rarityReason, ...restOfCardData } = card;
 
       let actualCardDataSnapshot: ConcreteCardData;
       if (card.type === "price") {
@@ -627,7 +616,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
               ),
               duration: 10000,
             });
-          } catch (err) {
+          } catch {
             toast({
               title: "Share Link (Manual Copy)",
               description: (

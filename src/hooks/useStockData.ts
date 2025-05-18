@@ -1,17 +1,11 @@
 // src/hooks/useStockData.ts
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import type {
-  SupabaseClient,
-  RealtimeChannel,
-  RealtimePostgresChangesPayload,
-} from "@supabase/supabase-js";
+import type { SupabaseClient, RealtimeChannel } from "@supabase/supabase-js";
 import {
   subscribeToQuoteUpdates as subscribeToLiveQuoteIndicators,
-  type LiveQuotePayload, // This is RealtimePostgresChangesPayload<LiveQuoteIndicatorDBRow>
+  type LiveQuotePayload,
   type SubscriptionStatus as LiveQuoteSubscriptionStatus,
-  // LiveQuoteIndicatorDBSchema is used within realtime-service.ts for its callback,
-  // but we'll use the typed payload directly here if possible.
 } from "@/lib/supabase/realtime-service";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -328,7 +322,7 @@ export function useStockData({
             }
           }
         )
-        .subscribe((status, err) => {
+        .subscribe((status) => {
           if (!isMountedRef.current) return;
           const retrySubscription = () => {
             if (exchangeStatusRetryTimeoutRef.current)
@@ -588,7 +582,7 @@ export function useStockData({
             }
           }
         },
-        (status: LiveQuoteSubscriptionStatus, err?: Error) => {
+        (status: LiveQuoteSubscriptionStatus) => {
           if (!isMountedRef.current || !quoteSubActive) return;
           if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
             if (isMountedRef.current) {

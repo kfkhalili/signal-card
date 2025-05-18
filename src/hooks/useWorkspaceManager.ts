@@ -12,7 +12,6 @@ import type {
 } from "@/components/game/types";
 import type { AddCardFormValues } from "@/components/workspace/AddCardForm";
 import type { PriceCardData } from "@/components/game/cards/price-card/price-card.types";
-import type { ProfileCardData } from "@/components/game/cards/profile-card/profile-card.types";
 
 import { calculateDynamicCardRarity } from "@/components/game/rarityCalculator";
 import { rehydrateCardFromStorage } from "@/components/game/cardRehydration";
@@ -262,12 +261,6 @@ export function useWorkspaceManager({
                 isFlipped,
                 currentRarity,
                 rarityReason,
-                isLikedByCurrentUser,
-                currentUserLikeId,
-                likeCount,
-                commentCount,
-                collectionCount,
-                isSavedByCurrentUser,
                 ...concreteCardData
               } = card;
 
@@ -355,12 +348,6 @@ export function useWorkspaceManager({
                 isFlipped,
                 currentRarity,
                 rarityReason,
-                isLikedByCurrentUser,
-                currentUserLikeId,
-                likeCount,
-                commentCount,
-                collectionCount,
-                isSavedByCurrentUser,
                 ...concreteCardData
               } = card;
               const updatedConcreteData = universalHandler(
