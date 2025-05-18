@@ -9,6 +9,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type {
   DisplayableCard,
   ConcreteCardData,
+  DisplayableCardState, // Import for keyof
 } from "@/components/game/types";
 import type { AddCardFormValues } from "@/components/workspace/AddCardForm";
 import type { PriceCardData } from "@/components/game/cards/price-card/price-card.types";
@@ -35,6 +36,9 @@ import "@/components/game/cards/updateHandlerInitializer";
 const INITIAL_ACTIVE_CARDS: DisplayableCard[] = [];
 const WORKSPACE_LOCAL_STORAGE_KEY = "finSignal-mainWorkspace-v1";
 
+// Define a type for the raw card data as stored in local storage
+type StoredCardRaw = Record<string, unknown>;
+
 interface UseWorkspaceManagerProps {
   isPremiumUser: boolean;
 }
@@ -43,23 +47,47 @@ interface AddCardOptions {
   requestingCardId?: string;
 }
 
+// Helper function to create ConcreteCardData from DisplayableCard
+// by omitting DisplayableCardState properties.
+const getConcreteCardData = (card: DisplayableCard): ConcreteCardData => {
+  const tempCard = { ...card };
+  // Keys of DisplayableCardState to remove
+  const stateKeys: (keyof DisplayableCardState)[] = [
+    "isFlipped",
+    "currentRarity",
+    "rarityReason",
+    "isLikedByCurrentUser",
+    "currentUserLikeId",
+    "likeCount",
+    "commentCount",
+    "isSavedByCurrentUser",
+    "collectionCount",
+  ];
+  for (const key of stateKeys) {
+    delete (tempCard as Partial<DisplayableCardState>)[key];
+  }
+  return tempCard as ConcreteCardData;
+};
+
 export function useWorkspaceManager({
   isPremiumUser,
 }: UseWorkspaceManagerProps) {
   const { toast } = useToast();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
 
-  const [initialCardsFromStorage, setCardsInLocalStorage] = useLocalStorage<
-    DisplayableCard[]
-  >(WORKSPACE_LOCAL_STORAGE_KEY, INITIAL_ACTIVE_CARDS);
+  const [rawCardsFromStorage, setCardsInLocalStorage] = useLocalStorage<
+    StoredCardRaw[]
+  >(WORKSPACE_LOCAL_STORAGE_KEY, []);
 
-  const [activeCards, setActiveCards] = useState<DisplayableCard[]>(() =>
-    Array.isArray(initialCardsFromStorage)
-      ? (initialCardsFromStorage
-          .map(rehydrateCardFromStorage)
-          .filter(Boolean) as DisplayableCard[])
-      : INITIAL_ACTIVE_CARDS
-  );
+  const [activeCards, setActiveCards] = useState<DisplayableCard[]>(() => {
+    if (Array.isArray(rawCardsFromStorage)) {
+      const rehydrated = rawCardsFromStorage
+        .map(rehydrateCardFromStorage)
+        .filter((card): card is DisplayableCard => card !== null);
+      return rehydrated;
+    }
+    return INITIAL_ACTIVE_CARDS;
+  });
 
   const [workspaceSymbolForRegularUser, setWorkspaceSymbolForRegularUser] =
     useState<string | null>(null);
@@ -79,7 +107,7 @@ export function useWorkspaceManager({
   }, [activeCards, isPremiumUser]);
 
   useEffect(() => {
-    setCardsInLocalStorage(activeCards);
+    setCardsInLocalStorage(activeCards as unknown as StoredCardRaw[]);
   }, [activeCards, setCardsInLocalStorage]);
 
   const uniqueSymbolsInWorkspace = useMemo(() => {
@@ -226,7 +254,7 @@ export function useWorkspaceManager({
         const errorMessage =
           error instanceof Error
             ? error.message
-            : "Could not add ${cardType} card.";
+            : `Could not add ${cardType} card.`;
         toast({
           title: "Error Adding Card",
           description: errorMessage,
@@ -247,11 +275,7 @@ export function useWorkspaceManager({
   );
 
   const handleLiveQuoteUpdate = useCallback(
-    (leanQuoteData: LiveQuoteIndicatorDBRow, source: "fetch" | "realtime") => {
-      // if (process.env.NODE_ENV === 'development') {
-      //   console.log(`[useWorkspaceManager] handleLiveQuoteUpdate for ${leanQuoteData.symbol}. Source: ${source}. Price: ${leanQuoteData.current_price}`, JSON.stringify(leanQuoteData));
-      // }
-
+    (leanQuoteData: LiveQuoteIndicatorDBRow) => {
       const updateContext: CardUpdateContext = { toast };
       const eventType: CardUpdateEventType = "LIVE_QUOTE_UPDATE";
 
@@ -261,21 +285,19 @@ export function useWorkspaceManager({
           if (card.symbol === leanQuoteData.symbol) {
             const handler = getCardUpdateHandler(card.type, eventType);
             if (handler) {
-              const {
-                isFlipped,
-                currentRarity,
-                rarityReason,
-                ...concreteCardData
-              } = card;
+              // Extract properties needed locally
+              const { isFlipped, currentRarity, rarityReason } = card;
+              // Get ConcreteCardData for the handler
+              const concreteCardDataForHandler = getConcreteCardData(card);
 
               const updatedConcreteData = handler(
-                concreteCardData as ConcreteCardData,
+                concreteCardDataForHandler,
                 leanQuoteData,
                 card,
                 updateContext
               );
 
-              if (updatedConcreteData !== concreteCardData) {
+              if (updatedConcreteData !== concreteCardDataForHandler) {
                 const tempForRarityCalc = {
                   ...updatedConcreteData,
                   isFlipped,
@@ -285,45 +307,17 @@ export function useWorkspaceManager({
 
                 if (
                   JSON.stringify(updatedConcreteData) !==
-                    JSON.stringify(concreteCardData) ||
+                    JSON.stringify(concreteCardDataForHandler) ||
                   newRarity !== currentRarity ||
                   newRarityReason !== rarityReason
                 ) {
                   overallChanged = true;
-                  const newCard = {
-                    ...card,
+                  const newCard: DisplayableCard = {
+                    ...(card as DisplayableCard),
                     ...updatedConcreteData,
                     currentRarity: newRarity,
                     rarityReason: newRarityReason,
                   };
-
-                  if (
-                    newCard.type === "price" &&
-                    source === "realtime" &&
-                    (newCard as PriceCardData).faceData.price !== null
-                  ) {
-                    const oldPrice = (card as PriceCardData).faceData.price;
-                    const newPrice = (newCard as PriceCardData).faceData.price;
-                    if (oldPrice !== newPrice) {
-                      // setTimeout( // Toasting can be noisy for frequent updates
-                      //   () =>
-                      //     toast({
-                      //       title: `Live Update: ${newCard.symbol}`,
-                      //       description: `$${newPrice?.toFixed(2)} (${
-                      //         (
-                      //           newCard as PriceCardData
-                      //         ).faceData.changePercentage?.toFixed(2) ?? "N/A"
-                      //       }%) ${
-                      //         newCard.currentRarity &&
-                      //         newCard.currentRarity !== "Common"
-                      //           ? `Rarity: ${newCard.currentRarity}`
-                      //           : ""
-                      //       }`,
-                      //     }),
-                      //   0
-                      // );
-                    }
-                  }
                   return newCard;
                 }
               }
@@ -348,19 +342,18 @@ export function useWorkspaceManager({
           if (card.symbol === updatedProfileDBRow.symbol) {
             const universalHandler = getCardUpdateHandler(card.type, eventType);
             if (universalHandler) {
-              const {
-                isFlipped,
-                currentRarity,
-                rarityReason,
-                ...concreteCardData
-              } = card;
+              // Extract properties needed locally
+              const { isFlipped, currentRarity, rarityReason } = card;
+              // Get ConcreteCardData for the handler
+              const concreteCardDataForHandler = getConcreteCardData(card);
+
               const updatedConcreteData = universalHandler(
-                concreteCardData as ConcreteCardData,
+                concreteCardDataForHandler,
                 updatedProfileDBRow,
                 card,
                 updateContext
               );
-              if (updatedConcreteData !== concreteCardData) {
+              if (updatedConcreteData !== concreteCardDataForHandler) {
                 const tempForRarityCalc = {
                   ...updatedConcreteData,
                   isFlipped,
@@ -369,7 +362,7 @@ export function useWorkspaceManager({
                   calculateDynamicCardRarity(tempForRarityCalc);
                 if (
                   JSON.stringify(updatedConcreteData) !==
-                    JSON.stringify(concreteCardData) ||
+                    JSON.stringify(concreteCardDataForHandler) ||
                   newRarity !== currentRarity ||
                   newRarityReason !== rarityReason
                 ) {
@@ -384,12 +377,13 @@ export function useWorkspaceManager({
                       0
                     );
                   }
-                  return {
-                    ...card,
+                  const newCard: DisplayableCard = {
+                    ...(card as DisplayableCard),
                     ...updatedConcreteData,
                     currentRarity: newRarity,
                     rarityReason: newRarityReason,
                   };
+                  return newCard;
                 }
               }
             }
@@ -415,7 +409,7 @@ export function useWorkspaceManager({
   const clearWorkspace = useCallback(() => {
     setActiveCards(INITIAL_ACTIVE_CARDS);
     setWorkspaceSymbolForRegularUser(null);
-    setCardsInLocalStorage(INITIAL_ACTIVE_CARDS);
+    setCardsInLocalStorage([]);
     setTimeout(
       () =>
         toast({

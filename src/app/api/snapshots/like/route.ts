@@ -116,10 +116,10 @@ export async function POST(request: Request): Promise<NextResponse> {
         { status: 400 }
       );
     }
-    return NextResponse.json(
-      { error: `Internal server error: ${error.message || "Unknown error"}` },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      error: `Internal server error: ${errorMessage}`,
+      status: 500,
+    });
   }
 }
 

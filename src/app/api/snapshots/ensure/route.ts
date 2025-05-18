@@ -1,12 +1,11 @@
-// This function will reside within /api/snapshots/ensure/route.ts initially
-// Or can be moved to a shared lib/utils file if used elsewhere.
 // src/app/api/snapshots/ensure/route.ts
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
 import type { CardType } from "@/components/game/cards/base-card/base-card.types";
 import { generateStateHash } from "@/lib/cardUtils";
-import { ConcreteCardData } from "@/components/game/types";
+import type { ConcreteCardData } from "@/components/game/types";
+import type { Json } from "@/lib/supabase/database.types"; // Import the Json type
 
 interface EnsureSnapshotRequestBody {
   cardType: CardType;
@@ -16,22 +15,15 @@ interface EnsureSnapshotRequestBody {
   cardDataSnapshot: ConcreteCardData;
   rarityLevel?: string | null;
   rarityReason?: string | null;
-  // sourceCardId is removed as it's less relevant for a global snapshot
 }
 
 export async function POST(request: Request) {
   const supabase = await createSupabaseServerClient();
-  // User authentication might not be strictly necessary for *ensuring* a global snapshot,
-  // but it's good for audit trails or if there are user-specific limits in the future.
-  // For now, let's keep it simple and assume this can be called by an authenticated user
-  // who is triggering an action that needs a snapshot ID.
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    // Or allow anonymous creation of snapshots if truly global and not tied to user actions yet.
-    // For now, require auth for any write-like operation.
     return NextResponse.json(
       { error: "User not authenticated." },
       { status: 401 }
@@ -45,7 +37,7 @@ export async function POST(request: Request) {
       symbol,
       companyName,
       logoUrl,
-      cardDataSnapshot,
+      cardDataSnapshot, // This is ConcreteCardData
       rarityLevel,
       rarityReason,
     } = body;
@@ -70,7 +62,6 @@ export async function POST(request: Request) {
       rarityReason
     );
 
-    // Check if snapshot already exists
     const { data: existingSnapshot, error: findError } = await supabase
       .from("card_snapshots")
       .select("*")
@@ -92,14 +83,14 @@ export async function POST(request: Request) {
       );
     }
 
-    // Snapshot doesn't exist, create it
     const newSnapshotData = {
       state_hash: stateHash,
       card_type: cardType,
       symbol: symbol,
       company_name: companyName,
       logo_url: logoUrl,
-      card_data_snapshot: cardDataSnapshot, // The ConcreteCardData
+      // Cast ConcreteCardData to unknown, then to Json for Supabase
+      card_data_snapshot: cardDataSnapshot as unknown as Json,
       rarity_level: rarityLevel,
       rarity_reason: rarityReason,
       // first_seen_at is handled by DB default
@@ -107,20 +98,18 @@ export async function POST(request: Request) {
 
     const { data: insertedSnapshot, error: insertError } = await supabase
       .from("card_snapshots")
-      .insert(newSnapshotData)
+      .insert(newSnapshotData) // newSnapshotData now has card_data_snapshot correctly typed for insert
       .select()
       .single();
 
     if (insertError) {
       console.error("Error inserting new snapshot:", insertError);
-      // Handle potential race condition if another request created it just now
       if (insertError.code === "23505") {
-        // unique_violation for state_hash
         const { data: raceSnapshot, error: raceFindError } = await supabase
           .from("card_snapshots")
           .select("*")
           .eq("state_hash", stateHash)
-          .single(); // Should exist now
+          .single();
         if (raceSnapshot) {
           return NextResponse.json(
             { snapshot: raceSnapshot, isNew: false, raceCondition: true },
@@ -144,7 +133,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       { snapshot: insertedSnapshot, isNew: true },
-      { status: 201 } // 201 Created
+      { status: 201 }
     );
   } catch (error: unknown) {
     const errorMessage =

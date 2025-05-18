@@ -2,100 +2,99 @@
 import React from "react";
 import BaseCard from "../base-card/BaseCard";
 import type {
-  CardActionContext,
-  BaseCardSocialInteractions,
-} from "../base-card/base-card.types";
-import type {
-  ProfileCardData,
+  ProfileCardData, // Still useful for internal casting
   ProfileCardInteractionCallbacks,
 } from "./profile-card.types";
 import { ProfileCardContent } from "./ProfileCardContent";
+import type { DisplayableCard } from "../../types"; // Import DisplayableCard
+import type { RegisteredCardRendererProps } from "../../cardRenderers"; // Import the generic props
 
-interface ProfileCardContainerProps {
-  cardData: ProfileCardData;
-  isFlipped: boolean;
-  onFlip: () => void;
-  cardContext: CardActionContext;
-  socialInteractions?: BaseCardSocialInteractions;
-  onDeleteRequest?: (context: CardActionContext) => void;
-  onHeaderIdentityClick?: (context: CardActionContext) => void;
+// Props should align with RegisteredCardRendererProps for cardData,
+// then add any specific interaction props.
+export interface ProfileCardContainerProps
+  extends Omit<
+    RegisteredCardRendererProps,
+    "cardData" | "specificInteractions" | "priceSpecificInteractions"
+  > {
+  cardData: DisplayableCard; // Accept generic DisplayableCard
   specificInteractions?: ProfileCardInteractionCallbacks;
-  currentRarity?: string | null;
-  rarityReason?: string | null;
-  className?: string;
-  innerCardClassName?: string;
-  children?: React.ReactNode;
-  isLikedByCurrentUser?: boolean;
-  isSavedByCurrentUser?: boolean;
-  likeCount?: number;
-  commentCount?: number;
-  collectionCount?: number;
-  isSaveDisabled?: boolean;
 }
 
-export const ProfileCardContainer: React.FC<ProfileCardContainerProps> =
-  React.memo(
-    ({
-      cardData,
-      isFlipped,
-      onFlip,
-      cardContext,
-      currentRarity,
-      rarityReason,
-      socialInteractions,
-      onDeleteRequest,
-      onHeaderIdentityClick,
-      specificInteractions,
-      className,
-      innerCardClassName,
-      children,
-      isLikedByCurrentUser,
-      isSavedByCurrentUser,
-      likeCount,
-      commentCount,
-      collectionCount,
-      isSaveDisabled,
-    }) => {
-      const faceContentForBaseCard = (
-        <ProfileCardContent
-          cardData={cardData}
-          isBackFace={false}
-          interactionCallbacks={specificInteractions}
-        />
+// Changed from: export const ProfileCardContainer: React.FC<ProfileCardContainerProps> = React.memo(...)
+export const ProfileCardContainer = React.memo<ProfileCardContainerProps>(
+  ({
+    cardData,
+    isFlipped,
+    onFlip,
+    cardContext,
+    currentRarity,
+    rarityReason,
+    socialInteractions,
+    onDeleteRequest, // This is inherited as required from RegisteredCardRendererProps
+    onHeaderIdentityClick,
+    specificInteractions,
+    className,
+    innerCardClassName,
+    children,
+    isLikedByCurrentUser,
+    isSavedByCurrentUser,
+    likeCount,
+    commentCount,
+    collectionCount,
+    isSaveDisabled,
+  }) => {
+    // Type guard and assertion
+    if (cardData.type !== "profile") {
+      console.error(
+        "[ProfileCardContainer] Received incorrect card type:",
+        cardData.type
       );
-
-      const backContentForBaseCard = (
-        <ProfileCardContent
-          cardData={cardData}
-          isBackFace={true}
-          interactionCallbacks={specificInteractions}
-        />
-      );
-
-      return (
-        <BaseCard
-          isFlipped={isFlipped}
-          faceContent={faceContentForBaseCard}
-          backContent={backContentForBaseCard}
-          onFlip={onFlip}
-          cardContext={cardContext}
-          currentRarity={currentRarity}
-          rarityReason={rarityReason}
-          socialInteractions={socialInteractions}
-          onDeleteRequest={onDeleteRequest}
-          onHeaderClick={onHeaderIdentityClick}
-          className={className}
-          innerCardClassName={innerCardClassName}
-          isLikedByCurrentUser={isLikedByCurrentUser}
-          isSavedByCurrentUser={isSavedByCurrentUser}
-          likeCount={likeCount}
-          commentCount={commentCount}
-          collectionCount={collectionCount}
-          isSaveDisabled={isSaveDisabled}>
-          {children}
-        </BaseCard>
-      );
+      // Optionally render an error message or null
+      return null;
     }
-  );
+    // Now we can safely use cardData as ProfileCardData
+    const specificCardData = cardData as ProfileCardData;
+
+    const faceContentForBaseCard = (
+      <ProfileCardContent
+        cardData={specificCardData}
+        isBackFace={false}
+        interactionCallbacks={specificInteractions}
+      />
+    );
+
+    const backContentForBaseCard = (
+      <ProfileCardContent
+        cardData={specificCardData}
+        isBackFace={true}
+        interactionCallbacks={specificInteractions}
+      />
+    );
+
+    return (
+      <BaseCard
+        isFlipped={isFlipped}
+        faceContent={faceContentForBaseCard}
+        backContent={backContentForBaseCard}
+        onFlip={onFlip}
+        cardContext={cardContext}
+        currentRarity={currentRarity}
+        rarityReason={rarityReason}
+        socialInteractions={socialInteractions}
+        onDeleteRequest={onDeleteRequest}
+        onHeaderClick={onHeaderIdentityClick}
+        className={className}
+        innerCardClassName={innerCardClassName}
+        isLikedByCurrentUser={isLikedByCurrentUser}
+        isSavedByCurrentUser={isSavedByCurrentUser}
+        likeCount={likeCount}
+        commentCount={commentCount}
+        collectionCount={collectionCount}
+        isSaveDisabled={isSaveDisabled}>
+        {children}
+      </BaseCard>
+    );
+  }
+);
 
 ProfileCardContainer.displayName = "ProfileCardContainer";

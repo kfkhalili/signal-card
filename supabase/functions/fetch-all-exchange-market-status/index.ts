@@ -2,7 +2,7 @@
 import {
   createClient,
   SupabaseClient,
-} from "https://esm.sh/@supabase/supabase-js@2.49.4"; // Or your project's current version
+} from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
 // Standard CORS headers
 const CORS_HEADERS = {

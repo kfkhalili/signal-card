@@ -2,43 +2,28 @@
 import React from "react";
 import BaseCard from "../base-card/BaseCard";
 import type {
-  CardActionContext,
-  BaseCardSocialInteractions,
-} from "../base-card/base-card.types";
-import type {
-  PriceCardData,
+  PriceCardData, // Still useful for internal casting
   PriceCardInteractionCallbacks,
 } from "./price-card.types";
 import { PriceCardContent } from "./PriceCardContent";
+import type { DisplayableCard } from "../../types"; // Import DisplayableCard
+import type { RegisteredCardRendererProps } from "../../cardRenderers"; // Import the generic props
 
-type PriceSpecificInteractions = Pick<
-  PriceCardInteractionCallbacks,
-  | "onPriceCardSmaClick"
-  | "onPriceCardRangeContextClick"
-  | "onPriceCardOpenPriceClick"
-  | "onPriceCardGenerateDailyPerformanceSignal"
->;
-
-interface PriceCardContainerProps {
-  cardData: PriceCardData;
-  isFlipped: boolean;
-  onFlip: () => void;
-  cardContext: CardActionContext;
-  socialInteractions?: BaseCardSocialInteractions;
-  onDeleteRequest?: (context: CardActionContext) => void;
-  onHeaderIdentityClick?: (context: CardActionContext) => void;
-  priceSpecificInteractions?: PriceSpecificInteractions;
-  currentRarity?: string | null;
-  rarityReason?: string | null;
-  className?: string;
-  innerCardClassName?: string;
-  children?: React.ReactNode;
-  isLikedByCurrentUser?: boolean;
-  isSavedByCurrentUser?: boolean;
-  likeCount?: number;
-  commentCount?: number;
-  collectionCount?: number;
-  isSaveDisabled?: boolean; // New prop
+// Props should align with RegisteredCardRendererProps for cardData,
+// then add any specific interaction props.
+export interface PriceCardContainerProps
+  extends Omit<
+    RegisteredCardRendererProps,
+    "cardData" | "specificInteractions" | "priceSpecificInteractions"
+  > {
+  cardData: DisplayableCard; // Accept generic DisplayableCard
+  priceSpecificInteractions?: Pick<
+    PriceCardInteractionCallbacks,
+    | "onPriceCardSmaClick"
+    | "onPriceCardRangeContextClick"
+    | "onPriceCardOpenPriceClick"
+    | "onPriceCardGenerateDailyPerformanceSignal"
+  >;
 }
 
 export const PriceCardContainer = React.memo<PriceCardContainerProps>(
@@ -61,11 +46,23 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
     likeCount,
     commentCount,
     collectionCount,
-    isSaveDisabled, // Destructure
+    isSaveDisabled,
   }) => {
+    // Type guard and assertion
+    if (cardData.type !== "price") {
+      console.error(
+        "[PriceCardContainer] Received incorrect card type:",
+        cardData.type
+      );
+      // Optionally render an error message or null
+      return null;
+    }
+    // Now we can safely use cardData as PriceCardData
+    const specificCardData = cardData as PriceCardData;
+
     const faceContentForBaseCard = (
       <PriceCardContent
-        cardData={cardData}
+        cardData={specificCardData}
         isBackFace={false}
         onSmaClick={priceSpecificInteractions?.onPriceCardSmaClick}
         onRangeContextClick={
@@ -80,7 +77,7 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
 
     const backContentForBaseCard = (
       <PriceCardContent
-        cardData={cardData}
+        cardData={specificCardData}
         isBackFace={true}
         onSmaClick={priceSpecificInteractions?.onPriceCardSmaClick}
         onRangeContextClick={
@@ -109,8 +106,7 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
         likeCount={likeCount}
         commentCount={commentCount}
         collectionCount={collectionCount}
-        isSaveDisabled={isSaveDisabled} /* Pass down */
-      >
+        isSaveDisabled={isSaveDisabled}>
         {children}
       </BaseCard>
     );
