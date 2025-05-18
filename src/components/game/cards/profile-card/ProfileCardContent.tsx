@@ -86,7 +86,7 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
           <ShadCardContent className="pt-1 pb-1 px-0 space-y-1.5 flex-grow">
             {description && (
               <p
-                className="text-muted-foreground text-sm leading-tight line-clamp-3"
+                className="text-muted-foreground text-sm leading-tight line-clamp-5"
                 style={{ minHeight: "6.25em" }}
                 title={description || undefined}>
                 {description}
