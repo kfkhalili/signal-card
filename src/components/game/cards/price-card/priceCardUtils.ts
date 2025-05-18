@@ -1,6 +1,4 @@
 // src/components/game/cards/price-card/priceCardUtils.ts
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ToastFunctionType } from "@/hooks/use-toast";
 import type { ProfileDBRow } from "@/hooks/useStockData";
 import type {
   PriceCardFaceData,
@@ -11,7 +9,6 @@ import type {
   DisplayableCardState,
   DisplayableLivePriceCard,
   DisplayableCard,
-  ConcreteCardData,
 } from "@/components/game/types";
 import type { LiveQuoteIndicatorDBRow } from "@/lib/supabase/realtime-service";
 import {
@@ -20,21 +17,17 @@ import {
 } from "@/components/game/cardInitializer.types";
 import {
   registerCardUpdateHandler,
-  type CardUpdateContext,
   type CardUpdateHandler,
 } from "@/components/game/cardUpdateHandler.types";
-import type { ProfileCardData as ProfileCardDataType } from "../profile-card/profile-card.types"; // Used for casting activeCards
+import type { ProfileCardData as ProfileCardDataType } from "../profile-card/profile-card.types";
 
-/**
- * Creates the face data for a PriceCard from a lean live quote.
- */
 export function createPriceCardFaceDataFromLiveQuote(
   leanQuote: LiveQuoteIndicatorDBRow,
   apiTimestampMillis: number
 ): PriceCardFaceData {
   return {
     timestamp: apiTimestampMillis,
-    price: leanQuote.current_price, // FMP current_price is price on our card
+    price: leanQuote.current_price,
     changePercentage: leanQuote.change_percentage ?? null,
     dayChange: leanQuote.day_change ?? null,
     dayLow: leanQuote.day_low ?? null,
@@ -47,9 +40,6 @@ export function createPriceCardFaceDataFromLiveQuote(
   };
 }
 
-/**
- * Creates the specific back data for a PriceCard from a lean live quote.
- */
 export function createPriceCardBackDataFromLiveQuote(
   leanQuote: LiveQuoteIndicatorDBRow
 ): PriceCardSpecificBackData {
@@ -60,16 +50,11 @@ export function createPriceCardBackDataFromLiveQuote(
   };
 }
 
-/**
- * Creates a new DisplayableLivePriceCard.
- * Used by the Card Initializer.
- * For shell cards, ensure leanQuote.current_price is null or faceData is adjusted post-creation (if mutable).
- */
 export function createDisplayablePriceCard(
-  leanQuote: LiveQuoteIndicatorDBRow, // For shell, current_price might be 0 or an indicator
+  leanQuote: LiveQuoteIndicatorDBRow,
   apiTimestampMillis: number,
   profileContext?: Pick<ProfileDBRow, "company_name" | "image" | "exchange">,
-  isShell: boolean = false // Added flag to indicate shell creation
+  isShell: boolean = false
 ): DisplayableLivePriceCard {
   let faceData = createPriceCardFaceDataFromLiveQuote(
     leanQuote,
@@ -77,11 +62,10 @@ export function createDisplayablePriceCard(
   );
 
   if (isShell) {
-    // For shell cards, ensure price is null and timestamp reflects shell creation.
     faceData = {
       ...faceData,
       price: null,
-      timestamp: apiTimestampMillis, // Use the passed timestamp (now for shells)
+      timestamp: apiTimestampMillis,
     };
   }
 
@@ -92,13 +76,13 @@ export function createDisplayablePriceCard(
   };
 
   const concreteCardData: PriceCardData = {
-    id: `${leanQuote.symbol}-price-${Date.now()}`, // Unique ID
+    id: `${leanQuote.symbol}-price-${Date.now()}`,
     type: "price",
     symbol: leanQuote.symbol,
     createdAt: Date.now(),
     companyName: profileContext?.company_name ?? leanQuote.symbol,
     logoUrl: profileContext?.image ?? null,
-    faceData, // Use the potentially adjusted faceData for shells
+    faceData,
     backData: {
       description: `Market price information for ${leanQuote.symbol}. Includes daily and historical price points, volume, and key moving averages.`,
       ...backSpecificData,
@@ -112,7 +96,6 @@ export function createDisplayablePriceCard(
   } as DisplayableLivePriceCard;
 }
 
-// --- Card Initializer for PriceCard ---
 async function initializePriceCard({
   symbol,
   supabase,
@@ -138,9 +121,9 @@ async function initializePriceCard({
 
     const profileContext = profileCardForSymbol
       ? {
-          company_name: profileCardForSymbol.companyName,
-          image: profileCardForSymbol.logoUrl,
-          exchange: profileCardForSymbol.staticData.exchange_full_name,
+          company_name: profileCardForSymbol.companyName ?? null,
+          image: profileCardForSymbol.logoUrl ?? null,
+          exchange: profileCardForSymbol.staticData.exchange_full_name ?? null,
         }
       : undefined;
 
@@ -150,20 +133,16 @@ async function initializePriceCard({
         liveQuote,
         liveQuote.api_timestamp * 1000,
         profileContext,
-        false // Not a shell
+        false
       );
     } else {
-      // Create a shell card
       const now = Date.now();
       const nowSeconds = Math.floor(now / 1000);
 
       const shellLeanQuote: LiveQuoteIndicatorDBRow = {
-        // id: `${symbol}-shell-${now}`, // id in LiveQuoteIndicatorDBRow comes from DB, not strictly needed for this temporary object
-        // but providing one for completeness if any utility expects it.
-        // However, createDisplayablePriceCard generates its own final card ID.
-        id: `shell-indicator-${now}`, // Or omit if not strictly used by createPriceCardFace/BackDataFromLiveQuote
+        id: `shell-indicator-${now}`,
         symbol: symbol,
-        current_price: 0, // Placeholder, will be effectively nullified by isShell=true
+        current_price: 0,
         api_timestamp: nowSeconds,
         fetched_at: new Date(now).toISOString(),
         exchange: profileContext?.exchange || null,
@@ -183,9 +162,9 @@ async function initializePriceCard({
 
       const shellDisplayableCard = createDisplayablePriceCard(
         shellLeanQuote,
-        now, // apiTimestampMillis for the shell card
+        now,
         profileContext,
-        true // Indicate it's a shell
+        true
       );
 
       if (toast) {
@@ -214,16 +193,10 @@ async function initializePriceCard({
 }
 registerCardInitializer("price", initializePriceCard);
 
-// --- Card Update Handlers ---
 const handlePriceCardLiveQuoteUpdate: CardUpdateHandler<
   PriceCardData,
   LiveQuoteIndicatorDBRow
-> = (
-  currentPriceCardData,
-  leanQuotePayload,
-  currentDisplayableCard,
-  context
-): PriceCardData => {
+> = (currentPriceCardData, leanQuotePayload): PriceCardData => {
   const apiTimestampMillis = leanQuotePayload.api_timestamp * 1000;
 
   if (
@@ -231,11 +204,6 @@ const handlePriceCardLiveQuoteUpdate: CardUpdateHandler<
     apiTimestampMillis < currentPriceCardData.faceData.timestamp &&
     currentPriceCardData.faceData.price !== null
   ) {
-    // if (process.env.NODE_ENV === "development") {
-    //   console.debug(
-    //     `[PriceCardHandler] Stale quote received for ${currentPriceCardData.symbol}, current ts: ${currentPriceCardData.faceData.timestamp}, new ts: ${apiTimestampMillis}, ignoring.`
-    //   );
-    // }
     return currentPriceCardData;
   }
 
@@ -250,10 +218,8 @@ const handlePriceCardLiveQuoteUpdate: CardUpdateHandler<
     JSON.stringify(currentPriceCardData.faceData) !==
     JSON.stringify(newFaceData)
   ) {
-    // More robust check for any change in faceData
     hasSignificantChange = true;
   } else if (
-    // Check backData only if faceData hasn't changed for performance
     currentPriceCardData.backData.marketCap !== newBackData.marketCap ||
     currentPriceCardData.backData.sma50d !== newBackData.sma50d ||
     currentPriceCardData.backData.sma200d !== newBackData.sma200d
@@ -292,20 +258,14 @@ registerCardUpdateHandler(
 const handlePriceCardProfileUpdate: CardUpdateHandler<
   PriceCardData,
   ProfileDBRow
-> = (
-  currentPriceCardData,
-  profilePayload, // This is ProfileDBRow
-  currentDisplayableCard, // Full DisplayableCard for context
-  context // CardUpdateContext { toast }
-): PriceCardData => {
+> = (currentPriceCardData, profilePayload): PriceCardData => {
   let needsUpdate = false;
 
-  // Determine new values, defaulting to current if profile doesn't provide a change
   const newCompanyName =
     profilePayload.company_name ?? currentPriceCardData.companyName;
-  const newLogoUrl = profilePayload.image ?? currentPriceCardData.logoUrl; // FMP profile uses 'image' for logo
+  const newLogoUrl = profilePayload.image ?? currentPriceCardData.logoUrl;
   const newExchangeCode =
-    profilePayload.exchange ?? currentPriceCardData.exchange_code; // 'exchange' from ProfileDBRow
+    profilePayload.exchange ?? currentPriceCardData.exchange_code;
 
   if (newCompanyName !== currentPriceCardData.companyName) {
     needsUpdate = true;
@@ -318,16 +278,15 @@ const handlePriceCardProfileUpdate: CardUpdateHandler<
   }
 
   if (needsUpdate) {
-    // Return a new PriceCardData object with updated fields
     return {
-      ...currentPriceCardData, // Spread all existing properties first
+      ...currentPriceCardData,
       companyName: newCompanyName,
       logoUrl: newLogoUrl,
       exchange_code: newExchangeCode,
     };
   }
 
-  return currentPriceCardData; // No relevant changes, return the original object
+  return currentPriceCardData;
 };
 
 registerCardUpdateHandler(
