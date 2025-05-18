@@ -13,27 +13,26 @@ import type {
   ProfileCardData,
   ProfileCardInteractionCallbacks as ProfileCardSpecificInteractions,
 } from "./cards/profile-card/profile-card.types";
+import type { DisplayableCard } from "./types"; // Import DisplayableCard
 
-// Define a common props interface that GameCard will provide.
-// Specific card containers will receive this and their specific 'cardData' and 'specificInteractions'.
 export interface CommonCardRendererProps {
   isFlipped: boolean;
-  onFlip: () => void; // The flip handler is now specific to the card instance via closure
+  onFlip: () => void;
   cardContext: CardActionContext;
   currentRarity?: string | null;
   rarityReason?: string | null;
   socialInteractions?: BaseCardSocialInteractions;
-  onDeleteRequest: (context: CardActionContext) => void; // GameCard ensures context is passed
+  onDeleteRequest: (context: CardActionContext) => void;
   onHeaderIdentityClick?: (context: CardActionContext) => void;
-  className?: string; // For the outer container styling
-  isLikedByCurrentUser?: boolean; // Passed from DisplayableCard state
+  className?: string;
+  isLikedByCurrentUser?: boolean;
   isSavedByCurrentUser?: boolean;
   likeCount?: number;
   commentCount?: number;
   collectionCount?: number;
+  isSaveDisabled?: boolean;
 }
 
-// This is the expected prop structure for PriceCardContainer
 export type PriceCardRendererProps = CommonCardRendererProps & {
   cardData: PriceCardData;
   priceSpecificInteractions?: Pick<
@@ -45,22 +44,31 @@ export type PriceCardRendererProps = CommonCardRendererProps & {
   >;
 };
 
-// This is the expected prop structure for ProfileCardContainer
 export type ProfileCardRendererProps = CommonCardRendererProps & {
   cardData: ProfileCardData;
   specificInteractions?: ProfileCardSpecificInteractions;
 };
 
-// A union type for all possible renderer props might be useful for advanced typing,
-// but React.ComponentType<any> is often sufficient for the registry value.
-// For this example, we'll keep it simple with React.ComponentType<any> for the registry.
-export type RegisteredCardRenderer = React.ComponentType<any>;
+// Union type for all specific card data types
+type SpecificCardData = PriceCardData | ProfileCardData;
+
+// Props that all registered renderers should accept.
+// This includes common props and a `cardData` prop typed to DisplayableCard.
+export type RegisteredCardRendererProps = CommonCardRendererProps & {
+  cardData: DisplayableCard; // Use DisplayableCard for the actual card data being passed
+  // Include specific interaction props if they can be generalized or are optional
+  priceSpecificInteractions?: PriceSpecificInteractionsForContainer;
+  specificInteractions?: ProfileCardSpecificInteractions; // For ProfileCard
+};
+
+export type RegisteredCardRenderer =
+  React.ComponentType<RegisteredCardRendererProps>;
 
 const cardRendererRegistry = new Map<CardType, RegisteredCardRenderer>();
 
 export function registerCardRenderer(
   cardType: CardType,
-  renderer: RegisteredCardRenderer
+  renderer: RegisteredCardRenderer // Expecting the more specific type
 ): void {
   if (cardRendererRegistry.has(cardType)) {
     if (process.env.NODE_ENV === "development") {
@@ -77,3 +85,12 @@ export function getCardRenderer(
 ): RegisteredCardRenderer | undefined {
   return cardRendererRegistry.get(cardType);
 }
+
+// Helper type for PriceCard specific interactions, if needed elsewhere
+type PriceSpecificInteractionsForContainer = Pick<
+  PriceCardInteractionCallbacks,
+  | "onPriceCardSmaClick"
+  | "onPriceCardRangeContextClick"
+  | "onPriceCardOpenPriceClick"
+  | "onPriceCardGenerateDailyPerformanceSignal"
+>;

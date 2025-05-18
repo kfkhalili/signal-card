@@ -9,7 +9,6 @@ import {
 } from "@/lib/supabase/realtime-service";
 import type { Database } from "@/lib/supabase/database.types";
 
-// Use generated types
 export type ProfileDBRow = Database["public"]["Tables"]["profiles"]["Row"];
 export type LiveQuoteIndicatorDBRow =
   Database["public"]["Tables"]["live_quote_indicators"]["Row"];
@@ -75,15 +74,17 @@ export function useStockData({
 
   useEffect(() => {
     isMountedRef.current = true;
+    const client = supabaseClientRef.current; // Capture the ref value
+
     return () => {
       isMountedRef.current = false;
       if (profileChannelRef.current) {
-        supabaseClientRef.current
+        client // Use captured value
           .removeChannel(profileChannelRef.current)
           .catch((err) =>
             console.error(
               `Error removing profile channel for ${symbol}:`,
-              err.message
+              (err as Error).message
             )
           );
         profileChannelRef.current = null;
@@ -93,12 +94,12 @@ export function useStockData({
         liveQuoteUnsubscribeRef.current = null;
       }
       if (exchangeStatusChannelRef.current) {
-        supabaseClientRef.current
+        client // Use captured value
           .removeChannel(exchangeStatusChannelRef.current)
           .catch((err) =>
             console.error(
               `Error removing exchange status channel for ${currentSubscribedExchangeCode.current}:`,
-              err.message
+              (err as Error).message
             )
           );
         exchangeStatusChannelRef.current = null;
@@ -108,7 +109,7 @@ export function useStockData({
         clearTimeout(exchangeStatusRetryTimeoutRef.current);
       }
     };
-  }, [symbol]);
+  }, [symbol]); // supabaseClientRef is stable, symbol is the key dependency
 
   useEffect(() => {
     if (!isMountedRef.current) return;
@@ -196,6 +197,7 @@ export function useStockData({
   const setupExchangeStatusSubscription = useCallback(
     async (exchangeCodeToSubscribe: string | undefined | null) => {
       if (!isMountedRef.current) return;
+      const client = supabaseClientRef.current; // Capture ref value
 
       if (exchangeStatusRetryTimeoutRef.current) {
         clearTimeout(exchangeStatusRetryTimeoutRef.current);
@@ -208,12 +210,12 @@ export function useStockData({
           !exchangeCodeToSubscribe)
       ) {
         if (exchangeStatusChannelRef.current) {
-          await supabaseClientRef.current
+          await client // Use captured value
             .removeChannel(exchangeStatusChannelRef.current)
             .catch((e) =>
               console.error(
                 "Error removing old exchange status channel",
-                e.message
+                (e as Error).message
               )
             );
           exchangeStatusChannelRef.current = null;
@@ -244,25 +246,23 @@ export function useStockData({
       }
 
       try {
-        const { data, error } = await supabaseClientRef.current
+        const { data, error } = await client // Use captured value
           .from("exchange_market_status")
           .select("*")
           .eq("exchange_code", exchangeCodeToSubscribe)
-          .single(); // data is ExchangeMarketStatusRecord | null
+          .single();
 
         if (!isMountedRef.current) return;
 
         if (error && error.code !== "PGRST116") {
-          // PGRST116: 0 rows, not an error for .single()
           throw error;
         }
 
         if (isMountedRef.current) {
-          setExchangeStatus(data); // data is already ExchangeMarketStatusRecord | null
+          setExchangeStatus(data);
           if (data && onExchangeStatusUpdate) {
             onExchangeStatusUpdate(data);
           } else if (!data) {
-            // No data found for this exchange
             setDerivedMarketStatus("Unknown");
             setMarketStatusMessage(
               `No market status data found for exchange: ${exchangeCodeToSubscribe}.`
@@ -282,12 +282,12 @@ export function useStockData({
       }
 
       if (exchangeStatusChannelRef.current) {
-        await supabaseClientRef.current
+        await client // Use captured value
           .removeChannel(exchangeStatusChannelRef.current)
           .catch((e) =>
             console.error(
               "Error removing stale exchange status channel",
-              e.message
+              (e as Error).message
             )
           );
         exchangeStatusChannelRef.current = null;
@@ -296,9 +296,9 @@ export function useStockData({
       const channelName = `exchange-status-${exchangeCodeToSubscribe
         .toLowerCase()
         .replace(/[^a-z0-9_.-]/gi, "-")}-${instanceIdRef.current}`;
-      const channel = supabaseClientRef.current
+      const channel = client // Use captured value
         .channel(channelName)
-        .on<ExchangeMarketStatusRecord>( // Realtime payload.new will be Partial<ExchangeMarketStatusRecord>
+        .on<ExchangeMarketStatusRecord>(
           "postgres_changes",
           {
             event: "*",
@@ -312,9 +312,6 @@ export function useStockData({
               if (isMountedRef.current) setExchangeStatus(null);
               return;
             }
-            // Assuming payload.new is a complete ExchangeMarketStatusRecord for INSERT/UPDATE
-            // If it can be partial, you might need to merge with existing state or re-fetch.
-            // For simplicity, we'll assume it's complete for now.
             const newRecord = payload.new as ExchangeMarketStatusRecord;
             if (isMountedRef.current) {
               setExchangeStatus(newRecord);
@@ -365,7 +362,7 @@ export function useStockData({
         });
       exchangeStatusChannelRef.current = channel;
     },
-    [onExchangeStatusUpdate] // Removed 'symbol' as it's not directly used in this callback's logic
+    [onExchangeStatusUpdate]
   );
 
   useEffect(() => {
@@ -376,20 +373,21 @@ export function useStockData({
       return;
     }
     let profileSubActive = true;
+    const client = supabaseClientRef.current; // Capture ref value
 
     const fetchInitialProfileAndSubscribe = async () => {
       try {
-        const { data, error } = await supabaseClientRef.current
+        const { data, error } = await client // Use captured value
           .from("profiles")
-          .select("*") // Selects all columns as defined by ProfileDBRow
+          .select("*")
           .eq("symbol", symbol)
-          .maybeSingle(); // data is ProfileDBRow | null
+          .maybeSingle();
 
         if (!profileSubActive || !isMountedRef.current) return;
         if (error) throw error;
 
         if (isMountedRef.current) {
-          setProfileData(data); // data is already ProfileDBRow | null
+          setProfileData(data);
           if (data && onProfileUpdate) {
             onProfileUpdate(data);
           }
@@ -418,10 +416,13 @@ export function useStockData({
       }
 
       if (profileChannelRef.current) {
-        await supabaseClientRef.current
+        await client // Use captured value
           .removeChannel(profileChannelRef.current)
           .catch((e) =>
-            console.error("Error removing stale profile channel", e.message)
+            console.error(
+              "Error removing stale profile channel",
+              (e as Error).message
+            )
           );
         profileChannelRef.current = null;
       }
@@ -429,7 +430,7 @@ export function useStockData({
       const channelName = `profile-${symbol
         .toLowerCase()
         .replace(/[^a-z0-9_.-]/gi, "-")}-${instanceIdRef.current}`;
-      const channel = supabaseClientRef.current
+      const channel = client // Use captured value
         .channel(channelName)
         .on<ProfileDBRow>(
           "postgres_changes",
@@ -442,12 +443,7 @@ export function useStockData({
           (payload) => {
             if (!isMountedRef.current || !profileSubActive || !payload.new)
               return;
-            // payload.new is Partial<ProfileDBRow>
-            // To maintain ProfileDBRow | null state, we might need to merge or ensure all fields
-            // For simplicity, if an update comes, we assume it's the full new state or enough to update.
-            // If payload.new is truly Partial, you might need to fetch the full row or merge.
-            // However, Supabase Realtime UPDATE often sends the complete new row.
-            const updatedRecord = payload.new as ProfileDBRow; // Cast if confident it's full
+            const updatedRecord = payload.new as ProfileDBRow;
             if (isMountedRef.current) {
               setProfileData(updatedRecord);
               if (onProfileUpdate) onProfileUpdate(updatedRecord);
@@ -483,13 +479,14 @@ export function useStockData({
 
     return () => {
       profileSubActive = false;
+      // client is already captured
       if (profileChannelRef.current) {
-        supabaseClientRef.current
+        client
           .removeChannel(profileChannelRef.current)
           .catch((e) =>
             console.error(
               "Error removing profile channel on cleanup",
-              e.message
+              (e as Error).message
             )
           );
         profileChannelRef.current = null;
@@ -503,6 +500,7 @@ export function useStockData({
       return;
     }
     let quoteSubActive = true;
+    const client = supabaseClientRef.current; // Capture ref value
 
     const setupQuoteSub = async () => {
       if (liveQuoteUnsubscribeRef.current) {
@@ -511,20 +509,20 @@ export function useStockData({
       }
 
       try {
-        const { data, error } = await supabaseClientRef.current
+        const { data, error } = await client // Use captured value
           .from("live_quote_indicators")
           .select("*")
           .eq("symbol", symbol)
           .order("fetched_at", { ascending: false })
           .limit(1)
-          .single(); // data is LiveQuoteIndicatorDBRow | null
+          .single();
 
         if (!quoteSubActive || !isMountedRef.current) return;
 
         if (error && error.code !== "PGRST116") throw error;
 
         if (isMountedRef.current) {
-          setLatestQuote(data); // data is already LiveQuoteIndicatorDBRow | null
+          setLatestQuote(data);
           if (data && onLiveQuoteUpdate) {
             onLiveQuoteUpdate(data, "fetch");
           }
@@ -537,7 +535,7 @@ export function useStockData({
           } else if (
             !currentExchange &&
             currentSubscribedExchangeCode.current &&
-            !profileData?.exchange
+            !profileData?.exchange // Check profileData as well before nullifying
           ) {
             setupExchangeStatusSubscription(null);
           }
@@ -557,16 +555,14 @@ export function useStockData({
       liveQuoteUnsubscribeRef.current = subscribeToLiveQuoteIndicators(
         symbol,
         (payload: LiveQuotePayload) => {
-          // payload is RealtimePostgresChangesPayload<LiveQuoteIndicatorDBRow>
           if (
             !isMountedRef.current ||
             !quoteSubActive ||
             payload.eventType === "DELETE" ||
-            !payload.new // payload.new is Partial<LiveQuoteIndicatorDBRow>
+            !payload.new
           )
             return;
 
-          // Assuming payload.new contains the full row for INSERT/UPDATE from Realtime
           const newQuoteRecord = payload.new as LiveQuoteIndicatorDBRow;
           if (isMountedRef.current) {
             setLatestQuote(newQuoteRecord);
@@ -582,7 +578,7 @@ export function useStockData({
             } else if (
               !newExchange &&
               currentSubscribedExchangeCode.current &&
-              !profileData?.exchange
+              !profileData?.exchange // Check profileData as well
             ) {
               setupExchangeStatusSubscription(null);
             }
@@ -617,7 +613,7 @@ export function useStockData({
         liveQuoteUnsubscribeRef.current = null;
       }
     };
-  }, [symbol, onLiveQuoteUpdate, setupExchangeStatusSubscription, profileData]);
+  }, [symbol, onLiveQuoteUpdate, setupExchangeStatusSubscription, profileData]); // Added profileData
 
   return { derivedMarketStatus, marketStatusMessage };
 }

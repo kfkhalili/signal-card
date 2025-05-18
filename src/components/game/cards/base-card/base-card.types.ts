@@ -17,7 +17,6 @@ export interface BaseCardData {
   readonly websiteUrl?: string | null;
 }
 
-// Context for Actions passed to BaseCard and its children
 export interface CardActionContext {
   readonly id: string;
   readonly symbol: string;
@@ -27,7 +26,6 @@ export interface CardActionContext {
   readonly websiteUrl?: string | null;
 }
 
-// Social Interactions (remains the same)
 export interface BaseCardSocialInteractions {
   readonly onLike?: (context: CardActionContext) => void;
   readonly onComment?: (context: CardActionContext) => void;
@@ -35,10 +33,9 @@ export interface BaseCardSocialInteractions {
   readonly onShare?: (context: CardActionContext) => void;
 }
 
-// Generic Card Data Point Interactions (remains the same)
 export interface DataPoint<TDetails = unknown> {
   readonly elementType: string;
-  readonly value?: any;
+  readonly value?: unknown; // Changed from any
   readonly details?: TDetails;
 }
 

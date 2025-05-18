@@ -20,6 +20,8 @@ import type {
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/supabase/database.types";
 
 interface LikeApiResponse {
   like: { id: string };
@@ -27,11 +29,12 @@ interface LikeApiResponse {
   isAlreadyLiked?: boolean;
 }
 
-// Use the generated type for the RPC response.
-// If `get_snapshot_social_counts` in database.types.ts has Returns as an array (e.g. `SomeType[]`),
-// then this should be `Database["public"]["Functions"]["get_snapshot_social_counts"]["Returns"][0]` for a single row type,
-// or just use `Database["public"]["Functions"]["get_snapshot_social_counts"]["Returns"]` if you expect an array.
-// Since our function `RETURNS TABLE` with one row, the generated `Returns` is likely `TYPE[]`.
+// Define the expected structure of the RPC response if it's a single object per snapshot
+interface SnapshotSocialCountsRPCResponse {
+  like_count: number;
+  comment_count: number;
+  collection_count: number;
+}
 
 function adaptSnapshotToDisplayableCard(
   snapshot: CardSnapshotFromDB,
@@ -97,8 +100,10 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
 
   const { toast } = useToast();
   const { user } = useAuth();
-  // Explicitly type the Supabase client with the generated Database type
-  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const supabase = useMemo(
+    () => createSupabaseBrowserClient() as SupabaseClient<Database>,
+    []
+  );
 
   useEffect(() => {
     if (isHighlighted && itemRef.current) {
@@ -184,37 +189,40 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
         });
     try {
       const response = await apiCall;
-      const result = (await response.json()) as LikeApiResponse;
+      const result = await response.json(); // Keep as unknown for now
       if (
         !response.ok &&
-        !(response.status === 200 && result.isAlreadyLiked) &&
+        !(
+          (
+            response.status === 200 &&
+            (result as LikeApiResponse).isAlreadyLiked
+          ) // Cast for this specific check
+        ) &&
         response.status !== 404
       ) {
         throw new Error(
-          (result as any).error ||
+          (result as { error?: string }).error || // Cast for error message access
             `Like/Unlike failed (status ${response.status})`
         );
       }
       toast({ title: originalIsLiked ? "Unliked!" : "Liked!" });
-      if (!originalIsLiked && result.like) {
-        setCurrentUserLikeIdLocal(result.like.id);
+      if (!originalIsLiked && (result as LikeApiResponse).like) {
+        // Cast for accessing like property
+        setCurrentUserLikeIdLocal((result as LikeApiResponse).like.id);
       }
 
+      // Assuming get_snapshot_social_counts returns an array of objects matching SnapshotSocialCountsRPCResponse
       const { data: rpcResponseData, error: rpcError } = await supabase.rpc(
         "get_snapshot_social_counts",
         { p_snapshot_id: snapshot.id }
       );
-      // `.returns` is not needed here if the client is typed with `Database`
-      // The type will be inferred from `Database["public"]["Functions"]["get_snapshot_social_counts"]["Returns"]`
 
       if (rpcError) {
         console.warn("Error refetching counts via RPC:", rpcError.message);
       } else if (rpcResponseData && rpcResponseData.length > 0) {
-        // rpcResponseData is Database["public"]["Functions"]["get_snapshot_social_counts"]["Returns"]
-        // which is likely SnapshotSocialCountsRPCResponse[]
-        const updatedCounts = rpcResponseData[0]; // Get the first (and only) row
+        const updatedCounts =
+          rpcResponseData[0] as SnapshotSocialCountsRPCResponse; // Cast the first element
         if (updatedCounts) {
-          // Check if updatedCounts itself is not null/undefined after indexing
           setLikeCountLocal(updatedCounts.like_count);
           setCommentCountLocal(updatedCounts.comment_count);
           setCollectionCountLocal(updatedCounts.collection_count);
@@ -228,12 +236,12 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
           `RPC get_snapshot_social_counts for ${snapshot.id} returned no data (empty array).`
         );
       } else if (!rpcResponseData) {
-        // This case handles if rpcResponseData is null
         console.warn(
           `RPC get_snapshot_social_counts for ${snapshot.id} returned null data property.`
         );
       }
-    } catch {
+    } catch (error: Error | { message?: string } | unknown) {
+      // Broader catch type
       toast({ title: "Action Failed", variant: "destructive" });
       setIsLikedByCurrentUserLocal(originalIsLiked);
       setLikeCountLocal(originalLikeCount);
@@ -305,7 +313,8 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
       );
       setCommentCountLocal((prev) => prev + 1);
     } else if (rpcResponseData && rpcResponseData.length > 0) {
-      const updatedCounts = rpcResponseData[0];
+      const updatedCounts =
+        rpcResponseData[0] as SnapshotSocialCountsRPCResponse;
       if (updatedCounts) {
         setLikeCountLocal(updatedCounts.like_count);
         setCommentCountLocal(updatedCounts.comment_count);
@@ -366,7 +375,9 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
             onToggleFlip={() =>
               toast({ title: "Flip action is disabled for history items." })
             }
-            onDeleteCardRequest={() => {}}
+            onDeleteCardRequest={() => {
+              /* Deletion is not applicable here */
+            }}
             socialInteractions={socialInteractionsForSnapshot}
             likeCount={likeCountLocal}
             commentCount={commentCountLocal}

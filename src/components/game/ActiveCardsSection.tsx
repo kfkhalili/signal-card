@@ -14,10 +14,15 @@ import type {
 import { getPriceCardInteractionHandlers } from "./cards/price-card/priceCardInteractions";
 import { getProfileCardInteractionHandlers } from "./cards/profile-card/profileCardInteractions";
 import type { ProfileCardInteractionCallbacks } from "./cards/profile-card/profile-card.types";
-import type { PriceCardInteractionCallbacks } from "./cards/price-card/price-card.types";
+import type {
+  PriceCardData,
+  PriceCardInteractionCallbacks,
+} from "./cards/price-card/price-card.types";
 import { useAuth } from "@/contexts/AuthContext";
 import { CommentDialog } from "@/components/comments/CommentDialog";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/supabase/database.types";
 
 export interface EnsureSnapshotRequestBody {
   cardType: APICardType;
@@ -77,14 +82,17 @@ interface CommentingCardInfo {
 const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
   activeCards,
   setActiveCards,
-  profileSpecificInteractions,
-  priceSpecificInteractions,
+  profileSpecificInteractions: initialProfileInteractions, // Renamed to avoid conflict
+  priceSpecificInteractions: initialPriceInteractions, // Renamed to avoid conflict
   onHeaderIdentityClick,
 }) => {
   const { toast } = useAppToast();
   const { user, isLoading: isLoadingAuth } = useAuth();
   const pathname = usePathname();
-  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const supabase = useMemo(
+    () => createSupabaseBrowserClient() as SupabaseClient<Database>,
+    []
+  );
 
   const [cardIdToConfirmDelete, setCardIdToConfirmDelete] = useState<
     string | null
@@ -107,6 +115,8 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
           logoUrl: card.logoUrl,
           faceData: card.faceData,
           backData: card.backData,
+          // Ensure exchange_code is handled if it's part of PriceCardData for snapshot
+          exchange_code: (card as PriceCardData).exchange_code,
         };
       } else if (card.type === "profile") {
         actualCardDataSnapshot = {
@@ -122,11 +132,11 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
           websiteUrl: card.websiteUrl,
         };
       } else {
-        const unknownCardType = (card as any).type;
+        const unknownCardType = (card as DisplayableCard).type;
         console.error("Unknown card type for snapshot:", unknownCardType);
         toast({
           title: "Snapshot Error",
-          description: `Unknown card type: ${unknownCardType}.`,
+          description: `Unknown card type: ${String(unknownCardType)}.`,
           variant: "destructive",
         });
         return null;
@@ -148,10 +158,10 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(requestBody),
         });
-        const result = (await response.json()) as SnapshotEnsureResponse;
+        const result = (await response.json()) as SnapshotEnsureResponse; // Type assertion
         if (!response.ok)
           throw new Error(
-            (result as any).error ||
+            (result as { error?: string }).error || // Type assertion for error case
               `Failed to ensure snapshot (status ${response.status})`
           );
         return result.snapshot.id;
@@ -189,7 +199,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
               .eq("snapshot_id", snapshotId),
             supabase
               .from("user_collections")
-              .select("id", { count: "exact", head: true }) // Fetching count of user_collections entries for this snapshot
+              .select("id", { count: "exact", head: true })
               .eq("snapshot_id", snapshotId),
             currentUserId
               ? supabase
@@ -200,9 +210,9 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
                   .maybeSingle()
               : Promise.resolve({ data: null, error: null }),
             currentUserId
-              ? supabase // Check if this user has this snapshot in their collection
+              ? supabase
                   .from("user_collections")
-                  .select("id") // just need to know if it exists
+                  .select("id")
                   .eq("snapshot_id", snapshotId)
                   .eq("user_id", currentUserId)
                   .maybeSingle()
@@ -241,7 +251,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
           collectionCount: collections.count || 0,
           isLikedByCurrentUser: !!userLike.data,
           currentUserLikeId: userLike.data?.id,
-          isSavedByCurrentUser: !!userSave.data, // True if userSave.data exists
+          isSavedByCurrentUser: !!userSave.data,
         };
       } catch (error) {
         console.error(
@@ -303,7 +313,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
           response.status !== 404
         ) {
           throw new Error(
-            (result as any).error ||
+            (result as { error?: string }).error || // Type assertion
               `Like/Unlike failed (status ${response.status})`
           );
         }
@@ -321,7 +331,6 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
             prev.map((c) => (c.id === context.id ? { ...c, ...stats } : c))
           );
         } else {
-          // Fallback optimistic update
           setActiveCards((prev) =>
             prev.map((c) =>
               c.id === context.id
@@ -382,14 +391,11 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
       const originalIsSaved = cardToToggleSave.isSavedByCurrentUser;
 
       if (originalIsSaved) {
-        // UN-SAVE card from collection
         toast({
           title: "Removing from Collection...",
           description: `Snapshot for ${cardToToggleSave.symbol}...`,
         });
         try {
-          // We need the user_collections.id to delete.
-          // Since we don't store it on the activeCard, we first fetch it.
           const { data: collectionEntry, error: fetchError } = await supabase
             .from("user_collections")
             .select("id")
@@ -423,16 +429,14 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
           });
         } catch (error: unknown) {
           const errorMessage =
-            error instanceof Error ? error.message : "unknown error occured";
+            error instanceof Error ? error.message : "unknown error occurred";
           toast({
             title: "Removal Failed",
             description: errorMessage,
             variant: "destructive",
           });
-          // No optimistic update for removal error, rely on fetchSnapshotSocialStats to correct
         }
       } else {
-        // SAVE card to collection
         toast({
           title: "Saving to Collection...",
           description: `Snapshot for ${cardToToggleSave.symbol}...`,
@@ -441,7 +445,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
           const addResponse = await fetch("/api/collections/add", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ snapshotId }),
+            body: JSON.stringify({ snapshot_id: snapshotId, user_id: user.id }), // Ensure user_id is sent
           });
           const addResult = await addResponse.json();
           if (
@@ -477,14 +481,12 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
         }
       }
 
-      // Always refetch stats to update UI correctly
       const stats = await fetchSnapshotSocialStats(snapshotId, user.id);
       if (stats) {
         setActiveCards((prev) =>
           prev.map((c) => (c.id === context.id ? { ...c, ...stats } : c))
         );
       } else {
-        // Fallback optimistic update (less reliable for counts but ok for boolean)
         setActiveCards((prev) =>
           prev.map((c) =>
             c.id === context.id
@@ -589,7 +591,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
     () => ({
       onLike: handleLikeOrUnlikeCard,
       onComment: handleCommentClick,
-      onSave: handleToggleSaveToCollection, // Use the new toggle save function
+      onSave: handleToggleSaveToCollection,
       onShare: async (context: CardActionContext) => {
         const cardToShare = activeCards.find((c) => c.id === context.id);
         if (!cardToShare) {
@@ -654,16 +656,21 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
     ]
   );
 
-  const finalPriceSpecificInteractions =
-    priceSpecificInteractions ||
-    useMemo(() => getPriceCardInteractionHandlers(toast), [toast]);
-  const finalProfileSpecificInteractions =
-    profileSpecificInteractions ||
-    useMemo(() => getProfileCardInteractionHandlers(toast), [toast]);
+  // Correctly call useMemo unconditionally
+  const finalPriceSpecificInteractions = useMemo(() => {
+    return initialPriceInteractions || getPriceCardInteractionHandlers(toast);
+  }, [initialPriceInteractions, toast]);
+
+  const finalProfileSpecificInteractions = useMemo(() => {
+    return (
+      initialProfileInteractions || getProfileCardInteractionHandlers(toast)
+    );
+  }, [initialProfileInteractions, toast]);
 
   const handleDeleteRequest = useCallback((cardId: string): void => {
     setCardIdToConfirmDelete(cardId);
   }, []);
+
   const confirmDeletion = useCallback((): void => {
     if (cardIdToConfirmDelete) {
       setActiveCards((prevCards) =>
@@ -673,11 +680,11 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
       setCardIdToConfirmDelete(null);
     }
   }, [cardIdToConfirmDelete, toast, setActiveCards]);
+
   const cancelDeletion = useCallback((): void => {
     setCardIdToConfirmDelete(null);
   }, []);
 
-  // Determine if the current page is /history for disabling save
   const isHistoryPage = pathname.startsWith("/history");
 
   return (
@@ -696,7 +703,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
           isHistoryPage
             ? {
                 ...socialInteractionsForCards,
-                onSave: undefined, // Disable save on history page
+                onSave: undefined,
               }
             : socialInteractionsForCards
         }
@@ -706,7 +713,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
         cardIdToConfirmDelete={cardIdToConfirmDelete}
         onConfirmDeletion={confirmDeletion}
         onCancelDeletion={cancelDeletion}
-        isSaveDisabled={isHistoryPage} // Explicit prop to disable save button rendering
+        isSaveDisabled={isHistoryPage}
       />
       {commentingCardInfo && (
         <CommentDialog

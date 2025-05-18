@@ -10,22 +10,16 @@ import type {
   ProfileCardLiveData,
 } from "./profile-card.types";
 import type { BaseCardBackData } from "../base-card/base-card.types";
-
-// Helper function to truncate text (can be moved to a shared utils if used elsewhere)
-// const truncateText = (text: string | null | undefined, maxLength: number): string => {
-//   if (!text) return "";
-//   if (text.length <= maxLength) return text;
-//   return text.substring(0, maxLength).trimEnd() + "...";
-// };
+import type { DisplayableCard } from "../../types"; // Import DisplayableCard
 
 const rehydrateProfileCardInstance: SpecificCardRehydrator = (
-  cardFromStorage: any,
+  cardFromStorage: Partial<DisplayableCard> & { type: "profile" }, // More specific type
   commonProps: CommonCardPropsForRehydration
 ): ProfileCardData | null => {
-  const staticDataFromStorage = cardFromStorage?.staticData || {};
-  const liveDataFromStorage = cardFromStorage?.liveData || {};
-  // Note: cardFromStorage.backData?.description might be an old company description.
-  // We will overwrite it with the generic card type description.
+  const staticDataFromStorage =
+    (cardFromStorage as ProfileCardData)?.staticData || {}; // Cast to access staticData
+  const liveDataFromStorage =
+    (cardFromStorage as ProfileCardData)?.liveData || {}; // Cast to access liveData
 
   const rehydratedStaticData: ProfileCardStaticData = {
     db_id: staticDataFromStorage.db_id || "",
@@ -33,6 +27,7 @@ const rehydrateProfileCardInstance: SpecificCardRehydrator = (
     industry: staticDataFromStorage.industry ?? null,
     country: staticDataFromStorage.country ?? null,
     exchange_full_name: staticDataFromStorage.exchange_full_name ?? null,
+    exchange: staticDataFromStorage.exchange ?? null,
     website: staticDataFromStorage.website ?? null,
     description: staticDataFromStorage.description ?? null,
     ceo: staticDataFromStorage.ceo ?? null,
@@ -58,9 +53,10 @@ const rehydrateProfileCardInstance: SpecificCardRehydrator = (
     volume: liveDataFromStorage.volume ?? null,
     yearHigh: liveDataFromStorage.yearHigh ?? null,
     yearLow: liveDataFromStorage.yearLow ?? null,
+    previousClose: liveDataFromStorage.previousClose ?? null,
+    dayOpen: liveDataFromStorage.dayOpen ?? null,
   };
 
-  // Generic description for the Profile Card type itself
   const cardTypeDescription = `Provides an overview of ${
     commonProps.companyName || commonProps.symbol
   }'s company profile, including sector, industry, and key operational highlights.`;
@@ -78,7 +74,8 @@ const rehydrateProfileCardInstance: SpecificCardRehydrator = (
     logoUrl: commonProps.logoUrl,
     staticData: rehydratedStaticData,
     liveData: rehydratedLiveData,
-    backData: rehydratedBackData, // Contains the generic card type description
+    backData: rehydratedBackData,
+    websiteUrl: staticDataFromStorage.website ?? null, // Ensure websiteUrl is correctly assigned
   };
 
   return rehydratedCard;

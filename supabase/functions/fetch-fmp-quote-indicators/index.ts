@@ -63,6 +63,7 @@ const SYMBOLS_TO_PROCESS: string[] = [
   "TSLA",
   "NVDA",
   "AMD",
+  "GME",
   "BTCUSD",
   "ETHUSD",
   "ADAUSD",

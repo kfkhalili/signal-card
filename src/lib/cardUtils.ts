@@ -7,14 +7,15 @@ import { ConcreteCardData } from "@/components/game/types";
  * Recursively sorts object keys for consistent JSON stringification.
  * Handles nested objects and arrays.
  */
-function stableStringifyReplacer(key: string, value: any): any {
+function stableStringifyReplacer(_key: string, value: unknown): unknown {
+  // If the value is an object (but not an array or null), sort its keys
   if (value && typeof value === "object" && !Array.isArray(value)) {
-    return Object.keys(value)
-      .sort()
-      .reduce((sortedObj, k) => {
-        sortedObj[k] = value[k];
-        return sortedObj;
-      }, {} as any);
+    const sortedKeys = Object.keys(value).sort();
+    const sortedObject: Record<string, unknown> = {};
+    for (const k of sortedKeys) {
+      sortedObject[k] = (value as Record<string, unknown>)[k];
+    }
+    return sortedObject;
   }
   return value;
 }
@@ -22,8 +23,6 @@ function stableStringifyReplacer(key: string, value: any): any {
 export function generateStateHash(
   cardType: CardType,
   symbol: string,
-  // snapshotData is the ConcreteCardData (e.g., PriceCardData, ProfileCardData)
-  // It contains all specific fields for that card type (faceData, backData, staticData, liveData etc.)
   snapshotData: ConcreteCardData,
   rarityLevel?: string | null,
   rarityReason?: string | null
@@ -35,7 +34,6 @@ export function generateStateHash(
     `rarityR:${rarityReason ?? "NULL"}`,
   ].join("|");
 
-  // Stringify the entire specific card data object with sorted keys for consistency
   const snapshotDataString = JSON.stringify(
     snapshotData,
     stableStringifyReplacer

@@ -2,55 +2,47 @@
  * src/app/components/game/cards/base-card/BaseCardContainer.tsx
  */
 import React from "react";
-import BaseCard from "./BaseCard"; // Assumes BaseCard now expects social props
+import BaseCard from "./BaseCard";
 import type {
   BaseCardData,
   OnCardInteraction,
   BaseCardContainerDataPointDetails,
-  CardActionContext, // Import for constructing cardContext
-  BaseCardSocialInteractions, // Import for the new prop
+  CardActionContext,
+  BaseCardSocialInteractions,
 } from "./base-card.types";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
 
 interface BaseCardContainerProps {
-  cardData: BaseCardData; // Provides id, symbol, type for cardContext
+  cardData: BaseCardData;
   isFlipped: boolean;
   onFlip: () => void;
   onCardInteraction?: OnCardInteraction<
     BaseCardData,
     BaseCardContainerDataPointDetails
   >;
-
-  // New prop to pass social interactions down to BaseCard
   socialInteractions?: BaseCardSocialInteractions;
-
   className?: string;
   innerCardClassName?: string;
-  // BaseCardContainer itself doesn't usually take 'children' if it's just defining
-  // the face/back content for BaseCard. The 'children' on BaseCard are for overlays.
+  isSaveDisabled?: boolean;
 }
 
-/**
- * BaseCardContainer is a conceptual base container.
- * It demonstrates wrapping BaseCard. It now also passes through social interaction props
- * and constructs the cardContext for BaseCard.
- */
 export const BaseCardContainer = React.memo<BaseCardContainerProps>(
   ({
     cardData,
     isFlipped,
     onFlip,
     onCardInteraction,
-    socialInteractions, // New prop received here
+    socialInteractions,
     className,
     innerCardClassName,
+    isSaveDisabled,
   }) => {
     const handleLocalInteraction = (
       event:
         | React.MouseEvent<HTMLDivElement>
         | React.KeyboardEvent<HTMLDivElement>,
       elementType: string,
-      value: any, // Keep 'any' if value can truly be anything for this generic interaction
+      value: unknown, // Changed from any to unknown
       details: BaseCardContainerDataPointDetails
     ) => {
       event.stopPropagation();
@@ -67,11 +59,8 @@ export const BaseCardContainer = React.memo<BaseCardContainerProps>(
       }
     };
 
-    // This faceContent is the *main content area* for the face,
-    // BaseCard will add the social bar below it.
     const faceContentNode = (
       <>
-        {/* Use fragment if no single root needed, or a div if styling needed here */}
         <ClickableDataItem
           isInteractive={!!onCardInteraction}
           onClickHandler={(e) =>
@@ -106,11 +95,8 @@ export const BaseCardContainer = React.memo<BaseCardContainerProps>(
       </>
     );
 
-    // This backContent is the *main content area* for the back,
-    // BaseCard will add the social bar below it.
     const backContentNode = (
       <>
-        {/* Use fragment or a div */}
         <ClickableDataItem
           isInteractive={!!onCardInteraction}
           onClickHandler={(e) =>
@@ -148,21 +134,18 @@ export const BaseCardContainer = React.memo<BaseCardContainerProps>(
       </>
     );
 
-    // Construct the cardContext from cardData
     const cardContextForBaseCard: CardActionContext = {
       id: cardData.id,
       symbol: cardData.symbol,
       type: cardData.type,
+      companyName: cardData.companyName,
+      logoUrl: cardData.logoUrl,
+      websiteUrl: cardData.websiteUrl,
     };
 
     return (
-      // The outer div of BaseCardContainer itself is not directly clickable for flip.
-      // The flip is handled by the clickable wrappers around faceContent/backContent.
-      // This component's primary role is to provide specific content to BaseCard.
-      // If BaseCardContainer itself needs to be clickable, it would wrap BaseCard.
-      // For now, assuming this container defines content for a BaseCard.
       <div
-        className="h-full w-full cursor-pointer" // This div makes the whole area flippable
+        className="h-full w-full cursor-pointer"
         onClick={onFlip}
         role="button"
         aria-label={`Flip ${cardData.symbol} card`}
@@ -177,13 +160,11 @@ export const BaseCardContainer = React.memo<BaseCardContainerProps>(
           onFlip={onFlip}
           faceContent={faceContentNode}
           backContent={backContentNode}
-          cardContext={cardContextForBaseCard} // Pass the constructed context
-          socialInteractions={socialInteractions} // Pass through social interactions
-          className={className} // Pass className to BaseCard's outer div
-          innerCardClassName={innerCardClassName} // Pass to BaseCard's inner flipping div
-          // Children (overlays) for BaseCard would typically be passed by a component
-          // that *uses* this BaseCardContainer, like GameCard.
-          // If BaseCardContainer is the final card representation, it might define its own children for BaseCard.
+          cardContext={cardContextForBaseCard}
+          socialInteractions={socialInteractions}
+          className={className}
+          innerCardClassName={innerCardClassName}
+          isSaveDisabled={isSaveDisabled}
         />
       </div>
     );
