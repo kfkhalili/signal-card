@@ -1,138 +1,168 @@
 // src/app/api/collection/capture-card/route.ts
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import type { CardType } from "@/components/game/cards/base-card/base-card.types";
-import { generateStateHash } from "@/lib/cardUtils";
-import { ConcreteCardData } from "@/components/game/types";
+import { DisplayableCard } from "@/components/game/types";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 interface CaptureCardRequestBody {
+  userId: string;
+  cardData: DisplayableCard;
   cardType: CardType;
   symbol: string;
-  companyName?: string | null;
-  logoUrl?: string | null;
-  cardDataSnapshot: ConcreteCardData;
-  sourceCardId?: string;
-  // Rarity information determined by the client for the live state
-  currentRarity?: string | null;
-  rarityReason?: string | null;
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
-  if (!user) {
+  const {
+    data: { session },
+    error: sessionError,
+  } = await supabase.auth.getSession();
+
+  if (sessionError) {
+    console.error("Error getting session:", sessionError);
     return NextResponse.json(
-      { error: "Unauthorized: User not authenticated." },
-      { status: 401 }
+      { message: `Session error: ${sessionError.message}` },
+      { status: 500 }
+    );
+  }
+
+  if (!session) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
+  let requestBody: CaptureCardRequestBody;
+  try {
+    requestBody = await request.json();
+  } catch {
+    return NextResponse.json(
+      { message: "Invalid request body" },
+      { status: 400 }
+    );
+  }
+
+  const { userId, cardData, cardType, symbol } = requestBody;
+
+  if (session.user.id !== userId) {
+    return NextResponse.json({ message: "User ID mismatch" }, { status: 403 });
+  }
+
+  if (!cardData || !cardType || !symbol || !userId) {
+    return NextResponse.json(
+      { message: "Missing required fields in request body" },
+      { status: 400 }
     );
   }
 
   try {
-    const body = (await request.json()) as CaptureCardRequestBody;
-    const {
-      cardType,
-      symbol,
-      companyName,
-      logoUrl,
-      cardDataSnapshot,
-      sourceCardId,
-      currentRarity,
-      rarityReason, // Directly use this from the body
-    } = body;
+    // Step 1: Ensure the snapshot exists or create it
+    // We'll use an RPC call for this to encapsulate the logic in the database
+    // or call the existing /api/snapshots/ensure endpoint if preferred.
+    // For simplicity here, let's assume an RPC `ensure_snapshot`
+    // which returns the snapshot_id.
 
-    if (
-      !cardType ||
-      !symbol ||
-      !cardDataSnapshot ||
-      cardType !== cardDataSnapshot.type
-    ) {
-      return NextResponse.json(
-        { error: "Missing required fields or card type mismatch." },
-        { status: 400 }
-      );
-    }
-
-    const stateHash = generateStateHash(
-      cardType,
-      symbol,
-      cardDataSnapshot,
-      currentRarity,
-      rarityReason
-    );
-    const { data: existingByHash, error: hashCheckError } = await supabase
-      .from("user_collected_cards")
-      .select("id, captured_at")
-      .eq("user_id", user.id)
-      .eq("symbol", symbol)
-      .eq("card_type", cardType)
-      .eq("state_hash", stateHash)
-      .maybeSingle();
-
-    if (hashCheckError) {
-      console.error(
-        "Error checking for existing card by hash:",
-        hashCheckError
-      );
-    }
-
-    if (existingByHash) {
-      return NextResponse.json(
-        {
-          error: "This exact card data state has already been collected.",
-          message: "Duplicate card state.",
-          existingCardId: existingByHash.id,
+    // For now, let's call the ensure snapshot API route internally.
+    // This is not ideal for production (direct DB call or RPC is better)
+    // but demonstrates the flow.
+    const ensureSnapshotResponse = await fetch(
+      new URL("/api/snapshots/ensure", request.url).toString(),
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: request.headers.get("Cookie") || "", // Forward cookies for auth
         },
-        { status: 409 }
+        body: JSON.stringify({
+          card_type: cardType,
+          symbol: symbol,
+          card_data: cardData,
+          rarity: cardData.currentRarity,
+        }),
+      }
+    );
+
+    if (!ensureSnapshotResponse.ok) {
+      const errorData = await ensureSnapshotResponse.json();
+      console.error("Error ensuring snapshot:", errorData);
+      return NextResponse.json(
+        { message: "Failed to ensure snapshot", details: errorData.message },
+        { status: ensureSnapshotResponse.status }
       );
     }
 
-    const newCollectedCard = {
-      user_id: user.id,
-      card_type: cardType,
-      symbol: symbol,
-      company_name: companyName,
-      logo_url: logoUrl,
-      card_data_snapshot: cardDataSnapshot, // This is the ConcreteCardData
-      source_card_id: sourceCardId,
-      state_hash: stateHash,
-      rarity_level: currentRarity, // Directly use from request body
-      rarity_reason: rarityReason, // Directly use from request body
-    };
+    const { snapshot_id } = await ensureSnapshotResponse.json();
 
-    const { data: insertedCard, error: insertError } = await supabase
-      .from("user_collected_cards")
-      .insert(newCollectedCard)
+    if (!snapshot_id) {
+      return NextResponse.json(
+        { message: "Failed to retrieve snapshot ID after ensuring." },
+        { status: 500 }
+      );
+    }
+
+    // Step 2: Add the snapshot to the user's collection
+    const { data: collectionEntry, error: collectionError } = await supabase
+      .from("user_collections")
+      .insert({
+        user_id: userId,
+        snapshot_id: snapshot_id,
+      })
       .select()
       .single();
 
-    if (insertError) {
-      console.error(
-        "Error inserting collected card into Supabase:",
-        insertError
-      );
+    if (collectionError) {
+      // Handle potential duplicate error if the user already collected this exact snapshot
+      if (collectionError.code === "23505") {
+        // Unique violation
+        // Fetch the existing entry to return it
+        const { data: existingEntry, error: fetchError } = await supabase
+          .from("user_collections")
+          .select("*")
+          .eq("user_id", userId)
+          .eq("snapshot_id", snapshot_id)
+          .single();
+
+        if (fetchError) {
+          console.error(
+            "Error fetching existing collection entry:",
+            fetchError
+          );
+          return NextResponse.json(
+            { message: `Database error: ${fetchError.message}` },
+            { status: 500 }
+          );
+        }
+        return NextResponse.json(
+          {
+            message: "Card already in collection.",
+            entry: existingEntry,
+          },
+          { status: 200 }
+        );
+      }
+      console.error("Error adding to collection:", collectionError);
       return NextResponse.json(
-        { error: `Database error: ${insertError.message}` },
+        { message: `Database error: ${collectionError.message}` },
         { status: 500 }
       );
     }
 
     return NextResponse.json(
-      { message: "Card captured successfully!", collectedCard: insertedCard },
+      {
+        message: "Card captured and added to collection successfully",
+        entry: collectionEntry,
+      },
       { status: 201 }
     );
-  } catch (error: any) {
-    console.error("Error processing capture card request:", error);
-    if (error instanceof SyntaxError) {
+  } catch (error: unknown) {
+    console.error("Error in POST /api/collections/capture-card:", error);
+    if (error instanceof Error) {
       return NextResponse.json(
-        { error: "Invalid JSON in request body." },
-        { status: 400 }
+        { message: `Server error: ${error.message}` },
+        { status: 500 }
       );
     }
     return NextResponse.json(
-      { error: `Internal server error: ${error.message || "Unknown error"}` },
+      { message: "An unexpected error occurred." },
       { status: 500 }
     );
   }

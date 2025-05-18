@@ -128,7 +128,7 @@ const GameCard: React.FC<GameCardProps> = ({
     );
   }
 
-  let rendererSpecificProps: {
+  const rendererSpecificProps: {
     cardData: DisplayableCard;
     [key: string]: any;
   } = {

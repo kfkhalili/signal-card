@@ -29,7 +29,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
           }[]
         ): void {
           try {
-            cookiesToSet.forEach(({ name, value, options }) =>
+            cookiesToSet.forEach(({ name, value }) =>
               request.cookies.set(name, value)
             );
             supabaseResponse = NextResponse.next({
@@ -48,7 +48,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
   const {
     data: { user },
-    error: getUserError,
+    // error: getUserError,
   } = await supabase.auth.getUser();
 
   // if (process.env.NODE_ENV === "development") {

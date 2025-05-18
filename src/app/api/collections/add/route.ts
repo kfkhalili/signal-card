@@ -1,97 +1,93 @@
 // src/app/api/collections/add/route.ts
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server"; // Updated import
 
-interface AddToCollectionRequestBody {
-  snapshotId: string; // UUID of the card_snapshots record
-  userNotes?: string | null;
-}
+export async function POST(request: NextRequest) {
+  const supabase = await createSupabaseServerClient(); // Updated client creation
 
-export async function POST(request: Request) {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { snapshot_id, user_id } = await request.json();
 
-  if (!user) {
+  if (!snapshot_id || !user_id) {
     return NextResponse.json(
-      { error: "User not authenticated." },
-      { status: 401 }
+      { message: "Missing snapshot_id or user_id" },
+      { status: 400 }
     );
   }
 
-  try {
-    const body = (await request.json()) as AddToCollectionRequestBody;
-    const { snapshotId, userNotes } = body;
+  // First, check if the user is authenticated
+  const {
+    data: { session },
+    error: sessionError,
+  } = await supabase.auth.getSession();
 
-    if (!snapshotId) {
+  if (sessionError) {
+    console.error("Error getting session:", sessionError);
+    return NextResponse.json(
+      { message: `Session error: ${sessionError.message}` },
+      { status: 500 }
+    );
+  }
+
+  if (!session || session.user.id !== user_id) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    // Check if the entry already exists
+    const { data: existingEntry, error: selectError } = await supabase
+      .from("user_collections")
+      .select("id")
+      .eq("user_id", user_id)
+      .eq("snapshot_id", snapshot_id)
+      .maybeSingle();
+
+    if (selectError) {
+      console.error("Error checking existing collection entry:", selectError);
       return NextResponse.json(
-        { error: "Missing snapshotId." },
-        { status: 400 }
+        { message: `Database error: ${selectError.message}` },
+        { status: 500 }
       );
     }
 
-    // Optionally, verify snapshotId exists in card_snapshots (though FK constraint handles it)
+    if (existingEntry) {
+      return NextResponse.json(
+        {
+          message: "Card snapshot already in collection for this user.",
+          entry: existingEntry,
+        },
+        { status: 200 }
+      );
+    }
 
-    const { data: newCollectionEntry, error: insertError } = await supabase
+    // If not, insert the new entry
+    const { data: newEntry, error: insertError } = await supabase
       .from("user_collections")
-      .insert({
-        user_id: user.id,
-        snapshot_id: snapshotId,
-        user_notes: userNotes,
-        // captured_at is handled by DB default
-      })
+      .insert({ user_id, snapshot_id })
       .select()
       .single();
 
     if (insertError) {
-      if (insertError.code === "23505") {
-        // unique_violation for (user_id, snapshot_id)
-        // User has already collected this snapshot. This is not necessarily an error.
-        // We can fetch the existing entry to return it.
-        const { data: existingEntry, error: fetchError } = await supabase
-          .from("user_collections")
-          .select("*")
-          .eq("user_id", user.id)
-          .eq("snapshot_id", snapshotId)
-          .single();
-
-        if (existingEntry) {
-          return NextResponse.json(
-            {
-              collectionEntry: existingEntry,
-              message: "Snapshot already in collection.",
-            },
-            { status: 200 } // 200 OK as it's already there
-          );
-        }
-        return NextResponse.json(
-          {
-            error: `Database error: ${
-              fetchError?.message || insertError.message
-            }`,
-          },
-          { status: 500 }
-        );
-      }
-      console.error("Error adding to user_collections:", insertError);
+      console.error("Error adding to collection:", insertError);
       return NextResponse.json(
-        { error: `Database error: ${insertError.message}` },
+        { message: `Database error: ${insertError.message}` },
         { status: 500 }
       );
     }
 
     return NextResponse.json(
-      {
-        collectionEntry: newCollectionEntry,
-        message: "Added to collection successfully!",
-      },
+      { message: "Successfully added to collection", entry: newEntry },
       { status: 201 }
     );
-  } catch (error: any) {
-    console.error("Error processing add to collection request:", error);
+  } catch (error: unknown) {
+    console.error("Error in POST /api/collections/add:", error);
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { message: `Server error: ${error.message}` },
+        { status: 500 }
+      );
+    }
     return NextResponse.json(
-      { error: `Internal server error: ${error.message || "Unknown error"}` },
+      { message: "An unexpected error occurred." },
       { status: 500 }
     );
   }

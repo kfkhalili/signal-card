@@ -193,7 +193,7 @@ export function useWorkspaceManager({
           };
 
           setActiveCards((prev) => {
-            let updatedCards = [...prev];
+            const updatedCards = [...prev];
             if (requestingCardId) {
               const sourceIndex = updatedCards.findIndex(
                 (c) => c.id === requestingCardId
