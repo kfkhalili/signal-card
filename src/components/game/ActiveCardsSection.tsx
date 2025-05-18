@@ -17,9 +17,8 @@ import type { ProfileCardInteractionCallbacks } from "./cards/profile-card/profi
 import type { PriceCardInteractionCallbacks } from "./cards/price-card/price-card.types";
 import { useAuth } from "@/contexts/AuthContext";
 import { CommentDialog } from "@/components/comments/CommentDialog";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client"; // For client-side calls
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
-// API Types (ensure these are accurate or imported from a shared location)
 export interface EnsureSnapshotRequestBody {
   cardType: APICardType;
   symbol: string;
@@ -31,7 +30,7 @@ export interface EnsureSnapshotRequestBody {
 }
 
 export interface SnapshotEnsureResponse {
-  snapshot: { id: string /* other fields */ };
+  snapshot: { id: string };
   isNew: boolean;
   raceCondition?: boolean;
 }
@@ -42,7 +41,6 @@ export interface LikeApiResponse {
   isAlreadyLiked?: boolean;
 }
 
-// Type for the stats we'll fetch for a snapshot
 interface SnapshotSocialStats {
   likeCount: number;
   commentCount: number;
@@ -72,6 +70,8 @@ interface CommentingCardInfo {
   snapshotId: string;
   symbol: string;
   name?: string | null;
+  workspaceCardId: string; // Added to uniquely identify the card in activeCards
+  type: APICardType; // Added to ensure correct type matching
 }
 
 const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
@@ -94,7 +94,6 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
   const [commentingCardInfo, setCommentingCardInfo] =
     useState<CommentingCardInfo | null>(null);
 
-  // Ensure ensureGlobalSnapshot is defined as before...
   const ensureGlobalSnapshot = useCallback(
     async (card: DisplayableCard): Promise<string | null> => {
       const {
@@ -106,13 +105,13 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
         likeCount,
         commentCount,
         collectionCount,
-        isSavedByCurrentUser, // Exclude these new state fields
+        isSavedByCurrentUser,
         ...restOfCardData
       } = card;
 
       let actualCardDataSnapshot: ConcreteCardData;
       if (card.type === "price") {
-        const priceSpecificData = restOfCardData as any; // Cast carefully
+        const priceSpecificData = restOfCardData as any;
         actualCardDataSnapshot = {
           id: priceSpecificData.id,
           type: "price",
@@ -124,7 +123,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
           backData: priceSpecificData.backData,
         };
       } else if (card.type === "profile") {
-        const profileSpecificData = restOfCardData as any; // Cast carefully
+        const profileSpecificData = restOfCardData as any;
         actualCardDataSnapshot = {
           id: profileSpecificData.id,
           type: "profile",
@@ -184,7 +183,6 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
     [toast]
   );
 
-  // New function to fetch all social stats for a snapshot
   const fetchSnapshotSocialStats = useCallback(
     async (
       snapshotId: string,
@@ -274,16 +272,19 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
     [supabase, toast]
   );
 
-  // --- Modified Interaction Handlers ---
-
   const handleLikeOrUnlikeCard = useCallback(
     async (context: CardActionContext) => {
       if (isLoadingAuth || !user) {
-        /* ... auth check ... */ return;
+        toast({
+          title: "Please log in to like cards.",
+          variant: "destructive",
+        });
+        return;
       }
       const cardIndex = activeCards.findIndex((c) => c.id === context.id);
       if (cardIndex === -1) {
-        /* ... card not found ... */ return;
+        toast({ title: "Card not found.", variant: "destructive" });
+        return;
       }
 
       const cardToToggleLike = activeCards[cardIndex];
@@ -312,7 +313,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
             response.status === 200 &&
             (result as LikeApiResponse).isAlreadyLiked
           ) &&
-          response.status !== 404
+          response.status !== 404 // Allow 404 for DELETE if like not found
         ) {
           throw new Error(
             (result as any).error ||
@@ -327,23 +328,24 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
           }.`,
         });
 
-        // Fetch all stats and update card
         const stats = await fetchSnapshotSocialStats(snapshotId, user.id);
         if (stats) {
           setActiveCards((prev) =>
-            prev.map((c, idx) => (idx === cardIndex ? { ...c, ...stats } : c))
+            prev.map((c) => (c.id === context.id ? { ...c, ...stats } : c))
           );
         } else {
-          // Fallback if stats fetch fails, just toggle local like state
           setActiveCards((prev) =>
-            prev.map((c, idx) =>
-              idx === cardIndex
+            prev.map((c) =>
+              c.id === context.id
                 ? {
                     ...c,
                     isLikedByCurrentUser: !originalIsLiked,
                     currentUserLikeId: originalIsLiked
                       ? undefined
                       : (result as LikeApiResponse).like?.id,
+                    likeCount: originalIsLiked
+                      ? Math.max(0, (c.likeCount || 1) - 1)
+                      : (c.likeCount || 0) + 1,
                   }
                 : c
             )
@@ -355,7 +357,6 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
           description: error.message,
           variant: "destructive",
         });
-        // No explicit revert here, as fetchSnapshotSocialStats will provide the source of truth or we use a simpler toggle.
       }
     },
     [
@@ -372,11 +373,16 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
   const handleCaptureCardToCollection = useCallback(
     async (context: CardActionContext) => {
       if (isLoadingAuth || !user) {
-        /* ... auth check ... */ return;
+        toast({
+          title: "Please log in to save cards.",
+          variant: "destructive",
+        });
+        return;
       }
       const cardIndex = activeCards.findIndex((c) => c.id === context.id);
       if (cardIndex === -1) {
-        /* ... card not found ... */ return;
+        toast({ title: "Card not found.", variant: "destructive" });
+        return;
       }
 
       const cardToCollect = activeCards[cardIndex];
@@ -418,19 +424,22 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
           } your collection.`,
         });
 
-        // Fetch all stats and update card
         const stats = await fetchSnapshotSocialStats(snapshotId, user.id);
         if (stats) {
           setActiveCards((prev) =>
-            prev.map((c, idx) => (idx === cardIndex ? { ...c, ...stats } : c))
+            prev.map((c) => (c.id === context.id ? { ...c, ...stats } : c))
           );
         } else {
-          // Fallback if stats fetch fails
-          setActiveCards(
-            (prev) =>
-              prev.map((c, idx) =>
-                idx === cardIndex ? { ...c, isSavedByCurrentUser: true } : c
-              ) // Simple optimistic
+          setActiveCards((prev) =>
+            prev.map((c) =>
+              c.id === context.id
+                ? {
+                    ...c,
+                    isSavedByCurrentUser: true,
+                    collectionCount: (c.collectionCount || 0) + 1,
+                  }
+                : c
+            )
           );
         }
       } catch (error: any) {
@@ -455,17 +464,19 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
   const handleCommentClick = useCallback(
     async (context: CardActionContext) => {
       if (!user) {
-        /* ... auth check ... */ return;
+        toast({ title: "Please log in to comment.", variant: "destructive" });
+        return;
       }
       const cardIndex = activeCards.findIndex((c) => c.id === context.id);
       if (cardIndex === -1) {
-        /* ... card not found ... */ return;
+        toast({ title: "Card not found.", variant: "destructive" });
+        return;
       }
 
       const cardForComment = activeCards[cardIndex];
       toast({
         title: "Loading Comments...",
-        description: `Fetching details for ${cardForComment.symbol}...`,
+        description: `Workspaceing details for ${cardForComment.symbol}...`,
       });
       const snapshotId = await ensureGlobalSnapshot(cardForComment);
       if (snapshotId) {
@@ -473,14 +484,18 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
           snapshotId,
           symbol: cardForComment.symbol,
           name: cardForComment.companyName,
+          workspaceCardId: cardForComment.id, // Store workspace ID
+          type: cardForComment.type, // Store type
         });
         setIsCommentDialogOpen(true);
-        // Optionally, fetch and update comment count for this card here too
+
         const stats = await fetchSnapshotSocialStats(snapshotId, user.id);
         if (stats) {
           setActiveCards((prev) =>
-            prev.map((c, idx) =>
-              idx === cardIndex ? { ...c, commentCount: stats.commentCount } : c
+            prev.map((c) =>
+              c.id === context.id
+                ? { ...c, commentCount: stats.commentCount }
+                : c
             )
           );
         }
@@ -502,45 +517,22 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
     ]
   );
 
-  // This callback is for when a comment is successfully posted from CommentDialog
-  // We need to update the specific card's comment count.
-  const onCommentDialogPosted = async (targetSnapshotId: string) => {
-    const stats = await fetchSnapshotSocialStats(targetSnapshotId, user?.id);
-    if (stats) {
-      setActiveCards((prev) =>
-        prev.map((c) => {
-          // This assumes the card ID in activeCards might not be the snapshot ID
-          // If we ensure it IS the snapshot ID after ensureGlobalSnapshot, this logic can be simpler.
-          // For now, we re-fetch stats for the specific snapshotId.
-          // A better way would be to find the card in activeCards that corresponds to this snapshotId
-          // if its ID was updated to be the snapshotId.
-          // This part needs careful consideration of how card IDs are managed vs snapshot IDs.
-
-          // Let's assume for now that after ensureGlobalSnapshot, the card's ID in activeCards
-          // might still be its original workspace ID, not necessarily the snapshotId.
-          // So, we'll just refetch stats for the snapshotId and apply it to the card that opened the dialog.
-          // This is a simplification. A more robust solution would map workspace card IDs to snapshot IDs.
-          if (
-            commentingCardInfo &&
-            commentingCardInfo.snapshotId === targetSnapshotId
-          ) {
-            const cardIndex = activeCards.findIndex(
-              (ac) =>
-                ac.symbol === commentingCardInfo.symbol &&
-                ac.type === (commentingCardInfo.name ? "profile" : "price")
-            ); // This is a guess
-            if (cardIndex !== -1) {
-              return {
-                ...activeCards[cardIndex],
-                commentCount: stats.commentCount,
-              };
+  const onCommentDialogPosted = useCallback(
+    async (targetSnapshotId: string, commentedWorkspaceCardId: string) => {
+      const stats = await fetchSnapshotSocialStats(targetSnapshotId, user?.id);
+      if (stats) {
+        setActiveCards((prevCards) =>
+          prevCards.map((card) => {
+            if (card.id === commentedWorkspaceCardId) {
+              return { ...card, commentCount: stats.commentCount };
             }
-          }
-          return c; // Fallback
-        })
-      );
-    }
-  };
+            return card;
+          })
+        );
+      }
+    },
+    [user, setActiveCards, fetchSnapshotSocialStats]
+  );
 
   const socialInteractionsForCards: BaseCardSocialInteractions = useMemo(
     () => ({
@@ -548,10 +540,13 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
       onComment: handleCommentClick,
       onSave: handleCaptureCardToCollection,
       onShare: async (context: CardActionContext) => {
-        // ... (share logic as before, using ensureGlobalSnapshot)
         const cardToShare = activeCards.find((c) => c.id === context.id);
         if (!cardToShare) {
-          /* ... */ return;
+          toast({
+            title: "Card not found for sharing.",
+            variant: "destructive",
+          });
+          return;
         }
         toast({ title: "Generating Share Link..." });
         const snapshotId = await ensureGlobalSnapshot(cardToShare);
@@ -591,7 +586,10 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
             });
           }
         } else {
-          toast({ title: "Share Error", variant: "destructive" });
+          toast({
+            title: "Share Error: Could not create snapshot.",
+            variant: "destructive",
+          });
         }
       },
     }),
@@ -602,7 +600,6 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
       toast,
       activeCards,
       ensureGlobalSnapshot,
-      pathname /* fetchSnapshotSocialStats is part of handlers */,
     ]
   );
 
@@ -613,7 +610,6 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
     profileSpecificInteractions ||
     useMemo(() => getProfileCardInteractionHandlers(toast), [toast]);
 
-  // The rest of the component (delete confirmation, Presentational component) remains the same
   const handleDeleteRequest = useCallback((cardId: string): void => {
     setCardIdToConfirmDelete(cardId);
   }, []);
@@ -653,17 +649,17 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
       {commentingCardInfo && (
         <CommentDialog
           isOpen={isCommentDialogOpen}
-          onOpenChange={(isOpen) => {
-            setIsCommentDialogOpen(isOpen);
-            if (!isOpen) {
-              // When dialog closes, if a comment was made, the count might need refresh
-              // The CommentDialog's internal onSubmitComment could call a prop function
-              // that then triggers a stats refresh for the specific snapshotId here.
-              // For now, we rely on the next interaction or page load for history view.
-              // For workspace, we'd need to update the activeCard.
-              if (commentingCardInfo.snapshotId) {
-                // Check if snapshotId exists
-                onCommentDialogPosted(commentingCardInfo.snapshotId);
+          onOpenChange={(isOpenValue) => {
+            setIsCommentDialogOpen(isOpenValue);
+            if (!isOpenValue) {
+              if (
+                commentingCardInfo.snapshotId &&
+                commentingCardInfo.workspaceCardId
+              ) {
+                onCommentDialogPosted(
+                  commentingCardInfo.snapshotId,
+                  commentingCardInfo.workspaceCardId
+                );
               }
               setCommentingCardInfo(null);
             }
