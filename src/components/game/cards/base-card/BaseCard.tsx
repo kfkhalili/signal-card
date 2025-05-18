@@ -434,8 +434,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
               : `Show ${symbol} back details`
           }
           aria-pressed={isFlipped}
-          // @ts-ignore
-          inert={isFlipped ? "true" : undefined}
+          inert={isFlipped ? true : undefined}
           aria-hidden={isFlipped ? "true" : "false"}>
           {deleteButtonElement}
           {actualIdentityHeaderElement}
@@ -465,8 +464,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
               ? `Show ${symbol} front details`
               : `Show ${symbol} back details`
           }
-          // @ts-ignore
-          inert={!isFlipped ? "true" : undefined}
+          inert={!isFlipped ? true : undefined}
           aria-hidden={!isFlipped ? "true" : "false"}>
           {deleteButtonElement}
           {headerPlaceholderElementForBack}
