@@ -29,7 +29,6 @@ interface LikeApiResponse {
   isAlreadyLiked?: boolean;
 }
 
-// Define the expected structure of the RPC response if it's a single object per snapshot
 interface SnapshotSocialCountsRPCResponse {
   like_count: number;
   comment_count: number;
@@ -189,29 +188,24 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
         });
     try {
       const response = await apiCall;
-      const result = await response.json(); // Keep as unknown for now
+      const result = await response.json();
       if (
         !response.ok &&
         !(
-          (
-            response.status === 200 &&
-            (result as LikeApiResponse).isAlreadyLiked
-          ) // Cast for this specific check
+          response.status === 200 && (result as LikeApiResponse).isAlreadyLiked
         ) &&
         response.status !== 404
       ) {
         throw new Error(
-          (result as { error?: string }).error || // Cast for error message access
+          (result as { error?: string }).error ||
             `Like/Unlike failed (status ${response.status})`
         );
       }
       toast({ title: originalIsLiked ? "Unliked!" : "Liked!" });
       if (!originalIsLiked && (result as LikeApiResponse).like) {
-        // Cast for accessing like property
         setCurrentUserLikeIdLocal((result as LikeApiResponse).like.id);
       }
 
-      // Assuming get_snapshot_social_counts returns an array of objects matching SnapshotSocialCountsRPCResponse
       const { data: rpcResponseData, error: rpcError } = await supabase.rpc(
         "get_snapshot_social_counts",
         { p_snapshot_id: snapshot.id }
@@ -221,7 +215,7 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
         console.warn("Error refetching counts via RPC:", rpcError.message);
       } else if (rpcResponseData && rpcResponseData.length > 0) {
         const updatedCounts =
-          rpcResponseData[0] as SnapshotSocialCountsRPCResponse; // Cast the first element
+          rpcResponseData[0] as SnapshotSocialCountsRPCResponse;
         if (updatedCounts) {
           setLikeCountLocal(updatedCounts.like_count);
           setCommentCountLocal(updatedCounts.comment_count);
@@ -240,8 +234,8 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
           `RPC get_snapshot_social_counts for ${snapshot.id} returned null data property.`
         );
       }
-    } catch (error: Error | { message?: string } | unknown) {
-      // Broader catch type
+    } catch (_error: unknown) {
+      // Prefixed unused variable
       toast({ title: "Action Failed", variant: "destructive" });
       setIsLikedByCurrentUserLocal(originalIsLiked);
       setLikeCountLocal(originalLikeCount);

@@ -13,7 +13,7 @@ import type {
   ProfileCardData,
   ProfileCardInteractionCallbacks as ProfileCardSpecificInteractions,
 } from "./cards/profile-card/profile-card.types";
-import type { DisplayableCard } from "./types"; // Import DisplayableCard
+import type { DisplayableCard } from "./types";
 
 export interface CommonCardRendererProps {
   isFlipped: boolean;
@@ -25,6 +25,8 @@ export interface CommonCardRendererProps {
   onDeleteRequest: (context: CardActionContext) => void;
   onHeaderIdentityClick?: (context: CardActionContext) => void;
   className?: string;
+  innerCardClassName?: string;
+  children?: React.ReactNode;
   isLikedByCurrentUser?: boolean;
   isSavedByCurrentUser?: boolean;
   likeCount?: number;
@@ -49,16 +51,12 @@ export type ProfileCardRendererProps = CommonCardRendererProps & {
   specificInteractions?: ProfileCardSpecificInteractions;
 };
 
-// Union type for all specific card data types
-type SpecificCardData = PriceCardData | ProfileCardData;
+// Removed unused 'SpecificCardData' type alias
 
-// Props that all registered renderers should accept.
-// This includes common props and a `cardData` prop typed to DisplayableCard.
 export type RegisteredCardRendererProps = CommonCardRendererProps & {
-  cardData: DisplayableCard; // Use DisplayableCard for the actual card data being passed
-  // Include specific interaction props if they can be generalized or are optional
+  cardData: DisplayableCard;
   priceSpecificInteractions?: PriceSpecificInteractionsForContainer;
-  specificInteractions?: ProfileCardSpecificInteractions; // For ProfileCard
+  specificInteractions?: ProfileCardSpecificInteractions;
 };
 
 export type RegisteredCardRenderer =
@@ -68,7 +66,7 @@ const cardRendererRegistry = new Map<CardType, RegisteredCardRenderer>();
 
 export function registerCardRenderer(
   cardType: CardType,
-  renderer: RegisteredCardRenderer // Expecting the more specific type
+  renderer: RegisteredCardRenderer
 ): void {
   if (cardRendererRegistry.has(cardType)) {
     if (process.env.NODE_ENV === "development") {
@@ -86,7 +84,6 @@ export function getCardRenderer(
   return cardRendererRegistry.get(cardType);
 }
 
-// Helper type for PriceCard specific interactions, if needed elsewhere
 type PriceSpecificInteractionsForContainer = Pick<
   PriceCardInteractionCallbacks,
   | "onPriceCardSmaClick"

@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
-import type { ServerFetchedCollectedCard } from "./page"; // Uses new type from page.tsx
+import type { ServerFetchedCollectedCard } from "./page";
 import GameCard from "@/components/game/GameCard";
 import type { DisplayableCard } from "@/components/game/types";
 import type {
@@ -10,7 +10,6 @@ import type {
   CardType,
 } from "@/components/game/cards/base-card/base-card.types";
 import { useToast } from "@/hooks/use-toast";
-// No direct Supabase client needed here for CRUD, using fetch for API calls
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,13 +38,12 @@ function adaptServerToDisplayable(
   serverCard: ServerFetchedCollectedCard,
   isFlipped: boolean
 ): DisplayableCard {
-  const snapshot = serverCard.card_snapshot_data; // Main source of card content
+  const snapshot = serverCard.card_snapshot_data;
   const capturedAtTimestamp = new Date(serverCard.captured_at).getTime();
 
   const commonData = {
-    id: snapshot.id, // Use snapshot_id as the primary ID for GameCard and its interactions
+    id: snapshot.id,
     symbol: snapshot.symbol,
-    // Use captured_at for when this user collected it. first_seen_at is when the snapshot was globally created.
     createdAt: capturedAtTimestamp,
     isFlipped: isFlipped,
     currentRarity: snapshot.rarity_level,
@@ -60,9 +58,9 @@ function adaptServerToDisplayable(
     case "price": {
       const priceSpecificData = concreteCardDataFromSnapshot as PriceCardData;
       const card: DisplayableCard = {
-        ...priceSpecificData, // Contains faceData, backData specific to PriceCard
-        ...commonData, // Overrides id, symbol, etc. with values from commonData
-        type: "price", // Explicitly set type
+        ...priceSpecificData,
+        ...commonData,
+        type: "price",
       };
       return card;
     }
@@ -70,7 +68,7 @@ function adaptServerToDisplayable(
       const profileSpecificData =
         concreteCardDataFromSnapshot as ProfileCardData;
       const card: DisplayableCard = {
-        ...profileSpecificData, // Contains staticData, liveData specific to ProfileCard
+        ...profileSpecificData,
         ...commonData,
         type: "profile",
       };
@@ -85,12 +83,14 @@ function adaptServerToDisplayable(
       const fallbackCard = {
         ...(concreteCardDataFromSnapshot ?? {}),
         ...commonData,
-        type: snapshot.card_type as CardType,
-        backData: concreteCardDataFromSnapshot?.backData ?? {
+        type: snapshot.card_type as CardType, // Assert CardType
+        backData: (
+          concreteCardDataFromSnapshot as { backData?: { description: string } }
+        )?.backData ?? {
           description: `Unknown Card Type: ${snapshot.card_type}`,
         },
       };
-      return fallbackCard as unknown as DisplayableCard;
+      return fallbackCard as unknown as DisplayableCard; // Final assertion for safety
     }
   }
 }
@@ -106,7 +106,6 @@ export default function CollectionClientPage({
   const { toast } = useToast();
 
   const handleToggleFlipCard = useCallback((displayableCardId: string) => {
-    // displayableCardId is snapshot_id. ClientCollectedCard has snapshot_id.
     setCollectedCards((prev) =>
       prev.map((cc) =>
         cc.snapshot_id === displayableCardId
@@ -124,7 +123,6 @@ export default function CollectionClientPage({
     if (!cardToConfirmDelete) return;
 
     try {
-      // cardToConfirmDelete.user_collection_id is the ID of the row in user_collections table
       const response = await fetch(
         `/api/collections/remove/${cardToConfirmDelete.user_collection_id}`,
         {
@@ -172,23 +170,16 @@ export default function CollectionClientPage({
 
   const collectedCardSocialInteractions = useCallback(
     (
-      clientCard: ClientCollectedCard
+      _clientCard: ClientCollectedCard // Prefixed unused variable
     ): BaseCardSocialInteractions | undefined => {
-      // Interactions on the collection page might differ.
-      // For now, perhaps no "Save" (it's already saved to collection).
-      // "Like" could still be relevant (liking the global snapshot).
-      // "Comment" could be added here.
-      // This needs further design based on desired UX for collected items.
       return {
-        // Example:
         onLike: async () => {
-          // const snapshotId = clientCard.snapshot_id;
-          // call /api/snapshots/like with snapshotId
+          // const snapshotId = _clientCard.snapshot_id; // Example of using it
           toast({ title: "Liked from collection!" });
         },
       };
     },
-    [toast] // Add dependencies if interactions are implemented
+    [toast]
   );
 
   if (collectedCards.length === 0) {
@@ -226,18 +217,17 @@ export default function CollectionClientPage({
 
           return (
             <div
-              key={clientCard.user_collection_id} // React key is the user_collection_id
+              key={clientCard.user_collection_id}
               className="flex flex-col items-center space-y-2">
               <GameCard
-                card={displayableCardForGameCard} // .id here is snapshot_id
+                card={displayableCardForGameCard}
                 onToggleFlip={() =>
                   handleToggleFlipCard(displayableCardForGameCard.id)
-                } // pass snapshot_id
+                }
                 onDeleteCardRequest={() => {
                   /* Deletion handled by button below */
                 }}
                 socialInteractions={collectedCardSocialInteractions(clientCard)}
-                // Pass other specific interactions if defined for collection view
               />
               <div className="text-center w-full px-1">
                 <p className="text-xs text-muted-foreground">

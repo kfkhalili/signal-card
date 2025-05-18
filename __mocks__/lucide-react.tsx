@@ -10,7 +10,6 @@ const MockLucideIcon: React.FC<
     strokeWidth?: number | string;
   }
 > = (props) => {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const {
     size,
     color,
@@ -40,27 +39,23 @@ const MockLucideIcon: React.FC<
 };
 
 // Explicitly export the icons used by SocialBar.tsx
-export const ThumbsUp: React.FC<any> = (props) => (
+export const ThumbsUp: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <MockLucideIcon {...props} data-lucide-icon-name="ThumbsUp" />
 );
-export const MessageCircle: React.FC<any> = (props) => (
-  <MockLucideIcon {...props} data-lucide-icon-name="MessageCircle" />
-);
-export const Bookmark: React.FC<any> = (props) => (
+export const MessageCircle: React.FC<React.SVGProps<SVGSVGElement>> = (
+  props
+) => <MockLucideIcon {...props} data-lucide-icon-name="MessageCircle" />;
+export const Bookmark: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <MockLucideIcon {...props} data-lucide-icon-name="Bookmark" />
 );
-export const Share2: React.FC<any> = (props) => (
+export const Share2: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <MockLucideIcon {...props} data-lucide-icon-name="Share2" />
 );
 
-// You can add more icons here if other components use them and cause issues.
-
-// Fallback for any other icons not explicitly mocked (less ideal but can prevent some errors)
-// This part acts like the Proxy for any other icon that might be imported.
 const AllIconsProxy = new Proxy(
   {},
   {
-    get: function (target, propKey) {
+    get: function (_target, propKey) {
       if (propKey === "__esModule") {
         return true;
       }
@@ -69,8 +64,7 @@ const AllIconsProxy = new Proxy(
       if (propKey === "Bookmark") return Bookmark;
       if (propKey === "Share2") return Share2;
 
-      // For any other icon, return a generic mock
-      const GenericMock: React.FC<any> = (props) => (
+      const GenericMock: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
         <MockLucideIcon {...props} data-lucide-icon-name={String(propKey)} />
       );
       GenericMock.displayName = `LucideMockProxy(${String(propKey)})`;
@@ -79,4 +73,4 @@ const AllIconsProxy = new Proxy(
   }
 );
 
-export default AllIconsProxy; // Default export can be the proxy or one of the icons if preferred
+export default AllIconsProxy;

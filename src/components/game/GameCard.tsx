@@ -35,7 +35,7 @@ interface GameCardProps {
   readonly commentCount?: number;
   readonly collectionCount?: number;
   readonly isSavedByCurrentUser?: boolean;
-  readonly isSaveDisabled?: boolean; // New prop
+  readonly isSaveDisabled?: boolean;
 }
 
 const GameCard: React.FC<GameCardProps> = ({
@@ -50,7 +50,7 @@ const GameCard: React.FC<GameCardProps> = ({
   commentCount,
   collectionCount,
   isSavedByCurrentUser,
-  isSaveDisabled, // Destructure new prop
+  isSaveDisabled,
 }) => {
   const handleFlip = React.useCallback(() => {
     onToggleFlip(card.id);
@@ -59,13 +59,13 @@ const GameCard: React.FC<GameCardProps> = ({
   const cardActionContextValue: CardActionContext = React.useMemo(() => {
     let websiteUrlForContext: string | null | undefined = undefined;
     if (card.type === "profile") {
-      const profileCardData = card as ProfileCardData;
+      const profileCardData = card as ProfileCardData; // Safe cast after type check
       websiteUrlForContext = profileCardData.staticData?.website;
     }
     return {
       id: card.id,
       symbol: card.symbol,
-      type: card.type as CardType,
+      type: card.type,
       companyName: card.companyName ?? null,
       logoUrl: card.logoUrl ?? null,
       websiteUrl: websiteUrlForContext ?? null,
@@ -99,13 +99,13 @@ const GameCard: React.FC<GameCardProps> = ({
     likeCount: likeCount,
     commentCount: commentCount,
     collectionCount: collectionCount,
-    isSaveDisabled: isSaveDisabled, // Pass down to specific card containers
+    isSaveDisabled: isSaveDisabled,
   };
 
-  const CardRenderer = getCardRenderer(card.type as CardType);
+  const CardRenderer = getCardRenderer(card.type);
 
   if (!CardRenderer) {
-    const unknownType = (card as any).type;
+    const unknownType = card.type; // Removed 'as any'
     if (process.env.NODE_ENV === "development") {
       console.error(
         `[GameCard] No renderer registered for card type: ${unknownType}. Card ID: ${card.id}`
@@ -128,20 +128,18 @@ const GameCard: React.FC<GameCardProps> = ({
     );
   }
 
-  const rendererSpecificProps: {
-    cardData: DisplayableCard;
-    [key: string]: any;
-  } = {
-    cardData: card,
-  };
-
-  if (card.type === "price") {
-    rendererSpecificProps.priceSpecificInteractions = priceSpecificInteractions;
-  } else if (card.type === "profile") {
-    rendererSpecificProps.specificInteractions = profileSpecificInteractions;
-  }
-
-  return <CardRenderer {...commonContainerProps} {...rendererSpecificProps} />;
+  return (
+    <CardRenderer
+      {...commonContainerProps}
+      cardData={card}
+      priceSpecificInteractions={
+        card.type === "price" ? priceSpecificInteractions : undefined
+      }
+      specificInteractions={
+        card.type === "profile" ? profileSpecificInteractions : undefined
+      }
+    />
+  );
 };
 
 export default React.memo(GameCard);

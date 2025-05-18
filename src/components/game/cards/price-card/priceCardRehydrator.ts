@@ -10,54 +10,50 @@ import type {
   PriceCardSpecificBackData,
 } from "./price-card.types";
 import { parseTimestampSafe } from "@/lib/formatters";
-import type { DisplayableCard } from "../../types";
 
 const rehydrateLivePriceCard: SpecificCardRehydrator = (
-  cardFromStorage: Partial<DisplayableCard> & { type: "price" }, // More specific type
+  cardFromStorage: any,
   commonProps: CommonCardPropsForRehydration
 ): PriceCardData | null => {
-  // Ensure faceData and backData exist on cardFromStorage before accessing their properties
   const originalFaceData = cardFromStorage.faceData || {};
-  const timestamp = parseTimestampSafe(
-    (originalFaceData as PriceCardFaceData).timestamp
-  );
+  const timestamp = parseTimestampSafe(originalFaceData.timestamp);
 
   const rehydratedFaceData: PriceCardFaceData = {
     timestamp: timestamp,
-    price: (originalFaceData as PriceCardFaceData).price ?? null,
-    dayChange: (originalFaceData as PriceCardFaceData).dayChange ?? null,
-    changePercentage:
-      (originalFaceData as PriceCardFaceData).changePercentage ?? null,
-    dayHigh: (originalFaceData as PriceCardFaceData).dayHigh ?? null,
-    dayLow: (originalFaceData as PriceCardFaceData).dayLow ?? null,
-    dayOpen: (originalFaceData as PriceCardFaceData).dayOpen ?? null,
-    previousClose:
-      (originalFaceData as PriceCardFaceData).previousClose ?? null,
-    volume: (originalFaceData as PriceCardFaceData).volume ?? null,
-    yearHigh: (originalFaceData as PriceCardFaceData).yearHigh ?? null,
-    yearLow: (originalFaceData as PriceCardFaceData).yearLow ?? null,
+    price: originalFaceData.price ?? null,
+    dayChange: originalFaceData.dayChange ?? null,
+    changePercentage: originalFaceData.changePercentage ?? null,
+    dayHigh: originalFaceData.dayHigh ?? null,
+    dayLow: originalFaceData.dayLow ?? null,
+    dayOpen: originalFaceData.dayOpen ?? null,
+    previousClose: originalFaceData.previousClose ?? null,
+    volume: originalFaceData.volume ?? null,
+    yearHigh: originalFaceData.yearHigh ?? null,
+    yearLow: originalFaceData.yearLow ?? null,
   };
 
   const originalBackData = cardFromStorage.backData || {};
   const rehydratedBackData: PriceCardSpecificBackData = {
-    description: (originalBackData as PriceCardSpecificBackData).description,
-    marketCap:
-      (originalBackData as PriceCardSpecificBackData).marketCap ?? null,
-    sma50d: (originalBackData as PriceCardSpecificBackData).sma50d ?? null,
-    sma200d: (originalBackData as PriceCardSpecificBackData).sma200d ?? null,
+    description: originalBackData.description,
+    marketCap: originalBackData.marketCap ?? null,
+    sma50d: originalBackData.sma50d ?? null,
+    sma200d: originalBackData.sma200d ?? null,
   };
 
+  // commonProps already contains id, symbol, createdAt, companyName, logoUrl, isFlipped, rarity etc.
+  // The SpecificCardRehydrator returns the ConcreteCardData part.
+  // BaseCardData properties are merged here.
   return {
     id: commonProps.id,
-    type: "price",
+    type: "price", // Ensure type is set correctly
     symbol: commonProps.symbol,
     createdAt: commonProps.createdAt,
     companyName: commonProps.companyName,
     logoUrl: commonProps.logoUrl,
     faceData: rehydratedFaceData,
     backData: rehydratedBackData,
-    exchange_code: (cardFromStorage as PriceCardData).exchange_code ?? null,
   };
 };
 
+// Register the rehydrator
 registerCardRehydrator("price", rehydrateLivePriceCard);
