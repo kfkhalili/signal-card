@@ -5,8 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 type SetValue<T> = (value: T | ((val: T) => T)) => void;
 
 // Reviver function to convert ISO date strings to Date objects
-const dateReviver = (key: string, value: any): any => {
-  // Regular expression to check if the string is in ISO 8601 format
+const dateReviver = (key: string, value: unknown): unknown => {
   const isoDatePattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/;
   if (typeof value === "string" && isoDatePattern.test(value)) {
     return new Date(value);
@@ -15,17 +14,12 @@ const dateReviver = (key: string, value: any): any => {
 };
 
 function useLocalStorage<T>(key: string, initialValue: T): [T, SetValue<T>] {
-  // Get from local storage then
-  // parse stored json or return initialValue
   const readValue = useCallback((): T => {
-    // Prevent build errors from localStorage access
     if (typeof window === "undefined") {
       return initialValue;
     }
-
     try {
       const item = window.localStorage.getItem(key);
-      // Use the dateReviver when parsing JSON
       return item ? (JSON.parse(item, dateReviver) as T) : initialValue;
     } catch (error) {
       console.warn(`Error reading localStorage key “${key}”:`, error);
@@ -33,30 +27,22 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, SetValue<T>] {
     }
   }, [initialValue, key]);
 
-  // State to store our value
-  // Pass initial state function to useState so logic is only executed once
   const [storedValue, setStoredValue] = useState<T>(readValue);
 
-  // Return a wrapped version of useState's setter function that ...
-  // ... persists the new value to localStorage.
   const setValue: SetValue<T> = useCallback(
     (value) => {
-      // Prevent build errors from localStorage access
       if (typeof window === "undefined") {
         console.warn(
           `Tried setting localStorage key “${key}” even though environment is not a client`
         );
+        return; // Early return if not in client environment
       }
 
       try {
-        // Allow value to be a function so we have same API as useState
         const newValue = value instanceof Function ? value(storedValue) : value;
-        // Save to local storage
         window.localStorage.setItem(key, JSON.stringify(newValue));
-        // Save state
         setStoredValue(newValue);
-        // We dispatch a custom event so every useLocalStorage hook are notified
-        window.dispatchEvent(new Event("local-storage"));
+        window.dispatchEvent(new Event("local-storage")); // Dispatch a generic Event
       } catch (error) {
         console.warn(`Error setting localStorage key “${key}”:`, error);
       }
@@ -67,22 +53,32 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, SetValue<T>] {
   useEffect(() => {
     setStoredValue(readValue());
   }, [readValue]);
+
   useEffect(() => {
-    const handleStorageChange = (e: StorageEvent | CustomEvent) => {
-      // Check if the event is a StorageEvent and if the key matches
-      const eventKey = (e as StorageEvent)?.key;
-      if (eventKey && eventKey !== key) {
-        return;
+    const handleStorageChange = (event: Event): void => {
+      // Handler for standard "storage" events from other tabs/windows
+      if (event instanceof StorageEvent) {
+        // Only update if the key matches for "storage" events
+        if (event.key === key) {
+          setStoredValue(readValue());
+        }
       }
-      // If it's a local-storage custom event or a matching StorageEvent, re-read the value
-      setStoredValue(readValue());
+      // Handler for custom "local-storage" event dispatched by this hook's setValue
+      else if (event.type === "local-storage") {
+        // This event signifies that any instance of useLocalStorage might have updated.
+        // Re-read to sync.
+        setStoredValue(readValue());
+      }
     };
 
-    // Listen for storage changes from other tabs/windows
+    // Add event listener for standard 'storage' events
     window.addEventListener("storage", handleStorageChange);
+    // Add event listener for custom 'local-storage' events
+    window.addEventListener("local-storage", handleStorageChange);
 
     return () => {
       window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("local-storage", handleStorageChange);
     };
   }, [key, readValue]);
 

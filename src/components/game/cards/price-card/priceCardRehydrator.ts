@@ -11,8 +11,34 @@ import type {
 } from "./price-card.types";
 import { parseTimestampSafe } from "@/lib/formatters";
 
+interface StoredPriceCardFaceDataShape {
+  timestamp?: string | number | null;
+  price?: number | null;
+  dayChange?: number | null;
+  changePercentage?: number | null;
+  dayHigh?: number | null;
+  dayLow?: number | null;
+  dayOpen?: number | null;
+  previousClose?: number | null;
+  volume?: number | null;
+  yearHigh?: number | null;
+  yearLow?: number | null;
+}
+
+interface StoredPriceCardBackDataShape {
+  description?: string | null; // Source can be string or null
+  marketCap?: number | null;
+  sma50d?: number | null;
+  sma200d?: number | null;
+}
+
+interface StoredPriceCardObject {
+  faceData?: StoredPriceCardFaceDataShape;
+  backData?: StoredPriceCardBackDataShape;
+}
+
 const rehydrateLivePriceCard: SpecificCardRehydrator = (
-  cardFromStorage: any,
+  cardFromStorage: StoredPriceCardObject,
   commonProps: CommonCardPropsForRehydration
 ): PriceCardData | null => {
   const originalFaceData = cardFromStorage.faceData || {};
@@ -34,18 +60,17 @@ const rehydrateLivePriceCard: SpecificCardRehydrator = (
 
   const originalBackData = cardFromStorage.backData || {};
   const rehydratedBackData: PriceCardSpecificBackData = {
-    description: originalBackData.description,
+    // If originalBackData.description is null, undefined, or "", it becomes undefined.
+    // Otherwise, it's the string value. This fits 'string | undefined'.
+    description: originalBackData.description || undefined,
     marketCap: originalBackData.marketCap ?? null,
     sma50d: originalBackData.sma50d ?? null,
     sma200d: originalBackData.sma200d ?? null,
   };
 
-  // commonProps already contains id, symbol, createdAt, companyName, logoUrl, isFlipped, rarity etc.
-  // The SpecificCardRehydrator returns the ConcreteCardData part.
-  // BaseCardData properties are merged here.
   return {
     id: commonProps.id,
-    type: "price", // Ensure type is set correctly
+    type: "price",
     symbol: commonProps.symbol,
     createdAt: commonProps.createdAt,
     companyName: commonProps.companyName,
@@ -55,5 +80,4 @@ const rehydrateLivePriceCard: SpecificCardRehydrator = (
   };
 };
 
-// Register the rehydrator
 registerCardRehydrator("price", rehydrateLivePriceCard);

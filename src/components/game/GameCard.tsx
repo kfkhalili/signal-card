@@ -9,7 +9,7 @@ import type {
 import type {
   CardActionContext,
   BaseCardSocialInteractions,
-  CardType,
+  // CardType, <-- Removed this unused import
 } from "./cards/base-card/base-card.types";
 import { cn } from "@/lib/utils";
 import { getCardRenderer } from "@/components/game/cardRenderers";
@@ -105,7 +105,7 @@ const GameCard: React.FC<GameCardProps> = ({
   const CardRenderer = getCardRenderer(card.type);
 
   if (!CardRenderer) {
-    const unknownType = card.type; // Removed 'as any'
+    const unknownType = card.type;
     if (process.env.NODE_ENV === "development") {
       console.error(
         `[GameCard] No renderer registered for card type: ${unknownType}. Card ID: ${card.id}`

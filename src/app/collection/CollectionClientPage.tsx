@@ -168,19 +168,16 @@ export default function CollectionClientPage({
     setCardToConfirmDelete(null);
   }, []);
 
-  const collectedCardSocialInteractions = useCallback(
-    (
-      _clientCard: ClientCollectedCard // Prefixed unused variable
-    ): BaseCardSocialInteractions | undefined => {
-      return {
-        onLike: async () => {
-          // const snapshotId = _clientCard.snapshot_id; // Example of using it
-          toast({ title: "Liked from collection!" });
-        },
-      };
-    },
-    [toast]
-  );
+  const collectedCardSocialInteractions = useCallback(():
+    | BaseCardSocialInteractions
+    | undefined => {
+    // Removed _unusedClientCard
+    return {
+      onLike: async () => {
+        toast({ title: "Liked from collection!" });
+      },
+    };
+  }, [toast]);
 
   if (collectedCards.length === 0) {
     return (
@@ -227,7 +224,7 @@ export default function CollectionClientPage({
                 onDeleteCardRequest={() => {
                   /* Deletion handled by button below */
                 }}
-                socialInteractions={collectedCardSocialInteractions(clientCard)}
+                socialInteractions={collectedCardSocialInteractions()} // Invoked without argument
               />
               <div className="text-center w-full px-1">
                 <p className="text-xs text-muted-foreground">

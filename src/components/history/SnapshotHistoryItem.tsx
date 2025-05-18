@@ -151,6 +151,8 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
           `[SnapshotHistoryItem ${snapshot.id}] Failed to fetch social status:`,
           errorMessage
         );
+        // Optionally, show a toast for this error as well
+        // toast({ title: "Error", description: "Could not fetch social status.", variant: "destructive" });
       } finally {
         setIsLoadingSocialStatus(false);
       }
@@ -194,7 +196,7 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
         !(
           response.status === 200 && (result as LikeApiResponse).isAlreadyLiked
         ) &&
-        response.status !== 404
+        response.status !== 404 // Allow 404 for DELETE if already unliked by another means
       ) {
         throw new Error(
           (result as { error?: string }).error ||
@@ -212,7 +214,10 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
       );
 
       if (rpcError) {
-        console.warn("Error refetching counts via RPC:", rpcError.message);
+        console.warn(
+          `[SnapshotHistoryItem ${snapshot.id}] Error refetching counts via RPC:`,
+          rpcError.message
+        );
       } else if (rpcResponseData && rpcResponseData.length > 0) {
         const updatedCounts =
           rpcResponseData[0] as SnapshotSocialCountsRPCResponse;
@@ -222,23 +227,27 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
           setCollectionCountLocal(updatedCounts.collection_count);
         } else {
           console.warn(
-            `RPC get_snapshot_social_counts for ${snapshot.id} returned an empty object in the array.`
+            `[SnapshotHistoryItem ${snapshot.id}] RPC get_snapshot_social_counts returned an empty object in the array.`
           );
         }
       } else if (rpcResponseData && rpcResponseData.length === 0) {
         console.warn(
-          `RPC get_snapshot_social_counts for ${snapshot.id} returned no data (empty array).`
+          `[SnapshotHistoryItem ${snapshot.id}] RPC get_snapshot_social_counts returned no data (empty array).`
         );
       } else if (!rpcResponseData) {
         console.warn(
-          `RPC get_snapshot_social_counts for ${snapshot.id} returned null data property.`
+          `[SnapshotHistoryItem ${snapshot.id}] RPC get_snapshot_social_counts returned null data property.`
         );
       }
-    } catch (_error: unknown) {
-      // Prefixed unused variable
+    } catch {
+      // Removed '_error: unknown' variable binding
+      // It's good practice to log the actual error, even if not shown to user:
+      // console.error("An error occurred during like/unlike operation:", caughtError);
       toast({ title: "Action Failed", variant: "destructive" });
+      // Revert optimistic updates
       setIsLikedByCurrentUserLocal(originalIsLiked);
       setLikeCountLocal(originalLikeCount);
+      // If an ID was optimistically cleared, and we need to revert, we'd need originalLikeId
     }
   }, [
     snapshot.id,
@@ -267,6 +276,7 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
             description: "Shareable link copied to clipboard.",
           });
         } catch {
+          // Error variable omitted as it's not used
           toast({
             title: "Could not copy link.",
             description: "Please copy manually: " + shareUrl,
@@ -275,7 +285,7 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
         }
       },
     }),
-    [handleLikeOrUnlikeCard, toast]
+    [handleLikeOrUnlikeCard, toast] // Removed setShowComments from deps as onComment directly uses it
   );
 
   const displayableCard = useMemo(
@@ -302,10 +312,10 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
 
     if (rpcError) {
       console.warn(
-        "Error refetching counts after comment post:",
+        `[SnapshotHistoryItem ${snapshot.id}] Error refetching counts after comment post:`,
         rpcError.message
       );
-      setCommentCountLocal((prev) => prev + 1);
+      setCommentCountLocal((prev) => prev + 1); // Optimistic update if RPC fails
     } else if (rpcResponseData && rpcResponseData.length > 0) {
       const updatedCounts =
         rpcResponseData[0] as SnapshotSocialCountsRPCResponse;
@@ -315,15 +325,15 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
         setCollectionCountLocal(updatedCounts.collection_count);
       } else {
         console.warn(
-          `RPC get_snapshot_social_counts for ${snapshot.id} returned an empty object in array after comment post.`
+          `[SnapshotHistoryItem ${snapshot.id}] RPC get_snapshot_social_counts returned an empty object in array after comment post.`
         );
-        setCommentCountLocal((prev) => prev + 1);
+        setCommentCountLocal((prev) => prev + 1); // Fallback optimistic
       }
     } else {
       console.warn(
-        `RPC get_snapshot_social_counts for ${snapshot.id} returned no data after comment post.`
+        `[SnapshotHistoryItem ${snapshot.id}] RPC get_snapshot_social_counts returned no data after comment post.`
       );
-      setCommentCountLocal((prev) => prev + 1);
+      setCommentCountLocal((prev) => prev + 1); // Fallback optimistic
     }
   }, [snapshot.id, supabase]);
 
@@ -377,7 +387,7 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
             commentCount={commentCountLocal}
             collectionCount={collectionCountLocal}
             isSavedByCurrentUser={isSavedByCurrentUserLocal}
-            isSaveDisabled={true}
+            isSaveDisabled={true} // Explicitly true, collection management isn't from history item
           />
         </div>
         {showComments && (

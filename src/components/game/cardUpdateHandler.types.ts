@@ -10,33 +10,20 @@ import type { CardType } from "@/components/game/cards/base-card/base-card.types
  * Defines known event types for card data updates.
  */
 export type CardUpdateEventType =
-  | "LIVE_QUOTE_UPDATE" // Expected Payload: LiveQuoteIndicatorDBRow
-  | "STATIC_PROFILE_UPDATE" // Expected Payload: ProfileDBRow
-  | "EXCHANGE_STATUS_UPDATE"; // Expected Payload: ExchangeMarketStatusRecord
-// Add more event types as your application grows
+  | "LIVE_QUOTE_UPDATE"
+  | "STATIC_PROFILE_UPDATE"
+  | "EXCHANGE_STATUS_UPDATE";
 
 /**
  * Context provided to card update handler functions.
  */
 export interface CardUpdateContext {
   toast: ToastFunctionType;
-  // Potentially add other context if handlers need it, e.g.:
-  // activeCards?: DisplayableCard[]; // If an update needs to know about other cards
-  // currentSymbol?: string;
 }
 
 /**
  * Defines the signature for a function that handles a specific type of data update
  * for a particular card type.
- *
- * @template TCardData - The specific ConcreteCardData type for the card.
- * @template TUpdatePayload - The type of the data payload for this event.
- *
- * @param currentCardConcreteData - The existing concrete data part of the card.
- * @param updatePayload - The new data payload relevant to the event.
- * @param currentDisplayableCard - The full current DisplayableCard object.
- * @param context - Shared utilities or context.
- * @returns The updated ConcreteCardData. If no relevant changes, return the original currentCardConcreteData.
  */
 export type CardUpdateHandler<
   TCardData extends ConcreteCardData,
@@ -49,9 +36,15 @@ export type CardUpdateHandler<
 ) => TCardData;
 
 // --- Registry Implementation ---
+
+// Type alias for the handler stored in the registry.
+// TCardData is effectively generalized to ConcreteCardData for storage,
+// and TUpdatePayload is unknown.
+type StoredCardUpdateHandler = CardUpdateHandler<ConcreteCardData, unknown>;
+
 const cardUpdateHandlerRegistry = new Map<
   CardType,
-  Map<CardUpdateEventType, CardUpdateHandler<any, any>>
+  Map<CardUpdateEventType, StoredCardUpdateHandler>
 >();
 
 export function registerCardUpdateHandler<
@@ -60,7 +53,7 @@ export function registerCardUpdateHandler<
 >(
   cardType: CardType,
   eventType: CardUpdateEventType,
-  handler: CardUpdateHandler<TCardData, TUpdatePayload>
+  handler: CardUpdateHandler<TCardData, TUpdatePayload> // This is the specific handler
 ): void {
   if (!cardUpdateHandlerRegistry.has(cardType)) {
     cardUpdateHandlerRegistry.set(cardType, new Map());
@@ -74,12 +67,20 @@ export function registerCardUpdateHandler<
       );
     }
   }
-  eventMap.set(eventType, handler as CardUpdateHandler<any, any>);
+  // The 'handler' has a specific TCardData (e.g., PriceCardData).
+  // StoredCardUpdateHandler expects ConcreteCardData as its first parameter.
+  // Due to contravariance of function parameter types, a direct cast from
+  // CardUpdateHandler<PriceCardData, X> to CardUpdateHandler<ConcreteCardData, Y>
+  // is unsafe if PriceCardData is a subtype of ConcreteCardData.
+  // The 'as unknown as StoredCardUpdateHandler' cast bypasses this check.
+  // We assert this is safe because getCardUpdateHandler is expected to be used
+  // in a context where the specific TCardData is known (e.g., via cardType).
+  eventMap.set(eventType, handler as unknown as StoredCardUpdateHandler);
 }
 
 export function getCardUpdateHandler(
   cardType: CardType,
   eventType: CardUpdateEventType
-): CardUpdateHandler<any, any> | undefined {
+): StoredCardUpdateHandler | undefined {
   return cardUpdateHandlerRegistry.get(cardType)?.get(eventType);
 }
