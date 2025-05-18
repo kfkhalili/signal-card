@@ -59,10 +59,16 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       { message: "Successfully removed from collection." },
       { status: 200 }
     );
-  } catch (error: any) {
-    console.error("Error processing remove from collection request:", error);
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred";
+
+    console.error(
+      "Error processing remove from collection request:",
+      errorMessage
+    );
     return NextResponse.json(
-      { error: `Internal server error: ${error.message || "Unknown error"}` },
+      { error: `Internal server error: ${errorMessage}` },
       { status: 500 }
     );
   }

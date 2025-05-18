@@ -140,10 +140,12 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
 
         if (userSaveResult.error) throw userSaveResult.error;
         setIsSavedByCurrentUserLocal(!!userSaveResult.data);
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : "An unknown error occurred";
         console.error(
           `[SnapshotHistoryItem ${snapshot.id}] Failed to fetch social status:`,
-          error.message
+          errorMessage
         );
       } finally {
         setIsLoadingSocialStatus(false);
@@ -244,7 +246,6 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
     likeCountLocal,
     supabase,
     isLoadingSocialStatus,
-    currentUserLikeIdLocal,
   ]);
 
   const socialInteractionsForSnapshot: BaseCardSocialInteractions = useMemo(

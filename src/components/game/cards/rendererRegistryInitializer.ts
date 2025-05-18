@@ -6,11 +6,8 @@ import { PriceCardContainer } from "./price-card/PriceCardContainer";
 import { ProfileCardContainer } from "./profile-card/ProfileCardContainer";
 
 // --- Register known card types ---
-registerCardRenderer("price", PriceCardContainer as React.ComponentType<any>);
-registerCardRenderer(
-  "profile",
-  ProfileCardContainer as React.ComponentType<any>
-);
+registerCardRenderer("price", PriceCardContainer);
+registerCardRenderer("profile", ProfileCardContainer);
 
 // As you create new card types (e.g., NewsCard, EarningsCard):
 // 1. Create their ...Container.tsx component.

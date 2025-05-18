@@ -222,10 +222,14 @@ export function useWorkspaceManager({
             );
           }
         }
-      } catch (err: any) {
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "Could not add ${cardType} card.";
         toast({
           title: "Error Adding Card",
-          description: err.message || `Could not add ${cardType} card.`,
+          description: errorMessage,
           variant: "destructive",
         });
       } finally {
@@ -288,7 +292,7 @@ export function useWorkspaceManager({
                   overallChanged = true;
                   const newCard = {
                     ...card,
-                    ...(updatedConcreteData as any),
+                    ...updatedConcreteData,
                     currentRarity: newRarity,
                     rarityReason: newRarityReason,
                   };
@@ -382,7 +386,7 @@ export function useWorkspaceManager({
                   }
                   return {
                     ...card,
-                    ...(updatedConcreteData as any),
+                    ...updatedConcreteData,
                     currentRarity: newRarity,
                     rarityReason: newRarityReason,
                   };

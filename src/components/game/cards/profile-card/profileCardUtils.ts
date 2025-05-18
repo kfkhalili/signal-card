@@ -156,12 +156,15 @@ async function initializeProfileCard({
       }
       return null;
     }
-  } catch (err: any) {
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "Could not initialize profile for ${symbol}.";
     if (toast) {
       toast({
         title: "Error Initializing Profile",
-        description:
-          err.message || `Could not initialize profile for ${symbol}.`,
+        description: errorMessage,
         variant: "destructive",
       });
     }

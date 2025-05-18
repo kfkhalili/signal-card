@@ -146,10 +146,12 @@ export async function POST(request: Request) {
       { snapshot: insertedSnapshot, isNew: true },
       { status: 201 } // 201 Created
     );
-  } catch (error: any) {
-    console.error("Error processing ensure snapshot request:", error);
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred";
+    console.error("Error processing ensure snapshot request:", errorMessage);
     return NextResponse.json(
-      { error: `Internal server error: ${error.message || "Unknown error"}` },
+      { error: `Internal server error: ${errorMessage || "Unknown error"}` },
       { status: 500 }
     );
   }

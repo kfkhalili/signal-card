@@ -70,7 +70,7 @@ const GameCard: React.FC<GameCardProps> = ({
       logoUrl: card.logoUrl ?? null,
       websiteUrl: websiteUrlForContext ?? null,
     };
-  }, [card.id, card.symbol, card.type, card.companyName, card.logoUrl, card]);
+  }, [card]);
 
   const handleDeleteRequestWithContext = React.useCallback(
     (context: CardActionContext) => {

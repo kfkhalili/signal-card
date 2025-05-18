@@ -66,7 +66,7 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, SetValue<T>] {
 
   useEffect(() => {
     setStoredValue(readValue());
-  }, []);
+  }, [readValue]);
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent | CustomEvent) => {
       // Check if the event is a StorageEvent and if the key matches

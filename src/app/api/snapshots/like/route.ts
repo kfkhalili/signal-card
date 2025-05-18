@@ -105,8 +105,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       { like: newLike, message: "Snapshot liked successfully!" },
       { status: 201 }
     );
-  } catch (error: any) {
-    console.error("Error processing like snapshot request:", error);
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred";
+
+    console.error("Error processing like snapshot request:", errorMessage);
     if (error instanceof SyntaxError) {
       return NextResponse.json(
         { error: "Invalid JSON in request body." },
@@ -174,8 +177,10 @@ export async function DELETE(request: Request): Promise<NextResponse> {
       { message: "Snapshot unliked successfully." },
       { status: 200 }
     );
-  } catch (error: any) {
-    console.error("Error processing unlike snapshot request:", error);
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred";
+    console.error("Error processing unlike snapshot request:", errorMessage);
     if (
       error instanceof SyntaxError &&
       request.method === "DELETE" &&
@@ -189,7 +194,7 @@ export async function DELETE(request: Request): Promise<NextResponse> {
       );
     }
     return NextResponse.json(
-      { error: `Internal server error: ${error.message || "Unknown error"}` },
+      { error: `Internal server error: ${errorMessage}` },
       { status: 500 }
     );
   }

@@ -86,7 +86,7 @@ function adaptServerToDisplayable(
         ...(concreteCardDataFromSnapshot ?? {}),
         ...commonData,
         type: snapshot.card_type as CardType,
-        backData: (concreteCardDataFromSnapshot as any)?.backData ?? {
+        backData: concreteCardDataFromSnapshot?.backData ?? {
           description: `Unknown Card Type: ${snapshot.card_type}`,
         },
       };
@@ -153,10 +153,12 @@ export default function CollectionClientPage({
           cardToConfirmDelete.card_snapshot_data.symbol
         } removed from your collection.`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "unknown error occurred";
       toast({
         title: "Removal Failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -179,11 +181,11 @@ export default function CollectionClientPage({
       // This needs further design based on desired UX for collected items.
       return {
         // Example:
-        // onLike: async () => {
-        //   const snapshotId = clientCard.snapshot_id;
-        //   // call /api/snapshots/like with snapshotId
-        //   toast({title: "Liked from collection!"});
-        // },
+        onLike: async () => {
+          // const snapshotId = clientCard.snapshot_id;
+          // call /api/snapshots/like with snapshotId
+          toast({ title: "Liked from collection!" });
+        },
       };
     },
     [toast] // Add dependencies if interactions are implemented

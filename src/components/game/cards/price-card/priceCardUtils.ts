@@ -176,15 +176,21 @@ async function initializePriceCard({
       }
       return shellDisplayableCard;
     }
-  } catch (err: any) {
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "Could not initialize price data for ${symbol}.";
     if (process.env.NODE_ENV === "development") {
-      console.error(`Error initializing price card for ${symbol}:`, err);
+      console.error(
+        `Error initializing price card for ${symbol}:`,
+        errorMessage
+      );
     }
     if (toast) {
       toast({
         title: "Error Initializing Price Data",
-        description:
-          err.message || `Could not initialize price data for ${symbol}.`,
+        description: errorMessage,
         variant: "destructive",
       });
     }

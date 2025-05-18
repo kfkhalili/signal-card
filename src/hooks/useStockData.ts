@@ -269,12 +269,14 @@ export function useStockData({
             );
           }
         }
-      } catch (e: any) {
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : "unknown error occurred";
         if (isMountedRef.current) {
           setExchangeStatus(null);
           setDerivedMarketStatus("Error");
           setMarketStatusMessage(
-            `Exception fetching market status for ${exchangeCodeToSubscribe}: ${e.message}`
+            `Exception fetching market status for ${exchangeCodeToSubscribe}: ${errorMessage}`
           );
         }
       }
@@ -404,11 +406,13 @@ export function useStockData({
             setupExchangeStatusSubscription(null);
           }
         }
-      } catch (err: any) {
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : "An unknown error occurred";
         if (!profileSubActive || !isMountedRef.current) return;
         console.error(
           `Exception during initial profile fetch for ${symbol}:`,
-          err.message
+          errorMessage
         );
         if (isMountedRef.current) setProfileData(null);
       }
@@ -538,11 +542,13 @@ export function useStockData({
             setupExchangeStatusSubscription(null);
           }
         }
-      } catch (e: any) {
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : "An unknown error occurred";
         if (isMountedRef.current && quoteSubActive) {
           console.error(
             `Exception fetching initial quote for ${symbol}:`,
-            e.message
+            errorMessage
           );
           if (isMountedRef.current) setLatestQuote(null);
         }

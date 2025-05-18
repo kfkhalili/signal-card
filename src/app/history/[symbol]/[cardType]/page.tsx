@@ -162,14 +162,16 @@ export default async function SignalHistoryPage({
       symbol,
       cardType
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "An unexpected error occurred while loading signal history.";
     console.error(
       `Failed to load signal history for ${symbol} (${cardType}):`,
       error
     );
-    fetchError =
-      error.message ||
-      "An unexpected error occurred while loading signal history.";
+    fetchError = errorMessage;
   }
 
   // Render error state if fetching failed

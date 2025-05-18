@@ -61,10 +61,12 @@ export const InlineCommentSection: React.FC<InlineCommentSectionProps> = ({
       }
       const data = await response.json();
       setComments(data.comments || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "unknown error occurred";
       toast({
         title: "Error Fetching Comments",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
       setComments([]);
@@ -112,10 +114,12 @@ export const InlineCommentSection: React.FC<InlineCommentSectionProps> = ({
       form.reset();
       toast({ title: "Comment Posted!", variant: "default" });
       onCommentPosted?.(); // Call the callback
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "unknown error occurred";
       toast({
         title: "Error Posting Comment",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

@@ -64,7 +64,7 @@ export function updateOrAddCard<
   // Prepare a card-like structure for rarity calculation
   // This assumes updatedConcreteCardData contains type, symbol, etc.
   const tempCardForRarityCalc = {
-    ...(updatedConcreteCardData as any), // Spread concrete data
+    ...updatedConcreteCardData, // Spread concrete data
     isFlipped: existingDisplayableCard?.isFlipped || false, // Preserve flip state or default
     // Ensure all fields expected by calculateDynamicCardRarity are present or defaulted
     // The 'as any' is used because ConcreteCardData doesn't enforce isFlipped,

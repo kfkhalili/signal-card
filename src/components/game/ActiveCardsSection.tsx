@@ -96,34 +96,30 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
 
   const ensureGlobalSnapshot = useCallback(
     async (card: DisplayableCard): Promise<string | null> => {
-      const { currentRarity, rarityReason, ...restOfCardData } = card;
-
       let actualCardDataSnapshot: ConcreteCardData;
       if (card.type === "price") {
-        const priceSpecificData = restOfCardData as any;
         actualCardDataSnapshot = {
-          id: priceSpecificData.id,
+          id: card.id,
           type: "price",
-          symbol: priceSpecificData.symbol,
-          createdAt: priceSpecificData.createdAt,
-          companyName: priceSpecificData.companyName,
-          logoUrl: priceSpecificData.logoUrl,
-          faceData: priceSpecificData.faceData,
-          backData: priceSpecificData.backData,
+          symbol: card.symbol,
+          createdAt: card.createdAt,
+          companyName: card.companyName,
+          logoUrl: card.logoUrl,
+          faceData: card.faceData,
+          backData: card.backData,
         };
       } else if (card.type === "profile") {
-        const profileSpecificData = restOfCardData as any;
         actualCardDataSnapshot = {
-          id: profileSpecificData.id,
+          id: card.id,
           type: "profile",
-          symbol: profileSpecificData.symbol,
-          createdAt: profileSpecificData.createdAt,
-          companyName: profileSpecificData.companyName,
-          logoUrl: profileSpecificData.logoUrl,
-          staticData: profileSpecificData.staticData,
-          liveData: profileSpecificData.liveData,
-          backData: profileSpecificData.backData,
-          websiteUrl: profileSpecificData.websiteUrl,
+          symbol: card.symbol,
+          createdAt: card.createdAt,
+          companyName: card.companyName,
+          logoUrl: card.logoUrl,
+          staticData: card.staticData,
+          liveData: card.liveData,
+          backData: card.backData,
+          websiteUrl: card.websiteUrl,
         };
       } else {
         const unknownCardType = (card as any).type;
@@ -142,8 +138,8 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
         companyName: card.companyName,
         logoUrl: card.logoUrl,
         cardDataSnapshot: actualCardDataSnapshot,
-        rarityLevel: currentRarity,
-        rarityReason: rarityReason,
+        rarityLevel: card.currentRarity,
+        rarityReason: card.rarityReason,
       };
 
       try {
@@ -159,11 +155,13 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
               `Failed to ensure snapshot (status ${response.status})`
           );
         return result.snapshot.id;
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : "unknown error occurred";
         console.error("Error ensuring global snapshot:", error);
         toast({
           title: "Snapshot Error",
-          description: error.message,
+          description: errorMessage,
           variant: "destructive",
         });
         return null;
@@ -341,10 +339,12 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
             )
           );
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : "unknown error occurred";
         toast({
           title: originalIsLiked ? "Unlike Failed" : "Like Failed",
-          description: error.message,
+          description: errorMessage,
           variant: "destructive",
         });
       }
@@ -421,10 +421,12 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
             title: "Removed!",
             description: `${cardToToggleSave.symbol} removed from your collection.`,
           });
-        } catch (error: any) {
+        } catch (error: unknown) {
+          const errorMessage =
+            error instanceof Error ? error.message : "unknown error occured";
           toast({
             title: "Removal Failed",
-            description: error.message,
+            description: errorMessage,
             variant: "destructive",
           });
           // No optimistic update for removal error, rely on fetchSnapshotSocialStats to correct
@@ -464,10 +466,12 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
                 : "added to"
             } your collection.`,
           });
-        } catch (error: any) {
+        } catch (error: unknown) {
+          const errorMessage =
+            error instanceof Error ? error.message : "unknown error occurred";
           toast({
             title: "Collection Failed",
-            description: error.message,
+            description: errorMessage,
             variant: "destructive",
           });
         }

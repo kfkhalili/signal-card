@@ -100,10 +100,15 @@ export async function GET(request: Request, { params }: RouteParams) {
     }));
 
     return NextResponse.json({ comments }, { status: 200 });
-  } catch (error: any) {
-    console.error("Error processing get comments request (with view):", error);
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred";
+    console.error(
+      "Error processing get comments request (with view):",
+      errorMessage
+    );
     return NextResponse.json(
-      { error: `Internal server error: ${error.message || "Unknown error"}` },
+      { error: `Internal server error: ${errorMessage}` },
       { status: 500 }
     );
   }
