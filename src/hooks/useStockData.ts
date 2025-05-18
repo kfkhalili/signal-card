@@ -29,7 +29,6 @@ export interface ProfileDBRow {
   industry?: string | null;
   website?: string | null;
   description?: string | null;
-  short_description?: string | null;
   country?: string | null;
   price?: number | null;
   market_cap?: number | null;
@@ -71,7 +70,6 @@ export const ProfileDBSchema = z.object({
   industry: z.string().nullable().optional(),
   website: z.string().url().nullable().optional(),
   description: z.string().nullable().optional(),
-  short_description: z.string().nullable().optional(),
   country: z.string().max(2).nullable().optional(),
   price: z.number().nullable().optional(),
   market_cap: z.number().int().nullable().optional(),
@@ -518,7 +516,7 @@ export function useStockData({
         const { data, error } = await supabaseClientRef.current
           .from("profiles")
           .select(
-            "id, symbol, company_name, image, exchange, sector, industry, website, description, short_description, country, price, market_cap, beta, last_dividend, range, change, change_percentage, volume, average_volume, currency, cik, isin, cusip, exchange_full_name, ceo, full_time_employees, phone, address, city, state, zip, ipo_date, default_image, is_etf, is_actively_trading, is_adr, is_fund, modified_at"
+            "id, symbol, company_name, image, exchange, sector, industry, website, description, country, price, market_cap, beta, last_dividend, range, change, change_percentage, volume, average_volume, currency, cik, isin, cusip, exchange_full_name, ceo, full_time_employees, phone, address, city, state, zip, ipo_date, default_image, is_etf, is_actively_trading, is_adr, is_fund, modified_at"
           )
           .eq("symbol", symbol)
           .maybeSingle();

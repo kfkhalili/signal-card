@@ -35,7 +35,6 @@ const rehydrateProfileCardInstance: SpecificCardRehydrator = (
     exchange_full_name: staticDataFromStorage.exchange_full_name ?? null,
     website: staticDataFromStorage.website ?? null,
     description: staticDataFromStorage.description ?? null,
-    short_description: staticDataFromStorage.short_description ?? null,
     ceo: staticDataFromStorage.ceo ?? null,
     full_address: staticDataFromStorage.full_address ?? null,
     phone: staticDataFromStorage.phone ?? null,

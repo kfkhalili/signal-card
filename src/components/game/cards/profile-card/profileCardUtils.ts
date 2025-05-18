@@ -77,7 +77,6 @@ export function transformProfileDBRowToStaticData(
     exchange: dbData.exchange,
     website: dbData.website,
     description: dbData.description,
-    short_description: dbData.short_description,
     ceo: dbData.ceo,
     full_address: [
       dbData.address,
@@ -141,7 +140,7 @@ async function initializeProfileCard({
     const { data, error } = await supabase
       .from("profiles")
       .select(
-        "id, symbol, company_name, image, exchange, sector, industry, website, description, short_description, country, price, market_cap, beta, last_dividend, range, change, change_percentage, volume, average_volume, currency, cik, isin, cusip, exchange_full_name, ceo, full_time_employees, phone, address, city, state, zip, ipo_date, default_image, is_etf, is_actively_trading, is_adr, is_fund, modified_at"
+        "id, symbol, company_name, image, exchange, sector, industry, website, description, country, price, market_cap, beta, last_dividend, range, change, change_percentage, volume, average_volume, currency, cik, isin, cusip, exchange_full_name, ceo, full_time_employees, phone, address, city, state, zip, ipo_date, default_image, is_etf, is_actively_trading, is_adr, is_fund, modified_at"
       )
       .eq("symbol", symbol)
       .maybeSingle();

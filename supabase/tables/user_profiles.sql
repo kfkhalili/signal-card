@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
     updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()),
 
     CONSTRAINT user_profiles_pkey PRIMARY KEY (id),
+    CONSTRAINT user_profiles_username_key unique (username),
+    CONSTRAINT user_profiles_id_fkey foreign KEY (id) references auth.users (id) on delete CASCADE,
     CONSTRAINT username_length CHECK (char_length(username) >= 3 AND char_length(username) <= 50) -- Example constraint
 );
 

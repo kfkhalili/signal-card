@@ -195,89 +195,141 @@ graph TD
 ```mermaid
 erDiagram
     "auth.users" {
-        UUID id PK
-        TEXT email
-        TIMESTAMP created_at
+      UUID id PK
+      TEXT email UK
+      TIMESTAMP created_at
     }
 
     user_profiles {
-        UUID user_id PK, FK
-        TEXT username
-        TEXT avatar_url
-        TEXT display_name
+      UUID user_id PK, FK
+      TEXT username UK
+      TEXT full_name
+      TIMESTAMP updated_at
     }
 
     card_snapshots {
-        UUID id PK
-        TEXT symbol
-        TEXT card_type
-        JSONB card_data_snapshot
-        TEXT state_hash UK
-        TEXT rarity_level
-        TIMESTAMP created_at
+      UUID id PK
+      TEXT state_hash UK
+      TEXT symbol FK
+      TEXT company_name
+      TEXT logo_url
+      TEXT card_type
+      JSONB card_data_snapshot
+      TEXT rarity_level
+      TEXT rarity_reason
+      TIMESTAMP first_seen_at
     }
 
     snapshot_comments {
-        UUID id PK
-        UUID snapshot_id FK
-        UUID user_id FK
-        TEXT comment_text
-        UUID parent_comment_id FK
-        TIMESTAMP created_at
+      UUID id PK
+      UUID user_id FK
+      UUID snapshot_id FK
+      UUID parent_comment_id FK
+      TEXT comment_text
+      TIMESTAMP created_at
+      TIMESTAMP updated_at
     }
 
     snapshot_likes {
-        UUID id PK
-        UUID snapshot_id FK
-        UUID user_id FK
-        TIMESTAMP created_at
+      UUID id PK
+      UUID user_id FK
+      UUID snapshot_id FK
+      TIMESTAMP liked_at
     }
 
     user_collections {
-        UUID id PK
-        UUID user_id FK
-        UUID snapshot_id FK
-        TEXT collection_name
-        TIMESTAMP created_at
+      UUID id PK
+      UUID user_id FK
+      UUID snapshot_id FK
+      TIMESTAMP captured_at
+      TEXT user_notes
     }
 
     profiles {
-        TEXT symbol PK
-        TEXT company_name
-        TEXT sector
-        TEXT industry
-        TEXT description
-        TIMESTAMP created_at
-        TIMESTAMP modified_at
+      UUID id
+      TEXT symbol PK
+      DOUBLE price
+      BIGINT market_cap
+      DOUBLE beta
+      DOUBLE last_dividend
+      text range
+      DOUBLE change
+      DOUBLE change_percentage
+      BIGINT volume
+      BIGINT average_volume
+      TEXT company_name
+      TEXT currency
+      TEXT cik
+      TEXT isin
+      TEXT cusip
+      TEXT exchange_full_name
+      TEXT exchange
+      TEXT industry
+      TEXT website
+      TEXT description
+      TEXT ceo
+      TEXT sector
+      TEXT country
+      BIGINT full_time_employees
+      TEXT phone
+      TEXT address
+      TEXT city
+      TEXT state
+      TEXT zip
+      TEXT image
+      DATE ipo_date
+      BOOLEAN default_image
+      BOOLEAN is_etf
+      BOOLEAN is_actively_trading
+      BOOLEAN is_adr
+      BOOLEAN is_fund
+      TIMESTAMP created_at
+      TIMESTAMP modified_at
     }
 
     live_quote_indicators {
-        TEXT symbol PK
-        FLOAT price
-        FLOAT change
-        FLOAT day_low
-        FLOAT day_high
-        BOOLEAN is_market_open
-        TEXT market_status_message
-        TIMESTAMP last_updated
-        TIMESTAMP created_at
+        UUID id PK
+        TEXT symbol UK
+        DOUBLE current_price
+        DOUBLE change_percentage
+        DOUBLE day_change
+        volume bigint
+        DOUBLE day_low
+        DOUBLE day_high
+        market_cap bigint
+        DOUBLE day_open
+        DOUBLE previous_close
+        api_timestamp bigint
+        DOUBLE sma_50d
+        DOUBLE sma_200d
+        DOUBLE year_low
+        DOUBLE year_high
+        TEXT exchange FK
+        TIMESTAMP fetched_at
     }
 
     exchange_market_status {
-        TEXT stock_exchange_name PK
-        BOOLEAN is_the_market_open
-        TEXT market_status_message
-        TIMESTAMP last_checked
+        TEXT exchange_code PK
+        TEXT name
+        TEXT opening_time_local
+        TEXT closing_time_local
+        TEXT timezone
+        BOOLEAN is_market_open
+        TEXT status_message
+        BOOLEAN current_day_is_holiday
+        TEXT current_holiday_name
+        JSONB raw_holidays_json
+        TIMESTAMP last_fetched_at
     }
 
     "auth.users" ||--|| user_profiles : "has one"
-    user_profiles }o--|| snapshot_comments : "authors"
-    user_profiles }o--|| snapshot_likes : "likes"
-    user_profiles }o--|| user_collections : "owns"
+    user_profiles ||--o{ snapshot_comments : "authors"
+    user_profiles ||--o{ snapshot_likes : "likes"
+    user_profiles ||--o{ user_collections : "owns"
 
-    card_snapshots }o--|| snapshot_comments : "has many"
-    card_snapshots }o--|| snapshot_likes : "has many"
-    card_snapshots }o--|| user_collections : "part of many"
+    card_snapshots ||--o{ snapshot_comments : "has many"
+    card_snapshots ||--o{ snapshot_likes : "has many"
+    card_snapshots }|--o{ user_collections : "part of none or many"
 
     profiles ||--|| live_quote_indicators : "has"
 

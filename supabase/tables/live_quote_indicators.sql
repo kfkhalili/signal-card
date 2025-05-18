@@ -1,20 +1,25 @@
--- Create the NEW table to store live quote data + SMAs
-CREATE TABLE public.live_quote_indicators (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),       -- Unique identifier for the row in this table
-    symbol text NOT NULL UNIQUE,                         -- Stock symbol (e.g., 'AAPL'), constrained to be unique
-    current_price double precision NOT NULL,             -- Current price from the quote
-    change_percentage double precision,                  -- Percentage change for the day
-    day_change double precision,                         -- Absolute price change for the day
-    volume bigint,                                       -- Volume recorded with the quote
-    day_low double precision,                            -- Lowest price recorded during the day
-    day_high double precision,                           -- Highest price recorded during the day
-    market_cap bigint,                                   -- Market capitalization
-    day_open double precision,                           -- Opening price for the day
-    previous_close double precision,                     -- Previous trading day's closing price
-    api_timestamp bigint NOT NULL,                       -- Raw epoch timestamp provided by the FMP /quote API (seconds since epoch)
-    sma_50d double precision,                            -- Latest 50-day Simple Moving Average
-    sma_200d double precision,                           -- Latest 200-day Simple Moving Average
-    fetched_at timestamptz NOT NULL DEFAULT now()        -- Timestamp when this data was inserted/updated in the DB
+-- Create table to store live quote data + SMAs
+create table public.live_quote_indicators (
+  id uuid not null default gen_random_uuid (),
+  symbol text not null,
+  current_price double precision not null,
+  change_percentage double precision null,
+  day_change double precision null,
+  volume bigint null,
+  day_low double precision null,
+  day_high double precision null,
+  market_cap bigint null,
+  day_open double precision null,
+  previous_close double precision null,
+  api_timestamp bigint not null,
+  sma_50d double precision null,
+  sma_200d double precision null,
+  year_low double precision null,
+  year_high double precision null,
+  exchange text null,
+  fetched_at timestamp with time zone not null default now(),
+  constraint live_quote_indicators_pkey primary key (id),
+  constraint live_quote_indicators_symbol_key unique (symbol)
 );
 
 -- Add comments to columns for clarity
@@ -32,6 +37,9 @@ COMMENT ON COLUMN public.live_quote_indicators.previous_close IS 'Previous tradi
 COMMENT ON COLUMN public.live_quote_indicators.api_timestamp IS 'Raw epoch timestamp provided by the FMP /quote API (seconds since epoch)';
 COMMENT ON COLUMN public.live_quote_indicators.sma_50d IS 'Latest 50-day Simple Moving Average from FMP';
 COMMENT ON COLUMN public.live_quote_indicators.sma_200d IS 'Latest 200-day Simple Moving Average from FMP';
+COMMENT ON COLUMN public.live_quote_indicators.year_low IS 'Lowest price recorded during the last 52 weeks from FMP';
+COMMENT ON COLUMN public.live_quote_indicators.year_high IS 'Highest price recorded during the last 52 weeks from FMP';
+COMMENT ON COLUMN public.live_quote_indicators.exchange IS 'Name of the primary exchange where this symbol is traded from FMP';
 COMMENT ON COLUMN public.live_quote_indicators.fetched_at IS 'Timestamp when this row was inserted/updated in the Supabase table';
 
 -- Add index for potentially useful queries

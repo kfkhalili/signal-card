@@ -16,7 +16,6 @@ export interface ProfileCardStaticData {
   readonly exchange_full_name?: string | null; // e.g., "Nasdaq Stock Market"
   readonly website?: string | null;
   readonly description?: string | null;
-  readonly short_description?: string | null;
   readonly ceo?: string | null;
   readonly full_address?: string | null;
   readonly phone?: string | null;

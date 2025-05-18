@@ -73,8 +73,7 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
     };
 
     if (!isBackFace) {
-      const taglineSource =
-        staticData?.short_description || staticData?.description;
+      const description = staticData?.description;
       const countryFlag = getFlagEmoji(staticData?.country);
       const fullCountryName = staticData?.country
         ? getCountryName(staticData.country)
@@ -85,12 +84,12 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
           data-testid={`profile-card-front-${symbol}`}
           className="pointer-events-auto flex flex-col h-full justify-between text-xs">
           <ShadCardContent className="pt-1 pb-1 px-0 space-y-1.5 flex-grow">
-            {taglineSource && (
+            {description && (
               <p
-                className="text-muted-foreground text-sm leading-tight line-clamp-7"
+                className="text-muted-foreground text-sm leading-tight line-clamp-3"
                 style={{ minHeight: "6.25em" }}
-                title={taglineSource || undefined}>
-                {taglineSource}
+                title={description || undefined}>
+                {description}
               </p>
             )}
 
