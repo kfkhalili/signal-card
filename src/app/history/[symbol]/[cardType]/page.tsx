@@ -7,20 +7,14 @@ import { SnapshotHistoryItem } from "@/components/history/SnapshotHistoryItem";
 import type { CardType as APICardType } from "@/components/game/cards/base-card/base-card.types";
 import type { ConcreteCardData } from "@/components/game/types";
 import type { SupabaseClient } from "@supabase/supabase-js"; // Import SupabaseClient type
+import { Tables } from "@/lib/supabase/database.types";
 
 // Interface for the data structure of a snapshot fetched from the database, including social counts
-export interface CardSnapshotFromDB {
-  id: string; // snapshot_id
-  card_type: APICardType;
-  symbol: string;
-  company_name?: string | null;
-  logo_url?: string | null;
-  card_data_snapshot: ConcreteCardData; // Parsed JSONB
-  rarity_level?: string | null;
-  rarity_reason?: string | null;
-  first_seen_at: string; // ISO string for timestamp
+type RawCardSnapshotFromDB = Tables<"card_snapshots">;
 
-  // Social interaction counts
+interface ProcessedCardSnapshot
+  extends Omit<RawCardSnapshotFromDB, "card_data_snapshot"> {
+  card_data_snapshot: ConcreteCardData; // Parsed from Json
   like_count: number;
   comment_count: number;
   collection_count: number;
@@ -49,7 +43,7 @@ async function getSnapshotsWithCounts(
   supabase: SupabaseClient, // Accepts SupabaseClient type
   symbol: string,
   cardType: APICardType
-): Promise<CardSnapshotFromDB[]> {
+): Promise<ProcessedCardSnapshot[]> {
   // Step 1: Fetch the base snapshot data
   const { data: snapshotsWithoutCounts, error: snapshotsError } = await supabase
     .from("card_snapshots")
@@ -133,7 +127,7 @@ async function getSnapshotsWithCounts(
   const resolvedSnapshotsWithCounts = await Promise.all(
     snapshotsWithCountsPromises
   );
-  return resolvedSnapshotsWithCounts as CardSnapshotFromDB[];
+  return resolvedSnapshotsWithCounts as ProcessedCardSnapshot[];
 }
 
 export default async function SignalHistoryPage({
@@ -152,7 +146,7 @@ export default async function SignalHistoryPage({
     notFound();
   }
 
-  let typedSnapshots: CardSnapshotFromDB[] = [];
+  let typedSnapshots: ProcessedCardSnapshot[] = [];
   let fetchError: string | null = null;
 
   try {

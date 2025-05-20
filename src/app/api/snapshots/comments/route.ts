@@ -1,26 +1,9 @@
 // src/app/api/snapshots/comments/route.ts
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import type { Tables } from "@/lib/supabase/database.types";
 
-interface CreateCommentRequestBody {
-  snapshotId: string; // UUID of the card_snapshots record
-  commentText: string;
-  parentCommentId?: string | null; // For threaded replies
-}
-
-// Updated: Simplified response structure for a newly created comment
-// This avoids complex joins in the POST response.
-// The GET endpoint (/api/snapshots/[snapshot_id]/comments) which uses the
-// 'snapshot_comments_with_author_details' view will provide full author details.
-interface NewCommentResponse {
-  id: string;
-  user_id: string;
-  snapshot_id: string;
-  parent_comment_id: string | null;
-  comment_text: string;
-  created_at: string;
-  updated_at: string;
-}
+type Comment = Tables<"snapshot_comments">;
 
 export async function POST(request: Request): Promise<NextResponse> {
   const supabase = await createSupabaseServerClient();
@@ -36,8 +19,12 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   try {
-    const body = (await request.json()) as CreateCommentRequestBody;
-    const { snapshotId, commentText, parentCommentId } = body;
+    const body: Comment = await request.json();
+    const {
+      snapshot_id: snapshotId,
+      comment_text: commentText,
+      parent_comment_id: parentCommentId,
+    } = body;
 
     // Validate input
     if (!snapshotId || !commentText || commentText.trim() === "") {
@@ -136,7 +123,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
-    const typedNewComment = newCommentData as NewCommentResponse;
+    const typedNewComment = newCommentData as Comment;
 
     return NextResponse.json(
       { comment: typedNewComment, message: "Comment posted successfully!" },

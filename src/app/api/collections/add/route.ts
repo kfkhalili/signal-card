@@ -1,11 +1,16 @@
 // src/app/api/collections/add/route.ts
 import { NextResponse, type NextRequest } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server"; // Updated import
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { TablesInsert } from "@/lib/supabase/database.types";
+
+interface AddToCollectionRequestBody
+  extends Pick<TablesInsert<"user_collections">, "snapshot_id" | "user_id"> {}
 
 export async function POST(request: NextRequest) {
-  const supabase = await createSupabaseServerClient(); // Updated client creation
+  const supabase = await createSupabaseServerClient();
+  const body: AddToCollectionRequestBody = await request.json();
 
-  const { snapshot_id, user_id } = await request.json();
+  const { snapshot_id, user_id } = body;
 
   if (!snapshot_id || !user_id) {
     return NextResponse.json(

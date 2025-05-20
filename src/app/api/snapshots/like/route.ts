@@ -1,10 +1,13 @@
 // src/app/api/snapshots/like/route.ts
 // We can add the DELETE handler to the existing like route file.
+import { Tables } from "@/lib/supabase/database.types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
-interface LikeSnapshotRequestBody {
-  snapshotId: string; // UUID of the card_snapshots record
+export interface LikeApiResponse {
+  like: Tables<"snapshot_likes">;
+  message: string;
+  isAlreadyLiked?: boolean;
 }
 
 // POST handler (existing - for Liking)
@@ -22,8 +25,8 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   try {
-    const body = (await request.json()) as LikeSnapshotRequestBody;
-    const { snapshotId } = body;
+    const body: LikeApiResponse = await request.json();
+    const { snapshot_id: snapshotId } = body.like;
 
     if (!snapshotId) {
       return NextResponse.json(
@@ -140,8 +143,9 @@ export async function DELETE(request: Request): Promise<NextResponse> {
   try {
     // Assuming snapshotId comes in the request body for consistency with POST
     // Alternatively, it could be a query parameter: const { searchParams } = new URL(request.url); const snapshotId = searchParams.get('snapshotId');
-    const body = (await request.json()) as LikeSnapshotRequestBody; // Reusing the interface for simplicity
-    const { snapshotId } = body;
+    const body: LikeApiResponse = await request.json(); // Reusing the interface for simplicity
+    const { like } = body;
+    const snapshotId = like.snapshot_id;
 
     if (!snapshotId) {
       return NextResponse.json(

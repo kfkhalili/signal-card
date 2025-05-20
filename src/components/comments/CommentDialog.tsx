@@ -20,23 +20,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Send, MessageCircle } from "lucide-react"; // Added Send icon
+import { Send, MessageCircle } from "lucide-react";
 import { formatDistanceToNowStrict } from "date-fns";
-
-// Type for comments fetched from the API (matches CommentWithAuthorResponse from the GET API)
-export interface Comment {
-  id: string;
-  user_id: string;
-  comment_text: string;
-  created_at: string;
-  updated_at: string;
-  author: {
-    id: string;
-    username?: string | null;
-    avatar_url?: string | null;
-  } | null;
-  // parent_comment_id and replies can be added later for threading
-}
+import { SharedCommentWithAuthor as Comment } from "@/types/comment.types";
 
 const commentFormSchema = z.object({
   commentText: z

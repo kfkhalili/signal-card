@@ -18,7 +18,9 @@ import { calculateDynamicCardRarity } from "@/components/game/rarityCalculator";
 import { rehydrateCardFromStorage } from "@/components/game/cardRehydration";
 import type { ProfileDBRow } from "@/hooks/useStockData";
 import type { LiveQuoteIndicatorDBRow } from "@/lib/supabase/realtime-service";
-import type { ExchangeMarketStatusRecord } from "@/types/market.types";
+
+type ExchangeMarketStatusRecord =
+  Database["public"]["Tables"]["exchange_market_status"]["Row"];
 
 import {
   getCardInitializer,
@@ -32,6 +34,7 @@ import {
   type CardUpdateEventType,
 } from "@/components/game/cardUpdateHandler.types";
 import "@/components/game/cards/updateHandlerInitializer";
+import { Database } from "@/lib/supabase/database.types";
 
 const INITIAL_ACTIVE_CARDS: DisplayableCard[] = [];
 const WORKSPACE_LOCAL_STORAGE_KEY = "finSignal-mainWorkspace-v1";

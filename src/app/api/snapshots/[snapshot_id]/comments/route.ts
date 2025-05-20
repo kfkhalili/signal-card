@@ -1,41 +1,13 @@
 // src/app/api/snapshots/[snapshot_id]/comments/route.ts
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import type { Tables } from "@/lib/supabase/database.types";
+import { SharedCommentWithAuthor } from "@/types/comment.types";
 
 interface RouteParams {
   params: Promise<{
     snapshot_id: string; // This is the card_snapshots.id (UUID)
   }>;
-}
-
-// This interface describes a row as returned by our new view
-interface CommentRowFromView {
-  id: string; // comment id
-  user_id: string; // commenter's auth.users.id (from snapshot_comments.user_id)
-  snapshot_id: string;
-  parent_comment_id: string | null;
-  comment_text: string;
-  created_at: string;
-  updated_at: string;
-  author_profile_id: string | null; // user_profiles.id (same as user_id if profile exists)
-  author_username: string | null;
-  author_avatar_url: string | null;
-}
-
-// Desired final response structure for each comment
-export interface CommentWithAuthorResponse {
-  id: string;
-  user_id: string;
-  snapshot_id: string;
-  parent_comment_id: string | null;
-  comment_text: string;
-  created_at: string;
-  updated_at: string;
-  author: {
-    id: string;
-    username?: string | null;
-    avatar_url?: string | null;
-  } | null;
 }
 
 export async function GET(request: Request, { params }: RouteParams) {
@@ -80,16 +52,16 @@ export async function GET(request: Request, { params }: RouteParams) {
     }
 
     // Transform the flat data from the view into the desired nested author structure
-    const comments: CommentWithAuthorResponse[] = (
-      (rowsFromView || []) as CommentRowFromView[]
+    const comments: SharedCommentWithAuthor[] = (
+      (rowsFromView || []) as Tables<"snapshot_comments_with_author_details">[]
     ).map((row) => ({
-      id: row.id,
-      user_id: row.user_id, // This is the original commenter's user_id
-      snapshot_id: row.snapshot_id,
-      parent_comment_id: row.parent_comment_id,
-      comment_text: row.comment_text,
-      created_at: row.created_at,
-      updated_at: row.updated_at,
+      id: row.id!,
+      user_id: row.user_id!, // This is the original commenter's user_id
+      snapshot_id: row.snapshot_id!,
+      parent_comment_id: row.parent_comment_id!,
+      comment_text: row.comment_text!,
+      created_at: row.created_at!,
+      updated_at: row.updated_at!,
       author: row.author_profile_id // Check if author_profile_id exists (due to LEFT JOIN in view)
         ? {
             id: row.author_profile_id, // This is user_profiles.id

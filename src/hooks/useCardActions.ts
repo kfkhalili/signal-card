@@ -4,8 +4,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ToastFunctionType } from "@/hooks/use-toast"; // Correct import
 import type { DisplayableCard } from "@/components/game/types";
 import type { CardActionContext } from "@/components/game/cards/base-card/base-card.types";
-import type { ProfileDBRow } from "./useStockData";
 import { createDisplayableProfileCardFromDB } from "@/components/game/cards/profile-card/profileCardUtils";
+import { Database } from "@/lib/supabase/database.types";
+
+type ProfileDBRow = Database["public"]["Tables"]["profiles"]["Row"];
 
 interface UseCardActionsProps {
   activeCards: DisplayableCard[];
