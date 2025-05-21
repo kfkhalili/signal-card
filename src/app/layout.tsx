@@ -1,38 +1,32 @@
 // src/app/layout.tsx
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { geistSansLocal, geistMonoLocal } from "./fonts"; // Adjust path if your fonts.ts is elsewhere
+
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import HeaderComponent from "@/components/layout/header";
-import { cn } from "../lib/utils"; // Corrected path if utils is one level up from app
-import { AuthProvider } from "@/contexts/AuthContext"; // Correct import
+import { cn } from "../lib/utils";
+import { AuthProvider } from "@/contexts/AuthContext";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const geistSansClassName = geistSansLocal.variable;
+const geistMonoClassName = geistMonoLocal.variable;
 
 export const metadata: Metadata = {
   title: "MarketEcho",
   description: "Financial Signal Card Game MVP Prototype",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
+interface RootLayoutProps {
   children: React.ReactNode;
-}>) {
+}
+
+const RootLayout: React.FC<RootLayoutProps> = ({ children }) => {
   return (
     <html lang="en" suppressHydrationWarning>
       <body
         className={cn(
-          geistSans.variable,
-          geistMono.variable,
+          geistSansClassName,
+          geistMonoClassName,
           "antialiased font-sans"
         )}>
         <AuthProvider>
@@ -47,4 +41,6 @@ export default function RootLayout({
       </body>
     </html>
   );
-}
+};
+
+export default RootLayout;
