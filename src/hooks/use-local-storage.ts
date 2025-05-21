@@ -1,3 +1,4 @@
+// src/hooks/use-local-storage.ts
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -30,57 +31,83 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, SetValue<T>] {
   const [storedValue, setStoredValue] = useState<T>(readValue);
 
   const setValue: SetValue<T> = useCallback(
-    (value) => {
+    (valueOrFn) => {
       if (typeof window === "undefined") {
         console.warn(
           `Tried setting localStorage key “${key}” even though environment is not a client`
         );
-        return; // Early return if not in client environment
+        return;
       }
-
       try {
-        const newValue = value instanceof Function ? value(storedValue) : value;
-        window.localStorage.setItem(key, JSON.stringify(newValue));
-        setStoredValue(newValue);
-        window.dispatchEvent(new Event("local-storage")); // Dispatch a generic Event
+        setStoredValue((currentState) => {
+          const newValue =
+            typeof valueOrFn === "function"
+              ? (valueOrFn as (val: T) => T)(currentState)
+              : valueOrFn;
+
+          window.localStorage.setItem(key, JSON.stringify(newValue));
+          window.dispatchEvent(new Event("local-storage")); // Dispatch custom event
+
+          return newValue;
+        });
       } catch (error) {
         console.warn(`Error setting localStorage key “${key}”:`, error);
       }
     },
-    [key, storedValue]
+    [key]
   );
 
+  // Effect to sync state from localStorage when key or initialValue (via readValue) changes
   useEffect(() => {
-    setStoredValue(readValue());
-  }, [readValue]);
+    setStoredValue((currentVal) => {
+      const valFromStorage = readValue();
+      // Only update if the stringified value has actually changed
+      // This prevents updates if readValue() returns a new reference to an identical object/array
+      if (JSON.stringify(currentVal) !== JSON.stringify(valFromStorage)) {
+        return valFromStorage;
+      }
+      return currentVal;
+    });
+  }, [readValue]); // Runs when readValue reference changes (i.e. initialValue or key changes)
 
+  // Effect to listen for storage events from other tabs/windows or custom events
   useEffect(() => {
     const handleStorageChange = (event: Event): void => {
-      // Handler for standard "storage" events from other tabs/windows
+      if (typeof window === "undefined") return;
+
+      let shouldAttemptRead = false;
       if (event instanceof StorageEvent) {
-        // Only update if the key matches for "storage" events
+        // Standard 'storage' event from other tabs/windows
         if (event.key === key) {
-          setStoredValue(readValue());
+          shouldAttemptRead = true;
         }
+      } else if (event.type === "local-storage") {
+        // Custom 'local-storage' event dispatched by setValue in this or another instance of the hook
+        // We always attempt to re-read to ensure synchronization,
+        // but the setStoredValue below will guard against unnecessary updates.
+        shouldAttemptRead = true;
       }
-      // Handler for custom "local-storage" event dispatched by this hook's setValue
-      else if (event.type === "local-storage") {
-        // This event signifies that any instance of useLocalStorage might have updated.
-        // Re-read to sync.
-        setStoredValue(readValue());
+
+      if (shouldAttemptRead) {
+        setStoredValue((currentVal) => {
+          const valFromStorage = readValue();
+          // Only update if the stringified value has actually changed
+          if (JSON.stringify(currentVal) !== JSON.stringify(valFromStorage)) {
+            return valFromStorage;
+          }
+          return currentVal;
+        });
       }
     };
 
-    // Add event listener for standard 'storage' events
     window.addEventListener("storage", handleStorageChange);
-    // Add event listener for custom 'local-storage' events
     window.addEventListener("local-storage", handleStorageChange);
 
     return () => {
       window.removeEventListener("storage", handleStorageChange);
       window.removeEventListener("local-storage", handleStorageChange);
     };
-  }, [key, readValue]);
+  }, [key, readValue]); // readValue reference is stable if initialValue & key are stable.
 
   return [storedValue, setValue];
 }
