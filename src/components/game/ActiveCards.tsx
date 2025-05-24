@@ -43,7 +43,7 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
   cardIdToConfirmDelete,
   onConfirmDeletion,
   onCancelDeletion,
-  isSaveDisabled, // Destructure new prop
+  isSaveDisabled,
   onGenericInteraction,
 }) => {
   const [hasMounted, setHasMounted] = React.useState(false);

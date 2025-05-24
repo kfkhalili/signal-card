@@ -54,15 +54,13 @@ const GameCard: React.FC<GameCardProps> = ({
   onToggleFlip,
   onDeleteCardRequest,
   socialInteractions,
-  // priceSpecificInteractions, // Destructure if kept for other uses
-  // profileSpecificInteractions, // Destructure if kept for other uses
   onHeaderIdentityClick,
-  likeCount, // These are now primarily coming from card object if fetched by ActiveCardsSection
+  likeCount,
   commentCount,
   collectionCount,
   isSavedByCurrentUser,
   isSaveDisabled,
-  onGenericInteraction, // Destructured
+  onGenericInteraction,
   className,
   innerCardClassName,
 }) => {

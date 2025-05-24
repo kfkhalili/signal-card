@@ -33,7 +33,6 @@ const DEFAULT_INTERACTIVE_CLASSES =
   "cursor-pointer hover:text-primary transition-colors";
 
 export const ClickableDataItem: React.FC<ClickableDataItemProps> = ({
-  // Destructure all custom props to prevent them from going into 'rest'
   isInteractive,
   onClickHandler,
   children,
@@ -47,7 +46,6 @@ export const ClickableDataItem: React.FC<ClickableDataItemProps> = ({
   sourceCardSymbol,
   sourceCardType,
   onGenericInteraction,
-  // 'rest' will now only contain standard HTML attributes like className, style, title, etc.
   ...rest
 }) => {
   const handleInteraction = (

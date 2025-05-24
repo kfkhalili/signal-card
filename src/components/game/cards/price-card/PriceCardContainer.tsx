@@ -51,10 +51,10 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
     commentCount,
     collectionCount,
     isSaveDisabled,
-    onGenericInteraction, // Destructure
-    sourceCardId, // Destructure
-    sourceCardSymbol, // Destructure
-    sourceCardType, // Destructure
+    onGenericInteraction,
+    sourceCardId,
+    sourceCardSymbol,
+    sourceCardType,
   }) => {
     // Type guard and assertion
     if (cardData.type !== "price") {
