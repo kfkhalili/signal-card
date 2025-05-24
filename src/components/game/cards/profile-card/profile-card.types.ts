@@ -55,7 +55,7 @@ export interface ProfileCardData extends BaseCardData {
   // websiteUrl is inherited from BaseCardData; its value typically comes from staticData.website
 }
 
-export interface ProfileCardInteractionCallbacks {
+export interface ProfileCardSpecificInteractions {
   readonly onWebsiteClick?: (websiteUrl: string) => void;
   readonly onFilterByField?: (
     fieldType: "sector" | "industry" | "exchange", // 'exchange' here might refer to 'exchange_full_name' or 'exchange' short code

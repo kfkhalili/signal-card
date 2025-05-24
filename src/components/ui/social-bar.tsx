@@ -80,7 +80,6 @@ export const SocialBar: React.FC<SocialBarProps> = ({
 
   const handleInteraction = (
     event: React.MouseEvent,
-    buttonKey: string,
     actionCallback: (context: CardActionContext) => void
   ): void => {
     event.stopPropagation();
@@ -132,7 +131,7 @@ export const SocialBar: React.FC<SocialBarProps> = ({
       {buttonConfigs.map((config) => (
         <button
           key={`${config.key}-${debugFaceName}`}
-          onClick={(e) => handleInteraction(e, config.key, config.action)}
+          onClick={(e) => handleInteraction(e, config.action)}
           title={config.title}
           className={cn(
             buttonBaseClass,

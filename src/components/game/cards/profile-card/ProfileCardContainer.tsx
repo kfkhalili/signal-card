@@ -3,7 +3,7 @@ import React from "react";
 import BaseCard from "../base-card/BaseCard";
 import type {
   ProfileCardData, // Still useful for internal casting
-  ProfileCardInteractionCallbacks,
+  ProfileCardSpecificInteractions,
 } from "./profile-card.types";
 import { ProfileCardContent } from "./ProfileCardContent";
 import type { DisplayableCard } from "../../types"; // Import DisplayableCard
@@ -22,7 +22,7 @@ export interface ProfileCardContainerProps
   sourceCardId: string;
   sourceCardSymbol: string;
   sourceCardType: CardType;
-  specificInteractions?: ProfileCardInteractionCallbacks;
+  specificInteractions?: ProfileCardSpecificInteractions;
 }
 
 // Changed from: export const ProfileCardContainer: React.FC<ProfileCardContainerProps> = React.memo(...)

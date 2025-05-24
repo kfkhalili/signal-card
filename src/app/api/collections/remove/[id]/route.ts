@@ -8,7 +8,7 @@ interface RouteParams {
   }>;
 }
 
-export async function DELETE(request: Request, { params }: RouteParams) {
+export async function DELETE(_: Request, { params }: RouteParams) {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },

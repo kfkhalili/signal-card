@@ -10,7 +10,7 @@ interface RouteParams {
   }>;
 }
 
-export async function GET(request: Request, { params }: RouteParams) {
+export async function GET(_: Request, { params }: RouteParams) {
   const supabase = await createSupabaseServerClient();
   const { snapshot_id: snapshotId } = await params;
 

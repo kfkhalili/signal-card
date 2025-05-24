@@ -12,10 +12,7 @@ import type {
   PriceCardData,
   PriceCardInteractionCallbacks,
 } from "./cards/price-card/price-card.types";
-import type {
-  ProfileCardData,
-  ProfileCardInteractionCallbacks as ProfileCardSpecificInteractions,
-} from "./cards/profile-card/profile-card.types";
+import type { ProfileCardSpecificInteractions } from "./cards/profile-card/profile-card.types";
 import type { DisplayableCard } from "./types";
 
 export interface CommonCardRendererProps {
@@ -52,13 +49,6 @@ export type PriceCardRendererProps = CommonCardRendererProps & {
     | "onPriceCardGenerateDailyPerformanceSignal"
   >;
 };
-
-export type ProfileCardRendererProps = CommonCardRendererProps & {
-  cardData: ProfileCardData;
-  specificInteractions?: ProfileCardSpecificInteractions;
-};
-
-// Removed unused 'SpecificCardData' type alias
 
 export type RegisteredCardRendererProps = CommonCardRendererProps & {
   cardData: DisplayableCard;

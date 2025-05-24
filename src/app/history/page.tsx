@@ -13,7 +13,7 @@ import Link from "next/link";
 
 export interface SymbolAndTypes {
   symbol: string;
-  card_types: string[]; // e.g., ["price", "profile"]
+  card_types: string[];
 }
 
 async function getAvailableHistorySelections(): Promise<SymbolAndTypes[]> {
