@@ -3,10 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 
-import {
-  AddCardForm,
-  type AddCardFormValues,
-} from "@/components/workspace/AddCardForm";
+import { AddCardForm } from "@/components/workspace/AddCardForm";
 import { StockDataHandler } from "@/components/workspace/StockDataHandler";
 import MarketDataStatusBanner from "@/components/workspace/MarketStatusBanner";
 import { useWorkspaceManager } from "@/hooks/useWorkspaceManager";
@@ -26,9 +23,6 @@ import {
 import "@/components/game/cards/rehydrators";
 import ActiveCardsSection from "@/components/game/ActiveCardsSection";
 import type { DerivedMarketStatus } from "@/hooks/useStockData";
-import type { CardActionContext } from "@/components/game/cards/base-card/base-card.types";
-import type { ProfileCardInteractionCallbacks } from "@/components/game/cards/profile-card/profile-card.types";
-import type { PriceCardInteractionCallbacks } from "@/components/game/cards/price-card/price-card.types";
 
 type MarketStatus = Record<
   string,
@@ -60,6 +54,7 @@ export default function WorkspacePage() {
     clearWorkspace,
     stockDataCallbacks,
     uniqueSymbolsInWorkspace,
+    onGenericInteraction,
   } = useWorkspaceManager({ isPremiumUser });
 
   const [marketStatuses, setMarketStatuses] = useState<MarketStatus>({});
@@ -80,40 +75,6 @@ export default function WorkspacePage() {
     setMarketStatuses({});
     setIsClearConfirmOpen(false);
   };
-
-  const handleRequestPriceCard = useCallback(
-    (context: CardActionContext) => {
-      const values: AddCardFormValues = {
-        symbol: context.symbol,
-        cardType: context.type,
-      };
-      addCardToWorkspace(values, { requestingCardId: context.id });
-    },
-    [addCardToWorkspace]
-  );
-
-  const handleRequestProfileCard = useCallback(
-    (context: CardActionContext) => {
-      const values: AddCardFormValues = {
-        symbol: context.symbol,
-        cardType: context.type,
-      };
-      addCardToWorkspace(values, { requestingCardId: context.id });
-    },
-    [addCardToWorkspace]
-  );
-
-  const profileInteractions: ProfileCardInteractionCallbacks = {
-    onRequestPriceCard: handleRequestPriceCard,
-  };
-
-  const priceSpecificInteractions: Pick<
-    PriceCardInteractionCallbacks,
-    | "onPriceCardSmaClick"
-    | "onPriceCardRangeContextClick"
-    | "onPriceCardOpenPriceClick"
-    | "onPriceCardGenerateDailyPerformanceSignal"
-  > = {};
 
   if (!hasMounted || isAuthLoading) {
     return (
@@ -207,9 +168,7 @@ export default function WorkspacePage() {
           <ActiveCardsSection
             activeCards={activeCards}
             setActiveCards={setActiveCards}
-            profileSpecificInteractions={profileInteractions}
-            priceSpecificInteractions={priceSpecificInteractions}
-            onHeaderIdentityClick={handleRequestProfileCard}
+            onGenericInteraction={onGenericInteraction}
           />
         )}
       </div>

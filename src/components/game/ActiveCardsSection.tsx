@@ -10,14 +10,9 @@ import type {
   BaseCardSocialInteractions,
   CardActionContext,
   CardType as APICardType,
+  OnGenericInteraction,
 } from "./cards/base-card/base-card.types";
-import { getPriceCardInteractionHandlers } from "./cards/price-card/priceCardInteractions";
-import { getProfileCardInteractionHandlers } from "./cards/profile-card/profileCardInteractions";
-import type { ProfileCardInteractionCallbacks } from "./cards/profile-card/profile-card.types";
-import type {
-  PriceCardData,
-  PriceCardInteractionCallbacks,
-} from "./cards/price-card/price-card.types";
+
 import { useAuth } from "@/contexts/AuthContext";
 import { CommentDialog } from "@/components/comments/CommentDialog";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -55,20 +50,11 @@ interface SnapshotSocialStats {
   isSavedByCurrentUser: boolean;
 }
 
-type PriceSpecificInteractionsForContainer = Pick<
-  PriceCardInteractionCallbacks,
-  | "onPriceCardSmaClick"
-  | "onPriceCardRangeContextClick"
-  | "onPriceCardOpenPriceClick"
-  | "onPriceCardGenerateDailyPerformanceSignal"
->;
-
 interface ActiveCardsSectionProps {
   activeCards: DisplayableCard[];
   setActiveCards: React.Dispatch<React.SetStateAction<DisplayableCard[]>>;
-  profileSpecificInteractions?: ProfileCardInteractionCallbacks;
-  priceSpecificInteractions?: PriceSpecificInteractionsForContainer;
   onHeaderIdentityClick?: (context: CardActionContext) => void;
+  onGenericInteraction: OnGenericInteraction;
 }
 
 interface CommentingCardInfo {
@@ -82,9 +68,7 @@ interface CommentingCardInfo {
 const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
   activeCards,
   setActiveCards,
-  profileSpecificInteractions: initialProfileInteractions, // Renamed to avoid conflict
-  priceSpecificInteractions: initialPriceInteractions, // Renamed to avoid conflict
-  onHeaderIdentityClick,
+  onGenericInteraction,
 }) => {
   const { toast } = useAppToast();
   const { user, isLoading: isLoadingAuth } = useAuth();
@@ -115,8 +99,6 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
           logoUrl: card.logoUrl,
           faceData: card.faceData,
           backData: card.backData,
-          // Ensure exchange_code is handled if it's part of PriceCardData for snapshot
-          exchange_code: (card as PriceCardData).exchange_code,
         };
       } else if (card.type === "profile") {
         actualCardDataSnapshot = {
@@ -656,17 +638,6 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
     ]
   );
 
-  // Correctly call useMemo unconditionally
-  const finalPriceSpecificInteractions = useMemo(() => {
-    return initialPriceInteractions || getPriceCardInteractionHandlers(toast);
-  }, [initialPriceInteractions, toast]);
-
-  const finalProfileSpecificInteractions = useMemo(() => {
-    return (
-      initialProfileInteractions || getProfileCardInteractionHandlers(toast)
-    );
-  }, [initialProfileInteractions, toast]);
-
   const handleDeleteRequest = useCallback((cardId: string): void => {
     setCardIdToConfirmDelete(cardId);
   }, []);
@@ -707,10 +678,8 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
               }
             : socialInteractionsForCards
         }
-        priceSpecificInteractions={finalPriceSpecificInteractions}
-        profileSpecificInteractions={finalProfileSpecificInteractions}
-        onHeaderIdentityClick={onHeaderIdentityClick}
         cardIdToConfirmDelete={cardIdToConfirmDelete}
+        onGenericInteraction={onGenericInteraction}
         onConfirmDeletion={confirmDeletion}
         onCancelDeletion={cancelDeletion}
         isSaveDisabled={isHistoryPage}

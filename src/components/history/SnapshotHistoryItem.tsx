@@ -2,7 +2,6 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import type { CardSnapshotFromDB } from "@/app/history/[symbol]/[cardType]/page";
 import GameCard from "@/components/game/GameCard";
 import { InlineCommentSection } from "@/components/comments/InlineCommentSection";
 import { Button } from "@/components/ui/button";
@@ -16,12 +15,22 @@ import type {
 import type {
   BaseCardSocialInteractions,
   CardActionContext,
+  CardType,
 } from "@/components/game/cards/base-card/base-card.types";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
+import type { ProcessedCardSnapshot } from "@/types/history.types";
+
+// Define a type that includes the social counts, as this is what the component receives and uses.
+type ProcessedCardSnapshotFromDB = ProcessedCardSnapshot & {
+  card_data_snapshot: ConcreteCardData; // Accept ConcreteCardData instead of Json
+  like_count: number;
+  comment_count: number;
+  collection_count: number;
+};
 
 interface LikeApiResponse {
   like: { id: string };
@@ -35,27 +44,38 @@ interface SnapshotSocialCountsRPCResponse {
   collection_count: number;
 }
 
+// Updated function to correctly adapt the snapshot data, expecting counts to be present.
 function adaptSnapshotToDisplayableCard(
-  snapshot: CardSnapshotFromDB,
+  snapshot: ProcessedCardSnapshotFromDB, // Expects the processed type with counts
   isLikedByCurrentUserState: boolean,
   isSavedByCurrentUserState: boolean,
   currentUserLikeIdState?: string
 ): DisplayableCard {
-  const concreteData = snapshot.card_data_snapshot as ConcreteCardData;
+  const concreteData =
+    snapshot.card_data_snapshot as unknown as ConcreteCardData;
+
+  // Ensure the 'type' from the snapshot table is used, and warn if it mismatches the blob's type.
+  // The `snapshot.card_type` is the definitive type for this context.
   if (snapshot.card_type !== concreteData.type) {
     console.warn(
-      `[SnapshotHistoryItem ${snapshot.id}] adaptSnapshot: Type mismatch. Snapshot: ${snapshot.card_type}, Concrete: ${concreteData.type}. Using snapshot.card_type.`
+      `[SnapshotHistoryItem ${snapshot.id}] adaptSnapshot: Type mismatch. Snapshot table card_type: ${snapshot.card_type}, Concrete data type: ${concreteData.type}. Using snapshot.card_type from the table.`
     );
   }
+
   return {
-    ...concreteData,
-    id: snapshot.id,
+    ...(snapshot.card_data_snapshot as unknown as ConcreteCardData), // Spread the core data first
+
+    // Override/ensure these top-level properties for DisplayableCard consistency,
+    // using the snapshot's denormalized values or direct snapshot ID.
+    id: snapshot.id, // Use snapshot's ID as the DisplayableCard ID for history context
     symbol: snapshot.symbol,
     companyName: snapshot.company_name,
     logoUrl: snapshot.logo_url,
-    type: snapshot.card_type,
+    type: snapshot.card_type as CardType, // Use the type from the snapshot table record
     createdAt: new Date(snapshot.first_seen_at).getTime(),
-    isFlipped: false,
+
+    // DisplayableCardState properties
+    isFlipped: false, // History items are not flippable by default
     currentRarity: snapshot.rarity_level,
     rarityReason: snapshot.rarity_reason,
     isLikedByCurrentUser: isLikedByCurrentUserState,
@@ -68,7 +88,7 @@ function adaptSnapshotToDisplayableCard(
 }
 
 interface SnapshotHistoryItemProps {
-  snapshot: CardSnapshotFromDB;
+  snapshot: ProcessedCardSnapshotFromDB; // Use the processed type here
   isHighlighted: boolean;
 }
 
@@ -86,6 +106,7 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
   const [isSavedByCurrentUserLocal, setIsSavedByCurrentUserLocal] =
     useState(false);
 
+  // Initialize local counts directly from the snapshot prop, which now includes them.
   const [likeCountLocal, setLikeCountLocal] = useState<number>(
     snapshot.like_count
   );
@@ -151,8 +172,6 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
           `[SnapshotHistoryItem ${snapshot.id}] Failed to fetch social status:`,
           errorMessage
         );
-        // Optionally, show a toast for this error as well
-        // toast({ title: "Error", description: "Could not fetch social status.", variant: "destructive" });
       } finally {
         setIsLoadingSocialStatus(false);
       }
@@ -181,12 +200,12 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
       ? fetch("/api/snapshots/like", {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ snapshotId: snapshot.id }),
+          body: JSON.stringify({ like: { snapshot_id: snapshot.id } }), // API expects `like.snapshot_id`
         })
       : fetch("/api/snapshots/like", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ snapshotId: snapshot.id }),
+          body: JSON.stringify({ like: { snapshot_id: snapshot.id } }), // API expects `like.snapshot_id`
         });
     try {
       const response = await apiCall;
@@ -196,7 +215,7 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
         !(
           response.status === 200 && (result as LikeApiResponse).isAlreadyLiked
         ) &&
-        response.status !== 404 // Allow 404 for DELETE if already unliked by another means
+        response.status !== 404
       ) {
         throw new Error(
           (result as { error?: string }).error ||
@@ -239,15 +258,15 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
           `[SnapshotHistoryItem ${snapshot.id}] RPC get_snapshot_social_counts returned null data property.`
         );
       }
-    } catch {
-      // Removed '_error: unknown' variable binding
-      // It's good practice to log the actual error, even if not shown to user:
-      // console.error("An error occurred during like/unlike operation:", caughtError);
-      toast({ title: "Action Failed", variant: "destructive" });
-      // Revert optimistic updates
+    } catch (e: unknown) {
+      const err = e as Error;
+      toast({
+        title: "Action Failed",
+        description: err.message,
+        variant: "destructive",
+      });
       setIsLikedByCurrentUserLocal(originalIsLiked);
       setLikeCountLocal(originalLikeCount);
-      // If an ID was optimistically cleared, and we need to revert, we'd need originalLikeId
     }
   }, [
     snapshot.id,
@@ -276,7 +295,6 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
             description: "Shareable link copied to clipboard.",
           });
         } catch {
-          // Error variable omitted as it's not used
           toast({
             title: "Could not copy link.",
             description: "Please copy manually: " + shareUrl,
@@ -285,7 +303,7 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
         }
       },
     }),
-    [handleLikeOrUnlikeCard, toast] // Removed setShowComments from deps as onComment directly uses it
+    [handleLikeOrUnlikeCard, toast]
   );
 
   const displayableCard = useMemo(
@@ -315,7 +333,7 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
         `[SnapshotHistoryItem ${snapshot.id}] Error refetching counts after comment post:`,
         rpcError.message
       );
-      setCommentCountLocal((prev) => prev + 1); // Optimistic update if RPC fails
+      setCommentCountLocal((prev) => prev + 1);
     } else if (rpcResponseData && rpcResponseData.length > 0) {
       const updatedCounts =
         rpcResponseData[0] as SnapshotSocialCountsRPCResponse;
@@ -327,13 +345,13 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
         console.warn(
           `[SnapshotHistoryItem ${snapshot.id}] RPC get_snapshot_social_counts returned an empty object in array after comment post.`
         );
-        setCommentCountLocal((prev) => prev + 1); // Fallback optimistic
+        setCommentCountLocal((prev) => prev + 1);
       }
     } else {
       console.warn(
         `[SnapshotHistoryItem ${snapshot.id}] RPC get_snapshot_social_counts returned no data after comment post.`
       );
-      setCommentCountLocal((prev) => prev + 1); // Fallback optimistic
+      setCommentCountLocal((prev) => prev + 1);
     }
   }, [snapshot.id, supabase]);
 
@@ -387,7 +405,14 @@ export const SnapshotHistoryItem: React.FC<SnapshotHistoryItemProps> = ({
             commentCount={commentCountLocal}
             collectionCount={collectionCountLocal}
             isSavedByCurrentUser={isSavedByCurrentUserLocal}
-            isSaveDisabled={true} // Explicitly true, collection management isn't from history item
+            isSaveDisabled={true} // Collection management isn't from history item
+            onGenericInteraction={() => {
+              toast({
+                title: "Interaction Disabled",
+                description:
+                  "Card creation from history items is not supported.",
+              });
+            }}
           />
         </div>
         {showComments && (

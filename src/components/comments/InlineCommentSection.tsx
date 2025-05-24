@@ -15,7 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Send, MessageCircle } from "lucide-react";
 import { formatDistanceToNowStrict } from "date-fns";
-import type { Comment } from "./CommentDialog"; // Reuse Comment type
+import { SharedCommentWithAuthor as Comment } from "@/types/comment.types";
 
 const commentFormSchema = z.object({
   commentText: z
@@ -185,7 +185,7 @@ export const InlineCommentSection: React.FC<InlineCommentSectionProps> = ({
                     <span className="font-medium text-card-foreground/90">
                       {comment.author?.username ||
                         (user?.id === comment.user_id
-                          ? user.email?.split("@")[0] || "You"
+                          ? user?.email?.split("@")[0] || "You"
                           : "Anonymous")}
                     </span>
                     <span

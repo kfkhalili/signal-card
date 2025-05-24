@@ -5,86 +5,65 @@ import {
   CardDescription,
   CardContent as ShadCardContent,
 } from "@/components/ui/card";
-import type {
-  PriceCardData,
-  PriceCardInteractionCallbacks,
-} from "./price-card.types";
+import type { PriceCardData } from "./price-card.types";
 import { cn } from "../../../../lib/utils";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
 import { formatNumberWithAbbreviations } from "@/lib/formatters";
-// Import the new RangeIndicator component
 import { RangeIndicator } from "@/components/ui/RangeIndicator";
+import type {
+  OnGenericInteraction,
+  CardType as BaseCardType,
+  InteractionPayload,
+} from "../base-card/base-card.types";
 
 const STATIC_BACK_FACE_DESCRIPTION =
   "Market Price: The value of a single unit of this asset.";
 
-// RangeBarStyling interface and getRangeBarStyling function REMOVED
-
 interface PriceCardContentProps {
   cardData: PriceCardData;
   isBackFace: boolean;
-  onSmaClick?: PriceCardInteractionCallbacks["onPriceCardSmaClick"];
-  onRangeContextClick?: PriceCardInteractionCallbacks["onPriceCardRangeContextClick"];
-  onOpenPriceClick?: PriceCardInteractionCallbacks["onPriceCardOpenPriceClick"];
-  onGenerateDailyPerformanceSignal?: PriceCardInteractionCallbacks["onPriceCardGenerateDailyPerformanceSignal"];
+  onGenericInteraction: OnGenericInteraction;
+  sourceCardId: string;
+  sourceCardSymbol: string; // Should be the symbol of the current card
+  sourceCardType: BaseCardType; // Should be "price" for this component
 }
 
 export const PriceCardContent = React.memo<PriceCardContentProps>(
   ({
     cardData,
     isBackFace,
-    onSmaClick,
-    onRangeContextClick,
-    onOpenPriceClick,
-    onGenerateDailyPerformanceSignal,
+    onGenericInteraction,
+    sourceCardId,
+    sourceCardType, // This is "price"
   }) => {
     const { faceData, backData } = cardData;
     const gridCellClass = "min-w-0";
 
-    const handleSmaInteraction = (
-      e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>,
-      smaPeriod: 50 | 200,
-      smaValue: number | null | undefined
-    ) => {
-      if (onSmaClick && smaValue != null) {
-        e.stopPropagation();
-        onSmaClick(cardData, smaPeriod, smaValue);
-      }
-    };
+    // Helper to create ClickableDataItem props, ensuring symbol is from cardData
+    const getClickableDataInteractionProps = (
+      targetType: BaseCardType,
+      ariaLabelContext: string
+    ) => ({
+      interactionTarget: "card" as const,
+      targetType,
+      sourceCardId,
+      sourceCardSymbol: cardData.symbol, // Explicitly use cardData.symbol for clarity
+      sourceCardType, // This will be "price"
+      onGenericInteraction,
+      "aria-label": `Request ${targetType} card related to ${ariaLabelContext} for ${cardData.symbol}`,
+      "data-interactive-child": true as const,
+    });
 
-    // Updated to be passed to RangeIndicator
-    const handleRangeLabelClick =
-      (
-        levelType: "High" | "Low" | "YearHigh" | "YearLow",
-        levelValue: number | null | undefined
-      ) =>
-      (
-        event:
-          | React.MouseEvent<HTMLDivElement>
-          | React.KeyboardEvent<HTMLDivElement>
-      ) => {
-        if (onRangeContextClick && levelValue != null) {
-          event.stopPropagation();
-          onRangeContextClick(cardData, levelType, levelValue);
-        }
-      };
-
-    const handleOpenPriceInteraction = (
-      e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>
-    ) => {
-      if (onOpenPriceClick && faceData.dayOpen != null) {
-        e.stopPropagation();
-        onOpenPriceClick(cardData);
-      }
-    };
-    const handleDailyPerformanceInteraction = (
-      e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>
-    ) => {
-      if (onGenerateDailyPerformanceSignal) {
-        e.stopPropagation();
-        onGenerateDailyPerformanceSignal(cardData);
-      }
-    };
+    // Helper to construct payload for direct onGenericInteraction calls
+    const createInteractionPayload = (
+      targetType: BaseCardType
+    ): InteractionPayload => ({
+      interactionTarget: "card",
+      targetType,
+      sourceCardId,
+      sourceCardSymbol: cardData.symbol,
+      sourceCardType,
+    });
 
     if (isBackFace) {
       return (
@@ -104,20 +83,13 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
             <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-1 sm:gap-y-1.5">
               <div className={cn(gridCellClass)}>
                 <ClickableDataItem
-                  isInteractive={
-                    !!(onOpenPriceClick && faceData.dayOpen != null)
-                  }
-                  onClickHandler={handleOpenPriceInteraction}
+                  isInteractive={faceData.dayOpen != null}
                   baseClassName="transition-colors w-full"
                   data-testid="open-price-interactive-area"
-                  aria-label={
-                    onOpenPriceClick && faceData.dayOpen != null
-                      ? `Interact with Open Price: ${faceData.dayOpen.toFixed(
-                          2
-                        )}`
-                      : undefined
-                  }
-                  data-interactive-child="true">
+                  {...getClickableDataInteractionProps(
+                    "profile",
+                    `Open Price: ${faceData.dayOpen?.toFixed(2)}`
+                  )}>
                   <span className="font-semibold block">Open</span>
                   <span>${faceData.dayOpen?.toFixed(2) ?? "N/A"}</span>
                 </ClickableDataItem>
@@ -138,36 +110,26 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
               </div>
               <div className={cn(gridCellClass)}>
                 <ClickableDataItem
-                  isInteractive={!!(onSmaClick && backData.sma50d != null)}
-                  onClickHandler={(e) =>
-                    handleSmaInteraction(e, 50, backData.sma50d)
-                  }
+                  isInteractive={backData.sma50d != null}
                   baseClassName="transition-colors w-full"
                   data-testid="sma-50d-interactive-area"
-                  aria-label={
-                    onSmaClick && backData.sma50d != null
-                      ? `Interact with 50D SMA: ${backData.sma50d.toFixed(2)}`
-                      : undefined
-                  }
-                  data-interactive-child="true">
+                  {...getClickableDataInteractionProps(
+                    "price",
+                    `50D SMA: ${backData.sma50d?.toFixed(2)}`
+                  )}>
                   <span className="font-semibold block">50D SMA</span>
                   <span>${backData.sma50d?.toFixed(2) ?? "N/A"}</span>
                 </ClickableDataItem>
               </div>
               <div className={cn(gridCellClass)}>
                 <ClickableDataItem
-                  isInteractive={!!(onSmaClick && backData.sma200d != null)}
-                  onClickHandler={(e) =>
-                    handleSmaInteraction(e, 200, backData.sma200d)
-                  }
+                  isInteractive={backData.sma200d != null}
                   baseClassName="transition-colors w-full"
                   data-testid="sma-200d-interactive-area"
-                  aria-label={
-                    onSmaClick && backData.sma200d != null
-                      ? `Interact with 200D SMA: ${backData.sma200d.toFixed(2)}`
-                      : undefined
-                  }
-                  data-interactive-child="true">
+                  {...getClickableDataInteractionProps(
+                    "price",
+                    `200D SMA: ${backData.sma200d?.toFixed(2)}`
+                  )}>
                   <span className="font-semibold block">200D SMA</span>
                   <span>${backData.sma200d?.toFixed(2) ?? "N/A"}</span>
                 </ClickableDataItem>
@@ -179,45 +141,24 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
     } else {
       // Front Face
       const currentPrice = faceData.price;
-      // Day and Year range values remain needed here for the logic
       const dayLow = faceData.dayLow;
       const dayHigh = faceData.dayHigh;
       const yearLow = faceData.yearLow;
       const yearHigh = faceData.yearHigh;
 
       const PriceDisplayBlock = (
-        <div
-          className={cn(
-            "w-fit",
-            onGenerateDailyPerformanceSignal && "group/textgroup"
-          )}
-          onClick={
-            onGenerateDailyPerformanceSignal
-              ? handleDailyPerformanceInteraction
-              : undefined
-          }
-          onKeyDown={
-            onGenerateDailyPerformanceSignal
-              ? (e) =>
-                  (e.key === "Enter" || e.key === " ") &&
-                  handleDailyPerformanceInteraction(e)
-              : undefined
-          }
-          role={onGenerateDailyPerformanceSignal ? "button" : undefined}
-          tabIndex={onGenerateDailyPerformanceSignal ? 0 : undefined}
-          aria-label={
-            onGenerateDailyPerformanceSignal
-              ? `Interact with daily performance: Price ${faceData.price?.toFixed(
-                  2
-                )}`
-              : undefined
-          }
-          data-interactive-child={!!onGenerateDailyPerformanceSignal}>
+        <ClickableDataItem
+          isInteractive={true}
+          baseClassName={cn("w-fit group/textgroup")}
+          data-testid="price-display-interactive-area"
+          {...getClickableDataInteractionProps(
+            "profile",
+            `Current Price: ${faceData.price?.toFixed(2)}`
+          )}>
           <p
             className={cn(
               "text-2xl sm:text-3xl md:text-4xl font-bold",
-              onGenerateDailyPerformanceSignal &&
-                "group-hover/textgroup:text-primary"
+              "group-hover/textgroup:text-primary"
             )}
             title="Current Price">
             ${faceData.price != null ? faceData.price.toFixed(2) : "N/A"}
@@ -230,8 +171,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                 : faceData.dayChange > 0
                 ? "text-green-600"
                 : "text-red-600",
-              onGenerateDailyPerformanceSignal &&
-                "group-hover/textgroup:text-primary"
+              "group-hover/textgroup:text-primary"
             )}>
             <p
               className="text-base sm:text-lg font-semibold"
@@ -254,7 +194,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
               )
             </p>
           </div>
-        </div>
+        </ClickableDataItem>
       );
 
       return (
@@ -268,7 +208,6 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
               {PriceDisplayBlock}
             </div>
 
-            {/* Daily Range Indicator */}
             <RangeIndicator
               containerClassName="mt-2 sm:mt-3"
               currentValue={currentPrice}
@@ -276,15 +215,11 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
               highValue={dayHigh}
               lowLabel="Day Low"
               highLabel="Day High"
-              onLowLabelClick={
-                onRangeContextClick && dayLow != null
-                  ? handleRangeLabelClick("Low", dayLow)
-                  : undefined
+              onLowLabelClick={() =>
+                onGenericInteraction(createInteractionPayload("profile"))
               }
-              onHighLabelClick={
-                onRangeContextClick && dayHigh != null
-                  ? handleRangeLabelClick("High", dayHigh)
-                  : undefined
+              onHighLabelClick={() =>
+                onGenericInteraction(createInteractionPayload("profile"))
               }
               lowValueForTitle={dayLow}
               highValueForTitle={dayHigh}
@@ -292,7 +227,6 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
               labelClassName="text-xs text-muted-foreground"
             />
 
-            {/* Yearly Range Indicator */}
             <RangeIndicator
               containerClassName="mt-3 sm:mt-4"
               currentValue={currentPrice}
@@ -300,15 +234,11 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
               highValue={yearHigh}
               lowLabel="52W Low"
               highLabel="52W High"
-              onLowLabelClick={
-                onRangeContextClick && yearLow != null
-                  ? handleRangeLabelClick("YearLow", yearLow)
-                  : undefined
+              onLowLabelClick={() =>
+                onGenericInteraction(createInteractionPayload("profile"))
               }
-              onHighLabelClick={
-                onRangeContextClick && yearHigh != null
-                  ? handleRangeLabelClick("YearHigh", yearHigh)
-                  : undefined
+              onHighLabelClick={() =>
+                onGenericInteraction(createInteractionPayload("profile"))
               }
               lowValueForTitle={yearLow}
               highValueForTitle={yearHigh}

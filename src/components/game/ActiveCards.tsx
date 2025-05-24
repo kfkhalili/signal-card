@@ -7,9 +7,8 @@ import type { DisplayableCard } from "./types";
 import type {
   BaseCardSocialInteractions,
   CardActionContext,
+  OnGenericInteraction,
 } from "./cards/base-card/base-card.types";
-import type { PriceCardInteractionCallbacks } from "./cards/price-card/price-card.types";
-import type { ProfileCardInteractionCallbacks } from "./cards/profile-card/profile-card.types";
 
 import {
   AlertDialog,
@@ -22,26 +21,17 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-type PriceSpecificInteractionsForContainer = Pick<
-  PriceCardInteractionCallbacks,
-  | "onPriceCardSmaClick"
-  | "onPriceCardRangeContextClick"
-  | "onPriceCardOpenPriceClick"
-  | "onPriceCardGenerateDailyPerformanceSignal"
->;
-
 interface ActiveCardsProps {
   cards: DisplayableCard[];
   onToggleFlipCard: (id: string) => void;
   onDeleteCardRequest: (id: string) => void;
   socialInteractions?: BaseCardSocialInteractions;
-  priceSpecificInteractions?: PriceSpecificInteractionsForContainer;
-  profileSpecificInteractions?: ProfileCardInteractionCallbacks;
   onHeaderIdentityClick?: (context: CardActionContext) => void;
   cardIdToConfirmDelete: string | null;
   onConfirmDeletion: () => void;
   onCancelDeletion: () => void;
   isSaveDisabled?: boolean; // New prop
+  onGenericInteraction: OnGenericInteraction;
 }
 
 export const ActiveCards: React.FC<ActiveCardsProps> = ({
@@ -49,13 +39,12 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
   onToggleFlipCard,
   onDeleteCardRequest,
   socialInteractions,
-  priceSpecificInteractions,
-  profileSpecificInteractions,
   onHeaderIdentityClick,
   cardIdToConfirmDelete,
   onConfirmDeletion,
   onCancelDeletion,
   isSaveDisabled, // Destructure new prop
+  onGenericInteraction,
 }) => {
   const [hasMounted, setHasMounted] = React.useState(false);
   React.useEffect(() => {
@@ -93,9 +82,8 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
                     ? { ...socialInteractions, onSave: undefined }
                     : socialInteractions
                 }
-                priceSpecificInteractions={priceSpecificInteractions}
-                profileSpecificInteractions={profileSpecificInteractions}
                 onHeaderIdentityClick={onHeaderIdentityClick}
+                onGenericInteraction={onGenericInteraction}
                 isSaveDisabled={isSaveDisabled} // Pass down to GameCard
               />
             </div>

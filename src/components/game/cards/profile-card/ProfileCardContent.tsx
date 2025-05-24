@@ -3,10 +3,7 @@ import React from "react";
 import { CardContent as ShadCardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
-import type {
-  ProfileCardData,
-  ProfileCardInteractionCallbacks,
-} from "./profile-card.types";
+import type { ProfileCardData } from "./profile-card.types";
 import {
   Users,
   CalendarDays,
@@ -19,6 +16,11 @@ import {
   SectorIconDisplay,
   type SectorName,
 } from "@/components/workspace/SectorIconDisplay";
+import type {
+  OnGenericInteraction,
+  CardType as BaseCardType,
+  InteractionPayload,
+} from "../base-card/base-card.types";
 
 const truncateText = (
   text: string | null | undefined,
@@ -32,42 +34,32 @@ const truncateText = (
 interface ProfileCardContentProps {
   cardData: ProfileCardData;
   isBackFace: boolean;
-  interactionCallbacks?: ProfileCardInteractionCallbacks;
+  onGenericInteraction: OnGenericInteraction;
+  sourceCardId: string;
+  sourceCardSymbol: string; // Should be the symbol of the current card
+  sourceCardType: BaseCardType; // Should be "price" for this component
 }
 
 export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
-  ({ cardData, isBackFace, interactionCallbacks }) => {
-    const { staticData, liveData, symbol, companyName } = cardData;
+  ({
+    cardData,
+    isBackFace,
+    onGenericInteraction,
+    sourceCardId,
+    sourceCardType,
+  }) => {
+    const { staticData, liveData, symbol } = cardData;
 
-    // if (!isBackFace && process.env.NODE_ENV === 'development') {
-    //   console.log(`[ProfileCardContent ${symbol} FRONT] Rendering. CardData:`, JSON.stringify(cardData));
-    //   console.log(`[ProfileCardContent ${symbol} FRONT] LiveData for rendering:`, JSON.stringify(liveData));
-    //   console.log(`[ProfileCardContent ${symbol} FRONT] LiveData.price for rendering:`, liveData?.price);
-    // }
-
-    const handlePriceNavigate = (e: React.MouseEvent | React.KeyboardEvent) => {
-      if (interactionCallbacks?.onRequestPriceCard) {
-        e.stopPropagation();
-        interactionCallbacks.onRequestPriceCard({
-          id: cardData.id,
-          symbol,
-          type: cardData.type,
-          companyName,
-          websiteUrl: staticData?.website,
-        });
-      }
-    };
-
-    const handleFilterClick = (
-      e: React.MouseEvent | React.KeyboardEvent,
-      fieldType: "sector" | "industry" | "exchange",
-      value: string | null | undefined
-    ) => {
-      if (value && interactionCallbacks?.onFilterByField) {
-        e.stopPropagation();
-        interactionCallbacks.onFilterByField(fieldType, value);
-      }
-    };
+    // Helper to construct payload for direct onGenericInteraction calls
+    const createInteractionPayload = (
+      targetType: BaseCardType
+    ): InteractionPayload => ({
+      interactionTarget: "card",
+      targetType,
+      sourceCardId,
+      sourceCardSymbol: cardData.symbol,
+      sourceCardType,
+    });
 
     if (!isBackFace) {
       const description = staticData?.description;
@@ -92,12 +84,9 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
 
             <div className="space-y-1 mt-1">
               <ClickableDataItem
-                isInteractive={
-                  !!interactionCallbacks?.onFilterByField &&
-                  !!staticData?.industry
-                }
-                onClickHandler={(e) =>
-                  handleFilterClick(e, "industry", staticData?.industry)
+                isInteractive={true}
+                onClickHandler={() =>
+                  onGenericInteraction(createInteractionPayload("price"))
                 }
                 title={`Industry: ${staticData?.industry || "N/A"}${
                   staticData?.sector ? ` (Sector: ${staticData.sector})` : ""
@@ -145,8 +134,10 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
           <div className="px-0 pt-1">
             <div className="flex justify-between items-center text-xs mb-0.5">
               <ClickableDataItem
-                isInteractive={!!interactionCallbacks?.onRequestPriceCard}
-                onClickHandler={handlePriceNavigate}
+                isInteractive={true}
+                onClickHandler={() =>
+                  onGenericInteraction(createInteractionPayload("price"))
+                }
                 baseClassName="py-0.5"
                 interactiveClassName="hover:text-primary cursor-pointer"
                 aria-label={`Request Price Card for ${symbol}`}>
@@ -236,16 +227,9 @@ export const ProfileCardContent: React.FC<ProfileCardContentProps> = React.memo(
               )}
               {staticData?.exchange_full_name && (
                 <ClickableDataItem
-                  isInteractive={
-                    !!interactionCallbacks?.onFilterByField &&
-                    !!staticData.exchange_full_name
-                  }
-                  onClickHandler={(e) =>
-                    handleFilterClick(
-                      e,
-                      "exchange",
-                      staticData.exchange_full_name
-                    )
+                  isInteractive={true}
+                  onClickHandler={() =>
+                    onGenericInteraction(createInteractionPayload("price"))
                   }
                   title={`Exchange: ${staticData.exchange_full_name}`}
                   baseClassName="min-w-0">

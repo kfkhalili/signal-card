@@ -8,6 +8,7 @@ import type {
 import { PriceCardContent } from "./PriceCardContent";
 import type { DisplayableCard } from "../../types"; // Import DisplayableCard
 import type { RegisteredCardRendererProps } from "../../cardRenderers"; // Import the generic props
+import { CardType, OnGenericInteraction } from "../base-card/base-card.types";
 
 // Props should align with RegisteredCardRendererProps for cardData,
 // then add any specific interaction props.
@@ -17,6 +18,10 @@ export interface PriceCardContainerProps
     "cardData" | "specificInteractions" | "priceSpecificInteractions"
   > {
   cardData: DisplayableCard; // Accept generic DisplayableCard
+  onGenericInteraction: OnGenericInteraction;
+  sourceCardId: string;
+  sourceCardSymbol: string;
+  sourceCardType: CardType;
   priceSpecificInteractions?: Pick<
     PriceCardInteractionCallbacks,
     | "onPriceCardSmaClick"
@@ -37,7 +42,6 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
     socialInteractions,
     onDeleteRequest,
     onHeaderIdentityClick,
-    priceSpecificInteractions,
     className,
     innerCardClassName,
     children,
@@ -47,6 +51,10 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
     commentCount,
     collectionCount,
     isSaveDisabled,
+    onGenericInteraction, // Destructure
+    sourceCardId, // Destructure
+    sourceCardSymbol, // Destructure
+    sourceCardType, // Destructure
   }) => {
     // Type guard and assertion
     if (cardData.type !== "price") {
@@ -60,31 +68,20 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
     // Now we can safely use cardData as PriceCardData
     const specificCardData = cardData as PriceCardData;
 
-    const faceContentForBaseCard = (
-      <PriceCardContent
-        cardData={specificCardData}
-        isBackFace={false}
-        onSmaClick={priceSpecificInteractions?.onPriceCardSmaClick}
-        onRangeContextClick={
-          priceSpecificInteractions?.onPriceCardRangeContextClick
-        }
-        onOpenPriceClick={priceSpecificInteractions?.onPriceCardOpenPriceClick}
-        onGenerateDailyPerformanceSignal={
-          priceSpecificInteractions?.onPriceCardGenerateDailyPerformanceSignal
-        }
-      />
-    );
+    const contentProps = {
+      cardData: specificCardData,
+      // Remove specific click handlers like onSmaClick, onRangeContextClick if they now use onGenericInteraction
+      onGenericInteraction, // Pass down
+      sourceCardId,
+      sourceCardSymbol,
+      sourceCardType,
+    };
 
+    const faceContentForBaseCard = (
+      <PriceCardContent {...contentProps} isBackFace={false} />
+    );
     const backContentForBaseCard = (
-      <PriceCardContent
-        cardData={specificCardData}
-        isBackFace={true}
-        onSmaClick={priceSpecificInteractions?.onPriceCardSmaClick}
-        onRangeContextClick={
-          priceSpecificInteractions?.onPriceCardRangeContextClick
-        }
-        onOpenPriceClick={priceSpecificInteractions?.onPriceCardOpenPriceClick}
-      />
+      <PriceCardContent {...contentProps} isBackFace={true} />
     );
 
     return (

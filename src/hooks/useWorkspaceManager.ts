@@ -9,10 +9,11 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type {
   DisplayableCard,
   ConcreteCardData,
-  DisplayableCardState, // Import for keyof
+  DisplayableCardState,
 } from "@/components/game/types";
 import type { AddCardFormValues } from "@/components/workspace/AddCardForm";
 import type { PriceCardData } from "@/components/game/cards/price-card/price-card.types";
+import type { OnGenericInteraction } from "@/components/game/cards/base-card/base-card.types"; // Added
 
 import { calculateDynamicCardRarity } from "@/components/game/rarityCalculator";
 import { rehydrateCardFromStorage } from "@/components/game/cardRehydration";
@@ -39,7 +40,6 @@ import { Database } from "@/lib/supabase/database.types";
 const INITIAL_ACTIVE_CARDS: DisplayableCard[] = [];
 const WORKSPACE_LOCAL_STORAGE_KEY = "finSignal-mainWorkspace-v1";
 
-// Define a type for the raw card data as stored in local storage
 type StoredCardRaw = Record<string, unknown>;
 
 interface UseWorkspaceManagerProps {
@@ -50,11 +50,8 @@ interface AddCardOptions {
   requestingCardId?: string;
 }
 
-// Helper function to create ConcreteCardData from DisplayableCard
-// by omitting DisplayableCardState properties.
 const getConcreteCardData = (card: DisplayableCard): ConcreteCardData => {
   const tempCard = { ...card };
-  // Keys of DisplayableCardState to remove
   const stateKeys: (keyof DisplayableCardState)[] = [
     "isFlipped",
     "currentRarity",
@@ -273,8 +270,26 @@ export function useWorkspaceManager({
       toast,
       isPremiumUser,
       workspaceSymbolForRegularUser,
-      setActiveCards,
+      setActiveCards, // Added missing dependency
     ]
+  );
+
+  const onGenericInteraction: OnGenericInteraction = useCallback(
+    async (payload) => {
+      if (payload.interactionTarget === "card") {
+        const { sourceCardSymbol, targetType, sourceCardId } = payload;
+
+        const values: AddCardFormValues = {
+          symbol: sourceCardSymbol,
+          cardType: targetType,
+        };
+
+        await addCardToWorkspace(values, { requestingCardId: sourceCardId });
+      }
+      // Future: else if (payload.interactionTarget === "modal") { /* handle modal logic */ }
+      // Future: else if (payload.interactionTarget === "filter") { /* handle filter logic */ }
+    },
+    [addCardToWorkspace]
   );
 
   const handleLiveQuoteUpdate = useCallback(
@@ -288,9 +303,7 @@ export function useWorkspaceManager({
           if (card.symbol === leanQuoteData.symbol) {
             const handler = getCardUpdateHandler(card.type, eventType);
             if (handler) {
-              // Extract properties needed locally
               const { isFlipped, currentRarity, rarityReason } = card;
-              // Get ConcreteCardData for the handler
               const concreteCardDataForHandler = getConcreteCardData(card);
 
               const updatedConcreteData = handler(
@@ -345,9 +358,7 @@ export function useWorkspaceManager({
           if (card.symbol === updatedProfileDBRow.symbol) {
             const universalHandler = getCardUpdateHandler(card.type, eventType);
             if (universalHandler) {
-              // Extract properties needed locally
               const { isFlipped, currentRarity, rarityReason } = card;
-              // Get ConcreteCardData for the handler
               const concreteCardDataForHandler = getConcreteCardData(card);
 
               const updatedConcreteData = universalHandler(
@@ -451,5 +462,6 @@ export function useWorkspaceManager({
     stockDataCallbacks,
     uniqueSymbolsInWorkspace,
     exchangeStatuses,
+    onGenericInteraction, // Expose the new handler
   };
 }

@@ -225,6 +225,9 @@ export default function CollectionClientPage({
                   /* Deletion handled by button below */
                 }}
                 socialInteractions={collectedCardSocialInteractions()} // Invoked without argument
+                onGenericInteraction={function (): void {
+                  throw new Error("Function not implemented.");
+                }}
               />
               <div className="text-center w-full px-1">
                 <p className="text-xs text-muted-foreground">

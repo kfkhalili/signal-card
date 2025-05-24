@@ -8,6 +8,7 @@ import type {
 import { ProfileCardContent } from "./ProfileCardContent";
 import type { DisplayableCard } from "../../types"; // Import DisplayableCard
 import type { RegisteredCardRendererProps } from "../../cardRenderers"; // Import the generic props
+import { CardType, OnGenericInteraction } from "../base-card/base-card.types";
 
 // Props should align with RegisteredCardRendererProps for cardData,
 // then add any specific interaction props.
@@ -17,6 +18,10 @@ export interface ProfileCardContainerProps
     "cardData" | "specificInteractions" | "priceSpecificInteractions"
   > {
   cardData: DisplayableCard; // Accept generic DisplayableCard
+  onGenericInteraction: OnGenericInteraction;
+  sourceCardId: string;
+  sourceCardSymbol: string;
+  sourceCardType: CardType;
   specificInteractions?: ProfileCardInteractionCallbacks;
 }
 
@@ -32,7 +37,6 @@ export const ProfileCardContainer = React.memo<ProfileCardContainerProps>(
     socialInteractions,
     onDeleteRequest, // This is inherited as required from RegisteredCardRendererProps
     onHeaderIdentityClick,
-    specificInteractions,
     className,
     innerCardClassName,
     children,
@@ -42,6 +46,10 @@ export const ProfileCardContainer = React.memo<ProfileCardContainerProps>(
     commentCount,
     collectionCount,
     isSaveDisabled,
+    onGenericInteraction, // Destructure
+    sourceCardId, // Destructure
+    sourceCardSymbol, // Destructure
+    sourceCardType, // Destructure
   }) => {
     // Type guard and assertion
     if (cardData.type !== "profile") {
@@ -55,20 +63,20 @@ export const ProfileCardContainer = React.memo<ProfileCardContainerProps>(
     // Now we can safely use cardData as ProfileCardData
     const specificCardData = cardData as ProfileCardData;
 
-    const faceContentForBaseCard = (
-      <ProfileCardContent
-        cardData={specificCardData}
-        isBackFace={false}
-        interactionCallbacks={specificInteractions}
-      />
-    );
+    const contentProps = {
+      cardData: specificCardData,
+      // Remove specific click handlers like onSmaClick, onRangeContextClick if they now use onGenericInteraction
+      onGenericInteraction, // Pass down
+      sourceCardId,
+      sourceCardSymbol,
+      sourceCardType,
+    };
 
+    const faceContentForBaseCard = (
+      <ProfileCardContent {...contentProps} isBackFace={false} />
+    );
     const backContentForBaseCard = (
-      <ProfileCardContent
-        cardData={specificCardData}
-        isBackFace={true}
-        interactionCallbacks={specificInteractions}
-      />
+      <ProfileCardContent {...contentProps} isBackFace={true} />
     );
 
     return (

@@ -9,6 +9,8 @@ import Image from "next/image";
 import type {
   CardActionContext,
   BaseCardSocialInteractions,
+  OnGenericInteraction,
+  InteractionPayload,
 } from "./base-card.types";
 import { SocialBar } from "@/components/ui/social-bar";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
@@ -40,6 +42,7 @@ interface BaseCardProps {
   commentCount?: number;
   collectionCount?: number;
   isSaveDisabled?: boolean; // New prop
+  onGenericInteraction?: OnGenericInteraction;
 }
 
 const outerStyle: React.CSSProperties = {
@@ -83,7 +86,8 @@ const BaseCard: React.FC<BaseCardProps> = ({
   likeCount,
   commentCount,
   collectionCount,
-  isSaveDisabled, // Destructure the new prop
+  isSaveDisabled,
+  onGenericInteraction,
 }) => {
   const {
     symbol,
@@ -132,9 +136,16 @@ const BaseCard: React.FC<BaseCardProps> = ({
       | React.MouseEvent<HTMLDivElement>
       | React.KeyboardEvent<HTMLDivElement>
   ) => {
-    if (onHeaderClick) {
-      event.stopPropagation();
-      onHeaderClick(cardContext);
+    event.stopPropagation();
+    if (onGenericInteraction) {
+      const payload: InteractionPayload = {
+        sourceCardId: cardContext.id,
+        sourceCardSymbol: cardContext.symbol,
+        sourceCardType: cardContext.type,
+        interactionTarget: "card",
+        targetType: "profile", // Default: header click on any card requests a profile card for that symbol
+      };
+      onGenericInteraction(payload);
     }
   };
 
@@ -182,8 +193,10 @@ const BaseCard: React.FC<BaseCardProps> = ({
         {clickableLogoElement}
       </div>
       <ClickableDataItem
-        isInteractive={!!onHeaderClick}
-        onClickHandler={onHeaderClick ? handleHeaderTextClick : undefined}
+        isInteractive={!!onGenericInteraction}
+        onClickHandler={
+          onGenericInteraction ? handleHeaderTextClick : undefined
+        }
         className={cn(
           "text-right min-w-0 max-w-[calc(100%-3rem-12px)] sm:max-w-[calc(100%-3.5rem-12px)] md:max-w-[calc(100%-4rem-12px)]",
           "flex flex-col justify-center"

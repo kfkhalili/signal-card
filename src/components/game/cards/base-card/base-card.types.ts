@@ -58,3 +58,14 @@ export type OnCardInteraction<
 export type BaseCardContainerDataPointDetails = {
   readonly kind: "symbol" | "type" | "description";
 };
+
+export interface InteractionPayload {
+  sourceCardId: string;
+  sourceCardSymbol: string;
+  sourceCardType: CardType;
+  interactionTarget: "card"; // Initially "card", can be expanded to an enum later
+  targetType: CardType; // The type of card to create
+  // No contextData for now, as per our discussion
+}
+
+export type OnGenericInteraction = (payload: InteractionPayload) => void;

@@ -1,6 +1,9 @@
 // src/components/game/cardRenderers.ts
 import React from "react";
-import type { CardType } from "@/components/game/cards/base-card/base-card.types";
+import type {
+  CardType,
+  OnGenericInteraction,
+} from "@/components/game/cards/base-card/base-card.types";
 import type {
   CardActionContext,
   BaseCardSocialInteractions,
@@ -33,6 +36,10 @@ export interface CommonCardRendererProps {
   commentCount?: number;
   collectionCount?: number;
   isSaveDisabled?: boolean;
+  onGenericInteraction: OnGenericInteraction;
+  sourceCardId: string;
+  sourceCardSymbol: string;
+  sourceCardType: CardType;
 }
 
 export type PriceCardRendererProps = CommonCardRendererProps & {
