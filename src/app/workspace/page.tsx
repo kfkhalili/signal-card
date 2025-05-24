@@ -1,4 +1,3 @@
-// src/app/workspace/page.tsx
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -9,6 +8,7 @@ import {
   type AddCardFormValues,
 } from "@/components/workspace/AddCardForm";
 import { StockDataHandler } from "@/components/workspace/StockDataHandler";
+import MarketDataStatusBanner from "@/components/workspace/MarketStatusBanner";
 import { useWorkspaceManager } from "@/hooks/useWorkspaceManager";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, RefreshCw, Loader2 } from "lucide-react";
@@ -30,10 +30,18 @@ import type { CardActionContext } from "@/components/game/cards/base-card/base-c
 import type { ProfileCardInteractionCallbacks } from "@/components/game/cards/profile-card/profile-card.types";
 import type { PriceCardInteractionCallbacks } from "@/components/game/cards/price-card/price-card.types";
 
+type MarketStatus = Record<
+  string,
+  {
+    status: DerivedMarketStatus;
+    message: string | null;
+  }
+>;
+
 export default function WorkspacePage() {
   const { user, isLoading: isAuthLoading } = useAuth();
 
-  const [hasMounted, setHasMounted] = useState(false);
+  const [hasMounted, setHasMounted] = useState<boolean>(false);
   useEffect(() => {
     setHasMounted(true);
   }, []);
@@ -54,15 +62,7 @@ export default function WorkspacePage() {
     uniqueSymbolsInWorkspace,
   } = useWorkspaceManager({ isPremiumUser });
 
-  const [marketStatuses, setMarketStatuses] = useState<
-    Record<
-      string,
-      {
-        status: DerivedMarketStatus;
-        message: string | null;
-      }
-    >
-  >({});
+  const [marketStatuses, setMarketStatuses] = useState<MarketStatus>({});
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState<boolean>(false);
 
   const handleMarketStatusChange = useCallback(
@@ -85,7 +85,7 @@ export default function WorkspacePage() {
     (context: CardActionContext) => {
       const values: AddCardFormValues = {
         symbol: context.symbol,
-        cardType: "price",
+        cardType: context.type,
       };
       addCardToWorkspace(values, { requestingCardId: context.id });
     },
@@ -96,7 +96,7 @@ export default function WorkspacePage() {
     (context: CardActionContext) => {
       const values: AddCardFormValues = {
         symbol: context.symbol,
-        cardType: "profile",
+        cardType: context.type,
       };
       addCardToWorkspace(values, { requestingCardId: context.id });
     },
@@ -126,16 +126,6 @@ export default function WorkspacePage() {
     );
   }
 
-  // if (process.env.NODE_ENV === 'development') {
-  //   console.log("[WorkspacePage] Rendering. stockDataCallbacks object:", stockDataCallbacks);
-  //   if (stockDataCallbacks) {
-  //     console.log("[WorkspacePage] typeof stockDataCallbacks.onLiveQuoteUpdate:", typeof stockDataCallbacks.onLiveQuoteUpdate);
-  //     console.log("[WorkspacePage] typeof stockDataCallbacks.onProfileUpdate:", typeof stockDataCallbacks.onProfileUpdate);
-  //   } else {
-  //     console.log("[WorkspacePage] stockDataCallbacks is undefined or null!");
-  //   }
-  // }
-
   return (
     <div className="space-y-6 pb-10">
       <div className="px-2 sm:px-4 pt-4 flex flex-col sm:flex-row justify-between items-center gap-3">
@@ -150,7 +140,7 @@ export default function WorkspacePage() {
               <RefreshCw className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Clear All
             </Button>
           )}
-          {(activeCards.length > 0 || isPremiumUser) && (
+          {activeCards.length > 0 && (
             <AddCardForm
               onAddCard={(formValues) => addCardToWorkspace(formValues)}
               existingCards={activeCards}
@@ -176,41 +166,12 @@ export default function WorkspacePage() {
         );
       })}
 
-      {activeCards.length > 0 && uniqueSymbolsInWorkspace.length > 0 && (
-        <div className="px-2 sm:px-4 text-center py-2 bg-card border text-card-foreground rounded-md text-xs sm:text-sm shadow max-h-48 overflow-y-auto">
-          <h3 className="font-semibold mb-1 text-sm">Market Data Status:</h3>
-          {uniqueSymbolsInWorkspace.map((s) => {
-            const statusInfo = marketStatuses[s];
-            if (!statusInfo && !isAddingCardInProgress)
-              return (
-                <p
-                  key={`status-${s}`}
-                  className="text-xs text-muted-foreground">
-                  {s}: Initializing stream...
-                </p>
-              );
-            if (!statusInfo && isAddingCardInProgress) return null;
-            if (!statusInfo) return null;
-
-            return (
-              <div key={`status-${s}`} className="text-xs mb-0.5">
-                <strong>{s}:</strong> {statusInfo.status}
-                {statusInfo.message && (
-                  <span className="italic text-muted-foreground">
-                    ({String(statusInfo.message)})
-                  </span>
-                )}
-              </div>
-            );
-          })}
-          {Object.keys(marketStatuses).length === 0 &&
-            uniqueSymbolsInWorkspace.length > 0 &&
-            !isAddingCardInProgress && (
-              <p className="text-xs text-muted-foreground">
-                Awaiting data streams for active symbols...
-              </p>
-            )}
-        </div>
+      {activeCards.length > 0 && ( // <-- Condition to show banner
+        <MarketDataStatusBanner
+          uniqueSymbolsInWorkspace={uniqueSymbolsInWorkspace}
+          marketStatuses={marketStatuses}
+          isAddingCardInProgress={isAddingCardInProgress}
+        />
       )}
 
       <div className="px-2 sm:px-0">
@@ -228,7 +189,6 @@ export default function WorkspacePage() {
               onAddCard={(formValues) => addCardToWorkspace(formValues)}
               existingCards={activeCards}
               isPremiumUser={isPremiumUser}
-              lockedSymbolForRegularUser={null}
               triggerButton={
                 <Button size="lg">
                   <PlusCircle className="mr-2 h-5 w-5" /> Add Your First Card
@@ -237,8 +197,9 @@ export default function WorkspacePage() {
             />
             {!isPremiumUser && (
               <p className="text-xs text-muted-foreground mt-3">
-                (You can add one symbol at a time. Clear workspace to change
-                symbol.)
+                You can add one symbol at a time.
+                <br />
+                Clear workspace to change symbol.
               </p>
             )}
           </div>
