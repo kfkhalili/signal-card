@@ -166,7 +166,7 @@ export default function WorkspacePage() {
         );
       })}
 
-      {activeCards.length > 0 && ( // <-- Condition to show banner
+      {activeCards.length > 0 && (
         <MarketDataStatusBanner
           uniqueSymbolsInWorkspace={uniqueSymbolsInWorkspace}
           marketStatuses={marketStatuses}
