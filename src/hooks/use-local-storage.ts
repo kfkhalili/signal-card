@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 type SetValue<T> = (value: T | ((val: T) => T)) => void;
 
 // Reviver function to convert ISO date strings to Date objects
-const dateReviver = (key: string, value: unknown): unknown => {
+const dateReviver = (value: unknown): unknown => {
   const isoDatePattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/;
   if (typeof value === "string" && isoDatePattern.test(value)) {
     return new Date(value);
