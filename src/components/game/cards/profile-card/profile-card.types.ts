@@ -1,7 +1,6 @@
 // src/components/game/cards/profile-card/profile-card.types.ts
 import type {
   BaseCardData,
-  BaseCardBackData,
   CardActionContext,
 } from "../base-card/base-card.types";
 
@@ -38,7 +37,6 @@ export interface ProfileCardData extends BaseCardData {
   readonly type: "profile";
   readonly staticData: ProfileCardStaticData;
   liveData: ProfileCardLiveData; // Mutable part for live updates
-  readonly backData: BaseCardBackData;
   // websiteUrl is inherited from BaseCardData; its value typically comes from staticData.website
 }
 

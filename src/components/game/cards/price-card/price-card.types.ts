@@ -26,9 +26,9 @@ export interface PriceCardLiveData {
   readonly volume: number | null;
   readonly yearHigh?: number | null;
   readonly yearLow?: number | null;
-  readonly marketCap: number | null; // Previously in PriceCardSpecificBackData
-  readonly sma50d: number | null; // Previously in PriceCardSpecificBackData
-  readonly sma200d: number | null; // Previously in PriceCardSpecificBackData
+  readonly marketCap: number | null;
+  readonly sma50d: number | null;
+  readonly sma200d: number | null;
 }
 
 /**
@@ -40,7 +40,6 @@ export interface PriceCardData extends BaseCardData {
   readonly type: "price";
   readonly staticData: PriceCardStaticData;
   liveData: PriceCardLiveData; // Mutable for live updates
-  // backData: BaseCardBackData is inherited from BaseCardData
 }
 
 /**
