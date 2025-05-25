@@ -23,7 +23,6 @@ export function registerLiveDataInitializer(
   initializer: () => LiveDataDefaults
 ): void {
   if (liveDataInitializers.has(cardType)) {
-    // It's good practice to warn if overwriting, though during initial setup this might happen.
     console.warn(
       `LiveData initializer for type "${cardType}" is being overwritten.`
     );
@@ -69,14 +68,18 @@ registerLiveDataInitializer(
 registerLiveDataInitializer(
   "profile",
   (): ProfileCardLiveData => ({
-    price: null, // ProfileCardLiveData only expects an optional price
+    price: null,
   })
 );
+
+/**
+ * A generic fallback LiveData structure to be used ONLY when a specific initializer is missing.
+ * This indicates a setup error. We use ProfileCardLiveData as it's the simplest.
+ */
+export const GENERIC_FALLBACK_LIVE_DATA: ProfileCardLiveData = { price: null };
 
 // Example for a future NewsCard that might not have liveData, or a different structure
 // registerLiveDataInitializer("news", (): NewsCardLiveData => ({
 //   headlineSource: null,
 //   articleCount: 0,
 // }));
-// If a card type has no liveData, you could register it to return an empty object,
-// or handle it in processCardDataSnapshot if getLiveDataInitializer returns undefined.

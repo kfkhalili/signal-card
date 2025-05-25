@@ -8,10 +8,10 @@ import type { CardType as APICardType } from "@/components/game/cards/base-card/
 import type { ConcreteCardData } from "@/components/game/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ProcessedCardSnapshot } from "@/types/history.types";
-// Import the utility for liveData initialization
 import {
   getLiveDataInitializer,
   LiveDataDefaults,
+  GENERIC_FALLBACK_LIVE_DATA,
 } from "@/components/game/cardLiveDataDefaults";
 
 interface SignalHistoryPageServerProps {
@@ -23,7 +23,6 @@ export default async function SignalHistoryPage({
   params,
   searchParams,
 }: SignalHistoryPageServerProps) {
-  // params and searchParams are now expected to be Promises
   const resolvedParams = await params;
   const resolvedSearchParams = await searchParams;
 
@@ -195,51 +194,61 @@ async function getSnapshotsWithCounts(
           collectionError.message
         );
 
-      // Process card_data_snapshot to ensure liveData and correct type
       const rawCardDataFromDbJson = snapshot.card_data_snapshot as Record<
         string,
-        any
+        unknown
       >;
       const snapshotCardTypeFromDb = snapshot.card_type as APICardType;
 
-      // Extract liveData from DB JSON if it exists and is an object, otherwise use an empty object.
-      const liveDataFromDb =
-        rawCardDataFromDbJson.liveData &&
-        typeof rawCardDataFromDbJson.liveData === "object"
-          ? { ...rawCardDataFromDbJson.liveData } // Create a copy to avoid modifying the original snapshot object directly
+      (rawCardDataFromDbJson as { type?: APICardType }).type =
+        snapshotCardTypeFromDb;
+
+      const liveDataFromDbOrEmpty =
+        typeof rawCardDataFromDbJson.liveData === "object" &&
+        rawCardDataFromDbJson.liveData !== null
+          ? { ...(rawCardDataFromDbJson.liveData as Record<string, unknown>) }
           : {};
 
-      let ensuredLiveData: LiveDataDefaults | {} = {};
+      let finalLiveData: LiveDataDefaults;
       const defaultLiveDataInitializer = getLiveDataInitializer(
         snapshotCardTypeFromDb
       );
 
       if (defaultLiveDataInitializer) {
         const defaultLiveData = defaultLiveDataInitializer();
-        // Merge: Start with defaults, then overwrite with any values present in liveDataFromDb
-        ensuredLiveData = { ...defaultLiveData, ...liveDataFromDb };
+        finalLiveData = {
+          ...defaultLiveData,
+          ...liveDataFromDbOrEmpty,
+        } as LiveDataDefaults;
       } else {
-        // If no initializer, use liveDataFromDb (which could be {} if liveData was missing in DB)
-        ensuredLiveData = liveDataFromDb;
-        // Optional: Warn if a card type that *should* have liveData doesn't have an initializer.
-        // This depends on your application's expectations for which card types must have liveData.
-        // For now, we assume that if an initializer is missing, the card type might not strictly need liveData,
-        // or `liveDataFromDb` (even if empty) is sufficient.
-        console.warn(
-          `No LiveData initializer found for card_type "${snapshotCardTypeFromDb}" in snapshot ID ${snapshot.id}. Using liveData from DB (if any) or empty object.`
+        console.error(
+          `CRITICAL: No LiveData initializer found for card_type "${snapshotCardTypeFromDb}" in snapshot ID ${snapshot.id}. Card processing may be incorrect. Ensure an initializer is registered in 'cardLiveDataDefaults.ts' for this type. Using a generic fallback.`
         );
+        // Use the centrally defined generic fallback.
+        // This is still semantically incorrect if snapshotCardTypeFromDb was 'price' and GENERIC_FALLBACK_LIVE_DATA is ProfileCardLiveData,
+        // but it avoids naming 'profile' directly in *this* file's fallback logic and centralizes the fallback choice.
+        // The cast to LiveDataDefaults is important here.
+        finalLiveData = {
+          ...GENERIC_FALLBACK_LIVE_DATA,
+          ...liveDataFromDbOrEmpty,
+        } as LiveDataDefaults;
       }
 
+      const baseSnapshotData = rawCardDataFromDbJson as Omit<
+        ConcreteCardData,
+        "liveData" | "type"
+      >;
+
       const processedConcreteData = {
-        ...rawCardDataFromDbJson, // Spread other fields from the DB JSON (like staticData, backData etc.)
-        type: snapshotCardTypeFromDb, // Ensure 'type' is authoritative from the table
-        liveData: ensuredLiveData, // Assign the ensured/merged liveData object
+        ...baseSnapshotData,
+        type: snapshotCardTypeFromDb,
+        liveData: finalLiveData,
       } as ConcreteCardData;
 
       return {
-        ...snapshot, // Spread the original snapshot table row data
-        card_type: snapshotCardTypeFromDb, // Ensure card_type is correctly typed after spread
-        card_data_snapshot: processedConcreteData, // Use the processed data
+        ...snapshot,
+        card_type: snapshotCardTypeFromDb,
+        card_data_snapshot: processedConcreteData,
         like_count: like_count || 0,
         comment_count: comment_count || 0,
         collection_count: collection_count || 0,

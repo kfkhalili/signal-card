@@ -7,12 +7,12 @@ import type { CardType } from "@/components/game/cards/base-card/base-card.types
 import type { ConcreteCardData } from "@/components/game/types";
 import type { Json } from "@/lib/supabase/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
-// Import the new utility
-import { getLiveDataInitializer } from "@/components/game/cardLiveDataDefaults";
+import {
+  getLiveDataInitializer,
+  LiveDataDefaults,
+  GENERIC_FALLBACK_LIVE_DATA,
+} from "@/components/game/cardLiveDataDefaults";
 
-// Define the structure of a snapshot as fetched from the 'card_snapshots' table
-// This is the type we want for our application logic.
-// Updated to include social counts
 interface CardSnapshotFromDB {
   id: string;
   card_type: CardType;
@@ -23,13 +23,11 @@ interface CardSnapshotFromDB {
   rarity_level?: string | null;
   rarity_reason?: string | null;
   first_seen_at: string;
-  like_count: number; // Added
-  comment_count: number; // Added
-  collection_count: number; // Added
+  like_count: number;
+  comment_count: number;
+  collection_count: number;
 }
 
-// This interface represents the raw shape from Supabase join,
-// where card_data_snapshot is still Json.
 interface RawSupabaseSnapshot {
   id: string;
   card_type: string;
@@ -40,7 +38,6 @@ interface RawSupabaseSnapshot {
   rarity_level?: string | null;
   rarity_reason?: string | null;
   first_seen_at: string;
-  // Counts will be added after fetching
 }
 
 export interface ServerFetchedCollectedCard {
@@ -49,46 +46,51 @@ export interface ServerFetchedCollectedCard {
   snapshot_id: string;
   captured_at: string;
   user_notes: string | null;
-  card_snapshot_data: CardSnapshotFromDB; // This will hold the correctly typed snapshot with counts
+  card_snapshot_data: CardSnapshotFromDB;
 }
 
-// Helper to safely cast and structure the snapshot data
 function processCardDataSnapshot(
   card_type: CardType,
   snapshotJson: Json
 ): ConcreteCardData {
-  const rawData = snapshotJson as Record<string, any>; // Cast to Record for easier manipulation
+  const rawData = snapshotJson as Record<string, unknown>;
 
-  // Ensure the base 'type' property in the blob matches card_type from the snapshot table record
-  // This helps align the blob's internal type with the table's authoritative type.
-  rawData.type = card_type;
+  (rawData as { type?: CardType }).type = card_type;
 
-  // Check if liveData is missing or not an object
-  if (!rawData.liveData || typeof rawData.liveData !== "object") {
-    const initializer = getLiveDataInitializer(card_type);
-    if (initializer) {
-      rawData.liveData = initializer();
-    } else {
-      // If no specific liveData initializer, it implies this card type might not
-      // have a 'liveData' field as per its ConcreteCardData definition,
-      // or an initializer hasn't been registered.
-      // Setting it to an empty object can prevent crashes if some downstream
-      // logic unexpectedly tries to access it, but for types defined without
-      // liveData, this field might just be ignored.
-      // It's also a good place to warn if a type *should* have liveData but lacks an initializer.
-      console.warn(
-        `LiveData is missing or not an object for card_type "${card_type}" and no initializer was found. Ensuring 'liveData' key exists as empty object if not part of its type definition.`
-      );
-      // Only add liveData: {} if the type definition for this card_type actually includes liveData.
-      // For now, we will add it to be safe, assuming most cards might have it or it's optional.
-      // A more advanced setup could check against a schema.
-      rawData.liveData = {};
-    }
+  const liveDataFromDbOrEmpty =
+    typeof rawData.liveData === "object" && rawData.liveData !== null
+      ? { ...(rawData.liveData as Record<string, unknown>) }
+      : {};
+
+  let finalLiveData: LiveDataDefaults;
+  const initializer = getLiveDataInitializer(card_type);
+
+  if (initializer) {
+    const defaultLiveData = initializer();
+    finalLiveData = {
+      ...defaultLiveData,
+      ...liveDataFromDbOrEmpty,
+    } as LiveDataDefaults;
+  } else {
+    console.error(
+      `CRITICAL: No LiveData initializer found for card_type "${card_type}". Card processing may be incorrect or lead to errors. Ensure an initializer is registered in 'cardLiveDataDefaults.ts' for this type if it uses liveData. Using a generic fallback.`
+    );
+    finalLiveData = {
+      ...GENERIC_FALLBACK_LIVE_DATA,
+      ...liveDataFromDbOrEmpty,
+    } as LiveDataDefaults;
   }
-  // The rawData, now with ensured rawData.type and potentially initialized/defaulted rawData.liveData,
-  // is cast to ConcreteCardData. The specific card type (PriceCardData, ProfileCardData, etc.)
-  // will determine if rawData.liveData is further refined or used based on its definition.
-  return rawData as ConcreteCardData;
+
+  const baseSnapshotData = rawData as Omit<
+    ConcreteCardData,
+    "liveData" | "type"
+  >;
+
+  return {
+    ...baseSnapshotData,
+    type: card_type,
+    liveData: finalLiveData,
+  } as ConcreteCardData;
 }
 
 async function getSnapshotCounts(
@@ -110,7 +112,7 @@ async function getSnapshotCounts(
       .eq("snapshot_id", snapshotId),
     supabase
       .from("user_collections")
-      .select("id", { count: "exact", head: true }) // This counts how many users collected this snapshot
+      .select("id", { count: "exact", head: true })
       .eq("snapshot_id", snapshotId),
   ]);
 
@@ -212,7 +214,6 @@ export default async function CollectionPage() {
         rawSnapshotFromDB.card_data_snapshot
       );
 
-      // Fetch counts for this snapshot
       const counts = await getSnapshotCounts(supabase, rawSnapshotFromDB.id);
 
       const appTypedSnapshot: CardSnapshotFromDB = {
