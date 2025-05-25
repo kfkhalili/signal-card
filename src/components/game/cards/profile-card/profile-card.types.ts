@@ -4,61 +4,48 @@ import type {
   BaseCardBackData,
   CardActionContext,
 } from "../base-card/base-card.types";
-import type { PriceCardFaceData } from "../price-card/price-card.types";
 
 // Defines the static, less frequently changing data specific to a profile.
 export interface ProfileCardStaticData {
-  readonly db_id: string; // ID from your 'profiles' table
+  readonly db_id: string;
   readonly sector?: string | null;
   readonly industry?: string | null;
-  readonly country?: string | null; // e.g., "US"
-  readonly exchange?: string | null; // e.g., "NASDAQ", "NYSE" - Short exchange code
-  readonly exchange_full_name?: string | null; // e.g., "Nasdaq Stock Market"
+  readonly country?: string | null;
+  readonly exchange?: string | null;
+  readonly exchange_full_name?: string | null;
   readonly website?: string | null;
   readonly description?: string | null;
   readonly ceo?: string | null;
   readonly full_address?: string | null;
   readonly phone?: string | null;
-  readonly profile_last_updated?: string | null; // Formatted date string, or ISO string
+  readonly profile_last_updated?: string | null;
   readonly currency?: string | null;
-  readonly formatted_ipo_date?: string | null; // Formatted date string, or ISO string
+  readonly formatted_ipo_date?: string | null;
   readonly formatted_full_time_employees?: string | null;
   readonly is_etf?: boolean | null;
   readonly is_adr?: boolean | null;
   readonly is_fund?: boolean | null;
 }
 
-// Defines the live, frequently updated data for a ProfileCard (typically a subset of price data)
-export type ProfileCardLiveData = Partial<
-  Pick<
-    PriceCardFaceData,
-    | "price"
-    | "dayChange"
-    | "changePercentage"
-    | "dayHigh"
-    | "dayLow"
-    | "yearHigh"
-    | "yearLow"
-    | "timestamp"
-    | "volume"
-    | "dayOpen"
-    | "previousClose"
-  >
->;
+// Defines the live, frequently updated data for a ProfileCard.
+// Simplified to only include price.
+export interface ProfileCardLiveData {
+  price?: number | null;
+}
 
 // Main interface for the complete ProfileCard data structure
 export interface ProfileCardData extends BaseCardData {
   readonly type: "profile";
-  readonly staticData: ProfileCardStaticData; // Correctly references the dedicated static data interface
+  readonly staticData: ProfileCardStaticData;
   liveData: ProfileCardLiveData; // Mutable part for live updates
-  readonly backData: BaseCardBackData; // Holds generic description for the card type
+  readonly backData: BaseCardBackData;
   // websiteUrl is inherited from BaseCardData; its value typically comes from staticData.website
 }
 
-export interface ProfileCardSpecificInteractions {
+export interface ProfileCardInteractions {
   readonly onWebsiteClick?: (websiteUrl: string) => void;
   readonly onFilterByField?: (
-    fieldType: "sector" | "industry" | "exchange", // 'exchange' here might refer to 'exchange_full_name' or 'exchange' short code
+    fieldType: "sector" | "industry" | "exchange",
     value: string
   ) => void;
   readonly onRequestPriceCard?: (context: CardActionContext) => void;

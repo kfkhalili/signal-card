@@ -59,14 +59,6 @@ export function registerCardUpdateHandler<
     cardUpdateHandlerRegistry.set(cardType, new Map());
   }
   const eventMap = cardUpdateHandlerRegistry.get(cardType)!;
-
-  if (eventMap.has(eventType)) {
-    if (process.env.NODE_ENV === "development") {
-      console.warn(
-        `Card update handler for type "${cardType}" and event "${eventType}" is being overwritten.`
-      );
-    }
-  }
   // The 'handler' has a specific TCardData (e.g., PriceCardData).
   // StoredCardUpdateHandler expects ConcreteCardData as its first parameter.
   // Due to contravariance of function parameter types, a direct cast from

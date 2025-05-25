@@ -1,12 +1,9 @@
 // src/components/game/cards/price-card/priceCardInteractions.ts
 import type { ToastFunctionType } from "@/hooks/use-toast";
-import type {
-  PriceCardData,
-  PriceCardInteractionCallbacks,
-} from "./price-card.types";
+import type { PriceCardData, PriceCardInteractions } from "./price-card.types";
 
 type PriceSpecificInteractionsForContainer = Pick<
-  PriceCardInteractionCallbacks,
+  PriceCardInteractions,
   | "onPriceCardSmaClick"
   | "onPriceCardRangeContextClick"
   | "onPriceCardOpenPriceClick"

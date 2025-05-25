@@ -3,7 +3,7 @@ import React from "react";
 import BaseCard from "../base-card/BaseCard";
 import type {
   PriceCardData, // Still useful for internal casting
-  PriceCardInteractionCallbacks,
+  PriceCardInteractions,
 } from "./price-card.types";
 import { PriceCardContent } from "./PriceCardContent";
 import type { DisplayableCard } from "../../types"; // Import DisplayableCard
@@ -23,7 +23,7 @@ export interface PriceCardContainerProps
   sourceCardSymbol: string;
   sourceCardType: CardType;
   priceSpecificInteractions?: Pick<
-    PriceCardInteractionCallbacks,
+    PriceCardInteractions,
     | "onPriceCardSmaClick"
     | "onPriceCardRangeContextClick"
     | "onPriceCardOpenPriceClick"

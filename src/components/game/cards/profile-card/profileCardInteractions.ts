@@ -1,11 +1,11 @@
 // src/components/game/cards/profile-card/profileCardInteractions.ts
 import type { ToastFunctionType } from "@/hooks/use-toast";
 import type { CardActionContext } from "../base-card/base-card.types";
-import type { ProfileCardSpecificInteractions } from "./profile-card.types";
+import type { ProfileCardInteractions } from "./profile-card.types";
 
 export function getProfileCardInteractionHandlers(
   toast: ToastFunctionType
-): ProfileCardSpecificInteractions {
+): ProfileCardInteractions {
   return {
     onWebsiteClick: (websiteUrl: string): void => {
       // Added block body

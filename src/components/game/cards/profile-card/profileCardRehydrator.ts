@@ -57,16 +57,6 @@ const rehydrateProfileCardInstance: SpecificCardRehydrator = (
 
   const rehydratedLiveData: ProfileCardLiveData = {
     price: liveDataFromStorage.price ?? null,
-    dayChange: liveDataFromStorage.dayChange ?? null,
-    changePercentage: liveDataFromStorage.changePercentage ?? null,
-    dayHigh: liveDataFromStorage.dayHigh ?? null,
-    dayLow: liveDataFromStorage.dayLow ?? null,
-    timestamp: liveDataFromStorage.timestamp ?? null,
-    volume: liveDataFromStorage.volume ?? null,
-    yearHigh: liveDataFromStorage.yearHigh ?? null,
-    yearLow: liveDataFromStorage.yearLow ?? null,
-    previousClose: liveDataFromStorage.previousClose ?? null,
-    dayOpen: liveDataFromStorage.dayOpen ?? null,
   };
 
   const cardTypeDescription = `Provides an overview of ${

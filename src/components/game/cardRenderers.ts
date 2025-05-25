@@ -10,9 +10,9 @@ import type {
 } from "@/components/game/cards/base-card/base-card.types";
 import type {
   PriceCardData,
-  PriceCardInteractionCallbacks,
+  PriceCardInteractions,
 } from "./cards/price-card/price-card.types";
-import type { ProfileCardSpecificInteractions } from "./cards/profile-card/profile-card.types";
+import type { ProfileCardInteractions } from "./cards/profile-card/profile-card.types";
 import type { DisplayableCard } from "./types";
 
 export interface CommonCardRendererProps {
@@ -42,7 +42,7 @@ export interface CommonCardRendererProps {
 export type PriceCardRendererProps = CommonCardRendererProps & {
   cardData: PriceCardData;
   priceSpecificInteractions?: Pick<
-    PriceCardInteractionCallbacks,
+    PriceCardInteractions,
     | "onPriceCardSmaClick"
     | "onPriceCardRangeContextClick"
     | "onPriceCardOpenPriceClick"
@@ -53,7 +53,7 @@ export type PriceCardRendererProps = CommonCardRendererProps & {
 export type RegisteredCardRendererProps = CommonCardRendererProps & {
   cardData: DisplayableCard;
   priceSpecificInteractions?: PriceSpecificInteractionsForContainer;
-  specificInteractions?: ProfileCardSpecificInteractions;
+  specificInteractions?: ProfileCardInteractions;
 };
 
 export type RegisteredCardRenderer =
@@ -82,7 +82,7 @@ export function getCardRenderer(
 }
 
 type PriceSpecificInteractionsForContainer = Pick<
-  PriceCardInteractionCallbacks,
+  PriceCardInteractions,
   | "onPriceCardSmaClick"
   | "onPriceCardRangeContextClick"
   | "onPriceCardOpenPriceClick"

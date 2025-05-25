@@ -1,6 +1,6 @@
 // src/components/game/cards/profile-card/profileCardUtils.ts
 import { format, parseISO, isValid as isValidDate } from "date-fns";
-import type { ProfileDBRow } from "@/hooks/useStockData";
+import type { ProfileDBRow } from "@/hooks/useStockData"; // Defines the structure of data from 'profiles' table
 import type {
   DisplayableCard,
   DisplayableCardState,
@@ -19,8 +19,22 @@ import {
   registerCardUpdateHandler,
   type CardUpdateHandler,
 } from "@/components/game/cardUpdateHandler.types";
-import { createPriceCardFaceDataFromLiveQuote } from "../price-card/priceCardUtils";
 import type { LiveQuoteIndicatorDBRow } from "@/lib/supabase/realtime-service";
+
+// Interface for the minimal data structure needed to create ProfileCardLiveData
+interface QuoteSource {
+  current_price: number | null;
+  // Other fields might be present but are not used by createProfileCardLiveDataFromLiveQuote
+}
+
+// Updated local utility function to accept an object with at least a 'current_price' property
+function createProfileCardLiveDataFromLiveQuote(
+  quote: QuoteSource
+): ProfileCardLiveData {
+  return {
+    price: quote.current_price,
+  };
+}
 
 export function transformProfileDBRowToStaticData(
   dbData: ProfileDBRow
@@ -30,10 +44,9 @@ export function transformProfileDBRowToStaticData(
     formatString: string
   ): string | undefined => {
     if (!dateString) return undefined;
-    let date = new Date(dateString); // Try direct parsing first (handles YYYY-MM-DD and full ISO)
+    let date = new Date(dateString);
 
     if (!isValidDate(date)) {
-      // If direct parsing fails, try parseISO for full ISO 8601
       try {
         date = parseISO(dateString);
       } catch {
@@ -45,14 +58,13 @@ export function transformProfileDBRowToStaticData(
       try {
         return format(date, formatString);
       } catch (e) {
-        // Fallback if formatting itself fails (unlikely for valid date)
         if (process.env.NODE_ENV === "development") {
           console.warn(
             `[transformProfileDBRowToStaticData] Error formatting date string: ${dateString}`,
             e
           );
         }
-        return dateString; // Return original problematic string
+        return dateString;
       }
     }
 
@@ -87,7 +99,7 @@ export function transformProfileDBRowToStaticData(
     formatted_full_time_employees: dbData.full_time_employees?.toLocaleString(),
     profile_last_updated: formatDate(dbData.modified_at, "MMM d, yy"),
     currency: dbData.currency,
-    formatted_ipo_date: formatDate(dbData.ipo_date, "MMMM d, yyyy"), // Corrected format for year
+    formatted_ipo_date: formatDate(dbData.ipo_date, "MMMM d, yy"),
     is_etf: dbData.is_etf,
     is_adr: dbData.is_adr,
     is_fund: dbData.is_fund,
@@ -109,14 +121,14 @@ export function createDisplayableProfileCardFromDB(
   };
 
   const concreteCardData: ProfileCardData = {
-    id: `profile-${dbData.symbol}-${Date.now()}`,
+    id: `profile-<span class="math-inline">\{dbData\.symbol\}\-</span>{Date.now()}`,
     type: "profile",
     symbol: dbData.symbol,
     companyName: dbData.company_name,
     logoUrl: dbData.image,
     createdAt: Date.now(),
     staticData,
-    liveData: {},
+    liveData: { price: dbData.price }, // Initialize with price from ProfileDBRow
     backData: cardBackData,
     websiteUrl: dbData.website,
   };
@@ -133,19 +145,53 @@ async function initializeProfileCard({
   toast,
 }: CardInitializationContext): Promise<DisplayableCard | null> {
   try {
-    const { data, error } = await supabase
+    const { data: profileData, error: profileError } = await supabase
       .from("profiles")
       .select(
-        "id, symbol, company_name, image, exchange, sector, industry, website, description, country, price, market_cap, beta, last_dividend, range, change, change_percentage, volume, average_volume, currency, cik, isin, cusip, exchange_full_name, ceo, full_time_employees, phone, address, city, state, zip, ipo_date, default_image, is_etf, is_actively_trading, is_adr, is_fund, modified_at"
+        "id, symbol, company_name, image, exchange, sector, industry, website, description, country, \
+        market_cap, beta, last_dividend, range, change, change_percentage, volume, average_volume, currency, cik, isin, \
+        cusip, exchange_full_name, ceo, full_time_employees, phone, address, city, state, zip, ipo_date, default_image, is_etf, \
+        is_actively_trading, is_adr, is_fund, modified_at"
       )
       .eq("symbol", symbol)
       .maybeSingle();
 
-    if (error) throw error;
+    if (profileError) throw profileError;
 
-    if (data) {
-      const profile = data as ProfileDBRow;
-      return createDisplayableProfileCardFromDB(profile) as DisplayableCard;
+    if (profileData) {
+      const profile = profileData as ProfileDBRow;
+      const displayableCard = createDisplayableProfileCardFromDB(
+        profile
+      ) as ProfileCardData & Pick<DisplayableCardState, "isFlipped">;
+
+      // Attempt to get a more current price from live_quote_indicators
+      // Select only 'price' and 'api_timestamp' (for ordering).
+      const { data: initialQuoteData, error: initialQuoteError } =
+        await supabase
+          .from("live_quote_indicators")
+          .select("current_price, api_timestamp") // Fetch only necessary fields
+          .eq("symbol", symbol)
+          .order("api_timestamp", { ascending: false })
+          .limit(1)
+          .maybeSingle(); // Type of initialQuoteData will be:
+      // { price: number | null; api_timestamp: string | number | null } | null
+
+      if (initialQuoteError && process.env.NODE_ENV === "development") {
+        console.warn(
+          `[initializeProfileCard] Error fetching initial quote for ${symbol}:`,
+          initialQuoteError.message
+        );
+      }
+
+      if (initialQuoteData) {
+        // initialQuoteData (if not null) is guaranteed to have a 'price' property,
+        // so it satisfies the 'QuoteSource' interface.
+        displayableCard.liveData =
+          createProfileCardLiveDataFromLiveQuote(initialQuoteData);
+      }
+      // If initialQuoteData is not found, liveData.price remains as initialized from profiles.price
+
+      return displayableCard as DisplayableCard;
     } else {
       if (toast) {
         toast({
@@ -160,7 +206,7 @@ async function initializeProfileCard({
     const errorMessage =
       error instanceof Error
         ? error.message
-        : "Could not initialize profile for ${symbol}.";
+        : `Could not initialize profile for ${symbol}.`;
     if (toast) {
       toast({
         title: "Error Initializing Profile",
@@ -173,127 +219,25 @@ async function initializeProfileCard({
 }
 registerCardInitializer("profile", initializeProfileCard);
 
+// Realtime updates are expected to send the full LiveQuoteIndicatorDBRow.
+// This row structure naturally satisfies the 'QuoteSource' interface as it includes 'price'.
 const handleProfileCardLiveQuoteUpdate: CardUpdateHandler<
   ProfileCardData,
-  LiveQuoteIndicatorDBRow
+  LiveQuoteIndicatorDBRow // Payload from Supabase realtime
 > = (currentProfileCardData, leanQuotePayload): ProfileCardData => {
-  const apiTimestampMillis = leanQuotePayload.api_timestamp * 1000;
+  const newLiveData = createProfileCardLiveDataFromLiveQuote(leanQuotePayload);
 
-  if (
-    currentProfileCardData.liveData?.timestamp &&
-    currentProfileCardData.liveData.price !== null &&
-    apiTimestampMillis < currentProfileCardData.liveData.timestamp
-  ) {
-    return currentProfileCardData;
+  if (currentProfileCardData.liveData?.price !== newLiveData.price) {
+    return {
+      ...currentProfileCardData,
+      liveData: newLiveData,
+    };
   }
 
-  const newLiveDataPortion = createPriceCardFaceDataFromLiveQuote(
-    leanQuotePayload,
-    apiTimestampMillis
-  ) as ProfileCardLiveData;
-
-  let liveDataActuallyChanged = false;
-  if (
-    !currentProfileCardData.liveData ||
-    Object.keys(currentProfileCardData.liveData).length === 0
-  ) {
-    if (
-      Object.values(newLiveDataPortion).some(
-        (v) => v !== null && v !== undefined && v !== 0
-      ) ||
-      newLiveDataPortion.timestamp !==
-        currentProfileCardData.liveData?.timestamp
-    ) {
-      liveDataActuallyChanged = true;
-    }
-  } else {
-    const fieldsToCompare: (keyof ProfileCardLiveData)[] = [
-      "price",
-      "dayChange",
-      "changePercentage",
-      "volume",
-      "timestamp",
-      "dayHigh",
-      "dayLow",
-      "yearHigh",
-      "yearLow",
-      "dayOpen",
-      "previousClose",
-    ];
-    for (const key of fieldsToCompare) {
-      if (
-        newLiveDataPortion.hasOwnProperty(key) &&
-        newLiveDataPortion[key] !== currentProfileCardData.liveData[key]
-      ) {
-        liveDataActuallyChanged = true;
-        break;
-      }
-      if (
-        currentProfileCardData.liveData.hasOwnProperty(key) &&
-        !newLiveDataPortion.hasOwnProperty(key) &&
-        currentProfileCardData.liveData[key] !== null
-      ) {
-        liveDataActuallyChanged = true;
-        break;
-      }
-    }
-  }
-
-  if (!liveDataActuallyChanged) {
-    return currentProfileCardData;
-  }
-
-  const updatedCardData = {
-    ...currentProfileCardData,
-    liveData: {
-      ...currentProfileCardData.liveData,
-      ...newLiveDataPortion,
-    },
-  };
-
-  return updatedCardData;
+  return currentProfileCardData;
 };
 registerCardUpdateHandler(
   "profile",
   "LIVE_QUOTE_UPDATE",
   handleProfileCardLiveQuoteUpdate
-);
-
-const handleProfileCardStaticUpdate: CardUpdateHandler<
-  ProfileCardData,
-  ProfileDBRow
-> = (currentProfileCardData, profilePayload): ProfileCardData => {
-  const newStaticData = transformProfileDBRowToStaticData(profilePayload);
-
-  let changed = false;
-  if (
-    JSON.stringify(currentProfileCardData.staticData) !==
-    JSON.stringify(newStaticData)
-  )
-    changed = true;
-  if (
-    currentProfileCardData.companyName !== (profilePayload.company_name ?? null)
-  )
-    changed = true;
-  if (currentProfileCardData.logoUrl !== (profilePayload.image ?? null))
-    changed = true;
-  if (currentProfileCardData.websiteUrl !== (profilePayload.website ?? null))
-    changed = true;
-
-  if (!changed) {
-    return currentProfileCardData;
-  }
-
-  return {
-    ...currentProfileCardData,
-    companyName: profilePayload.company_name ?? null,
-    logoUrl: profilePayload.image ?? null,
-    websiteUrl: profilePayload.website ?? null,
-    staticData: newStaticData,
-  };
-};
-registerCardUpdateHandler(
-  "profile",
-  "STATIC_PROFILE_UPDATE",
-  handleProfileCardStaticUpdate
 );
