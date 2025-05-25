@@ -6,11 +6,7 @@ import CollectionClientPage from "./CollectionClientPage";
 import type { CardType } from "@/components/game/cards/base-card/base-card.types";
 import type { ConcreteCardData } from "@/components/game/types";
 import type { Json } from "@/lib/supabase/database.types";
-import type {
-  PriceCardData,
-  PriceCardStaticData,
-  PriceCardLiveData,
-} from "@/components/game/cards/price-card/price-card.types";
+import type { PriceCardData } from "@/components/game/cards/price-card/price-card.types";
 import type { ProfileCardData } from "@/components/game/cards/profile-card/profile-card.types";
 import type { SupabaseClient } from "@supabase/supabase-js"; // Import SupabaseClient
 
@@ -61,20 +57,10 @@ function processCardDataSnapshot(
   card_type: CardType,
   snapshotJson: Json
 ): ConcreteCardData {
-  const rawData = snapshotJson as any;
+  const rawData = snapshotJson as unknown;
 
   if (card_type === "price") {
-    return {
-      id: rawData.id,
-      type: "price",
-      symbol: rawData.symbol,
-      createdAt: rawData.createdAt,
-      companyName: rawData.companyName,
-      logoUrl: rawData.logoUrl,
-      staticData: rawData.staticData as PriceCardStaticData,
-      liveData: rawData.liveData as PriceCardLiveData,
-      backData: rawData.backData,
-    } as PriceCardData;
+    return rawData as PriceCardData;
   } else if (card_type === "profile") {
     return rawData as ProfileCardData;
   }

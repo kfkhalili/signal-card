@@ -36,7 +36,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
     sourceCardId,
     sourceCardType,
   }) => {
-    const { liveData, backData, staticData } = cardData; // Destructure new data structure
+    const { liveData, backData } = cardData; // Destructure new data structure
     const gridCellClass = "min-w-0";
 
     const getClickableDataInteractionProps = (

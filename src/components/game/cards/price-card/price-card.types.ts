@@ -1,9 +1,5 @@
 // src/components/game/cards/price-card/price-card.types.ts
-import type {
-  BaseCardData,
-  BaseCardBackData,
-  // CardActionContext, // Kept for specific interactions if any remain significant
-} from "../base-card/base-card.types";
+import type { BaseCardData } from "../base-card/base-card.types";
 
 /**
  * Defines the static, less frequently changing data specific to a price card.

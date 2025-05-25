@@ -1,4 +1,4 @@
-// src/components/history/HistorySelectionForm.tsx
+// src/components/comments/HistorySelectionForm.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -23,7 +23,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import type { SymbolAndTypes } from "@/app/history/page"; // Import the interface
 
 const HistorySelectionSchema = z.object({
   symbol: z.string().min(1, "Please select a symbol."),
@@ -33,7 +32,11 @@ const HistorySelectionSchema = z.object({
 type FormValues = z.infer<typeof HistorySelectionSchema>;
 
 interface HistorySelectionFormProps {
-  availableSelections: SymbolAndTypes[];
+  // Define the shape of availableSelections inline
+  availableSelections: {
+    symbol: string;
+    card_types: string[];
+  }[];
 }
 
 export const HistorySelectionForm: React.FC<HistorySelectionFormProps> = ({
@@ -57,18 +60,17 @@ export const HistorySelectionForm: React.FC<HistorySelectionFormProps> = ({
         (s) => s.symbol === selectedSymbol
       );
       setAvailableCardTypes(selection ? selection.card_types : []);
-      form.resetField("cardType", { defaultValue: "" }); // Reset card type when symbol changes
+      form.resetField("cardType", { defaultValue: "" });
     } else {
       setAvailableCardTypes([]);
     }
   }, [selectedSymbol, availableSelections, form]);
 
-  // Pre-select the first symbol if available and none is selected
   useEffect(() => {
     if (!selectedSymbol && availableSelections.length > 0) {
       const firstSymbol = availableSelections[0].symbol;
       setSelectedSymbol(firstSymbol);
-      form.setValue("symbol", firstSymbol); // Also update form value
+      form.setValue("symbol", firstSymbol);
     }
   }, [availableSelections, selectedSymbol, form]);
 

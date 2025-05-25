@@ -23,11 +23,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
 import { format } from "date-fns";
-import type {
-  PriceCardData,
-  // PriceCardStaticData, // Not directly used here
-  // PriceCardLiveData, // Not directly used here
-} from "@/components/game/cards/price-card/price-card.types";
+import type { PriceCardData } from "@/components/game/cards/price-card/price-card.types";
 import type { ProfileCardData } from "@/components/game/cards/profile-card/profile-card.types";
 
 interface ClientCollectedCard extends ServerFetchedCollectedCard {
@@ -103,11 +99,11 @@ function adaptServerToDisplayable(
         id: displayId,
         ...commonData,
         type: snapshot.card_type as CardType,
-        backData: (concreteCardDataFromSnapshot as any)?.backData || {
+        backData: concreteCardDataFromSnapshot?.backData || {
           description: `Unknown Card Type: ${snapshot.card_type}`,
         },
-        isLikedByCurrentUser: undefined, // Placeholder
-        isSavedByCurrentUser: undefined, // Placeholder
+        isLikedByCurrentUser: undefined,
+        isSavedByCurrentUser: undefined,
       };
       return fallbackCard as unknown as DisplayableCard;
     }
