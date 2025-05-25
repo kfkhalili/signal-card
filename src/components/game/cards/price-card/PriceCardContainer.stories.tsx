@@ -1,14 +1,14 @@
-// src/components/game/cards/profile-card/ProfileCardContainer.stories.tsx
+// src/components/game/cards/price-card/PriceCardContainer.stories.tsx
 import React, { useState, useCallback, useEffect } from "react";
 import type { Meta, StoryObj } from "@storybook/react";
 import { action } from "@storybook/addon-actions";
-import { ProfileCardContainer } from "./ProfileCardContainer";
+import { PriceCardContainer } from "./PriceCardContainer";
 import type {
-  ProfileCardData,
-  ProfileCardStaticData,
-  ProfileCardLiveData,
-  ProfileCardInteractions,
-} from "./profile-card.types";
+  PriceCardData,
+  PriceCardStaticData,
+  PriceCardLiveData,
+  PriceCardInteractions,
+} from "./price-card.types";
 import type {
   CardActionContext,
   BaseCardSocialInteractions,
@@ -20,9 +20,9 @@ import type {
 import { RARITY_LEVELS } from "@/components/game/rarityCalculator";
 import type { DisplayableCardState } from "@/components/game/types";
 
-const meta: Meta<typeof ProfileCardContainer> = {
-  title: "Game/Cards/ProfileCardContainer",
-  component: ProfileCardContainer,
+const meta: Meta<typeof PriceCardContainer> = {
+  title: "Game/Cards/PriceCardContainer",
+  component: PriceCardContainer,
   tags: ["autodocs"],
   parameters: {
     layout: "centered",
@@ -41,51 +41,45 @@ const meta: Meta<typeof ProfileCardContainer> = {
 };
 
 export default meta;
-type Story = StoryObj<typeof ProfileCardContainer>;
+type Story = StoryObj<typeof PriceCardContainer>;
 
-const defaultSymbol: string = "AAPL";
-const defaultCompanyName: string = "Apple Inc.";
+const defaultSymbol: string = "TSLA";
+const defaultCompanyName: string = "Tesla, Inc.";
 const defaultLogoUrl: string =
-  "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Apple_logo_black.svg/500px-Apple_logo_black.svg.png"; // User updated logo
+  "https://upload.wikimedia.org/wikipedia/commons/e/e8/Tesla_logo.png";
 
-const mockStaticData: ProfileCardStaticData = {
-  db_id: "aapl-db-id",
-  exchange: "NASDAQ",
-  exchange_full_name: "NASDAQ Stock Market",
-  industry: "Technology",
-  sector: "Electronic Technology",
-  description:
-    "Apple Inc. designs, manufactures, and markets smartphones, personal computers, tablets, wearables, and accessories worldwide. It also sells various related services.",
-  website: "https://www.apple.com",
-  ceo: "Timothy D. Cook",
-  country: "US",
-  currency: "USD",
-  profile_last_updated: new Date().toISOString(),
-  formatted_ipo_date: "December 12, 1980",
-  formatted_full_time_employees: "164,000",
-  is_etf: false,
-  is_adr: false,
-  is_fund: false,
-  full_address: "One Apple Park Way, Cupertino, CA 95014",
-  phone: "408-996-1010",
+const mockStaticData: PriceCardStaticData = {
+  exchange_code: "NASDAQ",
 };
 
-const mockLiveData: ProfileCardLiveData = {
-  price: 170.34,
+const mockLiveData: PriceCardLiveData = {
+  timestamp: Date.now(),
+  price: 180.5,
+  dayChange: 2.1,
+  changePercentage: 1.18,
+  dayHigh: 182.0,
+  dayLow: 178.0,
+  dayOpen: 179.0,
+  previousClose: 178.4,
+  volume: 75000000,
+  yearHigh: 250.0,
+  yearLow: 150.0,
+  marketCap: 570000000000,
+  sma50d: 175.0,
+  sma200d: 190.0,
 };
 
 const mockBaseBackData: BaseCardBackData = {
   description:
-    "This card provides a snapshot of the company's profile and recent market performance. Flip for more details.",
+    "This card shows the latest market price and key trading indicators for the stock. Flip for more technical data.",
 };
 
-const initialMockCardData: ProfileCardData & DisplayableCardState = {
-  id: "profile-aapl-123",
+const initialMockCardData: PriceCardData & DisplayableCardState = {
+  id: "price-tsla-456",
   symbol: defaultSymbol,
-  type: "profile",
+  type: "price",
   companyName: defaultCompanyName,
   logoUrl: defaultLogoUrl,
-  websiteUrl: mockStaticData.website,
   createdAt: Date.now(),
   staticData: mockStaticData,
   liveData: mockLiveData,
@@ -93,9 +87,9 @@ const initialMockCardData: ProfileCardData & DisplayableCardState = {
   isFlipped: false,
   currentRarity: RARITY_LEVELS.COMMON,
   rarityReason: null,
-  likeCount: 120,
-  commentCount: 15,
-  collectionCount: 45,
+  likeCount: 250,
+  commentCount: 30,
+  collectionCount: 90,
   isLikedByCurrentUser: false,
   isSavedByCurrentUser: false,
 };
@@ -103,10 +97,10 @@ const initialMockCardData: ProfileCardData & DisplayableCardState = {
 const mockCardContext: CardActionContext = {
   id: initialMockCardData.id,
   symbol: initialMockCardData.symbol,
-  type: "profile" as CardType,
+  type: "price" as CardType,
   companyName: initialMockCardData.companyName,
   logoUrl: initialMockCardData.logoUrl,
-  websiteUrl: initialMockCardData.websiteUrl,
+  websiteUrl: null, // Price cards don't typically have a primary website URL in the same way profile cards do
 };
 
 const mockSocialInteractions: BaseCardSocialInteractions = {
@@ -116,12 +110,19 @@ const mockSocialInteractions: BaseCardSocialInteractions = {
   onSave: (context) => action("social:save")(context),
 };
 
-const mockSpecificInteractions: ProfileCardInteractions = {
-  onWebsiteClick: (websiteUrl: string) =>
-    action("specific:websiteClick")(websiteUrl),
-  onFilterByField: (fieldType, value) =>
-    action("specific:filterByField")(fieldType, value),
-  onRequestPriceCard: (context) => action("specific:requestPriceCard")(context),
+const mockSpecificInteractions: PriceCardInteractions = {
+  onPriceCardSmaClick: (cardData, smaPeriod, smaValue) =>
+    action("specific:smaClick")(cardData.symbol, smaPeriod, smaValue),
+  onPriceCardRangeContextClick: (cardData, levelType, levelValue) =>
+    action("specific:rangeContextClick")(
+      cardData.symbol,
+      levelType,
+      levelValue
+    ),
+  onPriceCardOpenPriceClick: (cardData) =>
+    action("specific:openPriceClick")(cardData.symbol),
+  onPriceCardGenerateDailyPerformanceSignal: (cardData) =>
+    action("specific:generateSignal")(cardData.symbol),
 };
 
 const mockOnGenericInteraction: OnGenericInteraction = (
@@ -130,13 +131,10 @@ const mockOnGenericInteraction: OnGenericInteraction = (
   action("onGenericInteraction")(payload);
 };
 
-// Default story now uses a render function for interactive flip
 export const Default: Story = {
   render: (args) => {
-    // Use local state for isFlipped, initialized by args.isFlipped (from controls)
     const [localIsFlipped, setLocalIsFlipped] = useState(args.isFlipped);
 
-    // Effect to update local state if args.isFlipped changes (e.g., via Storybook controls)
     useEffect(() => {
       setLocalIsFlipped(args.isFlipped);
     }, [args.isFlipped]);
@@ -144,30 +142,28 @@ export const Default: Story = {
     const handleFlip = useCallback(() => {
       setLocalIsFlipped((prev) => {
         const newFlippedState = !prev;
-        // Log the action, passing the card ID
         action("onFlip")(args.cardData?.id || "unknown-id");
         return newFlippedState;
       });
-    }, [args.cardData?.id]); // Removed args.onFlip from deps as it's just action()
+    }, [args.cardData?.id]);
 
-    // Ensure the cardData prop also reflects the current flipped state
     const currentCardData = {
-      ...(args.cardData as ProfileCardData & DisplayableCardState), // Cast to ensure type safety
+      ...(args.cardData as PriceCardData & DisplayableCardState),
       isFlipped: localIsFlipped,
     };
 
     return (
-      <ProfileCardContainer
-        {...args} // Spread all other args from the story
-        cardData={currentCardData} // Pass the cardData with updated isFlipped
-        isFlipped={localIsFlipped} // Pass the local isFlipped state as a direct prop
-        onFlip={handleFlip} // Use the custom handler
+      <PriceCardContainer
+        {...args}
+        cardData={currentCardData}
+        isFlipped={localIsFlipped}
+        onFlip={handleFlip}
       />
     );
   },
   args: {
-    cardData: { ...initialMockCardData, isFlipped: false }, // Initial state for cardData
-    isFlipped: false, // Initial state for the direct isFlipped prop
+    cardData: { ...initialMockCardData, isFlipped: false },
+    isFlipped: false,
     currentRarity: initialMockCardData.currentRarity,
     rarityReason: initialMockCardData.rarityReason,
     likeCount: initialMockCardData.likeCount,
@@ -184,22 +180,20 @@ export const Default: Story = {
     onGenericInteraction: mockOnGenericInteraction,
     sourceCardId: initialMockCardData.id,
     sourceCardSymbol: initialMockCardData.symbol,
-    sourceCardType: "profile",
-    specificInteractions: mockSpecificInteractions,
+    sourceCardType: "price",
+    priceSpecificInteractions: mockSpecificInteractions,
     className: "w-[300px] h-[420px]",
-    // onFlip: action("onFlip") // This is implicitly handled by the render function's handleFlip
   },
 };
 
 export const Flipped: Story = {
   args: {
-    ...Default.args, // Start with Default's args structure
+    ...Default.args,
     cardData: {
-      // Override cardData
       ...initialMockCardData,
       isFlipped: true,
     },
-    isFlipped: true, // Override direct prop
+    isFlipped: true,
   },
 };
 
@@ -208,7 +202,7 @@ export const WithActiveSocialInteractions: Story = {
     ...Default.args,
     cardData: {
       ...initialMockCardData,
-      isFlipped: Default.args?.isFlipped ?? false, // Maintain default flip state or specific for this story
+      isFlipped: Default.args?.isFlipped ?? false,
       isLikedByCurrentUser: true,
       isSavedByCurrentUser: true,
       likeCount: (initialMockCardData.likeCount ?? 0) + 1,
@@ -221,37 +215,104 @@ export const WithActiveSocialInteractions: Story = {
   },
 };
 
-export const RareCard: Story = {
-  args: {
-    ...Default.args,
-    cardData: {
-      ...initialMockCardData,
-      isFlipped: Default.args?.isFlipped ?? false,
-      currentRarity: RARITY_LEVELS.RARE,
-      rarityReason: "Significant news event today.",
-    },
-    currentRarity: RARITY_LEVELS.RARE,
-    rarityReason: "Significant news event today.",
-  },
-};
-
-export const MinimalLiveDataStory: Story = {
-  name: "Minimal Live Data",
+export const LegendaryCard: Story = {
   args: {
     ...Default.args,
     cardData: {
       ...initialMockCardData,
       isFlipped: Default.args?.isFlipped ?? false,
       liveData: {
-        price: 100.0,
+        ...initialMockCardData.liveData,
+        price: initialMockCardData.liveData.yearHigh ?? null, // At 52-week high
+      },
+      currentRarity: RARITY_LEVELS.LEGENDARY,
+      rarityReason: "At 52-Week High!",
+    },
+    currentRarity: RARITY_LEVELS.LEGENDARY,
+    rarityReason: "At 52-Week High!",
+  },
+};
+
+export const EpicCardLow: Story = {
+  args: {
+    ...Default.args,
+    cardData: {
+      ...initialMockCardData,
+      isFlipped: Default.args?.isFlipped ?? false,
+      liveData: {
+        ...initialMockCardData.liveData,
+        price: initialMockCardData.liveData.yearLow ?? null, // At 52-week low
+      },
+      currentRarity: RARITY_LEVELS.EPIC,
+      rarityReason: "At 52-Week Low!",
+    },
+    currentRarity: RARITY_LEVELS.EPIC,
+    rarityReason: "At 52-Week Low!",
+  },
+};
+
+export const EpicCardGain: Story = {
+  args: {
+    ...Default.args,
+    cardData: {
+      ...initialMockCardData,
+      isFlipped: Default.args?.isFlipped ?? false,
+      liveData: {
+        ...initialMockCardData.liveData,
+        changePercentage: 10.5,
+      },
+      currentRarity: RARITY_LEVELS.EPIC,
+      rarityReason: "Strong Gain: +10.5%",
+    },
+    currentRarity: RARITY_LEVELS.EPIC,
+    rarityReason: "Strong Gain: +10.5%",
+  },
+};
+
+export const RareCardDrop: Story = {
+  args: {
+    ...Default.args,
+    cardData: {
+      ...initialMockCardData,
+      isFlipped: Default.args?.isFlipped ?? false,
+      liveData: {
+        ...initialMockCardData.liveData,
+        changePercentage: -5.2,
+      },
+      currentRarity: RARITY_LEVELS.RARE,
+      rarityReason: "Notable Drop: -5.2%",
+    },
+    currentRarity: RARITY_LEVELS.RARE,
+    rarityReason: "Notable Drop: -5.2%",
+  },
+};
+
+export const MinimalData: Story = {
+  args: {
+    ...Default.args,
+    cardData: {
+      ...initialMockCardData,
+      isFlipped: Default.args?.isFlipped ?? false,
+      companyName: "Bitcoin",
+      logoUrl: null, // No logo for BTC
+      liveData: {
+        timestamp: Date.now(),
+        price: 60000.0,
+        dayChange: -500.0,
+        changePercentage: -0.83,
+        dayHigh: null,
+        dayLow: null,
+        dayOpen: 60500.0,
+        previousClose: 60500.0,
+        volume: null,
+        yearHigh: null,
+        yearLow: null,
+        marketCap: 1200000000000,
+        sma50d: null,
+        sma200d: null,
       },
       staticData: {
-        ...mockStaticData,
-        db_id: "min-data-id",
-        description: "A company with minimal profile data available currently.",
-        industry: undefined,
-        sector: undefined,
-        ceo: undefined,
+        exchange_code: "Crypto",
       },
     },
   },
@@ -261,7 +322,7 @@ export const NoInteractions: Story = {
   args: {
     ...Default.args,
     socialInteractions: undefined,
-    specificInteractions: undefined,
+    priceSpecificInteractions: undefined,
     onDeleteRequest: undefined,
     onHeaderIdentityClick: undefined,
   },
