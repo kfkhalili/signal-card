@@ -6,9 +6,9 @@ import CollectionClientPage from "./CollectionClientPage";
 import type { CardType } from "@/components/game/cards/base-card/base-card.types";
 import type { ConcreteCardData } from "@/components/game/types";
 import type { Json } from "@/lib/supabase/database.types";
-import type { PriceCardData } from "@/components/game/cards/price-card/price-card.types";
-import type { ProfileCardData } from "@/components/game/cards/profile-card/profile-card.types";
-import type { SupabaseClient } from "@supabase/supabase-js"; // Import SupabaseClient
+import type { SupabaseClient } from "@supabase/supabase-js";
+// Import the new utility
+import { getLiveDataInitializer } from "@/components/game/cardLiveDataDefaults";
 
 // Define the structure of a snapshot as fetched from the 'card_snapshots' table
 // This is the type we want for our application logic.
@@ -57,14 +57,37 @@ function processCardDataSnapshot(
   card_type: CardType,
   snapshotJson: Json
 ): ConcreteCardData {
-  const rawData = snapshotJson as unknown;
+  const rawData = snapshotJson as Record<string, any>; // Cast to Record for easier manipulation
 
-  if (card_type === "price") {
-    return rawData as PriceCardData;
-  } else if (card_type === "profile") {
-    return rawData as ProfileCardData;
+  // Ensure the base 'type' property in the blob matches card_type from the snapshot table record
+  // This helps align the blob's internal type with the table's authoritative type.
+  rawData.type = card_type;
+
+  // Check if liveData is missing or not an object
+  if (!rawData.liveData || typeof rawData.liveData !== "object") {
+    const initializer = getLiveDataInitializer(card_type);
+    if (initializer) {
+      rawData.liveData = initializer();
+    } else {
+      // If no specific liveData initializer, it implies this card type might not
+      // have a 'liveData' field as per its ConcreteCardData definition,
+      // or an initializer hasn't been registered.
+      // Setting it to an empty object can prevent crashes if some downstream
+      // logic unexpectedly tries to access it, but for types defined without
+      // liveData, this field might just be ignored.
+      // It's also a good place to warn if a type *should* have liveData but lacks an initializer.
+      console.warn(
+        `LiveData is missing or not an object for card_type "${card_type}" and no initializer was found. Ensuring 'liveData' key exists as empty object if not part of its type definition.`
+      );
+      // Only add liveData: {} if the type definition for this card_type actually includes liveData.
+      // For now, we will add it to be safe, assuming most cards might have it or it's optional.
+      // A more advanced setup could check against a schema.
+      rawData.liveData = {};
+    }
   }
-  console.warn(`Unknown card type in processCardDataSnapshot: ${card_type}`);
+  // The rawData, now with ensured rawData.type and potentially initialized/defaulted rawData.liveData,
+  // is cast to ConcreteCardData. The specific card type (PriceCardData, ProfileCardData, etc.)
+  // will determine if rawData.liveData is further refined or used based on its definition.
   return rawData as ConcreteCardData;
 }
 

@@ -8,6 +8,11 @@ import type { CardType as APICardType } from "@/components/game/cards/base-card/
 import type { ConcreteCardData } from "@/components/game/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ProcessedCardSnapshot } from "@/types/history.types";
+// Import the utility for liveData initialization
+import {
+  getLiveDataInitializer,
+  LiveDataDefaults,
+} from "@/components/game/cardLiveDataDefaults";
 
 interface SignalHistoryPageServerProps {
   params: Promise<{ symbol: string; cardType: string }>;
@@ -190,10 +195,51 @@ async function getSnapshotsWithCounts(
           collectionError.message
         );
 
+      // Process card_data_snapshot to ensure liveData and correct type
+      const rawCardDataFromDbJson = snapshot.card_data_snapshot as Record<
+        string,
+        any
+      >;
+      const snapshotCardTypeFromDb = snapshot.card_type as APICardType;
+
+      // Extract liveData from DB JSON if it exists and is an object, otherwise use an empty object.
+      const liveDataFromDb =
+        rawCardDataFromDbJson.liveData &&
+        typeof rawCardDataFromDbJson.liveData === "object"
+          ? { ...rawCardDataFromDbJson.liveData } // Create a copy to avoid modifying the original snapshot object directly
+          : {};
+
+      let ensuredLiveData: LiveDataDefaults | {} = {};
+      const defaultLiveDataInitializer = getLiveDataInitializer(
+        snapshotCardTypeFromDb
+      );
+
+      if (defaultLiveDataInitializer) {
+        const defaultLiveData = defaultLiveDataInitializer();
+        // Merge: Start with defaults, then overwrite with any values present in liveDataFromDb
+        ensuredLiveData = { ...defaultLiveData, ...liveDataFromDb };
+      } else {
+        // If no initializer, use liveDataFromDb (which could be {} if liveData was missing in DB)
+        ensuredLiveData = liveDataFromDb;
+        // Optional: Warn if a card type that *should* have liveData doesn't have an initializer.
+        // This depends on your application's expectations for which card types must have liveData.
+        // For now, we assume that if an initializer is missing, the card type might not strictly need liveData,
+        // or `liveDataFromDb` (even if empty) is sufficient.
+        console.warn(
+          `No LiveData initializer found for card_type "${snapshotCardTypeFromDb}" in snapshot ID ${snapshot.id}. Using liveData from DB (if any) or empty object.`
+        );
+      }
+
+      const processedConcreteData = {
+        ...rawCardDataFromDbJson, // Spread other fields from the DB JSON (like staticData, backData etc.)
+        type: snapshotCardTypeFromDb, // Ensure 'type' is authoritative from the table
+        liveData: ensuredLiveData, // Assign the ensured/merged liveData object
+      } as ConcreteCardData;
+
       return {
-        ...snapshot,
-        card_type: snapshot.card_type as APICardType,
-        card_data_snapshot: snapshot.card_data_snapshot as ConcreteCardData,
+        ...snapshot, // Spread the original snapshot table row data
+        card_type: snapshotCardTypeFromDb, // Ensure card_type is correctly typed after spread
+        card_data_snapshot: processedConcreteData, // Use the processed data
         like_count: like_count || 0,
         comment_count: comment_count || 0,
         collection_count: collection_count || 0,
