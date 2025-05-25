@@ -50,9 +50,9 @@ export const CommentDialog: React.FC<CommentDialogProps> = ({
   const [comments, setComments] = useState<Comment[]>([]);
   const [isLoadingComments, setIsLoadingComments] = useState<boolean>(false);
   const [isPostingComment, setIsPostingComment] = useState<boolean>(false);
-  const { user } = useAuth(); // Get authenticated user
+  const { user } = useAuth();
   const { toast } = useToast();
-  const commentsEndRef = useRef<HTMLDivElement>(null); // For scrolling to bottom
+  const commentsEndRef = useRef<HTMLDivElement>(null);
 
   const form = useForm<CommentFormValues>({
     resolver: zodResolver(commentFormSchema),
@@ -67,7 +67,7 @@ export const CommentDialog: React.FC<CommentDialogProps> = ({
 
   const fetchComments = useCallback(async () => {
     if (!snapshotId) {
-      setComments([]); // Clear comments if no snapshotId
+      setComments([]);
       return;
     }
     setIsLoadingComments(true);
@@ -87,7 +87,7 @@ export const CommentDialog: React.FC<CommentDialogProps> = ({
         description: errorMessage,
         variant: "destructive",
       });
-      setComments([]); // Clear comments on error
+      setComments([]);
     } finally {
       setIsLoadingComments(false);
     }
@@ -97,7 +97,6 @@ export const CommentDialog: React.FC<CommentDialogProps> = ({
     if (isOpen && snapshotId) {
       fetchComments();
     } else if (!isOpen) {
-      // Reset state when dialog is closed
       setComments([]);
       form.reset();
       setIsLoadingComments(false);
@@ -126,8 +125,8 @@ export const CommentDialog: React.FC<CommentDialogProps> = ({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          snapshotId: snapshotId,
-          commentText: values.commentText.trim(),
+          snapshot_id: snapshotId, // Changed to snake_case
+          comment_text: values.commentText.trim(), // Changed to snake_case
         }),
       });
       if (!response.ok) {
@@ -135,11 +134,9 @@ export const CommentDialog: React.FC<CommentDialogProps> = ({
         throw new Error(errorResult.error || "Failed to post comment.");
       }
       const { comment: newComment } = await response.json();
-      // Add new comment to the list (optimistic update or refetch)
-      setComments((prevComments) => [...prevComments, newComment]); // Add to bottom for chronological
+      setComments((prevComments) => [...prevComments, newComment]);
       form.reset();
       toast({ title: "Comment Posted!", variant: "default" });
-      // Scroll to bottom after new comment is added
       setTimeout(scrollToBottom, 100);
     } catch (error: unknown) {
       const errorMessage =
@@ -156,7 +153,7 @@ export const CommentDialog: React.FC<CommentDialogProps> = ({
 
   const getInitials = (name?: string | null): string => {
     if (!name && user?.email) return user.email[0].toUpperCase();
-    if (!name) return "U"; // Default User initial
+    if (!name) return "U";
     const parts = name.split(" ");
     if (parts.length > 1) {
       return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
@@ -177,7 +174,6 @@ export const CommentDialog: React.FC<CommentDialogProps> = ({
         </DialogHeader>
 
         <div className="flex-grow overflow-y-hidden flex flex-col min-h-[200px]">
-          {/* Added min-h */}
           {isLoadingComments ? (
             <div className="space-y-4 p-4">
               {[...Array(3)].map((_, i) => (
@@ -203,7 +199,6 @@ export const CommentDialog: React.FC<CommentDialogProps> = ({
             </div>
           ) : (
             <ScrollArea className="flex-grow pr-2">
-              {/* pr-2 for scrollbar space */}
               <div className="space-y-4 p-4">
                 {comments.map((comment) => (
                   <div key={comment.id} className="flex items-start space-x-3">
@@ -253,7 +248,7 @@ export const CommentDialog: React.FC<CommentDialogProps> = ({
               <Textarea
                 placeholder="Write your comment..."
                 {...form.register("commentText")}
-                className="min-h-[70px] text-sm" // Adjusted size
+                className="min-h-[70px] text-sm"
                 disabled={isPostingComment}
                 rows={3}
               />
@@ -284,13 +279,13 @@ export const CommentDialog: React.FC<CommentDialogProps> = ({
           </form>
         ) : (
           <p className="text-sm text-center text-muted-foreground pt-4 border-t shrink-0">
-            PleaseisPremiumUser
+            Please{" "}
             <a
               href="/auth"
               className="underline text-primary hover:text-primary/80">
               log in
-            </a>
-            isPremiumUser to post comments.
+            </a>{" "}
+            to post comments.
           </p>
         )}
       </DialogContent>

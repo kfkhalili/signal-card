@@ -1,8 +1,8 @@
 // src/components/game/cards/price-card/priceCardUtils.ts
 import type { ProfileDBRow } from "@/hooks/useStockData";
 import type {
-  PriceCardFaceData,
-  PriceCardSpecificBackData,
+  PriceCardStaticData,
+  PriceCardLiveData,
   PriceCardData,
 } from "./price-card.types";
 import type {
@@ -10,6 +10,7 @@ import type {
   DisplayableLivePriceCard,
   DisplayableCard,
 } from "@/components/game/types";
+import type { BaseCardBackData } from "../base-card/base-card.types";
 import type { LiveQuoteIndicatorDBRow } from "@/lib/supabase/realtime-service";
 import {
   registerCardInitializer,
@@ -21,13 +22,13 @@ import {
 } from "@/components/game/cardUpdateHandler.types";
 import type { ProfileCardData as ProfileCardDataType } from "../profile-card/profile-card.types";
 
-export function createPriceCardFaceDataFromLiveQuote(
+export function createPriceCardLiveData(
   leanQuote: LiveQuoteIndicatorDBRow,
-  apiTimestampMillis: number
-): PriceCardFaceData {
+  apiTimestampMillis: number | null // Allow null for shell cards
+): PriceCardLiveData {
   return {
     timestamp: apiTimestampMillis,
-    price: leanQuote.current_price,
+    price: leanQuote.current_price ?? null, // Ensure null if not available
     changePercentage: leanQuote.change_percentage ?? null,
     dayChange: leanQuote.day_change ?? null,
     dayLow: leanQuote.day_low ?? null,
@@ -37,42 +38,48 @@ export function createPriceCardFaceDataFromLiveQuote(
     previousClose: leanQuote.previous_close ?? null,
     yearHigh: leanQuote.year_high ?? null,
     yearLow: leanQuote.year_low ?? null,
-  };
-}
-
-export function createPriceCardBackDataFromLiveQuote(
-  leanQuote: LiveQuoteIndicatorDBRow
-): PriceCardSpecificBackData {
-  return {
     marketCap: leanQuote.market_cap ?? null,
     sma50d: leanQuote.sma_50d ?? null,
     sma200d: leanQuote.sma_200d ?? null,
   };
 }
 
+export function createPriceCardStaticData(
+  leanQuote: LiveQuoteIndicatorDBRow,
+  profileContext?: Pick<ProfileDBRow, "exchange">
+): PriceCardStaticData {
+  return {
+    exchange_code: leanQuote.exchange ?? profileContext?.exchange ?? null,
+  };
+}
+
 export function createDisplayablePriceCard(
   leanQuote: LiveQuoteIndicatorDBRow,
-  apiTimestampMillis: number,
+  apiTimestampMillis: number | null,
   profileContext?: Pick<ProfileDBRow, "company_name" | "image" | "exchange">,
   isShell: boolean = false
 ): DisplayableLivePriceCard {
-  let faceData = createPriceCardFaceDataFromLiveQuote(
+  let liveData = createPriceCardLiveData(
     leanQuote,
-    apiTimestampMillis
+    isShell ? null : apiTimestampMillis // Use null timestamp for shell if price is null
   );
 
   if (isShell) {
-    faceData = {
-      ...faceData,
-      price: null,
-      timestamp: apiTimestampMillis,
+    liveData = {
+      ...liveData,
+      price: null, // Explicitly null for shell
+      timestamp: apiTimestampMillis, // Keep timestamp for shell identification if needed
     };
   }
 
-  const backSpecificData = createPriceCardBackDataFromLiveQuote(leanQuote);
+  const staticData = createPriceCardStaticData(leanQuote, profileContext);
 
   const cardState: Pick<DisplayableCardState, "isFlipped"> = {
     isFlipped: false,
+  };
+
+  const backDataDescription: BaseCardBackData = {
+    description: `Market price information for ${leanQuote.symbol}. Includes daily and historical price points, volume, and key moving averages.`,
   };
 
   const concreteCardData: PriceCardData = {
@@ -82,12 +89,10 @@ export function createDisplayablePriceCard(
     createdAt: Date.now(),
     companyName: profileContext?.company_name ?? leanQuote.symbol,
     logoUrl: profileContext?.image ?? null,
-    faceData,
-    backData: {
-      description: `Market price information for ${leanQuote.symbol}. Includes daily and historical price points, volume, and key moving averages.`,
-      ...backSpecificData,
-    },
-    exchange_code: leanQuote.exchange ?? profileContext?.exchange ?? null,
+    staticData,
+    liveData,
+    backData: backDataDescription,
+    // websiteUrl can be added if relevant for PriceCard, though typically for Profile
   };
 
   return {
@@ -123,7 +128,7 @@ async function initializePriceCard({
       ? {
           company_name: profileCardForSymbol.companyName ?? null,
           image: profileCardForSymbol.logoUrl ?? null,
-          exchange: profileCardForSymbol.staticData.exchange_full_name ?? null,
+          exchange: profileCardForSymbol.staticData.exchange_full_name ?? null, // Assuming exchange_full_name is desired
         }
       : undefined;
 
@@ -139,10 +144,11 @@ async function initializePriceCard({
       const now = Date.now();
       const nowSeconds = Math.floor(now / 1000);
 
+      // Create a shell quote. Some fields might be unavailable or should be explicitly null.
       const shellLeanQuote: LiveQuoteIndicatorDBRow = {
-        id: `shell-indicator-${now}`,
+        id: `shell-indicator-${now}`, // Placeholder ID
         symbol: symbol,
-        current_price: 0,
+        current_price: 0, // Placeholder, will be nulled out by isShell in createDisplayablePriceCard
         api_timestamp: nowSeconds,
         fetched_at: new Date(now).toISOString(),
         exchange: profileContext?.exchange || null,
@@ -162,9 +168,9 @@ async function initializePriceCard({
 
       const shellDisplayableCard = createDisplayablePriceCard(
         shellLeanQuote,
-        now,
+        now, // Pass current time for shell's timestamp
         profileContext,
-        true
+        true // isShell = true
       );
 
       if (toast) {
@@ -180,7 +186,7 @@ async function initializePriceCard({
     const errorMessage =
       error instanceof Error
         ? error.message
-        : "Could not initialize price data for ${symbol}.";
+        : `Could not initialize price data for ${symbol}.`;
     if (process.env.NODE_ENV === "development") {
       console.error(
         `Error initializing price card for ${symbol}:`,
@@ -206,35 +212,28 @@ const handlePriceCardLiveQuoteUpdate: CardUpdateHandler<
   const apiTimestampMillis = leanQuotePayload.api_timestamp * 1000;
 
   if (
-    currentPriceCardData.faceData.timestamp &&
-    apiTimestampMillis < currentPriceCardData.faceData.timestamp &&
-    currentPriceCardData.faceData.price !== null
+    currentPriceCardData.liveData.timestamp &&
+    apiTimestampMillis < currentPriceCardData.liveData.timestamp &&
+    currentPriceCardData.liveData.price !== null // Ensure we don't block update if current price is null (shell card)
   ) {
-    return currentPriceCardData;
+    return currentPriceCardData; // Incoming data is older than current, and we have a price
   }
 
-  const newFaceData = createPriceCardFaceDataFromLiveQuote(
+  const newLiveData = createPriceCardLiveData(
     leanQuotePayload,
     apiTimestampMillis
   );
-  const newBackData = createPriceCardBackDataFromLiveQuote(leanQuotePayload);
+  const newStaticData = createPriceCardStaticData(leanQuotePayload); // Exchange might come from quote
 
   let hasSignificantChange = false;
   if (
-    JSON.stringify(currentPriceCardData.faceData) !==
-    JSON.stringify(newFaceData)
+    JSON.stringify(currentPriceCardData.liveData) !==
+    JSON.stringify(newLiveData)
   ) {
     hasSignificantChange = true;
   } else if (
-    currentPriceCardData.backData.marketCap !== newBackData.marketCap ||
-    currentPriceCardData.backData.sma50d !== newBackData.sma50d ||
-    currentPriceCardData.backData.sma200d !== newBackData.sma200d
-  ) {
-    hasSignificantChange = true;
-  }
-  if (
-    !hasSignificantChange &&
-    currentPriceCardData.exchange_code !== (leanQuotePayload.exchange ?? null)
+    currentPriceCardData.staticData.exchange_code !==
+    newStaticData.exchange_code
   ) {
     hasSignificantChange = true;
   }
@@ -245,14 +244,12 @@ const handlePriceCardLiveQuoteUpdate: CardUpdateHandler<
 
   return {
     ...currentPriceCardData,
-    faceData: newFaceData,
-    backData: {
-      ...currentPriceCardData.backData,
-      marketCap: newBackData.marketCap,
-      sma50d: newBackData.sma50d,
-      sma200d: newBackData.sma200d,
+    liveData: newLiveData,
+    staticData: {
+      // Keep existing static data and only update exchange_code if it changed
+      ...currentPriceCardData.staticData,
+      exchange_code: newStaticData.exchange_code,
     },
-    exchange_code: leanQuotePayload.exchange ?? null,
   };
 };
 registerCardUpdateHandler(
@@ -263,15 +260,16 @@ registerCardUpdateHandler(
 
 const handlePriceCardProfileUpdate: CardUpdateHandler<
   PriceCardData,
-  ProfileDBRow
+  ProfileDBRow // Assuming ProfileDBRow contains company_name, image, exchange
 > = (currentPriceCardData, profilePayload): PriceCardData => {
   let needsUpdate = false;
 
   const newCompanyName =
     profilePayload.company_name ?? currentPriceCardData.companyName;
   const newLogoUrl = profilePayload.image ?? currentPriceCardData.logoUrl;
-  const newExchangeCode =
-    profilePayload.exchange ?? currentPriceCardData.exchange_code;
+  // Exchange code update from profile might be less frequent or contingent
+  // For now, let's assume live_quote_indicators is the primary source for exchange for PriceCard
+  // const newExchangeCode = profilePayload.exchange ?? currentPriceCardData.staticData.exchange_code;
 
   if (newCompanyName !== currentPriceCardData.companyName) {
     needsUpdate = true;
@@ -279,16 +277,19 @@ const handlePriceCardProfileUpdate: CardUpdateHandler<
   if (newLogoUrl !== currentPriceCardData.logoUrl) {
     needsUpdate = true;
   }
-  if (newExchangeCode !== currentPriceCardData.exchange_code) {
-    needsUpdate = true;
-  }
+  // if (newExchangeCode !== currentPriceCardData.staticData.exchange_code) {
+  //   needsUpdate = true;
+  // }
 
   if (needsUpdate) {
     return {
       ...currentPriceCardData,
       companyName: newCompanyName,
       logoUrl: newLogoUrl,
-      exchange_code: newExchangeCode,
+      // staticData: {
+      //   ...currentPriceCardData.staticData,
+      //   exchange_code: newExchangeCode,
+      // },
     };
   }
 

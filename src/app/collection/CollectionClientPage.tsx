@@ -23,7 +23,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
 import { format } from "date-fns";
-import type { PriceCardData } from "@/components/game/cards/price-card/price-card.types";
+import type {
+  PriceCardData,
+  // PriceCardStaticData, // Not directly used here
+  // PriceCardLiveData, // Not directly used here
+} from "@/components/game/cards/price-card/price-card.types";
 import type { ProfileCardData } from "@/components/game/cards/profile-card/profile-card.types";
 
 interface ClientCollectedCard extends ServerFetchedCollectedCard {
@@ -38,11 +42,10 @@ function adaptServerToDisplayable(
   serverCard: ServerFetchedCollectedCard,
   isFlipped: boolean
 ): DisplayableCard {
-  const snapshot = serverCard.card_snapshot_data;
+  const snapshot = serverCard.card_snapshot_data; // This is CardSnapshotFromDB, now with counts
   const capturedAtTimestamp = new Date(serverCard.captured_at).getTime();
 
   const commonData = {
-    id: snapshot.id,
     symbol: snapshot.symbol,
     createdAt: capturedAtTimestamp,
     isFlipped: isFlipped,
@@ -50,17 +53,29 @@ function adaptServerToDisplayable(
     rarityReason: snapshot.rarity_reason,
     companyName: snapshot.company_name,
     logoUrl: snapshot.logo_url,
+    likeCount: snapshot.like_count,
+    commentCount: snapshot.comment_count,
+    collectionCount: snapshot.collection_count,
+    // isLikedByCurrentUser and isSavedByCurrentUser are part of DisplayableCardState.
+    // They need to be fetched and populated here if they are to be accurate for the current user.
+    // For now, they will be undefined if not explicitly set.
+    // Example: isLikedByCurrentUser: checkUserLikeStatus(snapshot.id),
   };
 
   const concreteCardDataFromSnapshot = snapshot.card_data_snapshot;
+  const displayId = snapshot.id;
 
   switch (snapshot.card_type) {
     case "price": {
       const priceSpecificData = concreteCardDataFromSnapshot as PriceCardData;
       const card: DisplayableCard = {
         ...priceSpecificData,
-        ...commonData,
+        id: displayId,
+        ...commonData, // commonData includes counts, but not user-specific like/save status yet
         type: "price",
+        // Ensure DisplayableCardState properties are considered; they might be undefined if not in commonData
+        isLikedByCurrentUser: undefined, // Placeholder: fetch or determine actual status
+        isSavedByCurrentUser: undefined, // Placeholder: fetch or determine actual status
       };
       return card;
     }
@@ -69,8 +84,11 @@ function adaptServerToDisplayable(
         concreteCardDataFromSnapshot as ProfileCardData;
       const card: DisplayableCard = {
         ...profileSpecificData,
+        id: displayId,
         ...commonData,
         type: "profile",
+        isLikedByCurrentUser: undefined, // Placeholder
+        isSavedByCurrentUser: undefined, // Placeholder
       };
       return card;
     }
@@ -82,15 +100,16 @@ function adaptServerToDisplayable(
       );
       const fallbackCard = {
         ...(concreteCardDataFromSnapshot ?? {}),
+        id: displayId,
         ...commonData,
-        type: snapshot.card_type as CardType, // Assert CardType
-        backData: (
-          concreteCardDataFromSnapshot as { backData?: { description: string } }
-        )?.backData ?? {
+        type: snapshot.card_type as CardType,
+        backData: (concreteCardDataFromSnapshot as any)?.backData || {
           description: `Unknown Card Type: ${snapshot.card_type}`,
         },
+        isLikedByCurrentUser: undefined, // Placeholder
+        isSavedByCurrentUser: undefined, // Placeholder
       };
-      return fallbackCard as unknown as DisplayableCard; // Final assertion for safety
+      return fallbackCard as unknown as DisplayableCard;
     }
   }
 }
@@ -108,7 +127,7 @@ export default function CollectionClientPage({
   const handleToggleFlipCard = useCallback((displayableCardId: string) => {
     setCollectedCards((prev) =>
       prev.map((cc) =>
-        cc.snapshot_id === displayableCardId
+        cc.card_snapshot_data.id === displayableCardId
           ? { ...cc, isFlipped: !cc.isFlipped }
           : cc
       )
@@ -171,10 +190,23 @@ export default function CollectionClientPage({
   const collectedCardSocialInteractions = useCallback(():
     | BaseCardSocialInteractions
     | undefined => {
-    // Removed _unusedClientCard
     return {
       onLike: async () => {
-        toast({ title: "Liked from collection!" });
+        toast({
+          title: "Like action on collected card triggered (snapshot like TBD).",
+        });
+      },
+      onComment: async () => {
+        toast({
+          title:
+            "Comment action on collected card triggered (snapshot comments TBD).",
+        });
+      },
+      onShare: async () => {
+        toast({
+          title:
+            "Share action on collected card triggered (snapshot share TBD).",
+        });
       },
     };
   }, [toast]);
@@ -211,23 +243,29 @@ export default function CollectionClientPage({
               </div>
             );
           }
-
           return (
             <div
               key={clientCard.user_collection_id}
               className="flex flex-col items-center space-y-2">
               <GameCard
-                card={displayableCardForGameCard}
+                card={displayableCardForGameCard} // This object now contains all necessary states
                 onToggleFlip={() =>
                   handleToggleFlipCard(displayableCardForGameCard.id)
                 }
                 onDeleteCardRequest={() => {
                   /* Deletion handled by button below */
                 }}
-                socialInteractions={collectedCardSocialInteractions()} // Invoked without argument
-                onGenericInteraction={function (): void {
-                  throw new Error("Function not implemented.");
+                socialInteractions={collectedCardSocialInteractions()}
+                onGenericInteraction={() => {
+                  toast({
+                    title: "Interaction Disabled",
+                    description:
+                      "Card creation from collection items is not supported.",
+                  });
                 }}
+                isSaveDisabled={true}
+                // GameCard will derive likeCount, commentCount, collectionCount,
+                // isLikedByCurrentUser, and isSavedByCurrentUser from the `card` prop.
               />
               <div className="text-center w-full px-1">
                 <p className="text-xs text-muted-foreground">

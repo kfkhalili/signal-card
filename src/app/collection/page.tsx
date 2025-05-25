@@ -5,34 +5,46 @@ import { redirect } from "next/navigation";
 import CollectionClientPage from "./CollectionClientPage";
 import type { CardType } from "@/components/game/cards/base-card/base-card.types";
 import type { ConcreteCardData } from "@/components/game/types";
-import type { Json } from "@/lib/supabase/database.types"; // Import Json type
+import type { Json } from "@/lib/supabase/database.types";
+import type {
+  PriceCardData,
+  PriceCardStaticData,
+  PriceCardLiveData,
+} from "@/components/game/cards/price-card/price-card.types";
+import type { ProfileCardData } from "@/components/game/cards/profile-card/profile-card.types";
+import type { SupabaseClient } from "@supabase/supabase-js"; // Import SupabaseClient
 
 // Define the structure of a snapshot as fetched from the 'card_snapshots' table
 // This is the type we want for our application logic.
+// Updated to include social counts
 interface CardSnapshotFromDB {
   id: string;
   card_type: CardType;
   symbol: string;
   company_name?: string | null;
   logo_url?: string | null;
-  card_data_snapshot: ConcreteCardData; // Application expects this
+  card_data_snapshot: ConcreteCardData;
   rarity_level?: string | null;
   rarity_reason?: string | null;
   first_seen_at: string;
+  like_count: number; // Added
+  comment_count: number; // Added
+  collection_count: number; // Added
 }
 
 // This interface represents the raw shape from Supabase join,
 // where card_data_snapshot is still Json.
 interface RawSupabaseSnapshot {
   id: string;
-  card_type: string; // Comes as string from DB
+  card_type: string;
   symbol: string;
   company_name?: string | null;
   logo_url?: string | null;
-  card_data_snapshot: Json; // Comes as Json from DB
+  card_data_snapshot: Json;
   rarity_level?: string | null;
   rarity_reason?: string | null;
   first_seen_at: string;
+  // Counts will be added after fetching
 }
 
 export interface ServerFetchedCollectedCard {
@@ -40,8 +52,80 @@ export interface ServerFetchedCollectedCard {
   user_id: string;
   snapshot_id: string;
   captured_at: string;
-  user_notes: string | null; // Changed from user_notes?: string | null;
-  card_snapshot_data: CardSnapshotFromDB; // This will hold the correctly typed snapshot
+  user_notes: string | null;
+  card_snapshot_data: CardSnapshotFromDB; // This will hold the correctly typed snapshot with counts
+}
+
+// Helper to safely cast and structure the snapshot data
+function processCardDataSnapshot(
+  card_type: CardType,
+  snapshotJson: Json
+): ConcreteCardData {
+  const rawData = snapshotJson as any;
+
+  if (card_type === "price") {
+    return {
+      id: rawData.id,
+      type: "price",
+      symbol: rawData.symbol,
+      createdAt: rawData.createdAt,
+      companyName: rawData.companyName,
+      logoUrl: rawData.logoUrl,
+      staticData: rawData.staticData as PriceCardStaticData,
+      liveData: rawData.liveData as PriceCardLiveData,
+      backData: rawData.backData,
+    } as PriceCardData;
+  } else if (card_type === "profile") {
+    return rawData as ProfileCardData;
+  }
+  console.warn(`Unknown card type in processCardDataSnapshot: ${card_type}`);
+  return rawData as ConcreteCardData;
+}
+
+async function getSnapshotCounts(
+  supabase: SupabaseClient,
+  snapshotId: string
+): Promise<{
+  like_count: number;
+  comment_count: number;
+  collection_count: number;
+}> {
+  const [likes, comments, collections] = await Promise.all([
+    supabase
+      .from("snapshot_likes")
+      .select("id", { count: "exact", head: true })
+      .eq("snapshot_id", snapshotId),
+    supabase
+      .from("snapshot_comments")
+      .select("id", { count: "exact", head: true })
+      .eq("snapshot_id", snapshotId),
+    supabase
+      .from("user_collections")
+      .select("id", { count: "exact", head: true }) // This counts how many users collected this snapshot
+      .eq("snapshot_id", snapshotId),
+  ]);
+
+  if (likes.error)
+    console.warn(
+      `Error fetching like count for snapshot ${snapshotId}:`,
+      likes.error.message
+    );
+  if (comments.error)
+    console.warn(
+      `Error fetching comment count for snapshot ${snapshotId}:`,
+      comments.error.message
+    );
+  if (collections.error)
+    console.warn(
+      `Error fetching collection count for snapshot ${snapshotId}:`,
+      collections.error.message
+    );
+
+  return {
+    like_count: likes.count || 0,
+    comment_count: comments.count || 0,
+    collection_count: collections.count || 0,
+  };
 }
 
 export default async function CollectionPage() {
@@ -55,7 +139,6 @@ export default async function CollectionPage() {
     redirect("/auth?message=Please log in to view your collection.");
   }
 
-  // Fetch user collection entries and the associated card snapshot data.
   const { data: userCollectionEntries, error } = await supabase
     .from("user_collections")
     .select(
@@ -95,63 +178,73 @@ export default async function CollectionPage() {
     );
   }
 
-  const serverCollectedCards: ServerFetchedCollectedCard[] =
-    userCollectionEntries
-      ?.map((entry) => {
-        let rawSnapshotFromDB: RawSupabaseSnapshot | null = null;
+  const serverCollectedCardsPromises =
+    userCollectionEntries?.map(async (entry) => {
+      let rawSnapshotFromDB: RawSupabaseSnapshot | null = null;
 
-        if (Array.isArray(entry.card_snapshots)) {
-          if (entry.card_snapshots.length > 0) {
-            rawSnapshotFromDB = entry.card_snapshots[0] as RawSupabaseSnapshot;
-          }
-        } else if (entry.card_snapshots) {
-          rawSnapshotFromDB = entry.card_snapshots as RawSupabaseSnapshot;
+      if (Array.isArray(entry.card_snapshots)) {
+        if (entry.card_snapshots.length > 0) {
+          rawSnapshotFromDB = entry.card_snapshots[0] as RawSupabaseSnapshot;
         }
+      } else if (entry.card_snapshots) {
+        rawSnapshotFromDB = entry.card_snapshots as RawSupabaseSnapshot;
+      }
 
-        if (!rawSnapshotFromDB) {
-          console.warn(
-            `Collection entry ${entry.id} is missing its card snapshot data. Skipping.`
-          );
-          return null;
-        }
+      if (!rawSnapshotFromDB) {
+        console.warn(
+          `Collection entry ${entry.id} is missing its card snapshot data. Skipping.`
+        );
+        return null;
+      }
 
-        const appTypedSnapshot: CardSnapshotFromDB = {
-          id: rawSnapshotFromDB.id,
-          card_type: rawSnapshotFromDB.card_type as CardType,
-          symbol: rawSnapshotFromDB.symbol,
-          company_name: rawSnapshotFromDB.company_name,
-          logo_url: rawSnapshotFromDB.logo_url,
-          card_data_snapshot:
-            rawSnapshotFromDB.card_data_snapshot as unknown as ConcreteCardData,
-          rarity_level: rawSnapshotFromDB.rarity_level,
-          rarity_reason: rawSnapshotFromDB.rarity_reason,
-          first_seen_at: rawSnapshotFromDB.first_seen_at,
-        };
+      const cardTypeFromDB = rawSnapshotFromDB.card_type as CardType;
+      const concreteData = processCardDataSnapshot(
+        cardTypeFromDB,
+        rawSnapshotFromDB.card_data_snapshot
+      );
 
-        if (
-          appTypedSnapshot.card_type !==
-          appTypedSnapshot.card_data_snapshot.type
-        ) {
-          console.warn(
-            `Data inconsistency for snapshot ID ${appTypedSnapshot.id}: ` +
-              `Snapshot table card_type is "${appTypedSnapshot.card_type}", but ` +
-              `card_data_snapshot.type is "${appTypedSnapshot.card_data_snapshot.type}". ` +
-              `Using card_type from snapshot table ("${appTypedSnapshot.card_type}").`
-          );
-        }
+      // Fetch counts for this snapshot
+      const counts = await getSnapshotCounts(supabase, rawSnapshotFromDB.id);
 
-        return {
-          user_collection_id: entry.id,
-          user_id: entry.user_id,
-          snapshot_id: entry.snapshot_id,
-          captured_at: entry.captured_at,
-          user_notes: entry.user_notes, // This is string | null from DB
-          card_snapshot_data: appTypedSnapshot,
-        };
-      })
-      // The type predicate now correctly aligns.
-      .filter((card): card is ServerFetchedCollectedCard => card !== null) ||
-    [];
+      const appTypedSnapshot: CardSnapshotFromDB = {
+        id: rawSnapshotFromDB.id,
+        card_type: cardTypeFromDB,
+        symbol: rawSnapshotFromDB.symbol,
+        company_name: rawSnapshotFromDB.company_name,
+        logo_url: rawSnapshotFromDB.logo_url,
+        card_data_snapshot: concreteData,
+        rarity_level: rawSnapshotFromDB.rarity_level,
+        rarity_reason: rawSnapshotFromDB.rarity_reason,
+        first_seen_at: rawSnapshotFromDB.first_seen_at,
+        like_count: counts.like_count,
+        comment_count: counts.comment_count,
+        collection_count: counts.collection_count,
+      };
+
+      if (
+        appTypedSnapshot.card_type !== appTypedSnapshot.card_data_snapshot.type
+      ) {
+        console.warn(
+          `Data inconsistency for snapshot ID ${appTypedSnapshot.id}: ` +
+            `Snapshot table card_type is "${appTypedSnapshot.card_type}", but ` +
+            `card_data_snapshot.type is "${appTypedSnapshot.card_data_snapshot.type}". ` +
+            `Using card_type from snapshot table ("${appTypedSnapshot.card_type}").`
+        );
+      }
+
+      return {
+        user_collection_id: entry.id,
+        user_id: entry.user_id,
+        snapshot_id: entry.snapshot_id,
+        captured_at: entry.captured_at,
+        user_notes: entry.user_notes,
+        card_snapshot_data: appTypedSnapshot,
+      };
+    }) || [];
+
+  const serverCollectedCards = (
+    await Promise.all(serverCollectedCardsPromises)
+  ).filter((card): card is ServerFetchedCollectedCard => card !== null);
 
   return (
     <div className="container mx-auto p-4">

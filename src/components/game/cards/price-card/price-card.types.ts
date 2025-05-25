@@ -1,25 +1,23 @@
 // src/components/game/cards/price-card/price-card.types.ts
-import { BaseCardBackData, BaseCardData } from "../base-card/base-card.types";
+import type {
+  BaseCardData,
+  BaseCardBackData,
+  // CardActionContext, // Kept for specific interactions if any remain significant
+} from "../base-card/base-card.types";
 
-export interface PriceCardFaceData {
-  readonly timestamp: number | null;
-  readonly price: number | null;
-  readonly dayChange: number | null;
-  readonly changePercentage: number | null;
-  readonly dayHigh: number | null;
-  readonly dayLow: number | null;
-  readonly dayOpen: number | null;
-  readonly previousClose: number | null;
-  readonly volume: number | null;
-  readonly yearHigh?: number | null;
-  readonly yearLow?: number | null;
-}
-
+/**
+ * Defines the static, less frequently changing data specific to a price card.
+ * Example: exchange code for the symbol.
+ */
 export interface PriceCardStaticData {
-  readonly db_id: string;
-  readonly exchange_code: string | null;
+  readonly exchange_code?: string | null;
+  // Potentially other static identifiers or configurations related to the price feed.
 }
 
+/**
+ * Defines the live, frequently updated data for a PriceCard.
+ * This includes current price, changes, volume, and technical indicators.
+ */
 export interface PriceCardLiveData {
   readonly timestamp: number | null;
   readonly price: number | null;
@@ -32,27 +30,27 @@ export interface PriceCardLiveData {
   readonly volume: number | null;
   readonly yearHigh?: number | null;
   readonly yearLow?: number | null;
-  readonly marketCap: number | null;
-  readonly sma50d: number | null;
-  readonly sma200d: number | null;
+  readonly marketCap: number | null; // Previously in PriceCardSpecificBackData
+  readonly sma50d: number | null; // Previously in PriceCardSpecificBackData
+  readonly sma200d: number | null; // Previously in PriceCardSpecificBackData
 }
 
-export interface PriceCardSpecificBackData extends BaseCardBackData {
-  readonly marketCap: number | null;
-  readonly sma50d: number | null;
-  readonly sma200d: number | null;
-}
-
+/**
+ * Main interface for the complete PriceCard data structure.
+ * It extends BaseCardData and includes card-specific static and live data.
+ * The `backData` (for description) is inherited from BaseCardData.
+ */
 export interface PriceCardData extends BaseCardData {
   readonly type: "price";
-  //readonly staticData: PriceCardStaticData;
-  //liveData: PriceCardLiveData;
-  readonly faceData: PriceCardFaceData;
-  readonly backData: PriceCardSpecificBackData;
-  //readonly backData: BaseCardBackData;
-  readonly exchange_code?: string | null;
+  readonly staticData: PriceCardStaticData;
+  liveData: PriceCardLiveData; // Mutable for live updates
+  // backData: BaseCardBackData is inherited from BaseCardData
 }
 
+/**
+ * Defines specific interaction callbacks for a PriceCard.
+ * These are actions unique to the PriceCard that aren't covered by generic interactions.
+ */
 export interface PriceCardInteractions {
   readonly onPriceCardSmaClick?: (
     cardData: PriceCardData,

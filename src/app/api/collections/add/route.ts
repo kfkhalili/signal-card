@@ -17,9 +17,9 @@ export async function POST(request: NextRequest) {
 
   // First, check if the user is authenticated
   const {
-    data: { session },
+    data: { user },
     error: sessionError,
-  } = await supabase.auth.getSession();
+  } = await supabase.auth.getUser();
 
   if (sessionError) {
     console.error("Error getting session:", sessionError);
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!session || session.user.id !== user_id) {
+  if (!user || user.id !== user_id) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 

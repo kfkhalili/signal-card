@@ -2,10 +2,9 @@
 import type { DisplayableCard } from "./types";
 import type { PriceCardData } from "./cards/price-card/price-card.types";
 import type { ProfileCardData } from "./cards/profile-card/profile-card.types";
-// Import other card data types as they get rarity logic
 
 export interface RarityOutcome {
-  rarity: string; // e.g., "Common", "Rare", "Epic"
+  rarity: string;
   reason: string | null;
 }
 
@@ -18,38 +17,79 @@ export const RARITY_LEVELS = {
 } as const;
 
 function calculatePriceCardRarityLogic(cardData: PriceCardData): RarityOutcome {
-  const { faceData } = cardData;
-  if (!faceData || typeof faceData.price !== "number") {
-    // Check if faceData and price are valid
+  // Check 1: Ensure cardData is a valid object.
+  if (!cardData || typeof cardData !== "object" || cardData === null) {
+    return {
+      rarity: RARITY_LEVELS.COMMON,
+      reason: "Internal error: Invalid card data object.",
+    };
+  }
+
+  // Check 2: Ensure liveData property exists and is a non-null object.
+  if (
+    !("liveData" in cardData) ||
+    cardData.liveData === undefined ||
+    cardData.liveData === null ||
+    typeof cardData.liveData !== "object"
+  ) {
+    return {
+      rarity: RARITY_LEVELS.COMMON,
+      reason: "Internal error: Live data structure invalid.",
+    };
+  }
+
+  const currentLiveData = cardData.liveData;
+
+  // Check 3: Ensure price property exists in liveData and is a number.
+  if (
+    !("price" in currentLiveData) ||
+    typeof currentLiveData.price !== "number"
+  ) {
     return { rarity: RARITY_LEVELS.COMMON, reason: "Price data unavailable." };
   }
 
-  if (faceData.yearHigh && faceData.price >= faceData.yearHigh) {
+  if (
+    currentLiveData.yearHigh != null &&
+    typeof currentLiveData.yearHigh === "number" &&
+    currentLiveData.price >= currentLiveData.yearHigh
+  ) {
     return { rarity: RARITY_LEVELS.LEGENDARY, reason: "At 52-Week High!" };
   }
-  if (faceData.yearLow && faceData.price <= faceData.yearLow) {
+  if (
+    currentLiveData.yearLow != null &&
+    typeof currentLiveData.yearLow === "number" &&
+    currentLiveData.price <= currentLiveData.yearLow
+  ) {
     return { rarity: RARITY_LEVELS.EPIC, reason: "At 52-Week Low!" };
   }
-  if (faceData.changePercentage) {
-    if (faceData.changePercentage >= 10)
+
+  if (
+    currentLiveData.changePercentage != null &&
+    typeof currentLiveData.changePercentage === "number"
+  ) {
+    if (currentLiveData.changePercentage >= 10)
       return {
         rarity: RARITY_LEVELS.EPIC,
-        reason: `Strong Gain: +${faceData.changePercentage.toFixed(1)}%`,
+        reason: `Strong Gain: +${currentLiveData.changePercentage.toFixed(1)}%`,
       };
-    if (faceData.changePercentage <= -10)
+    if (currentLiveData.changePercentage <= -10)
       return {
         rarity: RARITY_LEVELS.EPIC,
-        reason: `Significant Drop: ${faceData.changePercentage.toFixed(1)}%`,
+        reason: `Significant Drop: ${currentLiveData.changePercentage.toFixed(
+          1
+        )}%`,
       };
-    if (faceData.changePercentage >= 5)
+    if (currentLiveData.changePercentage >= 5)
       return {
         rarity: RARITY_LEVELS.RARE,
-        reason: `Notable Gain: +${faceData.changePercentage.toFixed(1)}%`,
+        reason: `Notable Gain: +${currentLiveData.changePercentage.toFixed(
+          1
+        )}%`,
       };
-    if (faceData.changePercentage <= -5)
+    if (currentLiveData.changePercentage <= -5)
       return {
         rarity: RARITY_LEVELS.RARE,
-        reason: `Notable Drop: ${faceData.changePercentage.toFixed(1)}%`,
+        reason: `Notable Drop: ${currentLiveData.changePercentage.toFixed(1)}%`,
       };
   }
   return { rarity: RARITY_LEVELS.COMMON, reason: null };
@@ -58,10 +98,22 @@ function calculatePriceCardRarityLogic(cardData: PriceCardData): RarityOutcome {
 function calculateProfileCardRarityLogic(
   cardData: ProfileCardData
 ): RarityOutcome {
-  // Example: Profile card rarity might be based on age of info or specific keywords if available
-  // For now, let's make them common or uncommon based on a simple criterion
   if (
-    cardData.staticData?.description &&
+    !cardData ||
+    typeof cardData !== "object" ||
+    cardData === null ||
+    !("staticData" in cardData) ||
+    typeof cardData.staticData !== "object" ||
+    cardData.staticData === null
+  ) {
+    return {
+      rarity: RARITY_LEVELS.COMMON,
+      reason: "Internal error: Profile card data structure invalid.",
+    };
+  }
+
+  if (
+    cardData.staticData.description &&
     cardData.staticData.description.length > 500
   ) {
     return {
@@ -72,23 +124,51 @@ function calculateProfileCardRarityLogic(
   return { rarity: RARITY_LEVELS.COMMON, reason: null };
 }
 
-// Add functions for other card types here:
-// function calculateNewsCardRarityLogic(cardData: NewsCardData): RarityOutcome { ... }
-
 export function calculateDynamicCardRarity(
   card: DisplayableCard
 ): RarityOutcome {
-  // Use card.type to dispatch to the correct specific calculator
-  // The 'card' here is DisplayableCard, which includes ConcreteCardData properties
+  if (!card || typeof card.type !== "string") {
+    return { rarity: RARITY_LEVELS.COMMON, reason: "Invalid card data." };
+  }
+
   switch (card.type) {
     case "price":
-      // We need to ensure 'card' is treated as PriceCardData for the specific calculator
+      if (
+        !("liveData" in card) ||
+        typeof (card as PriceCardData).liveData !== "object" ||
+        (card as PriceCardData).liveData === null
+      ) {
+        return {
+          rarity: RARITY_LEVELS.COMMON,
+          reason:
+            "Internal error: Price card data malformed (liveData check failed).",
+        };
+      }
       return calculatePriceCardRarityLogic(card as PriceCardData);
     case "profile":
+      if (
+        !("staticData" in card) ||
+        typeof (card as ProfileCardData).staticData !== "object" ||
+        (card as ProfileCardData).staticData === null ||
+        !("liveData" in card) ||
+        typeof (card as ProfileCardData).liveData !== "object" ||
+        (card as ProfileCardData).liveData === null
+      ) {
+        return {
+          rarity: RARITY_LEVELS.COMMON,
+          reason:
+            "Internal error: Profile card data malformed (staticData/liveData check failed).",
+        };
+      }
       return calculateProfileCardRarityLogic(card as ProfileCardData);
-    // Add cases for other card types
     default:
-      // For unhandled types, or types that don't have dynamic rarity based on their data
+      // const unknownCard = card as unknown as { type?: unknown; id?: unknown };
+      // console.warn( // Example of how you might log, but keeping it clean for now
+      //   `[calculateDynamicCardRarity] Unknown card type: ${
+      //     unknownCard.type ?? "unknown type"
+      //   } for card ID: ${unknownCard.id ?? "unknown id"}. Full card:`,
+      //   JSON.stringify(card, null, 2)
+      // );
       return { rarity: RARITY_LEVELS.COMMON, reason: "Standard information." };
   }
 }

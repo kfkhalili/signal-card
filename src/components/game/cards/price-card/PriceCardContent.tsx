@@ -24,8 +24,8 @@ interface PriceCardContentProps {
   isBackFace: boolean;
   onGenericInteraction: OnGenericInteraction;
   sourceCardId: string;
-  sourceCardSymbol: string; // Should be the symbol of the current card
-  sourceCardType: BaseCardType; // Should be "price" for this component
+  sourceCardSymbol: string;
+  sourceCardType: BaseCardType;
 }
 
 export const PriceCardContent = React.memo<PriceCardContentProps>(
@@ -34,12 +34,11 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
     isBackFace,
     onGenericInteraction,
     sourceCardId,
-    sourceCardType, // This is "price"
+    sourceCardType,
   }) => {
-    const { faceData, backData } = cardData;
+    const { liveData, backData, staticData } = cardData; // Destructure new data structure
     const gridCellClass = "min-w-0";
 
-    // Helper to create ClickableDataItem props, ensuring symbol is from cardData
     const getClickableDataInteractionProps = (
       targetType: BaseCardType,
       ariaLabelContext: string
@@ -47,14 +46,13 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
       interactionTarget: "card" as const,
       targetType,
       sourceCardId,
-      sourceCardSymbol: cardData.symbol, // Explicitly use cardData.symbol for clarity
-      sourceCardType, // This will be "price"
+      sourceCardSymbol: cardData.symbol,
+      sourceCardType,
       onGenericInteraction,
       "aria-label": `Request ${targetType} card related to ${ariaLabelContext} for ${cardData.symbol}`,
       "data-interactive-child": true as const,
     });
 
-    // Helper to construct payload for direct onGenericInteraction calls
     const createInteractionPayload = (
       targetType: BaseCardType
     ): InteractionPayload => ({
@@ -83,55 +81,55 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
             <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-1 sm:gap-y-1.5">
               <div className={cn(gridCellClass)}>
                 <ClickableDataItem
-                  isInteractive={faceData.dayOpen != null}
+                  isInteractive={liveData.dayOpen != null}
                   baseClassName="transition-colors w-full"
                   data-testid="open-price-interactive-area"
                   {...getClickableDataInteractionProps(
                     "profile",
-                    `Open Price: ${faceData.dayOpen?.toFixed(2)}`
+                    `Open Price: ${liveData.dayOpen?.toFixed(2)}`
                   )}>
                   <span className="font-semibold block">Open</span>
-                  <span>${faceData.dayOpen?.toFixed(2) ?? "N/A"}</span>
+                  <span>${liveData.dayOpen?.toFixed(2) ?? "N/A"}</span>
                 </ClickableDataItem>
               </div>
               <div className={cn(gridCellClass, "py-0.5")}>
                 <span className="font-semibold block">Prev Close</span>
-                <span>${faceData.previousClose?.toFixed(2) ?? "N/A"}</span>
+                <span>${liveData.previousClose?.toFixed(2) ?? "N/A"}</span>
               </div>
               <div className={cn(gridCellClass, "py-0.5")}>
                 <span className="font-semibold block">Volume</span>
-                <span>{formatNumberWithAbbreviations(faceData.volume)}</span>
+                <span>{formatNumberWithAbbreviations(liveData.volume)}</span>
               </div>
               <div className={cn(gridCellClass, "py-0.5")}>
                 <span className="font-semibold block">Market Cap</span>
                 <span>
-                  ${formatNumberWithAbbreviations(backData.marketCap)}
+                  ${formatNumberWithAbbreviations(liveData.marketCap)}
                 </span>
               </div>
               <div className={cn(gridCellClass)}>
                 <ClickableDataItem
-                  isInteractive={backData.sma50d != null}
+                  isInteractive={liveData.sma50d != null}
                   baseClassName="transition-colors w-full"
                   data-testid="sma-50d-interactive-area"
                   {...getClickableDataInteractionProps(
-                    "price",
-                    `50D SMA: ${backData.sma50d?.toFixed(2)}`
+                    "price", // Or "profile" if preferred
+                    `50D SMA: ${liveData.sma50d?.toFixed(2)}`
                   )}>
                   <span className="font-semibold block">50D SMA</span>
-                  <span>${backData.sma50d?.toFixed(2) ?? "N/A"}</span>
+                  <span>${liveData.sma50d?.toFixed(2) ?? "N/A"}</span>
                 </ClickableDataItem>
               </div>
               <div className={cn(gridCellClass)}>
                 <ClickableDataItem
-                  isInteractive={backData.sma200d != null}
+                  isInteractive={liveData.sma200d != null}
                   baseClassName="transition-colors w-full"
                   data-testid="sma-200d-interactive-area"
                   {...getClickableDataInteractionProps(
-                    "price",
-                    `200D SMA: ${backData.sma200d?.toFixed(2)}`
+                    "price", // Or "profile"
+                    `200D SMA: ${liveData.sma200d?.toFixed(2)}`
                   )}>
                   <span className="font-semibold block">200D SMA</span>
-                  <span>${backData.sma200d?.toFixed(2) ?? "N/A"}</span>
+                  <span>${liveData.sma200d?.toFixed(2) ?? "N/A"}</span>
                 </ClickableDataItem>
               </div>
             </div>
@@ -140,11 +138,11 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
       );
     } else {
       // Front Face
-      const currentPrice = faceData.price;
-      const dayLow = faceData.dayLow;
-      const dayHigh = faceData.dayHigh;
-      const yearLow = faceData.yearLow;
-      const yearHigh = faceData.yearHigh;
+      const currentPrice = liveData.price;
+      const dayLow = liveData.dayLow;
+      const dayHigh = liveData.dayHigh;
+      const yearLow = liveData.yearLow;
+      const yearHigh = liveData.yearHigh;
 
       const PriceDisplayBlock = (
         <ClickableDataItem
@@ -153,7 +151,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
           data-testid="price-display-interactive-area"
           {...getClickableDataInteractionProps(
             "profile",
-            `Current Price: ${faceData.price?.toFixed(2)}`
+            `Current Price: ${liveData.price?.toFixed(2)}`
           )}>
           <p
             className={cn(
@@ -161,14 +159,14 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
               "group-hover/textgroup:text-primary"
             )}
             title="Current Price">
-            ${faceData.price != null ? faceData.price.toFixed(2) : "N/A"}
+            ${liveData.price != null ? liveData.price.toFixed(2) : "N/A"}
           </p>
           <div
             className={cn(
               "flex items-baseline space-x-1 sm:space-x-2",
-              faceData.dayChange === 0 || faceData.dayChange == null
+              liveData.dayChange === 0 || liveData.dayChange == null
                 ? "text-muted-foreground"
-                : faceData.dayChange > 0
+                : liveData.dayChange > 0
                 ? "text-green-600"
                 : "text-red-600",
               "group-hover/textgroup:text-primary"
@@ -176,20 +174,20 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
             <p
               className="text-base sm:text-lg font-semibold"
               title="Day Change">
-              {faceData.dayChange != null
+              {liveData.dayChange != null
                 ? `${
-                    faceData.dayChange >= 0 ? "+" : ""
-                  }${faceData.dayChange.toFixed(2)}`
+                    liveData.dayChange >= 0 ? "+" : ""
+                  }${liveData.dayChange.toFixed(2)}`
                 : "N/A"}
             </p>
             <p
               className="text-base sm:text-lg font-semibold"
               title="Percent Change">
               (
-              {faceData.changePercentage != null
+              {liveData.changePercentage != null
                 ? `${
-                    faceData.changePercentage >= 0 ? "+" : ""
-                  }${faceData.changePercentage.toFixed(2)}%`
+                    liveData.changePercentage >= 0 ? "+" : ""
+                  }${liveData.changePercentage.toFixed(2)}%`
                 : "N/A"}
               )
             </p>

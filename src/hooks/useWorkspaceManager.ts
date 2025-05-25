@@ -13,7 +13,7 @@ import type {
 } from "@/components/game/types";
 import type { AddCardFormValues } from "@/components/workspace/AddCardForm";
 import type { PriceCardData } from "@/components/game/cards/price-card/price-card.types";
-import type { OnGenericInteraction } from "@/components/game/cards/base-card/base-card.types"; // Added
+import type { OnGenericInteraction } from "@/components/game/cards/base-card/base-card.types";
 
 import { calculateDynamicCardRarity } from "@/components/game/rarityCalculator";
 import { rehydrateCardFromStorage } from "@/components/game/cardRehydration";
@@ -234,10 +234,28 @@ export function useWorkspaceManager({
             return updatedCards;
           });
 
+          // Corrected shell card check
           const isPriceCard = newCardToAdd.type === "price";
-          const isPriceCardShell =
-            isPriceCard &&
-            (newCardToAdd as PriceCardData).faceData.price === null;
+          let isPriceCardShell = false;
+          if (isPriceCard) {
+            const priceCardData = newCardToAdd as PriceCardData;
+            // A shell card is one where liveData.price is null
+            // It should still have a liveData object.
+            if (
+              priceCardData.liveData &&
+              priceCardData.liveData.price === null
+            ) {
+              isPriceCardShell = true;
+            } else if (!priceCardData.liveData) {
+              // This case indicates a malformed card if it's supposed to be a PriceCard
+              console.error(
+                "Price card is missing liveData object:",
+                priceCardData
+              );
+              isPriceCardShell = true; // Treat as shell or error state
+            }
+            // If liveData.price is a number, it's not a shell.
+          }
 
           if (!isPriceCardShell) {
             setTimeout(
@@ -249,6 +267,8 @@ export function useWorkspaceManager({
               0
             );
           }
+          // If it IS a shell card, the "Price Card Added (Shell)" toast
+          // would have been shown by the `initializePriceCard` function.
         }
       } catch (error: unknown) {
         const errorMessage =
@@ -270,7 +290,7 @@ export function useWorkspaceManager({
       toast,
       isPremiumUser,
       workspaceSymbolForRegularUser,
-      setActiveCards, // Added missing dependency
+      setActiveCards,
     ]
   );
 
@@ -286,8 +306,6 @@ export function useWorkspaceManager({
 
         await addCardToWorkspace(values, { requestingCardId: sourceCardId });
       }
-      // Future: else if (payload.interactionTarget === "modal") { /* handle modal logic */ }
-      // Future: else if (payload.interactionTarget === "filter") { /* handle filter logic */ }
     },
     [addCardToWorkspace]
   );
@@ -462,6 +480,6 @@ export function useWorkspaceManager({
     stockDataCallbacks,
     uniqueSymbolsInWorkspace,
     exchangeStatuses,
-    onGenericInteraction, // Expose the new handler
+    onGenericInteraction,
   };
 }

@@ -15,9 +15,9 @@ export async function POST(request: NextRequest) {
   const supabase = await createSupabaseServerClient();
 
   const {
-    data: { session },
+    data: { user },
     error: sessionError,
-  } = await supabase.auth.getSession();
+  } = await supabase.auth.getUser();
 
   if (sessionError) {
     console.error("Error getting session:", sessionError);
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!session) {
+  if (!user) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
 
   const { userId, cardData, cardType, symbol } = requestBody;
 
-  if (session.user.id !== userId) {
+  if (user.id !== userId) {
     return NextResponse.json({ message: "User ID mismatch" }, { status: 403 });
   }
 

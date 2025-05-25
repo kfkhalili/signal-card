@@ -18,6 +18,8 @@ import { CommentDialog } from "@/components/comments/CommentDialog";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
+import type { PriceCardData } from "./cards/price-card/price-card.types"; // Import PriceCardData
+import type { ProfileCardData } from "./cards/profile-card/profile-card.types"; // Import ProfileCardData
 
 export interface EnsureSnapshotRequestBody {
   cardType: APICardType;
@@ -89,29 +91,35 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
   const ensureGlobalSnapshot = useCallback(
     async (card: DisplayableCard): Promise<string | null> => {
       let actualCardDataSnapshot: ConcreteCardData;
+
+      // Construct the snapshot based on the card type and new structure
       if (card.type === "price") {
+        const priceCard = card as PriceCardData; // Cast to ensure correct properties
         actualCardDataSnapshot = {
-          id: card.id,
+          id: priceCard.id,
           type: "price",
-          symbol: card.symbol,
-          createdAt: card.createdAt,
-          companyName: card.companyName,
-          logoUrl: card.logoUrl,
-          faceData: card.faceData,
-          backData: card.backData,
+          symbol: priceCard.symbol,
+          createdAt: priceCard.createdAt,
+          companyName: priceCard.companyName,
+          logoUrl: priceCard.logoUrl,
+          staticData: priceCard.staticData, // Include staticData
+          liveData: priceCard.liveData, // Include liveData
+          backData: priceCard.backData, // Standard backData
+          // websiteUrl could be here if it's part of PriceCardData now
         };
       } else if (card.type === "profile") {
+        const profileCard = card as ProfileCardData; // Cast for clarity
         actualCardDataSnapshot = {
-          id: card.id,
+          id: profileCard.id,
           type: "profile",
-          symbol: card.symbol,
-          createdAt: card.createdAt,
-          companyName: card.companyName,
-          logoUrl: card.logoUrl,
-          staticData: card.staticData,
-          liveData: card.liveData,
-          backData: card.backData,
-          websiteUrl: card.websiteUrl,
+          symbol: profileCard.symbol,
+          createdAt: profileCard.createdAt,
+          companyName: profileCard.companyName,
+          logoUrl: profileCard.logoUrl,
+          staticData: profileCard.staticData,
+          liveData: profileCard.liveData,
+          backData: profileCard.backData,
+          websiteUrl: profileCard.websiteUrl,
         };
       } else {
         const unknownCardType = (card as DisplayableCard).type;
@@ -140,10 +148,10 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(requestBody),
         });
-        const result = (await response.json()) as SnapshotEnsureResponse; // Type assertion
+        const result = (await response.json()) as SnapshotEnsureResponse;
         if (!response.ok)
           throw new Error(
-            (result as { error?: string }).error || // Type assertion for error case
+            (result as { error?: string }).error ||
               `Failed to ensure snapshot (status ${response.status})`
           );
         return result.snapshot.id;
@@ -275,12 +283,12 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
         ? fetch("/api/snapshots/like", {
             method: "DELETE",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ snapshotId }),
+            body: JSON.stringify({ snapshotId }), // Ensure consistent payload
           })
         : fetch("/api/snapshots/like", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ snapshotId }),
+            body: JSON.stringify({ like: { snapshot_id: snapshotId } }), // Corrected payload for POST
           });
 
       try {
@@ -289,13 +297,15 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
         if (
           !response.ok &&
           !(
-            response.status === 200 &&
-            (result as LikeApiResponse).isAlreadyLiked
+            (
+              response.status === 200 &&
+              (result as LikeApiResponse).isAlreadyLiked
+            ) // For POST
           ) &&
-          response.status !== 404
+          response.status !== 404 // For DELETE if like not found
         ) {
           throw new Error(
-            (result as { error?: string }).error || // Type assertion
+            (result as { error?: string }).error ||
               `Like/Unlike failed (status ${response.status})`
           );
         }
@@ -313,6 +323,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
             prev.map((c) => (c.id === context.id ? { ...c, ...stats } : c))
           );
         } else {
+          // Fallback optimistic update if stats fetch fails
           setActiveCards((prev) =>
             prev.map((c) =>
               c.id === context.id
@@ -321,7 +332,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
                     isLikedByCurrentUser: !originalIsLiked,
                     currentUserLikeId: originalIsLiked
                       ? undefined
-                      : (result as LikeApiResponse).like?.id,
+                      : (result as LikeApiResponse).like?.id, // Only for POST
                     likeCount: originalIsLiked
                       ? Math.max(0, (c.likeCount || 1) - 1)
                       : (c.likeCount || 0) + 1,
@@ -427,7 +438,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
           const addResponse = await fetch("/api/collections/add", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ snapshot_id: snapshotId, user_id: user.id }), // Ensure user_id is sent
+            body: JSON.stringify({ snapshot_id: snapshotId, user_id: user.id }),
           });
           const addResult = await addResponse.json();
           if (
@@ -511,7 +522,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
       const cardForComment = activeCards[cardIndex];
       toast({
         title: "Loading Comments...",
-        description: `Workspaceing details for ${cardForComment.symbol}...`,
+        description: `Preparing details for ${cardForComment.symbol}...`,
       });
       const snapshotId = await ensureGlobalSnapshot(cardForComment);
       if (snapshotId) {

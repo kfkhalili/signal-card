@@ -1,5 +1,4 @@
 // src/app/api/snapshots/like/route.ts
-// We can add the DELETE handler to the existing like route file.
 import { Tables } from "@/lib/supabase/database.types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
@@ -8,6 +7,11 @@ export interface LikeApiResponse {
   like: Tables<"snapshot_likes">;
   message: string;
   isAlreadyLiked?: boolean;
+}
+
+// Interface for the expected body of a DELETE request for unliking
+interface UnlikeRequestBody {
+  snapshotId: string;
 }
 
 // POST handler (existing - for Liking)
@@ -25,7 +29,8 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   try {
-    const body: LikeApiResponse = await request.json();
+    // For POST, the body is expected to contain the 'like' object with snapshot_id
+    const body: { like: { snapshot_id: string } } = await request.json();
     const { snapshot_id: snapshotId } = body.like;
 
     if (!snapshotId) {
@@ -61,13 +66,12 @@ export async function POST(request: Request): Promise<NextResponse> {
         user_id: user.id,
         snapshot_id: snapshotId,
       })
-      .select("id, snapshot_id, user_id, liked_at") // Return the created like record
+      .select("id, snapshot_id, user_id, liked_at")
       .single();
 
     if (insertError) {
       if (insertError.code === "23505") {
-        // Fetch the existing like to return its ID
-        const { data: existingLike, error: fetchExistingError } = await supabase
+        const { data: existingLike } = await supabase
           .from("snapshot_likes")
           .select("id, snapshot_id, user_id, liked_at")
           .eq("user_id", user.id)
@@ -83,16 +87,13 @@ export async function POST(request: Request): Promise<NextResponse> {
             { status: 200 }
           );
         }
-        // If fetching existing like fails after unique violation, it's an issue
         console.error(
           "Error fetching existing like after unique violation:",
-          fetchExistingError
+          insertError // Log the original insert error which might have more context
         );
         return NextResponse.json(
           {
-            error: `Database error: ${
-              fetchExistingError?.message || insertError.message
-            }`,
+            error: `Database error: ${insertError.message}`,
           },
           { status: 500 }
         );
@@ -119,14 +120,16 @@ export async function POST(request: Request): Promise<NextResponse> {
         { status: 400 }
       );
     }
-    return NextResponse.json({
-      error: `Internal server error: ${errorMessage}`,
-      status: 500,
-    });
+    return NextResponse.json(
+      {
+        error: `Internal server error: ${errorMessage}`,
+      },
+      { status: 500 }
+    );
   }
 }
 
-// DELETE handler (New - for Unliking)
+// DELETE handler (Updated - for Unliking)
 export async function DELETE(request: Request): Promise<NextResponse> {
   const supabase = await createSupabaseServerClient();
   const {
@@ -141,11 +144,9 @@ export async function DELETE(request: Request): Promise<NextResponse> {
   }
 
   try {
-    // Assuming snapshotId comes in the request body for consistency with POST
-    // Alternatively, it could be a query parameter: const { searchParams } = new URL(request.url); const snapshotId = searchParams.get('snapshotId');
-    const body: LikeApiResponse = await request.json(); // Reusing the interface for simplicity
-    const { like } = body;
-    const snapshotId = like.snapshot_id;
+    // Expecting a body like { snapshotId: "..." }
+    const body: UnlikeRequestBody = await request.json();
+    const { snapshotId } = body; // Directly access snapshotId
 
     if (!snapshotId) {
       return NextResponse.json(
@@ -156,7 +157,7 @@ export async function DELETE(request: Request): Promise<NextResponse> {
 
     const { error: deleteError, count } = await supabase
       .from("snapshot_likes")
-      .delete({ count: "exact" }) // Get the count of deleted rows
+      .delete({ count: "exact" })
       .eq("user_id", user.id)
       .eq("snapshot_id", snapshotId);
 
@@ -169,11 +170,9 @@ export async function DELETE(request: Request): Promise<NextResponse> {
     }
 
     if (count === 0) {
-      // This means the user hadn't liked this snapshot, or it was already unliked.
-      // Not necessarily an error, could be a "not found to delete".
       return NextResponse.json(
         { message: "Like not found or already removed." },
-        { status: 404 } // Or 200 with a specific message
+        { status: 404 }
       );
     }
 
@@ -185,13 +184,7 @@ export async function DELETE(request: Request): Promise<NextResponse> {
     const errorMessage =
       error instanceof Error ? error.message : "An unknown error occurred";
     console.error("Error processing unlike snapshot request:", errorMessage);
-    if (
-      error instanceof SyntaxError &&
-      request.method === "DELETE" &&
-      !request.headers.get("content-type")?.includes("application/json")
-    ) {
-      // DELETE with no body is fine, but if body is expected and not JSON, it's an issue.
-      // For now, we assume body is sent for DELETE for snapshotId.
+    if (error instanceof SyntaxError) {
       return NextResponse.json(
         { error: "Invalid JSON in request body for DELETE, or body missing." },
         { status: 400 }

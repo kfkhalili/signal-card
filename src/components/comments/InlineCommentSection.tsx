@@ -1,5 +1,4 @@
 // src/components/comments/InlineCommentSection.tsx
-// NEW FILE
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
@@ -27,7 +26,7 @@ type CommentFormValues = z.infer<typeof commentFormSchema>;
 
 interface InlineCommentSectionProps {
   snapshotId: string;
-  onCommentPosted?: () => void; // New optional callback
+  onCommentPosted?: () => void;
 }
 
 export const InlineCommentSection: React.FC<InlineCommentSectionProps> = ({
@@ -81,7 +80,6 @@ export const InlineCommentSection: React.FC<InlineCommentSectionProps> = ({
 
   useEffect(() => {
     if (comments.length > 0) {
-      // Timeout to allow DOM to update if a comment was just added
       setTimeout(scrollToBottom, 100);
     }
   }, [comments, scrollToBottom]);
@@ -101,8 +99,8 @@ export const InlineCommentSection: React.FC<InlineCommentSectionProps> = ({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          snapshotId: snapshotId,
-          commentText: values.commentText.trim(),
+          snapshot_id: snapshotId, // Changed to snake_case
+          comment_text: values.commentText.trim(), // Changed to snake_case
         }),
       });
       if (!response.ok) {
@@ -113,7 +111,7 @@ export const InlineCommentSection: React.FC<InlineCommentSectionProps> = ({
       setComments((prevComments) => [...prevComments, newComment]);
       form.reset();
       toast({ title: "Comment Posted!", variant: "default" });
-      onCommentPosted?.(); // Call the callback
+      onCommentPosted?.();
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "unknown error occurred";
@@ -139,14 +137,10 @@ export const InlineCommentSection: React.FC<InlineCommentSectionProps> = ({
 
   return (
     <div className="border rounded-lg p-4 bg-card h-full flex flex-col max-h-[500px] md:max-h-full">
-      {" "}
-      {/* Max height for scrollability */}
       <h3 className="text-lg font-semibold mb-3 text-card-foreground">
         Comments
       </h3>
       <ScrollArea className="flex-grow pr-3 mb-4">
-        {" "}
-        {/* ScrollArea for comments list */}
         {isLoadingComments ? (
           <div className="space-y-3">
             {[...Array(2)].map((_, i) => (
@@ -250,7 +244,7 @@ export const InlineCommentSection: React.FC<InlineCommentSectionProps> = ({
             href="/auth"
             className="underline text-primary hover:text-primary/80">
             log in
-          </a>{" "}
+          </a>
           to post comments.
         </p>
       )}

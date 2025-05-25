@@ -6,12 +6,14 @@ import {
 } from "@/components/game/cardRehydration";
 import type {
   PriceCardData,
-  PriceCardFaceData,
-  PriceCardSpecificBackData,
+  PriceCardLiveData,
+  PriceCardStaticData,
 } from "./price-card.types";
+import type { BaseCardBackData } from "../base-card/base-card.types";
 import { parseTimestampSafe } from "@/lib/formatters";
 
-interface StoredPriceCardFaceDataShape {
+// Expected shape of the 'liveData' object in storage
+interface StoredPriceCardLiveDataShape {
   timestamp?: string | number | null;
   price?: number | null;
   dayChange?: number | null;
@@ -23,49 +25,70 @@ interface StoredPriceCardFaceDataShape {
   volume?: number | null;
   yearHigh?: number | null;
   yearLow?: number | null;
-}
-
-interface StoredPriceCardBackDataShape {
-  description?: string | null; // Source can be string or null
   marketCap?: number | null;
   sma50d?: number | null;
   sma200d?: number | null;
 }
 
+// Expected shape of the 'staticData' object in storage
+interface StoredPriceCardStaticDataShape {
+  exchange_code?: string | null;
+}
+
+// Expected shape of the 'backData' object (for description)
+interface StoredBaseCardBackDataShape {
+  description?: string | null;
+}
+
+// Overall expected shape for a stored PriceCard
 interface StoredPriceCardObject {
-  faceData?: StoredPriceCardFaceDataShape;
-  backData?: StoredPriceCardBackDataShape;
+  staticData?: StoredPriceCardStaticDataShape;
+  liveData?: StoredPriceCardLiveDataShape;
+  backData?: StoredBaseCardBackDataShape; // For the description
+  // Old direct fields that might exist in older stored cards (for graceful migration if needed)
+  faceData?: StoredPriceCardLiveDataShape; // Old name for liveData parts
+  exchange_code?: string | null; // Old location for exchange_code
 }
 
 const rehydrateLivePriceCard: SpecificCardRehydrator = (
-  cardFromStorage: StoredPriceCardObject,
+  cardFromStorage: Record<string, unknown>, // Raw object from storage
   commonProps: CommonCardPropsForRehydration
 ): PriceCardData | null => {
-  const originalFaceData = cardFromStorage.faceData || {};
-  const timestamp = parseTimestampSafe(originalFaceData.timestamp);
+  const stored = cardFromStorage as StoredPriceCardObject;
 
-  const rehydratedFaceData: PriceCardFaceData = {
+  // Prioritize new liveData structure, fallback to old faceData for migration
+  const liveDataSource = stored.liveData || stored.faceData || {};
+  const staticDataSource = stored.staticData || {};
+  const backDataSource = stored.backData || {};
+
+  const timestamp = parseTimestampSafe(liveDataSource.timestamp);
+
+  const rehydratedLiveData: PriceCardLiveData = {
     timestamp: timestamp,
-    price: originalFaceData.price ?? null,
-    dayChange: originalFaceData.dayChange ?? null,
-    changePercentage: originalFaceData.changePercentage ?? null,
-    dayHigh: originalFaceData.dayHigh ?? null,
-    dayLow: originalFaceData.dayLow ?? null,
-    dayOpen: originalFaceData.dayOpen ?? null,
-    previousClose: originalFaceData.previousClose ?? null,
-    volume: originalFaceData.volume ?? null,
-    yearHigh: originalFaceData.yearHigh ?? null,
-    yearLow: originalFaceData.yearLow ?? null,
+    price: liveDataSource.price ?? null,
+    dayChange: liveDataSource.dayChange ?? null,
+    changePercentage: liveDataSource.changePercentage ?? null,
+    dayHigh: liveDataSource.dayHigh ?? null,
+    dayLow: liveDataSource.dayLow ?? null,
+    dayOpen: liveDataSource.dayOpen ?? null,
+    previousClose: liveDataSource.previousClose ?? null,
+    volume: liveDataSource.volume ?? null,
+    yearHigh: liveDataSource.yearHigh ?? null,
+    yearLow: liveDataSource.yearLow ?? null,
+    marketCap: liveDataSource.marketCap ?? null,
+    sma50d: liveDataSource.sma50d ?? null,
+    sma200d: liveDataSource.sma200d ?? null,
   };
 
-  const originalBackData = cardFromStorage.backData || {};
-  const rehydratedBackData: PriceCardSpecificBackData = {
-    // If originalBackData.description is null, undefined, or "", it becomes undefined.
-    // Otherwise, it's the string value. This fits 'string | undefined'.
-    description: originalBackData.description || undefined,
-    marketCap: originalBackData.marketCap ?? null,
-    sma50d: originalBackData.sma50d ?? null,
-    sma200d: originalBackData.sma200d ?? null,
+  const rehydratedStaticData: PriceCardStaticData = {
+    exchange_code:
+      staticDataSource.exchange_code ?? stored.exchange_code ?? null, // Fallback for older stored data
+  };
+
+  const rehydratedBackData: BaseCardBackData = {
+    description:
+      backDataSource.description ||
+      `Market price information for ${commonProps.symbol}. Includes daily and historical price points, volume, and key moving averages.`, // Default description
   };
 
   return {
@@ -75,8 +98,10 @@ const rehydrateLivePriceCard: SpecificCardRehydrator = (
     createdAt: commonProps.createdAt,
     companyName: commonProps.companyName,
     logoUrl: commonProps.logoUrl,
-    faceData: rehydratedFaceData,
+    staticData: rehydratedStaticData,
+    liveData: rehydratedLiveData,
     backData: rehydratedBackData,
+    // websiteUrl: commonProps.websiteUrl, // If applicable from commonProps
   };
 };
 
