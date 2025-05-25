@@ -1,11 +1,5 @@
 # **App Name**: MarketEcho
 
-## Core Features:
-
-- Data Pipeline: Fetches AAPL price data every 5 minutes from Financial Modeling Prep and broadcasts it via Supabase Realtime.
-- Price Card Display: Displays 'Price Cards' with fading timers, allowing users to secure them by clicking. Secured cards stop fading.
-- Card Interaction and Combination: Enables users to examine secured 'Price Cards' and generate 'Trend Cards' based on price trends. Also enables the user to combine 2 Price Cards to generate a 'Price Change Signal Card'.
-
 ## Style Guidelines:
 
 - Primary color: White or light gray for the background to ensure readability.
