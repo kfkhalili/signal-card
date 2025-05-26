@@ -1,8 +1,5 @@
 // supabase/functions/fetch-all-exchange-market-status/index.ts
-import {
-  createClient,
-  SupabaseClient,
-} from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 // Standard CORS headers
 const CORS_HEADERS = {
