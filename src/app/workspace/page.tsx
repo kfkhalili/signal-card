@@ -1,7 +1,9 @@
+// src/app/workspace/page.tsx
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useRouter } from "next/navigation"; // Import useRouter
 
 import { AddCardForm } from "@/components/workspace/AddCardForm";
 import { StockDataHandler } from "@/components/workspace/StockDataHandler";
@@ -34,11 +36,20 @@ type MarketStatus = Record<
 
 export default function WorkspacePage() {
   const { user, isLoading: isAuthLoading } = useAuth();
+  const router = useRouter(); // Initialize router
 
   const [hasMounted, setHasMounted] = useState<boolean>(false);
   useEffect(() => {
     setHasMounted(true);
   }, []);
+
+  // Effect to handle redirection when user logs out
+  useEffect(() => {
+    // Ensure this runs only after initial mount and auth state is resolved
+    if (hasMounted && !isAuthLoading && !user) {
+      router.push("/");
+    }
+  }, [user, isAuthLoading, router, hasMounted]);
 
   const isPremiumUser =
     hasMounted && !isAuthLoading
@@ -76,6 +87,7 @@ export default function WorkspacePage() {
     setIsClearConfirmOpen(false);
   };
 
+  // Initial loading state for the page or auth
   if (!hasMounted || isAuthLoading) {
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
@@ -87,6 +99,20 @@ export default function WorkspacePage() {
     );
   }
 
+  // If auth is resolved, user is null (logged out), and page has mounted,
+  // show a redirecting message. The useEffect above will handle the redirect.
+  if (hasMounted && !isAuthLoading && !user) {
+    return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-4 text-lg text-muted-foreground">
+          Redirecting to homepage...
+        </p>
+      </div>
+    );
+  }
+
+  // If user is present, render the workspace content
   return (
     <div className="space-y-6 pb-10">
       <div className="px-2 sm:px-4 pt-4 flex flex-col sm:flex-row justify-between items-center gap-3">
