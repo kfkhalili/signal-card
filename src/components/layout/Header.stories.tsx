@@ -2,7 +2,7 @@
 import React from "react";
 import type { Meta, StoryObj } from "@storybook/react";
 import { action } from "@storybook/addon-actions";
-import HeaderComponent from "./HeaderComponent";
+import Header from "./Header";
 import { AuthContext, type AuthContextType } from "@/contexts/AuthContext"; // Correctly import context and its type
 import type {
   Session,
@@ -65,9 +65,9 @@ const defaultAuthContextMock: AuthContextType = {
   },
 };
 
-const meta: Meta<typeof HeaderComponent> = {
-  title: "Layout/HeaderComponent",
-  component: HeaderComponent,
+const meta: Meta<typeof Header> = {
+  title: "Layout/Header",
+  component: Header,
   tags: ["autodocs"],
   parameters: {
     // nextjs: { // If using storybook-nextjs-router for Next.js Link components
@@ -87,7 +87,7 @@ interface HeaderStoryCustomArgs {
 // Define the Story type, making Storybook aware of our custom args structure.
 // This combines the inferred props of HeaderComponent (none in this case) with our custom args.
 type Story = StoryObj<
-  React.ComponentProps<typeof HeaderComponent> & HeaderStoryCustomArgs
+  React.ComponentProps<typeof Header> & HeaderStoryCustomArgs
 >;
 
 // Template story that provides the AuthContext
@@ -99,7 +99,7 @@ const Template: Story = {
 
     return (
       <AuthContext.Provider value={authContextValueToProvide}>
-        <HeaderComponent />
+        <Header />
       </AuthContext.Provider>
     );
   },

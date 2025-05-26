@@ -30,7 +30,7 @@ const NavLinkItem: React.FC<{
   </>
 );
 
-const HeaderComponent: React.FC = () => {
+const Header: React.FC = () => {
   const { user, signOut, isLoading } = useAuth();
 
   return (
@@ -90,4 +90,4 @@ const HeaderComponent: React.FC = () => {
   );
 };
 
-export default React.memo(HeaderComponent);
+export default React.memo(Header);

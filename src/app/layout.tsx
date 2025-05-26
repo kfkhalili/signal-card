@@ -4,7 +4,7 @@ import { geistSansLocal, geistMonoLocal } from "./fonts"; // Adjust path if your
 
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
-import HeaderComponent from "@/components/layout/HeaderComponent";
+import Header from "@/components/layout/Header";
 import { cn } from "../lib/utils";
 import { AuthProvider } from "@/contexts/AuthContext";
 
@@ -31,7 +31,7 @@ const RootLayout: React.FC<RootLayoutProps> = ({ children }) => {
         )}>
         <AuthProvider>
           <div className="flex flex-col min-h-screen">
-            <HeaderComponent />
+            <Header />
             <main className="flex-grow container mx-auto px-4 py-8">
               {children}
             </main>
