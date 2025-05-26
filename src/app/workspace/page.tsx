@@ -116,7 +116,6 @@ export default function WorkspacePage() {
   return (
     <div className="space-y-6 pb-10">
       <div className="px-2 sm:px-4 pt-4 flex flex-col sm:flex-row justify-between items-center gap-3">
-        <h1 className="text-xl sm:text-2xl font-semibold">My Workspace</h1>
         <div className="flex gap-2 items-center" style={{ minHeight: "32px" }}>
           {activeCards.length > 0 && (
             <Button
