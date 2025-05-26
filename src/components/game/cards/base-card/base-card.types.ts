@@ -26,39 +26,6 @@ export interface CardActionContext {
   readonly websiteUrl?: string | null;
 }
 
-export interface BaseCardSocialInteractions {
-  readonly onLike?: (context: CardActionContext) => void;
-  readonly onComment?: (context: CardActionContext) => void;
-  readonly onSave?: (context: CardActionContext) => void;
-  readonly onShare?: (context: CardActionContext) => void;
-}
-
-export interface DataPoint<TDetails = unknown> {
-  readonly elementType: string;
-  readonly value?: unknown; // Changed from any
-  readonly details?: TDetails;
-}
-
-export interface CardInteractionEvent<
-  TCardData extends BaseCardData = BaseCardData,
-  TDetails = unknown
-> {
-  readonly cardData: TCardData;
-  readonly clickedDataPoint: DataPoint<TDetails>;
-  readonly originalUIEvent?:
-    | React.MouseEvent<HTMLElement>
-    | React.KeyboardEvent<HTMLElement>;
-}
-
-export type OnCardInteraction<
-  TCardData extends BaseCardData = BaseCardData,
-  TDetails = unknown
-> = (event: CardInteractionEvent<TCardData, TDetails>) => void;
-
-export type BaseCardContainerDataPointDetails = {
-  readonly kind: "symbol" | "type" | "description";
-};
-
 export interface InteractionPayload {
   sourceCardId: string;
   sourceCardSymbol: string;

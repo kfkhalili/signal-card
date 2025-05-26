@@ -82,16 +82,8 @@ export const ClickableDataItem: React.FC<ClickableDataItemProps> = ({
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if ((event.key === "Enter" || event.key === " ") && isInteractive) {
-      event.preventDefault(); // Prevent default spacebar scroll for button-like divs
-      handleInteraction(event);
-    } else if (
-      onClickHandler &&
-      (event.key === "Enter" || event.key === " ") &&
-      isInteractive
-    ) {
-      onClickHandler(event);
-    }
+    event.preventDefault(); // Prevent default spacebar scroll for button-like divs
+    handleInteraction(event);
   };
 
   const finalInteractiveClasses =

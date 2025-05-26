@@ -5,7 +5,6 @@ import React from "react";
 import GameCard from "@/components/game/GameCard";
 import type { DisplayableCard } from "./types";
 import type {
-  BaseCardSocialInteractions,
   CardActionContext,
   OnGenericInteraction,
 } from "./cards/base-card/base-card.types";
@@ -25,12 +24,10 @@ interface ActiveCardsProps {
   cards: DisplayableCard[];
   onToggleFlipCard: (id: string) => void;
   onDeleteCardRequest: (id: string) => void;
-  socialInteractions?: BaseCardSocialInteractions;
   onHeaderIdentityClick?: (context: CardActionContext) => void;
   cardIdToConfirmDelete: string | null;
   onConfirmDeletion: () => void;
   onCancelDeletion: () => void;
-  isSaveDisabled?: boolean; // New prop
   onGenericInteraction: OnGenericInteraction;
 }
 
@@ -38,12 +35,10 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
   cards,
   onToggleFlipCard,
   onDeleteCardRequest,
-  socialInteractions,
   onHeaderIdentityClick,
   cardIdToConfirmDelete,
   onConfirmDeletion,
   onCancelDeletion,
-  isSaveDisabled,
   onGenericInteraction,
 }) => {
   const [hasMounted, setHasMounted] = React.useState(false);
@@ -77,14 +72,8 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
                 card={card}
                 onToggleFlip={onToggleFlipCard}
                 onDeleteCardRequest={onDeleteCardRequest}
-                socialInteractions={
-                  isSaveDisabled && socialInteractions
-                    ? { ...socialInteractions, onSave: undefined }
-                    : socialInteractions
-                }
                 onHeaderIdentityClick={onHeaderIdentityClick}
                 onGenericInteraction={onGenericInteraction}
-                isSaveDisabled={isSaveDisabled} // Pass down to GameCard
               />
             </div>
           ))}

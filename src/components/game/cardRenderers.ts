@@ -4,51 +4,25 @@ import type {
   CardType,
   OnGenericInteraction,
 } from "@/components/game/cards/base-card/base-card.types";
-import type {
-  CardActionContext,
-  BaseCardSocialInteractions,
-} from "@/components/game/cards/base-card/base-card.types";
-import type {
-  PriceCardData,
-  PriceCardInteractions,
-} from "./cards/price-card/price-card.types";
+import type { CardActionContext } from "@/components/game/cards/base-card/base-card.types";
+import type { PriceCardInteractions } from "./cards/price-card/price-card.types";
 import type { ProfileCardInteractions } from "./cards/profile-card/profile-card.types";
 import type { DisplayableCard } from "./types";
 
-export interface CommonCardRendererProps {
+interface CommonCardRendererProps {
   isFlipped: boolean;
   onFlip: () => void;
   cardContext: CardActionContext;
-  currentRarity?: string | null;
-  rarityReason?: string | null;
-  socialInteractions?: BaseCardSocialInteractions;
   onDeleteRequest: (context: CardActionContext) => void;
   onHeaderIdentityClick?: (context: CardActionContext) => void;
   className?: string;
   innerCardClassName?: string;
   children?: React.ReactNode;
-  isLikedByCurrentUser?: boolean;
-  isSavedByCurrentUser?: boolean;
-  likeCount?: number;
-  commentCount?: number;
-  collectionCount?: number;
-  isSaveDisabled?: boolean;
   onGenericInteraction: OnGenericInteraction;
   sourceCardId: string;
   sourceCardSymbol: string;
   sourceCardType: CardType;
 }
-
-export type PriceCardRendererProps = CommonCardRendererProps & {
-  cardData: PriceCardData;
-  priceSpecificInteractions?: Pick<
-    PriceCardInteractions,
-    | "onPriceCardSmaClick"
-    | "onPriceCardRangeContextClick"
-    | "onPriceCardOpenPriceClick"
-    | "onPriceCardGenerateDailyPerformanceSignal"
-  >;
-};
 
 export type RegisteredCardRendererProps = CommonCardRendererProps & {
   cardData: DisplayableCard;
@@ -56,8 +30,7 @@ export type RegisteredCardRendererProps = CommonCardRendererProps & {
   specificInteractions?: ProfileCardInteractions;
 };
 
-export type RegisteredCardRenderer =
-  React.ComponentType<RegisteredCardRendererProps>;
+type RegisteredCardRenderer = React.ComponentType<RegisteredCardRendererProps>;
 
 const cardRendererRegistry = new Map<CardType, RegisteredCardRenderer>();
 

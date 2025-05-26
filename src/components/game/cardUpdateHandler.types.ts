@@ -58,7 +58,7 @@ export function registerCardUpdateHandler<
   if (!cardUpdateHandlerRegistry.has(cardType)) {
     cardUpdateHandlerRegistry.set(cardType, new Map());
   }
-  const eventMap = cardUpdateHandlerRegistry.get(cardType)!;
+  const eventMap = cardUpdateHandlerRegistry.get(cardType);
   // The 'handler' has a specific TCardData (e.g., PriceCardData).
   // StoredCardUpdateHandler expects ConcreteCardData as its first parameter.
   // Due to contravariance of function parameter types, a direct cast from
@@ -67,7 +67,7 @@ export function registerCardUpdateHandler<
   // The 'as unknown as StoredCardUpdateHandler' cast bypasses this check.
   // We assert this is safe because getCardUpdateHandler is expected to be used
   // in a context where the specific TCardData is known (e.g., via cardType).
-  eventMap.set(eventType, handler as unknown as StoredCardUpdateHandler);
+  eventMap?.set(eventType, handler as unknown as StoredCardUpdateHandler);
 }
 
 export function getCardUpdateHandler(

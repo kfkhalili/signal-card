@@ -5,13 +5,7 @@ import React from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import {
-  LogOut,
-  LayoutDashboard, // For Workspace
-  Library, // For Collection
-  History, // New Icon for History
-  Loader2,
-} from "lucide-react";
+import { LogOut, LayoutDashboard, Loader2 } from "lucide-react";
 
 const NavLinkItem: React.FC<{
   href: string;
@@ -62,18 +56,6 @@ const HeaderComponent: React.FC = () => {
                 title="Workspace"
                 icon={LayoutDashboard}
                 text="Workspace"
-              />
-              <NavLinkItem
-                href="/collection"
-                title="My Collection"
-                icon={Library}
-                text="Collection"
-              />
-              <NavLinkItem
-                href="/history"
-                title="Signal History"
-                icon={History}
-                text="History"
               />
 
               {user.email && (

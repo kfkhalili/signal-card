@@ -1,10 +1,10 @@
 import React from "react";
 import type { DerivedMarketStatus } from "@/hooks/useStockData";
 
-type MarketStatusInfo = {
+interface MarketStatusInfo {
   status: DerivedMarketStatus;
   message: string | null;
-};
+}
 
 type MarketStatus = Record<string, MarketStatusInfo>;
 

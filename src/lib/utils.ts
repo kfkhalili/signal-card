@@ -33,7 +33,7 @@ export function getFlagEmoji(countryCode: string | null | undefined): string {
  */
 export function getCountryName(
   countryCode: string | null | undefined,
-  locale: string = "en"
+  locale = "en"
 ): string {
   if (!countryCode || countryCode.length !== 2) {
     return countryCode || "N/A"; // Return original code or N/A if invalid

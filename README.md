@@ -14,21 +14,18 @@ FinCard Explorer addresses these challenges by offering:
 
 - **Modular Card System:** Users build personalized dashboards by adding various Financial Cards to a dynamic workspace. Each card displays self-contained, live-updated information.
 - **Deep Interactivity:** Metrics within cards (e.g., current price, 52-week high/low, SMA 50) are clickable, instantly generating new, related cards in the workspace, allowing for intuitive drill-down and discovery.
-- **Gamified Learning & Engagement:** Each live card state possesses a "rarity" (Common to Legendary), subtly guiding users, especially beginners, to understand the significance or unusual nature of current data points.
-- **Social & Community Features:** Users can like, comment on, and share specific card states (snapshots). They can also save these snapshots to personal "Collections," creating a historical record of their analysis or interesting market moments, which can be explored by other users.
 - **Sleek, User-Centric Design:** The interface is designed to be minimalist, visualization-rich, and gamified, leveraging modern UI components for an engaging financial exploration experience.
 
 ## 4. Target Audience
 
 FinCard Explorer caters to two primary user groups:
 
-- **Beginner Investors:** Individuals seeking to learn about investing and understand market data without being overwhelmed. They benefit from the simplified card format, rarity indicators, and community insights.
+- **Beginner Investors:** Individuals seeking to learn about investing and understand market data without being overwhelmed. They benefit from the simplified card format and community insights.
 - **Professionals & Experienced Investors:** Users who require powerful tools for in-depth financial metric exploration, company comparisons, and the creation of sophisticated, shareable dashboards and "Collections."
 
 ## 5. Unique Selling Proposition (USP)
 
 - **Novel Exploration Method:** An intuitive and engaging way to navigate complex financial data through interactive, self-contained cards.
-- **Integrated Social & Gamification:** Rarity indicators and social features provide context, encourage learning, and build community.
 - **Personalized & Dynamic Dashboards:** Users tailor their workspace to their specific interests with live data updates.
 - **Dual Audience Appeal:** Simplifies complexity for beginners while offering depth and customization for professionals.
 
@@ -37,7 +34,6 @@ FinCard Explorer caters to two primary user groups:
 FinCard Explorer will operate on a freemium model with revenue generated through:
 
 - **Premium Subscriptions:** Features like multiple workspaces, public dashboard publishing, custom entry cards, and potentially advanced analytics.
-- **E-commerce:** Selling physical, high-quality printed versions of users' saved card "snapshots."
 
 ## 7. Technical Architecture & Development Status
 
@@ -115,7 +111,6 @@ The frontend, built with Next.js and the App Router, emphasizes a modular and co
 - **State Management:**
   - Client-side state is managed using a combination of React hooks (`useState`, `useCallback`), custom hooks like `useWorkspaceManager` for the main interactive card area, and `AuthContext` for global authentication state.
   - `useLocalStorage` hook is employed for persisting workspace card configurations.
-- **API Routes (Next.js Route Handlers):** Located in `src/app/api/`, these handle backend operations like managing user collections, card snapshot creation/management, and handling likes/comments.
 
 #### Frontend Card System Overview
 
@@ -180,10 +175,6 @@ graph TD
   - This data populates core tables like `public.profiles` (company information) and `public.live_quote_indicators` (live market data).
 - **Real-time Data Propagation:** Changes to key tables (e.g., `live_quote_indicators`, `profiles`) are broadcast using Supabase Realtime. The frontend subscribes to these broadcasts (via `realtime-service.ts`) to update Financial Cards dynamically.
 - **Core Application Database Schema:**
-  - `public.card_snapshots`: Stores immutable snapshots of card states (JSONB data, rarity, symbol), crucial for history, sharing, and collections. Uniqueness is enforced by `state_hash`.
-  - `public.snapshot_comments`: Threaded comments on `card_snapshots`.
-  - `public.snapshot_likes`: User likes for `card_snapshots`.
-  - `public.user_collections`: Allows users to curate collections of `card_snapshots`.
   - `public.user_profiles`: Extends `auth.users` with custom profile data, auto-populated on new user creation.
   - `public.profiles`: Stores detailed static company information.
   - `public.live_quote_indicators`: Stores frequently updated market data for symbols.
@@ -205,44 +196,6 @@ erDiagram
       TEXT username UK
       TEXT full_name
       TIMESTAMP updated_at
-    }
-
-    card_snapshots {
-      UUID id PK
-      TEXT state_hash UK
-      TEXT symbol FK
-      TEXT company_name
-      TEXT logo_url
-      TEXT card_type
-      JSONB card_data_snapshot
-      TEXT rarity_level
-      TEXT rarity_reason
-      TIMESTAMP first_seen_at
-    }
-
-    snapshot_comments {
-      UUID id PK
-      UUID user_id FK
-      UUID snapshot_id FK
-      UUID parent_comment_id FK
-      TEXT comment_text
-      TIMESTAMP created_at
-      TIMESTAMP updated_at
-    }
-
-    snapshot_likes {
-      UUID id PK
-      UUID user_id FK
-      UUID snapshot_id FK
-      TIMESTAMP liked_at
-    }
-
-    user_collections {
-      UUID id PK
-      UUID user_id FK
-      UUID snapshot_id FK
-      TIMESTAMP captured_at
-      TEXT user_notes
     }
 
     profiles {
@@ -323,18 +276,7 @@ erDiagram
     }
 
     "auth.users" ||--|| user_profiles : "has one"
-    user_profiles ||--o{ snapshot_comments : "authors"
-    user_profiles ||--o{ snapshot_likes : "likes"
-    user_profiles ||--o{ user_collections : "owns"
-
-    card_snapshots ||--o{ snapshot_comments : "has many"
-    card_snapshots ||--o{ snapshot_likes : "has many"
-    card_snapshots }|--o{ user_collections : "part of none or many"
-
     profiles ||--|| live_quote_indicators : "has"
-
-    card_snapshots }o--|| profiles : "relates to"
-    card_snapshots }o--|| live_quote_indicators : "relates to"
 
     live_quote_indicators }o--|| exchange_market_status : "market status from"
 ```

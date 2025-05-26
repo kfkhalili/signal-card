@@ -11,13 +11,11 @@ import type {
 } from "./profile-card.types";
 import type {
   CardActionContext,
-  BaseCardSocialInteractions,
   OnGenericInteraction,
   CardType,
   BaseCardBackData,
   InteractionPayload,
 } from "../base-card/base-card.types";
-import { RARITY_LEVELS } from "@/components/game/rarityCalculator";
 import type { DisplayableCardState } from "@/components/game/types";
 
 const meta: Meta<typeof ProfileCardContainer> = {
@@ -30,22 +28,15 @@ const meta: Meta<typeof ProfileCardContainer> = {
   argTypes: {
     isFlipped: { control: "boolean" },
     cardContext: { control: "object" },
-    currentRarity: { control: "select", options: Object.values(RARITY_LEVELS) },
-    likeCount: { control: "number" },
-    commentCount: { control: "number" },
-    collectionCount: { control: "number" },
-    isLikedByCurrentUser: { control: "boolean" },
-    isSavedByCurrentUser: { control: "boolean" },
-    isSaveDisabled: { control: "boolean" },
   },
 };
 
 export default meta;
 type Story = StoryObj<typeof ProfileCardContainer>;
 
-const defaultSymbol: string = "AAPL";
-const defaultCompanyName: string = "Apple Inc.";
-const defaultLogoUrl: string =
+const defaultSymbol = "AAPL";
+const defaultCompanyName = "Apple Inc.";
+const defaultLogoUrl =
   "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Apple_logo_black.svg/500px-Apple_logo_black.svg.png"; // User updated logo
 
 const mockStaticData: ProfileCardStaticData = {
@@ -76,7 +67,7 @@ const mockLiveData: ProfileCardLiveData = {
 
 const mockBaseBackData: BaseCardBackData = {
   description:
-    "This card provides a snapshot of the company's profile and recent market performance. Flip for more details.",
+    "This card provides a description of the company's profile and recent market performance. Flip for more details.",
 };
 
 const initialMockCardData: ProfileCardData & DisplayableCardState = {
@@ -91,13 +82,6 @@ const initialMockCardData: ProfileCardData & DisplayableCardState = {
   liveData: mockLiveData,
   backData: mockBaseBackData,
   isFlipped: false,
-  currentRarity: RARITY_LEVELS.COMMON,
-  rarityReason: null,
-  likeCount: 120,
-  commentCount: 15,
-  collectionCount: 45,
-  isLikedByCurrentUser: false,
-  isSavedByCurrentUser: false,
 };
 
 const mockCardContext: CardActionContext = {
@@ -107,13 +91,6 @@ const mockCardContext: CardActionContext = {
   companyName: initialMockCardData.companyName,
   logoUrl: initialMockCardData.logoUrl,
   websiteUrl: initialMockCardData.websiteUrl,
-};
-
-const mockSocialInteractions: BaseCardSocialInteractions = {
-  onLike: (context) => action("social:like")(context),
-  onComment: (context) => action("social:comment")(context),
-  onShare: (context) => action("social:share")(context),
-  onSave: (context) => action("social:save")(context),
 };
 
 const mockSpecificInteractions: ProfileCardInteractions = {
@@ -168,26 +145,16 @@ export const Default: Story = {
   args: {
     cardData: { ...initialMockCardData, isFlipped: false }, // Initial state for cardData
     isFlipped: false, // Initial state for the direct isFlipped prop
-    currentRarity: initialMockCardData.currentRarity,
-    rarityReason: initialMockCardData.rarityReason,
-    likeCount: initialMockCardData.likeCount,
-    commentCount: initialMockCardData.commentCount,
-    collectionCount: initialMockCardData.collectionCount,
-    isLikedByCurrentUser: initialMockCardData.isLikedByCurrentUser,
-    isSavedByCurrentUser: initialMockCardData.isSavedByCurrentUser,
     cardContext: mockCardContext,
-    socialInteractions: mockSocialInteractions,
     onDeleteRequest: (context) => action("onDeleteRequest")(context),
     onHeaderIdentityClick: (context) =>
       action("onHeaderIdentityClick")(context),
-    isSaveDisabled: false,
     onGenericInteraction: mockOnGenericInteraction,
     sourceCardId: initialMockCardData.id,
     sourceCardSymbol: initialMockCardData.symbol,
     sourceCardType: "profile",
     specificInteractions: mockSpecificInteractions,
     className: "w-[300px] h-[420px]",
-    // onFlip: action("onFlip") // This is implicitly handled by the render function's handleFlip
   },
 };
 
@@ -200,38 +167,6 @@ export const Flipped: Story = {
       isFlipped: true,
     },
     isFlipped: true, // Override direct prop
-  },
-};
-
-export const WithActiveSocialInteractions: Story = {
-  args: {
-    ...Default.args,
-    cardData: {
-      ...initialMockCardData,
-      isFlipped: Default.args?.isFlipped ?? false, // Maintain default flip state or specific for this story
-      isLikedByCurrentUser: true,
-      isSavedByCurrentUser: true,
-      likeCount: (initialMockCardData.likeCount ?? 0) + 1,
-      collectionCount: (initialMockCardData.collectionCount ?? 0) + 1,
-    },
-    isLikedByCurrentUser: true,
-    isSavedByCurrentUser: true,
-    likeCount: (Default.args?.likeCount ?? 0) + 1,
-    collectionCount: (Default.args?.collectionCount ?? 0) + 1,
-  },
-};
-
-export const RareCard: Story = {
-  args: {
-    ...Default.args,
-    cardData: {
-      ...initialMockCardData,
-      isFlipped: Default.args?.isFlipped ?? false,
-      currentRarity: RARITY_LEVELS.RARE,
-      rarityReason: "Significant news event today.",
-    },
-    currentRarity: RARITY_LEVELS.RARE,
-    rarityReason: "Significant news event today.",
   },
 };
 
@@ -260,7 +195,6 @@ export const MinimalLiveDataStory: Story = {
 export const NoInteractions: Story = {
   args: {
     ...Default.args,
-    socialInteractions: undefined,
     specificInteractions: undefined,
     onDeleteRequest: undefined,
     onHeaderIdentityClick: undefined,

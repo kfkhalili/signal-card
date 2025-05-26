@@ -23,7 +23,7 @@ function getRangeBarStyling(
   return { bgColorClass: "bg-emerald-500" };
 }
 
-export interface RangeIndicatorProps {
+interface RangeIndicatorProps {
   currentValue: number | null | undefined;
   lowValue: number | null | undefined;
   highValue: number | null | undefined;

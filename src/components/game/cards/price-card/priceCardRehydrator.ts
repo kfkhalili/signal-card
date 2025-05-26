@@ -101,7 +101,6 @@ const rehydrateLivePriceCard: SpecificCardRehydrator = (
     staticData: rehydratedStaticData,
     liveData: rehydratedLiveData,
     backData: rehydratedBackData,
-    // websiteUrl: commonProps.websiteUrl, // If applicable from commonProps
   };
 };
 

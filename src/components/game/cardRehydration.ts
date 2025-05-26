@@ -4,7 +4,6 @@ import type {
   DisplayableCardState,
   ConcreteCardData,
 } from "@/components/game/types";
-import { RARITY_LEVELS } from "@/components/game/rarityCalculator";
 import { parseTimestampSafe } from "@/lib/formatters";
 
 export interface CommonCardPropsForRehydration extends DisplayableCardState {
@@ -73,10 +72,6 @@ export function rehydrateCardFromStorage(
     createdAt: finalCreatedAt,
     companyName: (cardFromStorage.companyName as string | undefined) ?? null,
     logoUrl: (cardFromStorage.logoUrl as string | undefined) ?? null,
-    currentRarity:
-      (cardFromStorage.currentRarity as string | undefined) ||
-      RARITY_LEVELS.COMMON,
-    rarityReason: (cardFromStorage.rarityReason as string | undefined) || null,
   };
 
   try {
@@ -92,8 +87,6 @@ export function rehydrateCardFromStorage(
     return {
       ...concreteCardData,
       isFlipped: commonProps.isFlipped,
-      currentRarity: commonProps.currentRarity,
-      rarityReason: commonProps.rarityReason,
     } as DisplayableCard;
   } catch (error) {
     console.error(

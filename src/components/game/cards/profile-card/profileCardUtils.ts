@@ -36,7 +36,7 @@ function createProfileCardLiveDataFromLiveQuote(
   };
 }
 
-export function transformProfileDBRowToStaticData(
+function transformProfileDBRowToStaticData(
   dbData: ProfileDBRow
 ): ProfileCardStaticData {
   const formatDate = (
@@ -106,7 +106,7 @@ export function transformProfileDBRowToStaticData(
   };
 }
 
-export function createDisplayableProfileCardFromDB(
+function createDisplayableProfileCardFromDB(
   dbData: ProfileDBRow
 ): ProfileCardData & Pick<DisplayableCardState, "isFlipped"> {
   const staticData: ProfileCardStaticData =
@@ -121,7 +121,7 @@ export function createDisplayableProfileCardFromDB(
   };
 
   const concreteCardData: ProfileCardData = {
-    id: `profile-<span class="math-inline">\{dbData\.symbol\}\-</span>{Date.now()}`,
+    id: `profile-<span class="math-inline">{dbData.symbol}-</span>{Date.now()}`,
     type: "profile",
     symbol: dbData.symbol,
     companyName: dbData.company_name,

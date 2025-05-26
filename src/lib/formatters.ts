@@ -9,7 +9,7 @@
  */
 export function formatNumberWithAbbreviations(
   num: number | null | undefined,
-  decimals: number = 2
+  decimals = 2
 ): string {
   if (num === null || num === undefined || isNaN(num)) {
     return "N/A";
@@ -40,23 +40,6 @@ export function formatNumberWithAbbreviations(
     return num.toFixed(fixedDecimals); // Apply decimals if the original number has them
   }
   return num.toLocaleString(undefined, { maximumFractionDigits: 0 }); // Format as integer if no decimals
-}
-
-/**
- * Formats a number as a percentage string.
- * Returns 'N/A' for null or undefined inputs.
- * @param num The number to format (e.g., 5.2 for 5.2%).
- * @param decimals The number of decimal places. Default is 2.
- * @returns Formatted percentage string or 'N/A'.
- */
-export function formatPercentage(
-  num: number | null | undefined,
-  decimals: number = 2
-): string {
-  if (num === null || num === undefined || isNaN(num)) {
-    return "N/A";
-  }
-  return `${num.toFixed(Math.max(0, decimals))}%`;
 }
 
 /**

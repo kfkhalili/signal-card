@@ -10,9 +10,9 @@ import {
 import type { Database } from "@/lib/supabase/database.types";
 
 export type ProfileDBRow = Database["public"]["Tables"]["profiles"]["Row"];
-export type LiveQuoteIndicatorDBRow =
+type LiveQuoteIndicatorDBRow =
   Database["public"]["Tables"]["live_quote_indicators"]["Row"];
-export type ExchangeMarketStatusRecord =
+type ExchangeMarketStatusRecord =
   Database["public"]["Tables"]["exchange_market_status"]["Row"];
 
 export type DerivedMarketStatus =

@@ -22,7 +22,7 @@ export interface CardInitializationContext {
  * Defines the signature for a function that can initialize a specific type of card.
  * It should fetch necessary data and return a DisplayableCard or null if initialization fails.
  */
-export type CardInitializer = (
+type CardInitializer = (
   context: CardInitializationContext
 ) => Promise<DisplayableCard | null>;
 

@@ -4,44 +4,26 @@
 import React, { useRef, useEffect } from "react";
 import { Card as ShadCard, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { XIcon, Sparkle, Award, Gem, Crown } from "lucide-react";
+import { XIcon } from "lucide-react";
 import Image from "next/image";
 import type {
   CardActionContext,
-  BaseCardSocialInteractions,
   OnGenericInteraction,
   InteractionPayload,
 } from "./base-card.types";
-import { SocialBar } from "@/components/ui/social-bar";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
-import { RARITY_LEVELS } from "@/components/game/rarityCalculator";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 interface BaseCardProps {
   isFlipped: boolean;
   faceContent: React.ReactNode;
   backContent: React.ReactNode;
   cardContext: CardActionContext;
-  currentRarity?: string | null;
-  rarityReason?: string | null;
-  socialInteractions?: BaseCardSocialInteractions;
   onDeleteRequest?: (context: CardActionContext) => void;
   onFlip: () => void;
   onHeaderClick?: (context: CardActionContext) => void;
   className?: string;
   innerCardClassName?: string;
   children?: React.ReactNode;
-  isLikedByCurrentUser?: boolean;
-  isSavedByCurrentUser?: boolean;
-  likeCount?: number;
-  commentCount?: number;
-  collectionCount?: number;
-  isSaveDisabled?: boolean; // New prop
   onGenericInteraction?: OnGenericInteraction;
 }
 
@@ -72,21 +54,12 @@ const BaseCard: React.FC<BaseCardProps> = ({
   faceContent,
   backContent,
   cardContext,
-  currentRarity,
-  rarityReason,
-  socialInteractions,
   onDeleteRequest,
   onFlip,
   onHeaderClick,
   className,
   innerCardClassName,
   children,
-  isLikedByCurrentUser,
-  isSavedByCurrentUser,
-  likeCount,
-  commentCount,
-  collectionCount,
-  isSaveDisabled,
   onGenericInteraction,
 }) => {
   const {
@@ -264,81 +237,6 @@ const BaseCard: React.FC<BaseCardProps> = ({
     </div>
   );
 
-  const RarityReasonOnBackHeader = rarityReason ? (
-    <div className="absolute top-3 sm:top-4 left-3 sm:left-4 md:left-5 pr-8 sm:pr-10 md:pr-12 max-w-[calc(100%-40px-1rem)] pointer-events-none">
-      <p className="text-xs font-medium text-muted-foreground leading-tight text-left line-clamp-3">
-        {currentRarity && currentRarity !== RARITY_LEVELS.COMMON && (
-          <span className="font-semibold text-primary italic">
-            {currentRarity}:{" "}
-          </span>
-        )}
-        {rarityReason}
-      </p>
-    </div>
-  ) : null;
-
-  const RarityIconOnFront = () => {
-    if (!currentRarity || currentRarity === RARITY_LEVELS.COMMON) {
-      return (
-        <div className="px-3 sm:px-4 md:px-5 py-1.5 h-[26px] sm:h-[28px]"></div>
-      );
-    }
-    let IconComponent: React.ElementType | null = null;
-    let iconColor = "text-muted-foreground";
-    switch (currentRarity) {
-      case RARITY_LEVELS.UNCOMMON:
-        IconComponent = Sparkle;
-        iconColor = "text-sky-500";
-        break;
-      case RARITY_LEVELS.RARE:
-        IconComponent = Award;
-        iconColor = "text-blue-600";
-        break;
-      case RARITY_LEVELS.EPIC:
-        IconComponent = Gem;
-        iconColor = "text-purple-600";
-        break;
-      case RARITY_LEVELS.LEGENDARY:
-        IconComponent = Crown;
-        iconColor = "text-amber-500";
-        break;
-    }
-    if (!IconComponent)
-      return (
-        <div className="px-3 sm:px-4 md:px-5 py-1.5 h-[26px] sm:h-[28px]"></div>
-      );
-
-    const tooltipContent = (
-      <>
-        <p className="font-semibold">{currentRarity}</p>
-        {rarityReason && (
-          <p className="text-xs text-muted-foreground max-w-xs">
-            {rarityReason}
-          </p>
-        )}
-      </>
-    );
-    return (
-      <div className="px-3 sm:px-4 md:px-5 py-1.5 text-right h-[26px] sm:h-[28px] flex items-center justify-end">
-        <TooltipProvider delayDuration={100}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <IconComponent
-                className={cn("h-4 w-4 sm:h-5 sm:w-5", iconColor)}
-              />
-            </TooltipTrigger>
-            <TooltipContent
-              side="top"
-              align="end"
-              className="bg-popover text-popover-foreground p-2 rounded-md shadow-lg text-xs">
-              {tooltipContent}
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
-    );
-  };
-
   const handleCardFlipInteraction = (
     e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>
   ) => {
@@ -389,37 +287,6 @@ const BaseCard: React.FC<BaseCardProps> = ({
     return () => clearTimeout(timer);
   }, [isFlipped]);
 
-  const socialBarContent = (faceName: "front" | "back") => {
-    const currentInteractions = isSaveDisabled
-      ? { ...socialInteractions, onSave: undefined }
-      : socialInteractions;
-
-    return currentInteractions ? (
-      <div
-        className={cn(
-          "transition-all duration-300 ease-in-out z-10 mt-auto shrink-0",
-          "opacity-0 group-hover:opacity-100",
-          "translate-y-full group-hover:translate-y-0",
-          (faceName === "front" && isFlipped) ||
-            (faceName === "back" && !isFlipped)
-            ? "pointer-events-none"
-            : "pointer-events-auto"
-        )}
-        data-interactive-child="true">
-        <SocialBar
-          interactions={currentInteractions}
-          cardContext={cardContext}
-          isLikedByCurrentUser={isLikedByCurrentUser}
-          isSavedByCurrentUser={isSavedByCurrentUser}
-          debugFaceName={faceName}
-          likeCount={likeCount}
-          commentCount={commentCount}
-          collectionCount={collectionCount}
-        />
-      </div>
-    ) : null;
-  };
-
   return (
     <div style={outerStyle} className={cn("group", className)}>
       <div
@@ -450,11 +317,9 @@ const BaseCard: React.FC<BaseCardProps> = ({
           aria-hidden={isFlipped ? "true" : "false"}>
           {deleteButtonElement}
           {actualIdentityHeaderElement}
-          {RarityIconOnFront()}
           <div className="flex-grow overflow-y-auto relative p-3 sm:p-4 md:px-5 md:pb-5 md:pt-2">
             {faceContent}
           </div>
-          {socialBarContent("front")}
         </ShadCard>
 
         <ShadCard
@@ -480,11 +345,9 @@ const BaseCard: React.FC<BaseCardProps> = ({
           aria-hidden={!isFlipped ? "true" : "false"}>
           {deleteButtonElement}
           {headerPlaceholderElementForBack}
-          {RarityReasonOnBackHeader}
           <div className="flex-grow overflow-y-auto relative p-3 sm:p-4 md:px-5 md:pb-5 md:pt-2">
             {backContent}
           </div>
-          {socialBarContent("back")}
         </ShadCard>
       </div>
       {children}

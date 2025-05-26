@@ -22,7 +22,7 @@ import {
 } from "@/components/game/cardUpdateHandler.types";
 import type { ProfileCardData as ProfileCardDataType } from "../profile-card/profile-card.types";
 
-export function createPriceCardLiveData(
+function createPriceCardLiveData(
   leanQuote: LiveQuoteIndicatorDBRow,
   apiTimestampMillis: number | null // Allow null for shell cards
 ): PriceCardLiveData {
@@ -44,7 +44,7 @@ export function createPriceCardLiveData(
   };
 }
 
-export function createPriceCardStaticData(
+function createPriceCardStaticData(
   leanQuote: LiveQuoteIndicatorDBRow,
   profileContext?: Pick<ProfileDBRow, "exchange">
 ): PriceCardStaticData {
@@ -53,11 +53,11 @@ export function createPriceCardStaticData(
   };
 }
 
-export function createDisplayablePriceCard(
+function createDisplayablePriceCard(
   leanQuote: LiveQuoteIndicatorDBRow,
   apiTimestampMillis: number | null,
   profileContext?: Pick<ProfileDBRow, "company_name" | "image" | "exchange">,
-  isShell: boolean = false
+  isShell = false
 ): DisplayableLivePriceCard {
   let liveData = createPriceCardLiveData(
     leanQuote,
@@ -277,19 +277,12 @@ const handlePriceCardProfileUpdate: CardUpdateHandler<
   if (newLogoUrl !== currentPriceCardData.logoUrl) {
     needsUpdate = true;
   }
-  // if (newExchangeCode !== currentPriceCardData.staticData.exchange_code) {
-  //   needsUpdate = true;
-  // }
 
   if (needsUpdate) {
     return {
       ...currentPriceCardData,
       companyName: newCompanyName,
       logoUrl: newLogoUrl,
-      // staticData: {
-      //   ...currentPriceCardData.staticData,
-      //   exchange_code: newExchangeCode,
-      // },
     };
   }
 

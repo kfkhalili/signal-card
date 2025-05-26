@@ -7,7 +7,7 @@ import type { ToastActionElement, ToastProps } from "@/components/ui/toast";
 const TOAST_LIMIT = 1;
 const TOAST_REMOVE_DELAY = 1000000; // This seems excessively long, typically a few seconds.
 
-export type ToasterToast = ToastProps & {
+type ToasterToast = ToastProps & {
   // Export ToasterToast if not already implicitly
   id: string;
   title?: React.ReactNode;
@@ -22,12 +22,12 @@ function genId(): string {
   return count.toString();
 }
 
-type ActionType = {
+interface ActionType {
   ADD_TOAST: "ADD_TOAST";
   UPDATE_TOAST: "UPDATE_TOAST";
   DISMISS_TOAST: "DISMISS_TOAST";
   REMOVE_TOAST: "REMOVE_TOAST";
-};
+}
 
 type Action =
   | {
@@ -69,7 +69,7 @@ const addToRemoveQueue = (toastId: string): void => {
   toastTimeouts.set(toastId, timeout);
 };
 
-export const reducer = (state: State, action: Action): State => {
+const reducer = (state: State, action: Action): State => {
   switch (action.type) {
     case "ADD_TOAST":
       return {
@@ -120,7 +120,7 @@ export const reducer = (state: State, action: Action): State => {
   }
 };
 
-const listeners: Array<(state: State) => void> = [];
+const listeners: ((state: State) => void)[] = [];
 let memoryState: State = { toasts: [] };
 
 function dispatch(action: Action): void {
@@ -194,4 +194,4 @@ function useToast(): State & {
   };
 }
 
-export { useToast, toast };
+export { useToast };

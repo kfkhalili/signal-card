@@ -16,7 +16,7 @@ export type LiveQuotePayload =
   RealtimePostgresChangesPayload<LiveQuoteIndicatorDBRow>;
 
 // QuoteUpdateCallback expects a payload where 'new' (if present) is LiveQuoteIndicatorDBRow
-export type QuoteUpdateCallback = (payload: LiveQuotePayload) => void;
+type QuoteUpdateCallback = (payload: LiveQuotePayload) => void;
 
 export type SubscriptionStatus =
   | "SUBSCRIBED"
@@ -24,7 +24,7 @@ export type SubscriptionStatus =
   | "CLOSED"
   | "CHANNEL_ERROR";
 
-export type SubscriptionStatusCallback = (
+type SubscriptionStatusCallback = (
   status: SubscriptionStatus,
   err?: Error
 ) => void;

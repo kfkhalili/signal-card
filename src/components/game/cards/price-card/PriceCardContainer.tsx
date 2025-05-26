@@ -12,7 +12,7 @@ import { CardType, OnGenericInteraction } from "../base-card/base-card.types";
 
 // Props should align with RegisteredCardRendererProps for cardData,
 // then add any specific interaction props.
-export interface PriceCardContainerProps
+interface PriceCardContainerProps
   extends Omit<
     RegisteredCardRendererProps,
     "cardData" | "specificInteractions" | "priceSpecificInteractions"
@@ -37,20 +37,11 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
     isFlipped,
     onFlip,
     cardContext,
-    currentRarity,
-    rarityReason,
-    socialInteractions,
     onDeleteRequest,
     onHeaderIdentityClick,
     className,
     innerCardClassName,
     children,
-    isLikedByCurrentUser,
-    isSavedByCurrentUser,
-    likeCount,
-    commentCount,
-    collectionCount,
-    isSaveDisabled,
     onGenericInteraction,
     sourceCardId,
     sourceCardSymbol,
@@ -62,16 +53,13 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
         "[PriceCardContainer] Received incorrect card type:",
         cardData.type
       );
-      // Optionally render an error message or null
       return null;
     }
-    // Now we can safely use cardData as PriceCardData
     const specificCardData = cardData as PriceCardData;
 
     const contentProps = {
       cardData: specificCardData,
-      // Remove specific click handlers like onSmaClick, onRangeContextClick if they now use onGenericInteraction
-      onGenericInteraction, // Pass down
+      onGenericInteraction,
       sourceCardId,
       sourceCardSymbol,
       sourceCardType,
@@ -91,19 +79,10 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
         backContent={backContentForBaseCard}
         onFlip={onFlip}
         cardContext={cardContext}
-        currentRarity={currentRarity}
-        rarityReason={rarityReason}
-        socialInteractions={socialInteractions}
         onDeleteRequest={onDeleteRequest}
         onHeaderClick={onHeaderIdentityClick}
         className={className}
-        innerCardClassName={innerCardClassName}
-        isLikedByCurrentUser={isLikedByCurrentUser}
-        isSavedByCurrentUser={isSavedByCurrentUser}
-        likeCount={likeCount}
-        commentCount={commentCount}
-        collectionCount={collectionCount}
-        isSaveDisabled={isSaveDisabled}>
+        innerCardClassName={innerCardClassName}>
         {children}
       </BaseCard>
     );

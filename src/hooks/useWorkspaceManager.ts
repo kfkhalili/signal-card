@@ -15,7 +15,6 @@ import type { AddCardFormValues } from "@/components/workspace/AddCardForm";
 import type { PriceCardData } from "@/components/game/cards/price-card/price-card.types";
 import type { OnGenericInteraction } from "@/components/game/cards/base-card/base-card.types";
 
-import { calculateDynamicCardRarity } from "@/components/game/rarityCalculator";
 import { rehydrateCardFromStorage } from "@/components/game/cardRehydration";
 import type { ProfileDBRow } from "@/hooks/useStockData";
 import type { LiveQuoteIndicatorDBRow } from "@/lib/supabase/realtime-service";
@@ -51,22 +50,9 @@ interface AddCardOptions {
 }
 
 const getConcreteCardData = (card: DisplayableCard): ConcreteCardData => {
-  const tempCard = { ...card };
-  const stateKeys: (keyof DisplayableCardState)[] = [
-    "isFlipped",
-    "currentRarity",
-    "rarityReason",
-    "isLikedByCurrentUser",
-    "currentUserLikeId",
-    "likeCount",
-    "commentCount",
-    "isSavedByCurrentUser",
-    "collectionCount",
-  ];
-  for (const key of stateKeys) {
-    delete (tempCard as Partial<DisplayableCardState>)[key];
-  }
-  return tempCard as ConcreteCardData;
+  const cardClone = { ...card };
+  delete (cardClone as Partial<DisplayableCardState>).isFlipped;
+  return cardClone as ConcreteCardData;
 };
 
 export function useWorkspaceManager({
@@ -212,63 +198,53 @@ export function useWorkspaceManager({
         newCardToAdd = await initializer(initContext);
 
         if (newCardToAdd) {
-          const { rarity, reason } = calculateDynamicCardRarity(newCardToAdd);
-          newCardToAdd = {
-            ...newCardToAdd,
-            currentRarity: rarity,
-            rarityReason: reason,
-          };
-
           setActiveCards((prev) => {
             const updatedCards = [...prev];
             if (requestingCardId) {
               const sourceIndex = updatedCards.findIndex(
                 (c) => c.id === requestingCardId
               );
-              if (sourceIndex !== -1)
-                updatedCards.splice(sourceIndex + 1, 0, newCardToAdd!);
-              else updatedCards.push(newCardToAdd!);
-            } else {
-              updatedCards.push(newCardToAdd!);
+              if (sourceIndex !== -1 && newCardToAdd) {
+                updatedCards.splice(sourceIndex + 1, 0, newCardToAdd);
+              } else if (newCardToAdd) {
+                updatedCards.push(newCardToAdd);
+              }
+            } else if (newCardToAdd) {
+              updatedCards.push(newCardToAdd);
             }
             return updatedCards;
           });
 
-          // Corrected shell card check
-          const isPriceCard = newCardToAdd.type === "price";
-          let isPriceCardShell = false;
-          if (isPriceCard) {
-            const priceCardData = newCardToAdd as PriceCardData;
-            // A shell card is one where liveData.price is null
-            // It should still have a liveData object.
-            if (
-              priceCardData.liveData &&
-              priceCardData.liveData.price === null
-            ) {
-              isPriceCardShell = true;
-            } else if (!priceCardData.liveData) {
-              // This case indicates a malformed card if it's supposed to be a PriceCard
-              console.error(
-                "Price card is missing liveData object:",
-                priceCardData
-              );
-              isPriceCardShell = true; // Treat as shell or error state
+          if (newCardToAdd) {
+            const isPriceCard = newCardToAdd.type === "price";
+            let isPriceCardShell = false;
+            if (isPriceCard) {
+              const priceCardData = newCardToAdd as PriceCardData;
+              if (
+                priceCardData.liveData &&
+                priceCardData.liveData.price === null
+              ) {
+                isPriceCardShell = true;
+              } else if (!priceCardData.liveData) {
+                console.error(
+                  "Price card is missing liveData object:",
+                  priceCardData
+                );
+                isPriceCardShell = true;
+              }
             }
-            // If liveData.price is a number, it's not a shell.
-          }
 
-          if (!isPriceCardShell) {
-            setTimeout(
-              () =>
-                toast({
-                  title: "Card Added!",
-                  description: `${determinedSymbol} ${cardType} card added to workspace.`,
-                }),
-              0
-            );
+            if (!isPriceCardShell) {
+              setTimeout(
+                () =>
+                  toast({
+                    title: "Card Added!",
+                    description: `${determinedSymbol} ${cardType} card added to workspace.`,
+                  }),
+                0
+              );
+            }
           }
-          // If it IS a shell card, the "Price Card Added (Shell)" toast
-          // would have been shown by the `initializePriceCard` function.
         }
       } catch (error: unknown) {
         const errorMessage =
@@ -321,7 +297,6 @@ export function useWorkspaceManager({
           if (card.symbol === leanQuoteData.symbol) {
             const handler = getCardUpdateHandler(card.type, eventType);
             if (handler) {
-              const { isFlipped, currentRarity, rarityReason } = card;
               const concreteCardDataForHandler = getConcreteCardData(card);
 
               const updatedConcreteData = handler(
@@ -332,25 +307,14 @@ export function useWorkspaceManager({
               );
 
               if (updatedConcreteData !== concreteCardDataForHandler) {
-                const tempForRarityCalc = {
-                  ...updatedConcreteData,
-                  isFlipped,
-                } as DisplayableCard;
-                const { rarity: newRarity, reason: newRarityReason } =
-                  calculateDynamicCardRarity(tempForRarityCalc);
-
                 if (
                   JSON.stringify(updatedConcreteData) !==
-                    JSON.stringify(concreteCardDataForHandler) ||
-                  newRarity !== currentRarity ||
-                  newRarityReason !== rarityReason
+                  JSON.stringify(concreteCardDataForHandler)
                 ) {
                   overallChanged = true;
                   const newCard: DisplayableCard = {
                     ...(card as DisplayableCard),
                     ...updatedConcreteData,
-                    currentRarity: newRarity,
-                    rarityReason: newRarityReason,
                   };
                   return newCard;
                 }
@@ -376,7 +340,6 @@ export function useWorkspaceManager({
           if (card.symbol === updatedProfileDBRow.symbol) {
             const universalHandler = getCardUpdateHandler(card.type, eventType);
             if (universalHandler) {
-              const { isFlipped, currentRarity, rarityReason } = card;
               const concreteCardDataForHandler = getConcreteCardData(card);
 
               const updatedConcreteData = universalHandler(
@@ -386,17 +349,9 @@ export function useWorkspaceManager({
                 updateContext
               );
               if (updatedConcreteData !== concreteCardDataForHandler) {
-                const tempForRarityCalc = {
-                  ...updatedConcreteData,
-                  isFlipped,
-                } as DisplayableCard;
-                const { rarity: newRarity, reason: newRarityReason } =
-                  calculateDynamicCardRarity(tempForRarityCalc);
                 if (
                   JSON.stringify(updatedConcreteData) !==
-                    JSON.stringify(concreteCardDataForHandler) ||
-                  newRarity !== currentRarity ||
-                  newRarityReason !== rarityReason
+                  JSON.stringify(concreteCardDataForHandler)
                 ) {
                   overallChanged = true;
                   if (card.type === "profile") {
@@ -412,8 +367,6 @@ export function useWorkspaceManager({
                   const newCard: DisplayableCard = {
                     ...(card as DisplayableCard),
                     ...updatedConcreteData,
-                    currentRarity: newRarity,
-                    rarityReason: newRarityReason,
                   };
                   return newCard;
                 }
