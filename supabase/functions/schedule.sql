@@ -29,3 +29,20 @@
       ) as request_id;
     $$
 );
+
+SELECT
+  cron.schedule(
+    'fetch-monthly-financial-statements',
+    '0 0 1 * *', -- every month on the 1st at midnight
+    $$
+    SELECT
+      net.http_post(
+          url := current_setting('supabase.functions.url') || '/fetch-financial-statements', -- Use helper to get Edge Function URL
+          headers := jsonb_build_object(
+            'Content-Type', 'application/json',
+            'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'supabase_service_role_key') -- Ensure you have service_role_key in vault
+          ),
+          body := '{}'::jsonb -- Send an empty JSON body or any required payload
+      ) AS request_id;
+    $$
+  );
