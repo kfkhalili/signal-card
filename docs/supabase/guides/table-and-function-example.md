@@ -345,4 +345,4 @@ This SQL needs to be run against your database. You can do this via the Supabase
 
 ## Conclusion
 
-You've now created a Supabase table and an Edge Function to populate it. This toy example demonstrates the basic workflow. For real-world applications, your
+You've now created a Supabase table and an Edge Function to populate it. This toy example demonstrates the basic workflow. For real-world applications, your Edge Function would fetch data from an actual external API, include more robust error handling, and potentially more complex data transformation.
