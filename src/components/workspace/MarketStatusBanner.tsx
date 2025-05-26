@@ -45,7 +45,8 @@ const MarketStatusBanner: React.FC<MarketStatusBannerProps> = ({
         <strong>{symbol}:</strong> {statusInfo.status}
         {statusInfo.message && (
           <span className="italic text-muted-foreground">
-            ` ({String(statusInfo.message)})`
+            {" "}
+            ({String(statusInfo.message)})
           </span>
         )}
       </div>
