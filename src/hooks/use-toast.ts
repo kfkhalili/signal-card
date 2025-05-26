@@ -5,7 +5,7 @@ import * as React from "react";
 import type { ToastActionElement, ToastProps } from "@/components/ui/toast";
 
 const TOAST_LIMIT = 1;
-const TOAST_REMOVE_DELAY = 1000000; // This seems excessively long, typically a few seconds.
+const TOAST_REMOVE_DELAY = 1000; // 1 second
 
 type ToasterToast = ToastProps & {
   // Export ToasterToast if not already implicitly
