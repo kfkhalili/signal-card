@@ -1,4 +1,4 @@
-// src/components/layout/header.tsx
+// src/components/layout/Header.tsx
 "use client";
 
 import React from "react";

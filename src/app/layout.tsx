@@ -4,7 +4,7 @@ import { geistSansLocal, geistMonoLocal } from "./fonts"; // Adjust path if your
 
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
-import HeaderComponent from "@/components/layout/header";
+import HeaderComponent from "@/components/layout/HeaderComponent";
 import { cn } from "../lib/utils";
 import { AuthProvider } from "@/contexts/AuthContext";
 

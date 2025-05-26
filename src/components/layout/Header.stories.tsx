@@ -2,7 +2,7 @@
 import React from "react";
 import type { Meta, StoryObj } from "@storybook/react";
 import { action } from "@storybook/addon-actions";
-import HeaderComponent from "./header"; // Assuming story is in src/components/layout/
+import HeaderComponent from "./HeaderComponent";
 import { AuthContext, type AuthContextType } from "@/contexts/AuthContext"; // Correctly import context and its type
 import type {
   Session,
