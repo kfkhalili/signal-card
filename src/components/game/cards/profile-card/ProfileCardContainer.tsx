@@ -74,7 +74,8 @@ export const ProfileCardContainer = React.memo<ProfileCardContainerProps>(
         onDeleteRequest={onDeleteRequest}
         onHeaderClick={onHeaderIdentityClick}
         className={className}
-        innerCardClassName={innerCardClassName}>
+        innerCardClassName={innerCardClassName}
+        onGenericInteraction={onGenericInteraction}>
         {children}
       </BaseCard>
     );
