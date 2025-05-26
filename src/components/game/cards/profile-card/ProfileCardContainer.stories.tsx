@@ -28,16 +28,128 @@ const meta: Meta<typeof ProfileCardContainer> = {
   argTypes: {
     isFlipped: { control: "boolean" },
     cardContext: { control: "object" },
+    onGenericInteraction: { action: "onGenericInteraction" },
+    sourceCardId: { control: "text" },
+    sourceCardSymbol: { control: "text" },
+    sourceCardType: { control: "text" },
+    onDeleteRequest: { action: "onDeleteRequest" },
+    onHeaderIdentityClick: { action: "onHeaderIdentityClick" },
+    className: { control: "text" },
+    innerCardClassName: { control: "text" },
+    specificInteractions: { control: "object" },
   },
 };
 
 export default meta;
-type Story = StoryObj<typeof ProfileCardContainer>;
+
+type ProfileCardStoryWrapperProps = StoryObj<
+  typeof ProfileCardContainer
+>["args"] & {
+  initialIsFlipped: boolean;
+};
+
+const ProfileCardStoryWrapper: React.FC<ProfileCardStoryWrapperProps> = (
+  props
+) => {
+  const {
+    initialIsFlipped,
+    cardData: initialCardDataFromArgs,
+    onGenericInteraction,
+    sourceCardId,
+    sourceCardSymbol,
+    sourceCardType,
+    cardContext,
+    onDeleteRequest, // Destructure onDeleteRequest
+    onHeaderIdentityClick,
+    className,
+    innerCardClassName,
+    specificInteractions,
+    children,
+  } = props;
+
+  const [localIsFlipped, setLocalIsFlipped] = useState(initialIsFlipped);
+
+  useEffect(() => {
+    setLocalIsFlipped(initialIsFlipped);
+  }, [initialIsFlipped]);
+
+  const handleFlip = useCallback(() => {
+    setLocalIsFlipped((prev) => {
+      const newFlippedState = !prev;
+      action("onFlip")(initialCardDataFromArgs?.id || "unknown-id");
+      return newFlippedState;
+    });
+  }, [initialCardDataFromArgs?.id]);
+
+  // Extended guard clause including onDeleteRequest
+  if (
+    !onGenericInteraction ||
+    !sourceCardId ||
+    !sourceCardSymbol ||
+    !sourceCardType ||
+    !cardContext ||
+    !initialCardDataFromArgs ||
+    !onDeleteRequest // Add onDeleteRequest to the guard
+  ) {
+    if (process.env.NODE_ENV === "development") {
+      console.error(
+        "[Storybook ProfileCardStoryWrapper] Essential prop(s) missing from story args. " +
+          "ProfileCardContainer requires: onGenericInteraction, sourceCardId, sourceCardSymbol, sourceCardType, cardContext, cardData, and onDeleteRequest.",
+        {
+          onGenericInteraction,
+          sourceCardId,
+          sourceCardSymbol,
+          sourceCardType,
+          cardContext,
+          initialCardDataFromArgs,
+          onDeleteRequest,
+        }
+      );
+    }
+    return (
+      <div
+        style={{
+          padding: "20px",
+          border: "1px solid red",
+          color: "red",
+          backgroundColor: "lightpink",
+          maxWidth: "300px",
+          textAlign: "center",
+        }}>
+        Error: Story args are incomplete. Check console.
+      </div>
+    );
+  }
+
+  const currentCardDataForContainer = {
+    ...(initialCardDataFromArgs as ProfileCardData & DisplayableCardState),
+    isFlipped: localIsFlipped,
+  };
+
+  return (
+    <ProfileCardContainer
+      cardData={currentCardDataForContainer}
+      isFlipped={localIsFlipped}
+      onFlip={handleFlip}
+      onGenericInteraction={onGenericInteraction}
+      sourceCardId={sourceCardId}
+      sourceCardSymbol={sourceCardSymbol}
+      sourceCardType={sourceCardType}
+      cardContext={cardContext}
+      onDeleteRequest={onDeleteRequest} // Now known to be non-undefined
+      onHeaderIdentityClick={onHeaderIdentityClick}
+      className={className}
+      innerCardClassName={innerCardClassName}
+      specificInteractions={specificInteractions}>
+      {children}
+    </ProfileCardContainer>
+  );
+};
 
 const defaultSymbol = "AAPL";
 const defaultCompanyName = "Apple Inc.";
 const defaultLogoUrl =
-  "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Apple_logo_black.svg/500px-Apple_logo_black.svg.png"; // User updated logo
+  "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Apple_logo_black.svg/500px-Apple_logo_black.svg.png";
 
 const mockStaticData: ProfileCardStaticData = {
   db_id: "aapl-db-id",
@@ -93,7 +205,7 @@ const mockCardContext: CardActionContext = {
   websiteUrl: initialMockCardData.websiteUrl,
 };
 
-const mockSpecificInteractions: ProfileCardInteractions = {
+const mockProfileSpecificInteractions: ProfileCardInteractions = {
   onWebsiteClick: (websiteUrl: string) =>
     action("specific:websiteClick")(websiteUrl),
   onFilterByField: (fieldType, value) =>
@@ -107,75 +219,65 @@ const mockOnGenericInteraction: OnGenericInteraction = (
   action("onGenericInteraction")(payload);
 };
 
-// Default story now uses a render function for interactive flip
+const mockOnDeleteRequest = (context: CardActionContext) =>
+  action("onDeleteRequest")(context);
+
+type Story = StoryObj<typeof ProfileCardContainer>;
+
 export const Default: Story = {
-  render: (args) => {
-    // Use local state for isFlipped, initialized by args.isFlipped (from controls)
-    const [localIsFlipped, setLocalIsFlipped] = useState(args.isFlipped);
-
-    // Effect to update local state if args.isFlipped changes (e.g., via Storybook controls)
-    useEffect(() => {
-      setLocalIsFlipped(args.isFlipped);
-    }, [args.isFlipped]);
-
-    const handleFlip = useCallback(() => {
-      setLocalIsFlipped((prev) => {
-        const newFlippedState = !prev;
-        // Log the action, passing the card ID
-        action("onFlip")(args.cardData?.id || "unknown-id");
-        return newFlippedState;
-      });
-    }, [args.cardData?.id]); // Removed args.onFlip from deps as it's just action()
-
-    // Ensure the cardData prop also reflects the current flipped state
-    const currentCardData = {
-      ...(args.cardData as ProfileCardData & DisplayableCardState), // Cast to ensure type safety
-      isFlipped: localIsFlipped,
-    };
-
-    return (
-      <ProfileCardContainer
-        {...args} // Spread all other args from the story
-        cardData={currentCardData} // Pass the cardData with updated isFlipped
-        isFlipped={localIsFlipped} // Pass the local isFlipped state as a direct prop
-        onFlip={handleFlip} // Use the custom handler
-      />
-    );
-  },
+  render: (args) => (
+    <ProfileCardStoryWrapper
+      {...args}
+      initialIsFlipped={args.isFlipped ?? false}
+    />
+  ),
   args: {
-    cardData: { ...initialMockCardData, isFlipped: false }, // Initial state for cardData
-    isFlipped: false, // Initial state for the direct isFlipped prop
+    cardData: { ...initialMockCardData, isFlipped: false },
+    isFlipped: false,
     cardContext: mockCardContext,
-    onDeleteRequest: (context) => action("onDeleteRequest")(context),
+    onDeleteRequest: mockOnDeleteRequest,
     onHeaderIdentityClick: (context) =>
       action("onHeaderIdentityClick")(context),
     onGenericInteraction: mockOnGenericInteraction,
     sourceCardId: initialMockCardData.id,
     sourceCardSymbol: initialMockCardData.symbol,
     sourceCardType: "profile",
-    specificInteractions: mockSpecificInteractions,
+    specificInteractions: mockProfileSpecificInteractions,
     className: "w-[300px] h-[420px]",
   },
 };
 
 export const Flipped: Story = {
+  render: (args) => (
+    <ProfileCardStoryWrapper
+      {...args}
+      initialIsFlipped={args.isFlipped ?? true}
+    />
+  ),
   args: {
-    ...Default.args, // Start with Default's args structure
+    ...Default.args,
     cardData: {
-      // Override cardData
-      ...initialMockCardData,
+      ...(Default.args?.cardData as ProfileCardData & DisplayableCardState),
       isFlipped: true,
     },
-    isFlipped: true, // Override direct prop
+    isFlipped: true,
   },
 };
 
 export const MinimalLiveDataStory: Story = {
   name: "Minimal Live Data",
+  render: (args) => (
+    <ProfileCardStoryWrapper
+      {...args}
+      initialIsFlipped={args.isFlipped ?? false}
+    />
+  ),
   args: {
     ...Default.args,
     cardData: {
       ...initialMockCardData,
+      id: "profile-min-live",
+      symbol: "MIN",
       isFlipped: Default.args?.isFlipped ?? false,
       liveData: {
         price: 100.0,
@@ -189,14 +291,30 @@ export const MinimalLiveDataStory: Story = {
         ceo: undefined,
       },
     },
+    sourceCardId: "profile-min-live",
+    sourceCardSymbol: "MIN",
+    cardContext: {
+      ...(Default.args?.cardContext as CardActionContext),
+      id: "profile-min-live",
+      symbol: "MIN",
+    },
   },
 };
 
 export const NoInteractions: Story = {
+  render: (args) => (
+    <ProfileCardStoryWrapper
+      {...args}
+      initialIsFlipped={args.isFlipped ?? false}
+    />
+  ),
   args: {
     ...Default.args,
-    specificInteractions: undefined,
-    onDeleteRequest: undefined,
+    // Provide a non-undefined onDeleteRequest to satisfy the guard, even if it's a no-op
+    onDeleteRequest: (context) => {
+      action("onDeleteRequest (no-op for NoInteractions story)")(context);
+    },
     onHeaderIdentityClick: undefined,
+    specificInteractions: undefined,
   },
 };
