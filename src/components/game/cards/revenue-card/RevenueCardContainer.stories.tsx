@@ -12,18 +12,15 @@ import type {
   RevenueCardData,
   RevenueCardStaticData,
   RevenueCardLiveData,
-  RevenueCardInteractions,
 } from "./revenue-card.types";
 import type {
   CardActionContext,
   OnGenericInteraction,
   BaseCardBackData,
   InteractionPayload,
+  CardType,
 } from "../base-card/base-card.types";
-import type {
-  DisplayableCardState,
-  DisplayableCard,
-} from "@/components/game/types";
+import type { DisplayableCardState } from "@/components/game/types";
 
 const meta: Meta<typeof RevenueCardContainer> = {
   title: "Game/Cards/RevenueCardContainer",
@@ -33,11 +30,13 @@ const meta: Meta<typeof RevenueCardContainer> = {
     layout: "centered",
   },
   argTypes: {
-    // Props controlled by the StoryWrapper or internal to it are not listed here for direct control
-    // Props for RevenueCardContainer itself that are passed through the wrapper:
     cardData: {
       control: "object",
-      description: "The core data for the revenue card.",
+      description: "The core data for the revenue card, including flip state.",
+    },
+    isFlipped: {
+      control: "boolean",
+      description: "Controls the flipped state of the card.",
     },
     cardContext: {
       control: "object",
@@ -47,82 +46,90 @@ const meta: Meta<typeof RevenueCardContainer> = {
       action: "onGenericInteraction",
       description: "Handler for generic card interactions.",
     },
-    sourceCardId: {
-      control: "text",
-      description: "ID of the card triggering an interaction.",
-    },
-    sourceCardSymbol: {
-      control: "text",
-      description: "Symbol of the card triggering an interaction.",
-    },
-    sourceCardType: {
-      control: "select",
-      options: ["price", "profile", "revenue"],
-      description: "Type of the card triggering an interaction.",
-    },
     onDeleteRequest: {
       action: "onDeleteRequest",
       description: "Handler for card deletion requests.",
-    },
-    onHeaderIdentityClick: {
-      action: "onHeaderIdentityClick",
-      description: "Handler for header clicks.",
     },
     className: { control: "text", description: "Optional outer class names." },
     innerCardClassName: {
       control: "text",
       description: "Optional inner class names for styling.",
     },
-    specificInteractions: {
-      control: "object",
-      description: "Revenue card specific interaction handlers.",
-    },
   },
 };
 
 export default meta;
 
-// Props for the wrapper component
-interface RevenueCardStoryWrapperProps
-  extends Omit<
-    ComponentProps<typeof RevenueCardContainer>,
-    "isFlipped" | "onFlip"
-  > {
+// Adjusted Props for the Storybook wrapper component
+type RevenueCardStoryWrapperProps = Pick<
+  ComponentProps<typeof RevenueCardContainer>,
+  | "cardContext"
+  | "onGenericInteraction"
+  | "onDeleteRequest"
+  | "className"
+  | "innerCardClassName"
+  | "children"
+> & {
   initialIsFlipped: boolean;
-}
+  initialCardData: RevenueCardData & DisplayableCardState;
+};
 
 const RevenueCardStoryWrapper: React.FC<RevenueCardStoryWrapperProps> = ({
   initialIsFlipped,
-  cardData: initialCardDataFromArgs, // This is DisplayableCard from RevenueCardContainerProps
-  ...restOfContainerProps // These are the other props for RevenueCardContainer
+  initialCardData,
+  onGenericInteraction,
+  cardContext: propCardContext,
+  onDeleteRequest,
+  className,
+  innerCardClassName,
+  children,
 }) => {
   const [localIsFlipped, setLocalIsFlipped] = useState(initialIsFlipped);
+  const [currentCardData, setCurrentCardData] = useState<
+    RevenueCardData & DisplayableCardState
+  >({
+    ...initialCardData,
+    isFlipped: initialIsFlipped,
+  });
 
   useEffect(() => {
     setLocalIsFlipped(initialIsFlipped);
+    setCurrentCardData((prev) => ({ ...prev, isFlipped: initialIsFlipped }));
   }, [initialIsFlipped]);
+
+  useEffect(() => {
+    setCurrentCardData({ ...initialCardData, isFlipped: localIsFlipped });
+  }, [initialCardData, localIsFlipped]);
 
   const handleFlip = useCallback(() => {
     setLocalIsFlipped((prev) => {
       const newFlippedState = !prev;
-      action("onFlip (handled by wrapper)")(initialCardDataFromArgs.id);
+      action("onFlip (handled by wrapper)")(initialCardData.id);
+      setCurrentCardData((prevCardData) => ({
+        ...prevCardData,
+        isFlipped: newFlippedState,
+      }));
       return newFlippedState;
     });
-  }, [initialCardDataFromArgs.id]);
+  }, [initialCardData.id]);
 
   if (
-    !restOfContainerProps.onGenericInteraction ||
-    !restOfContainerProps.sourceCardId ||
-    !restOfContainerProps.sourceCardSymbol ||
-    !restOfContainerProps.sourceCardType ||
-    !restOfContainerProps.cardContext ||
-    !initialCardDataFromArgs ||
-    !restOfContainerProps.onDeleteRequest
+    !onGenericInteraction ||
+    !propCardContext ||
+    !currentCardData ||
+    !onDeleteRequest
   ) {
-    console.error(
-      "[Storybook RevenueCardStoryWrapper] Essential prop(s) missing from story args.",
-      { props: restOfContainerProps, cardData: initialCardDataFromArgs }
-    );
+    if (process.env.NODE_ENV === "development") {
+      console.error(
+        "[Storybook RevenueCardStoryWrapper] Essential prop(s) missing from story args.",
+        {
+          onGenericInteraction,
+          propCardContext,
+          currentCardData,
+          onDeleteRequest,
+        }
+      );
+    }
     return (
       <div
         style={{
@@ -137,22 +144,21 @@ const RevenueCardStoryWrapper: React.FC<RevenueCardStoryWrapperProps> = ({
     );
   }
 
-  const currentCardDataForContainer: DisplayableCard = {
-    ...(initialCardDataFromArgs as RevenueCardData & DisplayableCardState), // Ensure correct type for spreading
-    isFlipped: localIsFlipped,
-  };
-
   return (
     <RevenueCardContainer
-      {...restOfContainerProps}
-      cardData={currentCardDataForContainer}
+      cardData={currentCardData}
       isFlipped={localIsFlipped}
       onFlip={handleFlip}
-    />
+      onGenericInteraction={onGenericInteraction}
+      cardContext={propCardContext}
+      onDeleteRequest={onDeleteRequest}
+      className={className}
+      innerCardClassName={innerCardClassName}>
+      {children}
+    </RevenueCardContainer>
   );
 };
 
-// --- Mock Data ---
 const defaultSymbol = "MSFT";
 const defaultCompanyName = "Microsoft Corporation";
 const defaultLogoUrl =
@@ -179,7 +185,6 @@ const mockBaseBackData: BaseCardBackData = {
   description: `Key financial metrics for ${defaultCompanyName} (${mockStaticData.periodLabel}, ending ${mockStaticData.statementDate}). Includes revenue, profits, and free cash flow.`,
 };
 
-// This is the full data structure for a RevenueCard, including its display state.
 const initialMockDisplayableRevenueCard: RevenueCardData &
   DisplayableCardState = {
   id: `revenue-${defaultSymbol}-${mockStaticData.statementDate}-${mockStaticData.statementPeriod}`,
@@ -191,19 +196,17 @@ const initialMockDisplayableRevenueCard: RevenueCardData &
   staticData: mockStaticData,
   liveData: mockLiveData,
   backData: mockBaseBackData,
-  isFlipped: false, // Default flip state for the mock data
+  isFlipped: false,
 };
 
 const mockCardContext: CardActionContext = {
   id: initialMockDisplayableRevenueCard.id,
   symbol: initialMockDisplayableRevenueCard.symbol,
-  type: "revenue",
+  type: "revenue" as CardType,
   companyName: initialMockDisplayableRevenueCard.companyName,
   logoUrl: initialMockDisplayableRevenueCard.logoUrl,
   websiteUrl: null,
 };
-
-const mockSpecificInteractions: RevenueCardInteractions = {};
 
 const mockOnGenericInteraction: OnGenericInteraction = (
   payload: InteractionPayload
@@ -214,25 +217,16 @@ const mockOnGenericInteraction: OnGenericInteraction = (
 const mockOnDeleteRequest = (context: CardActionContext) =>
   action("onDeleteRequest")(context);
 
-// --- Stories ---
 type Story = StoryObj<RevenueCardStoryWrapperProps>;
 
 export const Default: Story = {
   render: (args) => <RevenueCardStoryWrapper {...args} />,
   args: {
-    // Props for RevenueCardStoryWrapperProps
     initialIsFlipped: false,
-    // Props for RevenueCardContainer (passed via ...restOfContainerProps)
-    cardData: initialMockDisplayableRevenueCard, // Pass the complete DisplayableCard object
+    initialCardData: initialMockDisplayableRevenueCard,
     cardContext: mockCardContext,
     onDeleteRequest: mockOnDeleteRequest,
-    onHeaderIdentityClick: (context) =>
-      action("onHeaderIdentityClick")(context),
     onGenericInteraction: mockOnGenericInteraction,
-    sourceCardId: initialMockDisplayableRevenueCard.id,
-    sourceCardSymbol: initialMockDisplayableRevenueCard.symbol,
-    sourceCardType: "revenue",
-    specificInteractions: mockSpecificInteractions,
     className: "w-[300px] h-[420px]",
   },
 };
@@ -242,9 +236,7 @@ export const Flipped: Story = {
   args: {
     ...Default.args,
     initialIsFlipped: true,
-    // cardData's internal isFlipped will be overridden by localIsFlipped in the wrapper
-    // but it's good practice for the mock to reflect the intended initial state.
-    cardData: { ...initialMockDisplayableRevenueCard, isFlipped: true },
+    initialCardData: { ...initialMockDisplayableRevenueCard, isFlipped: true },
   },
 };
 
@@ -253,8 +245,7 @@ export const MinimalData: Story = {
   args: {
     ...Default.args,
     initialIsFlipped: false,
-    cardData: {
-      // This is DisplayableCard (RevenueCardData & DisplayableCardState)
+    initialCardData: {
       id: "revenue-minimal-data",
       type: "revenue",
       symbol: "MIN",
@@ -281,23 +272,25 @@ export const MinimalData: Story = {
         description: "Financial highlights for Minimal Inc. (Q1 2024).",
       },
     },
-    sourceCardId: "revenue-minimal-data",
-    sourceCardSymbol: "MIN",
     cardContext: {
       ...mockCardContext,
       id: "revenue-minimal-data",
       symbol: "MIN",
+      type: "revenue" as CardType,
       companyName: "Minimal Inc.",
       logoUrl: null,
     },
   },
 };
 
-export const NoInteractions: Story = {
+export const NoInteractionsStory: Story = {
   render: (args) => <RevenueCardStoryWrapper {...args} />,
   args: {
     ...Default.args,
-    onHeaderIdentityClick: undefined,
-    specificInteractions: undefined,
+    initialIsFlipped: false,
+    initialCardData: { ...initialMockDisplayableRevenueCard, isFlipped: false },
+    onGenericInteraction: (payload: InteractionPayload) => {
+      action("onGenericInteraction (NoInteractionsStory)")(payload);
+    },
   },
 };

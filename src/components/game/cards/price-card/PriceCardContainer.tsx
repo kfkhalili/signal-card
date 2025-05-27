@@ -1,34 +1,19 @@
 // src/components/game/cards/price-card/PriceCardContainer.tsx
 import React from "react";
 import BaseCard from "../base-card/BaseCard";
-import type {
-  PriceCardData, // Still useful for internal casting
-  PriceCardInteractions,
-} from "./price-card.types";
+import type { PriceCardData } from "./price-card.types";
 import { PriceCardContent } from "./PriceCardContent";
-import type { DisplayableCard } from "../../types"; // Import DisplayableCard
-import type { RegisteredCardRendererProps } from "../../cardRenderers"; // Import the generic props
-import { CardType, OnGenericInteraction } from "../base-card/base-card.types";
+import type { DisplayableCard } from "../../types";
+import type { RegisteredCardRendererProps } from "../../cardRenderers";
+import type { OnGenericInteraction } from "../base-card/base-card.types";
 
-// Props should align with RegisteredCardRendererProps for cardData,
-// then add any specific interaction props.
 interface PriceCardContainerProps
   extends Omit<
     RegisteredCardRendererProps,
-    "cardData" | "specificInteractions" | "priceSpecificInteractions"
+    "cardData" | "specificInteractions" | "priceSpecificInteractions" // Ensure all specific interaction props are omitted
   > {
-  cardData: DisplayableCard; // Accept generic DisplayableCard
+  cardData: DisplayableCard;
   onGenericInteraction: OnGenericInteraction;
-  sourceCardId: string;
-  sourceCardSymbol: string;
-  sourceCardType: CardType;
-  priceSpecificInteractions?: Pick<
-    PriceCardInteractions,
-    | "onPriceCardSmaClick"
-    | "onPriceCardRangeContextClick"
-    | "onPriceCardOpenPriceClick"
-    | "onPriceCardGenerateDailyPerformanceSignal"
-  >;
 }
 
 export const PriceCardContainer = React.memo<PriceCardContainerProps>(
@@ -38,16 +23,11 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
     onFlip,
     cardContext,
     onDeleteRequest,
-    onHeaderIdentityClick,
     className,
     innerCardClassName,
     children,
     onGenericInteraction,
-    sourceCardId,
-    sourceCardSymbol,
-    sourceCardType,
   }) => {
-    // Type guard and assertion
     if (cardData.type !== "price") {
       console.error(
         "[PriceCardContainer] Received incorrect card type:",
@@ -55,14 +35,12 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
       );
       return null;
     }
+    // Cast to specific card data type for PriceCardContent
     const specificCardData = cardData as PriceCardData;
 
     const contentProps = {
       cardData: specificCardData,
       onGenericInteraction,
-      sourceCardId,
-      sourceCardSymbol,
-      sourceCardType,
     };
 
     const faceContentForBaseCard = (
@@ -80,9 +58,10 @@ export const PriceCardContainer = React.memo<PriceCardContainerProps>(
         onFlip={onFlip}
         cardContext={cardContext}
         onDeleteRequest={onDeleteRequest}
-        onHeaderClick={onHeaderIdentityClick}
         className={className}
-        innerCardClassName={innerCardClassName}>
+        innerCardClassName={innerCardClassName}
+        onGenericInteraction={onGenericInteraction} // Pass down to BaseCard
+      >
         {children}
       </BaseCard>
     );

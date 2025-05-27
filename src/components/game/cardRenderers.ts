@@ -3,32 +3,28 @@ import React from "react";
 import type {
   CardType,
   OnGenericInteraction,
-} from "@/components/game/cards/base-card/base-card.types";
+} from "@/components/game/cards/base-card/base-card.types"; //
 import type { CardActionContext } from "@/components/game/cards/base-card/base-card.types";
-import type { PriceCardInteractions } from "./cards/price-card/price-card.types";
-import type { ProfileCardInteractions } from "./cards/profile-card/profile-card.types";
-import type { DisplayableCard } from "./types";
+import type { DisplayableCard } from "./types"; //
 
-interface CommonCardRendererProps {
+/**
+ * Common props expected by all registered card renderers (containers).
+ * GameCard will prepare and pass these down.
+ */
+export interface RegisteredCardRendererProps {
+  cardData: DisplayableCard; // The full data for the card being rendered
   isFlipped: boolean;
   onFlip: () => void;
-  cardContext: CardActionContext;
+  cardContext: CardActionContext; // Contextual info about the card for actions
   onDeleteRequest: (context: CardActionContext) => void;
-  onHeaderIdentityClick?: (context: CardActionContext) => void;
-  className?: string;
-  innerCardClassName?: string;
-  children?: React.ReactNode;
-  onGenericInteraction: OnGenericInteraction;
-  sourceCardId: string;
-  sourceCardSymbol: string;
-  sourceCardType: CardType;
-}
+  onHeaderIdentityClick?: (context: CardActionContext) => void; // Optional: For BaseCard header clicks
+  className?: string; // For outer styling of the card component
+  innerCardClassName?: string; // For styling the inner flippable surfaces
+  children?: React.ReactNode; // For potential future extensibility
 
-export type RegisteredCardRendererProps = CommonCardRendererProps & {
-  cardData: DisplayableCard;
-  priceSpecificInteractions?: PriceSpecificInteractionsForContainer;
-  specificInteractions?: ProfileCardInteractions;
-};
+  // The primary generic interaction handler passed from the top
+  onGenericInteraction: OnGenericInteraction;
+}
 
 type RegisteredCardRenderer = React.ComponentType<RegisteredCardRendererProps>;
 
@@ -53,11 +49,3 @@ export function getCardRenderer(
 ): RegisteredCardRenderer | undefined {
   return cardRendererRegistry.get(cardType);
 }
-
-type PriceSpecificInteractionsForContainer = Pick<
-  PriceCardInteractions,
-  | "onPriceCardSmaClick"
-  | "onPriceCardRangeContextClick"
-  | "onPriceCardOpenPriceClick"
-  | "onPriceCardGenerateDailyPerformanceSignal"
->;

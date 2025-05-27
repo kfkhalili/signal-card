@@ -1,5 +1,10 @@
 // src/components/game/cards/price-card/PriceCardContainer.stories.tsx
-import React, { useState, useCallback, useEffect } from "react";
+import React, {
+  useState,
+  useCallback,
+  useEffect,
+  type ComponentProps,
+} from "react";
 import type { Meta, StoryObj } from "@storybook/react";
 import { action } from "@storybook/addon-actions";
 import { PriceCardContainer } from "./PriceCardContainer";
@@ -7,7 +12,6 @@ import type {
   PriceCardData,
   PriceCardStaticData,
   PriceCardLiveData,
-  PriceCardInteractions,
 } from "./price-card.types";
 import type {
   CardActionContext,
@@ -27,79 +31,84 @@ const meta: Meta<typeof PriceCardContainer> = {
   },
   argTypes: {
     isFlipped: { control: "boolean" },
+    cardData: { control: "object" }, // Keep cardData
     cardContext: { control: "object" },
-    onGenericInteraction: { action: "onGenericInteraction" },
-    sourceCardId: { control: "text" },
-    sourceCardSymbol: { control: "text" },
-    sourceCardType: { control: "text" },
+    onGenericInteraction: { action: "onGenericInteraction" }, // This is the key interaction prop now
     onDeleteRequest: { action: "onDeleteRequest" },
-    onHeaderIdentityClick: { action: "onHeaderIdentityClick" },
     className: { control: "text" },
     innerCardClassName: { control: "text" },
-    priceSpecificInteractions: { control: "object" },
   },
 };
 
 export default meta;
 
-type PriceCardStoryWrapperProps = StoryObj<
-  typeof PriceCardContainer
->["args"] & {
+// Adjusted Props for the wrapper, PriceCardContainer itself has a leaner API now
+type PriceCardStoryWrapperProps = Omit<
+  ComponentProps<typeof PriceCardContainer>,
+  "isFlipped" | "onFlip" | "cardData"
+> & {
   initialIsFlipped: boolean;
+  // Pass the full cardData object to the wrapper, which includes isFlipped state for the initial setup
+  initialCardData: PriceCardData & DisplayableCardState;
 };
 
 const PriceCardStoryWrapper: React.FC<PriceCardStoryWrapperProps> = (props) => {
   const {
     initialIsFlipped,
-    cardData: initialCardDataFromArgs,
+    initialCardData, // Use this for initial state
     onGenericInteraction,
-    sourceCardId,
-    sourceCardSymbol,
-    sourceCardType,
     cardContext,
-    onDeleteRequest, // Destructure onDeleteRequest
-    onHeaderIdentityClick,
+    onDeleteRequest,
     className,
     innerCardClassName,
-    priceSpecificInteractions,
     children,
   } = props;
 
   const [localIsFlipped, setLocalIsFlipped] = useState(initialIsFlipped);
+  // The cardData for the container now also derives its flip state from localIsFlipped
+  const [currentCardData, setCurrentCardData] = useState<
+    PriceCardData & DisplayableCardState
+  >({
+    ...initialCardData,
+    isFlipped: initialIsFlipped,
+  });
 
   useEffect(() => {
     setLocalIsFlipped(initialIsFlipped);
+    setCurrentCardData((prev) => ({ ...prev, isFlipped: initialIsFlipped }));
   }, [initialIsFlipped]);
 
+  useEffect(() => {
+    // If initialCardData itself changes (e.g., from story args), update local state
+    setCurrentCardData({ ...initialCardData, isFlipped: localIsFlipped });
+  }, [initialCardData, localIsFlipped]);
+
   const handleFlip = useCallback(() => {
-    setLocalIsFlipped((prev) => {
-      const newFlippedState = !prev;
-      action("onFlip")(initialCardDataFromArgs?.id || "unknown-id");
+    setLocalIsFlipped((prevFlipped) => {
+      const newFlippedState = !prevFlipped;
+      action("onFlip")(initialCardData.id);
+      // Update the cardData prop passed to the container to reflect the flip
+      setCurrentCardData((prevCardData) => ({
+        ...prevCardData,
+        isFlipped: newFlippedState,
+      }));
       return newFlippedState;
     });
-  }, [initialCardDataFromArgs?.id]);
+  }, [initialCardData.id]);
 
-  // Extended guard clause
   if (
     !onGenericInteraction ||
-    !sourceCardId ||
-    !sourceCardSymbol ||
-    !sourceCardType ||
     !cardContext ||
-    !initialCardDataFromArgs ||
-    !onDeleteRequest // Add onDeleteRequest to the guard
+    !currentCardData || // Check currentCardData
+    !onDeleteRequest
   ) {
     if (process.env.NODE_ENV === "development") {
       console.error(
-        "[Storybook PriceCardStoryWrapper] Essential prop(s) missing from story args. " +
-          "PriceCardContainer requires: onGenericInteraction, sourceCardId, sourceCardSymbol, sourceCardType, cardContext, cardData, and onDeleteRequest.",
+        "[Storybook PriceCardStoryWrapper] Essential prop(s) missing from story args. ",
         {
           onGenericInteraction,
-          sourceCardId,
-          sourceCardSymbol,
-          sourceCardType,
           cardContext,
-          initialCardDataFromArgs,
+          currentCardData,
           onDeleteRequest,
         }
       );
@@ -113,30 +122,23 @@ const PriceCardStoryWrapper: React.FC<PriceCardStoryWrapperProps> = (props) => {
           backgroundColor: "lightpink",
           maxWidth: "300px",
           textAlign: "center",
-        }}></div>
+        }}>
+        {" "}
+        Error in story setup. Check console.{" "}
+      </div>
     );
   }
 
-  const currentCardDataForContainer = {
-    ...(initialCardDataFromArgs as PriceCardData & DisplayableCardState),
-    isFlipped: localIsFlipped,
-  };
-
   return (
     <PriceCardContainer
-      cardData={currentCardDataForContainer}
-      isFlipped={localIsFlipped}
+      cardData={currentCardData} // Pass the stateful cardData
+      isFlipped={localIsFlipped} // isFlipped is now consistent with cardData.isFlipped
       onFlip={handleFlip}
       onGenericInteraction={onGenericInteraction}
-      sourceCardId={sourceCardId}
-      sourceCardSymbol={sourceCardSymbol}
-      sourceCardType={sourceCardType}
       cardContext={cardContext}
-      onDeleteRequest={onDeleteRequest} // Now known to be non-undefined
-      onHeaderIdentityClick={onHeaderIdentityClick}
+      onDeleteRequest={onDeleteRequest}
       className={className}
-      innerCardClassName={innerCardClassName}
-      priceSpecificInteractions={priceSpecificInteractions}>
+      innerCardClassName={innerCardClassName}>
       {children}
     </PriceCardContainer>
   );
@@ -173,7 +175,8 @@ const mockBaseBackData: BaseCardBackData = {
     "This card shows the latest market price and key trading indicators for the stock. Flip for more technical data.",
 };
 
-const initialMockCardData: PriceCardData & DisplayableCardState = {
+// This is the full data structure for a PriceCard, including its display state.
+const initialMockPriceCardData: PriceCardData & DisplayableCardState = {
   id: "price-tsla-456",
   symbol: defaultSymbol,
   type: "price",
@@ -183,31 +186,16 @@ const initialMockCardData: PriceCardData & DisplayableCardState = {
   staticData: mockStaticData,
   liveData: mockLiveData,
   backData: mockBaseBackData,
-  isFlipped: false,
+  isFlipped: false, // Default flip state for the mock data
 };
 
 const mockCardContext: CardActionContext = {
-  id: initialMockCardData.id,
-  symbol: initialMockCardData.symbol,
+  id: initialMockPriceCardData.id,
+  symbol: initialMockPriceCardData.symbol,
   type: "price" as CardType,
-  companyName: initialMockCardData.companyName,
-  logoUrl: initialMockCardData.logoUrl,
-  websiteUrl: null,
-};
-
-const mockSpecificInteractions: PriceCardInteractions = {
-  onPriceCardSmaClick: (cardData, smaPeriod, smaValue) =>
-    action("specific:smaClick")(cardData.symbol, smaPeriod, smaValue),
-  onPriceCardRangeContextClick: (cardData, levelType, levelValue) =>
-    action("specific:rangeContextClick")(
-      cardData.symbol,
-      levelType,
-      levelValue
-    ),
-  onPriceCardOpenPriceClick: (cardData) =>
-    action("specific:openPriceClick")(cardData.symbol),
-  onPriceCardGenerateDailyPerformanceSignal: (cardData) =>
-    action("specific:generateSignal")(cardData.symbol),
+  companyName: initialMockPriceCardData.companyName,
+  logoUrl: initialMockPriceCardData.logoUrl,
+  websiteUrl: null, // Price cards typically don't have a primary website URL
 };
 
 const mockOnGenericInteraction: OnGenericInteraction = (
@@ -216,66 +204,42 @@ const mockOnGenericInteraction: OnGenericInteraction = (
   action("onGenericInteraction")(payload);
 };
 
-// Define a default mock for onDeleteRequest for convenience
 const mockOnDeleteRequest = (context: CardActionContext) =>
   action("onDeleteRequest")(context);
 
-type Story = StoryObj<typeof PriceCardContainer>;
+type Story = StoryObj<PriceCardStoryWrapperProps>; // Use the wrapper's props type
 
 export const Default: Story = {
-  render: (args) => (
-    <PriceCardStoryWrapper
-      {...args}
-      initialIsFlipped={args.isFlipped ?? false}
-    />
-  ),
+  render: (args) => <PriceCardStoryWrapper {...args} />,
   args: {
-    cardData: { ...initialMockCardData, isFlipped: false },
-    isFlipped: false,
+    initialIsFlipped: false,
+    initialCardData: initialMockPriceCardData, // Pass the full initial card data
     cardContext: mockCardContext,
-    onDeleteRequest: mockOnDeleteRequest, // Use the defined mock
-    onHeaderIdentityClick: (context) =>
-      action("onHeaderIdentityClick")(context),
+    onDeleteRequest: mockOnDeleteRequest,
     onGenericInteraction: mockOnGenericInteraction,
-    sourceCardId: initialMockCardData.id,
-    sourceCardSymbol: initialMockCardData.symbol,
-    sourceCardType: "price",
-    priceSpecificInteractions: mockSpecificInteractions,
     className: "w-[300px] h-[420px]",
   },
 };
 
 export const Flipped: Story = {
-  render: (args) => (
-    <PriceCardStoryWrapper
-      {...args}
-      initialIsFlipped={args.isFlipped ?? true}
-    />
-  ),
+  render: (args) => <PriceCardStoryWrapper {...args} />,
   args: {
-    ...Default.args,
-    cardData: {
-      ...(Default.args?.cardData as PriceCardData & DisplayableCardState),
-      isFlipped: true,
-    },
-    isFlipped: true,
+    ...Default.args, // Spread default args
+    initialIsFlipped: true,
+    initialCardData: { ...initialMockPriceCardData, isFlipped: true }, // Ensure mock reflects this
   },
 };
 
 export const MinimalData: Story = {
-  render: (args) => (
-    <PriceCardStoryWrapper
-      {...args}
-      initialIsFlipped={args.isFlipped ?? false}
-    />
-  ),
+  render: (args) => <PriceCardStoryWrapper {...args} />,
   args: {
-    ...Default.args,
-    cardData: {
-      ...initialMockCardData,
+    ...Default.args, // Spread default args
+    initialIsFlipped: false,
+    initialCardData: {
+      // This is DisplayableCard (PriceCardData & DisplayableCardState)
+      ...initialMockPriceCardData, // Start with full mock
       id: "price-btc-minimal",
       symbol: "BTC",
-      isFlipped: Default.args?.isFlipped ?? false,
       companyName: "Bitcoin",
       logoUrl: null,
       liveData: {
@@ -297,34 +261,29 @@ export const MinimalData: Story = {
       staticData: {
         exchange_code: "Crypto",
       },
+      isFlipped: false, // Explicitly set
     },
-    sourceCardId: "price-btc-minimal",
-    sourceCardSymbol: "BTC",
     cardContext: {
-      ...(Default.args?.cardContext as CardActionContext),
-      id: "price-btc-minimal",
+      id: "price-btc-minimal", // Ensure context matches cardData
       symbol: "BTC",
+      type: "price" as CardType,
       companyName: "Bitcoin",
       logoUrl: null,
+      websiteUrl: null,
     },
   },
 };
 
-export const NoInteractions: Story = {
-  render: (args) => (
-    <PriceCardStoryWrapper
-      {...args}
-      initialIsFlipped={args.isFlipped ?? false}
-    />
-  ),
+export const NoInteractionsStory: Story = {
+  // Renamed to avoid conflict with type
+  render: (args) => <PriceCardStoryWrapper {...args} />,
   args: {
-    ...Default.args,
-    // To satisfy the guard, NoInteractions must now provide a non-undefined onDeleteRequest.
-    // If it's truly "no interactions", this would be a no-op.
-    onDeleteRequest: (context) => {
-      action("onDeleteRequest (no-op for NoInteractions story)")(context);
+    ...Default.args, // Spread default args
+    initialIsFlipped: false,
+    initialCardData: { ...initialMockPriceCardData, isFlipped: false }, // Use a distinct card data if needed
+    onGenericInteraction: (payload: InteractionPayload) => {
+      action("onGenericInteraction (NoInteractionsStory)")(payload);
+      // No actual interaction handling for this story, just logging
     },
-    onHeaderIdentityClick: undefined,
-    priceSpecificInteractions: undefined,
   },
 };

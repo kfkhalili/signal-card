@@ -1,135 +1,126 @@
 # **Process for Adding a New Card Type: "Revenue Card" Example**
 
-Adding a new card type to the FinCard Explorer application involves a series of steps to define its data structure, appearance, behavior, and integration with the existing system. This document outlines the process followed for the "Revenue Card," which displays key financial metrics from a company's income and cash flow statements.
+Adding a new card type to the FinCard Explorer application involves a series of steps to define its data structure, appearance, behavior, and integration with the existing system. This document outlines the process, reflecting the updated generic interaction model, using the "Revenue Card" as an example.
 
 ## **1\. Define Core Types & Card-Specific Data Structures**
 
 The first step is to define the necessary TypeScript types.
 
-- **Update Global Card Types**:
-  - The main CardType union (in src/components/game/cards/base-card/base-card.types.ts) was extended to include "revenue".
-  - The ConcreteCardData and DisplayableCard union types (in src/components/game/types.ts) were updated to include the new RevenueCardData type.
-- **Create Card-Specific Types (src/components/game/cards/revenue-card/revenue-card.types.ts)**:
-  - **RevenueCardFmpIncomeStatementData & RevenueCardFmpCashFlowData**: Interfaces to represent the relevant fields parsed from the income_statement_payload and cash_flow_payload JSONB columns in the financial_statements Supabase table. These include fields like revenue, grossProfit, operatingIncome, netIncome, and freeCashFlow, along with contextual data like date, period, reportedCurrency, etc.
-  - **RevenueCardStaticData**: Defines less frequently changing data for the card, such as a formatted periodLabel (e.g., "FY2023"), reportedCurrency, filingDate, acceptedDate, statementDate, and statementPeriod.
-  - **RevenueCardLiveData**: Holds the actual financial figures that will be displayed and potentially updated: revenue, grossProfit, operatingIncome, netIncome, and freeCashFlow.
-  - **RevenueCardData**: The main data interface for the revenue card, extending BaseCardData (which includes id, type, symbol, companyName, logoUrl, createdAt, backData). It includes staticData and liveData.
-  - **RevenueCardInteractions**: An interface for any interactions specific to this card type (initially empty).
+- **Update Global Card Types** (in `src/components/game/cards/base-card/base-card.types.ts`):
+
+  - Extend the `CardType` union to include the new card type (e.g., `"revenue"`).
+
+- **Update Union Types** (in `src/components/game/types.ts`):
+
+  - Update `ConcreteCardData` and `DisplayableCard` union types to include the new card's data type (e.g., `RevenueCardData`).
+
+- **Create Card-Specific Types** (e.g., in `src/components/game/cards/revenue-card/revenue-card.types.ts`):
+
+  - **External Data Interfaces** (e.g., `RevenueCardFmpIncomeStatementData`): Define interfaces for relevant parts of external data sources (like FMP API payloads) if the card processes complex external data.
+  - **`[CardName]StaticData`**: Defines less frequently changing, serializable data specific to the card.
+  - **`[CardName]LiveData`**: Defines more frequently updated, serializable data.
+  - **`[CardName]Data`**: The main data interface for the new card, extending `BaseCardData`. It includes its specific `staticData` and `liveData`.
+  - **`[CardName]Interactions`**: This interface is now deprecated for specific callback props. All interactions are channeled through the generic `OnGenericInteraction` system defined in `base-card.types.ts`.
+
+- **Update Generic Interaction Types** (in `src/components/game/cards/base-card/base-card.types.ts`):
+
+  - If the new card introduces fundamentally new _intents_ for interaction (beyond requesting new cards, navigation, filtering, or custom actions), update the `InteractionIntent` union type.
+  - If a new intent requires a unique payload structure, define a new interface (e.g., `[NewIntent]Interaction`) extending `BaseInteraction` and add it to the `InteractionPayload` discriminated union.
 
 ## **2\. Implement the Card Initializer**
 
-This function is responsible for fetching initial data and constructing the card object when a user adds it to their workspace.
+This asynchronous function fetches initial data and constructs the card object when a user adds it to their workspace.
 
-- **File**: src/components/game/cards/revenue-card/revenueCardUtils.ts
-- **Function**: async function initializeRevenueCard(context: CardInitializationContext)
+- **File**: e.g., `src/components/game/cards/revenue-card/revenueCardUtils.ts`
+- **Function**: `async function initialize[CardName]Card(context: CardInitializationContext)`
 - **Logic**:
-  1. Fetches company_name and image (logo URL) from the public.profiles table for the given symbol. This ensures the card header has appropriate display information from the start. If profile data is not found, it defaults companyName to the symbol and logoUrl to null.
-  2. Fetches the latest financial statement record from the public.financial_statements table for the symbol, ordering by date and then period to get the most recent and comprehensive data.
-  3. If statement data is found:
-     - Parses the income_statement_payload and cash_flow_payload.
-     - Constructs RevenueCardStaticData and RevenueCardLiveData using the fetched and parsed data.
-     - Uses a helper function (constructRevenueCardData) to assemble the full RevenueCardData object, incorporating the profile information for companyName and logoUrl.
-     - Creates the DisplayableRevenueCard object, setting isFlipped: false.
-  4. If no statement data is found, it informs the user via a toast and returns null.
-  5. Handles any errors during the process, showing a toast message.
-- **Registration**: The initializeRevenueCard function is registered with the system using registerCardInitializer("revenue", initializeRevenueCard).
-- **Global Import**: revenueCardUtils.ts is imported in src/components/game/cards/initializers.ts to ensure the registration code runs.
+  1. Fetch necessary data from Supabase or other sources (e.g., profile info, latest relevant data for the card).
+  2. Parse and transform fetched data into the card's `StaticData` and `LiveData` structures.
+  3. Construct the full `[CardName]Data` object, including common properties from `BaseCardData` (like `id`, `type`, `symbol`, `companyName`, `logoUrl`, `createdAt`, and `backData`).
+  4. Return a `DisplayableCard` object (which includes `isFlipped: false` and the constructed card data) or `null` if initialization fails.
+  5. Handle errors gracefully, potentially using the `toast` from the context.
+- **Registration**: Register the initializer in `src/components/game/cardInitializer.types.ts` using `registerCardInitializer("[cardType]", initialize[CardName]Card)`.
+- **Global Import**: Import the card's utility file (e.g., `revenueCardUtils.ts`) in `src/components/game/cards/initializers.ts` to ensure the registration code executes.
 
 ## **3\. Create UI Components for Rendering**
 
-These React components define how the card looks and feels.
+These React components define the card's visual representation and how users interact with its content.
 
-- **RevenueCardContent.tsx (src/components/game/cards/revenue-card/RevenueCardContent.tsx)**:
-  - Displays the financial data for both front and back faces.
-  - Uses a reusable DataRow sub-component for consistent formatting of label-value pairs.
-  - **Front Face**: Shows a Badge with the periodLabel. Displays "Revenue" (with a larger label and value size for prominence), "Gross Profit", "Operating Income", "Net Income", and "Free Cash Flow". Each data row is interactive, triggering a generic interaction to request a "price" card for the symbol. Hover effects change text color to primary (no background change). Currency symbol "$" is used for "USD".
-  - **Back Face**: Shows the card's backData.description. Displays metadata: Period, Currency, Statement Date, Filing Date, and Accepted Date. Financial figures are not repeated on the back.
-- **RevenueCardContainer.tsx (src/components/game/cards/revenue-card/RevenueCardContainer.tsx)**:
-  - A wrapper component that uses the BaseCard component for the common card shell (flippable structure, header, delete button).
-  - Passes instances of RevenueCardContent (configured for front and back) to BaseCard.
-  - Manages props and context for BaseCard.
-- **Renderer Registration**: The RevenueCardContainer is registered in src/components/game/cards/rendererRegistryInitializer.ts using registerCardRenderer("revenue", RevenueCardContainer).
+- **`[CardName]Content.tsx`** (e.g., `src/components/game/cards/revenue-card/RevenueCardContent.tsx`):
+  - Renders the specific data for the card's front and back faces.
+  - Receives `cardData` (the specific `[CardName]Data`) and `onGenericInteraction` as props.
+  - Interactive elements within the content (e.g., clickable metrics, links) should call the received `onGenericInteraction` prop with an appropriate `InteractionPayload`.
+  - For example, clicking a data row in `RevenueCardContent` that should lead to a Price card dispatches an `InteractionPayload` with `intent: "REQUEST_NEW_CARD"` and `targetCardType: "price"`.
+- **`[CardName]Container.tsx`** (e.g., `src/components/game/cards/revenue-card/RevenueCardContainer.tsx`):
+  - Acts as a wrapper that utilizes the `BaseCard` component for common UI structure (flippable shell, header, delete functionality).
+  - Passes instances of `[CardName]Content` (for front and back faces) to `BaseCard`.
+  - Receives `onGenericInteraction` from `GameCard` and passes it down to `BaseCard` and `[CardName]Content`.
+  - Does **not** handle card-specific interaction props directly anymore; all interactions are channeled through `onGenericInteraction`.
+- **Renderer Registration**: Register `[CardName]Container` in `src/components/game/cardRenderers.ts` using `registerCardRenderer("[cardType]", [CardName]Container)`. The `RegisteredCardRendererProps` type has been updated to remove card-specific interaction bundles.
+- **Global Import**: Import the container in `src/components/game/cards/rendererRegistryInitializer.ts`.
 
 ## **4\. Implement the Card Rehydrator**
 
-This function reconstructs the card's state from data stored in local storage when the application loads.
+This function reconstructs the card's state from data stored in local storage.
 
-- **File**: src/components/game/cards/revenue-card/revenueCardRehydrator.ts
-- **Function**: rehydrateRevenueCardInstance(cardFromStorage, commonProps)
+- **File**: e.g., `src/components/game/cards/revenue-card/revenueCardRehydrator.ts`
+- **Function**: `rehydrate[CardName]Instance(cardFromStorage: Record<string, unknown>, commonProps: CommonCardPropsForRehydration)`
 - **Logic**:
-  1. Safely accesses staticData and liveData from the raw cardFromStorage object.
-  2. Provides default values (e.g., null, "N/A") for each field if it's missing or invalid in the stored data, ensuring the rehydrated object conforms to RevenueCardStaticData and RevenueCardLiveData.
-  3. Reconstructs backData with a default description if necessary.
-  4. Assembles the complete RevenueCardData object using the parsed data and the commonProps (which include id, symbol, createdAt, companyName, logoUrl, isFlipped).
-- **Registration**: Registered using registerCardRehydrator("revenue", rehydrateRevenueCardInstance).
-- **Global Import**: revenueCardRehydrator.ts is imported in src/components/game/cards/rehydrators.ts.
+  1. Safely access specific static and live data fields from `cardFromStorage`.
+  2. Provide default values for missing or invalid fields to conform to `[CardName]StaticData` and `[CardName]LiveData`.
+  3. Reconstruct `backData` with a default or derived description.
+  4. Assemble the complete `[CardName]Data` object using the rehydrated data and `commonProps`.
+- **Registration**: Register the rehydrator in `src/components/game/cardRehydration.ts` using `registerCardRehydrator("[cardType]", rehydrate[CardName]Instance)`.
+- **Global Import**: Import the card's rehydrator file (e.g., `revenueCardRehydrator.ts`) in `src/components/game/cards/rehydrators.ts`.
 
 ## **5\. Implement Update Handlers for Real-time Data**
 
-These functions process incoming data changes and update the card's state.
+These functions process incoming real-time data changes and update the card's state.
 
-- **Define New Event Type**: "FINANCIAL_STATEMENT_UPDATE" was added to CardUpdateEventType in src/components/game/cardUpdateHandler.types.ts.
-- **Financial Statement Update Handler (revenueCardUtils.ts)**:
-  - **Function**: handleRevenueCardStatementUpdate(currentCardData, newFinancialStatementRow, context)
-  - **Trigger**: Real-time updates from the financial_statements table.
+- **Define Event Type(s)**: If the card subscribes to new types of real-time data, add corresponding event types to `CardUpdateEventType` in `src/components/game/cardUpdateHandler.types.ts`. For the Revenue Card, "FINANCIAL_STATEMENT_UPDATE" was added.
+- **Create Update Handler(s)** (e.g., in `src/components/game/cards/revenue-card/revenueCardUtils.ts`):
+  - **Function Signature**: `CardUpdateHandler<[CardName]Data, [UpdatePayloadType]>`
   - **Logic**:
-    1. Compares the incoming newFinancialStatementRow's date, period, and accepted_date with the currentRevenueCardData.
-    2. Determines if the new statement is more recent or more relevant (e.g., "FY" preferred over "Q4" for the same year-end date).
-    3. If an update is warranted, it reconstructs the RevenueCardData using the constructRevenueCardData helper, preserving the card's id, existing companyName, and logoUrl, but updating staticData, liveData, backData.description, and createdAt.
-    4. Shows a toast notification about the update.
-  - **Registration**: Registered for the "revenue" card type and "FINANCIAL_STATEMENT_UPDATE" event.
-- **Profile Info Update Handler (revenueCardUtils.ts)**:
-  - **Function**: handleRevenueCardProfileUpdate(currentCardData, profilePayload, context)
-  - **Trigger**: Real-time updates from the profiles table (via useStockData).
-  - **Logic**:
-    1. Compares the incoming profilePayload's company_name and image with the currentRevenueCardData.
-    2. If there's a change, it updates the companyName and logoUrl on the RevenueCardData.
-    3. Also updates the backData.description if it contained the company name.
-  - **Registration**: Registered for the "revenue" card type and "STATIC_PROFILE_UPDATE" event.
-- **Global Import**: revenueCardUtils.ts (which now contains these handlers) is imported in src/components/game/cards/updateHandlerInitializer.ts.
+    1. Compare incoming `updatePayload` with `currentCardConcreteData`.
+    2. If an update is necessary, construct and return a new `[CardName]Data` object. Otherwise, return the current data.
+    3. The `handleRevenueCardStatementUpdate` function, for instance, compares dates and period relevance before reconstructing the card data.
+    4. The `handleRevenueCardProfileUpdate` updates `companyName`, `logoUrl`, and `backData.description` if the profile information changes.
+- **Registration**: Register handlers in `src/components/game/cardUpdateHandler.types.ts` using `registerCardUpdateHandler("[cardType]", "[EventType]", handlerFunction)`.
+- **Global Import**: Import the card's utility file in `src/components/game/cards/updateHandlerInitializer.ts`.
 
-## **6\. Integrate Real-time Subscriptions**
+## **6\. Integrate Real-time Subscriptions (if applicable)**
 
-This involves modifying several hooks and components to listen for and propagate financial statement updates.
+If the new card type depends on a new real-time data source (like the Revenue Card needing `financial_statements`):
 
-- **src/lib/supabase/realtime-service.ts**:
-  - Added FinancialStatementDBRow and FinancialStatementPayload types.
-  - Implemented subscribeToFinancialStatementUpdates(symbol, onData, onStatusChange) function to subscribe to changes on the financial_statements table for a specific symbol.
-- **src/hooks/useStockData.ts**:
-  - Added an onFinancialStatementUpdate?: (statement: FinancialStatementDBRow) \=\> void prop to its interface.
-  - Added a useEffect hook to call subscribeToFinancialStatementUpdates when the symbol or onFinancialStatementUpdate callback changes.
-  - When new statement data is received via the subscription, it calls the onFinancialStatementUpdate callback.
-  - Manages the lifecycle (subscribe/unsubscribe) of this new subscription.
-- **src/components/workspace/StockDataHandler.tsx**:
-  - Added the onFinancialStatementUpdate prop to its interface.
-  - Passes this prop down to the useStockData hook.
-- **src/hooks/useWorkspaceManager.ts**:
-  - Defined a handleFinancialStatementUpdate(updatedStatementDBRow) callback. This function:
-    - Identifies active "revenue" cards for the relevant symbol.
-    - Uses getCardUpdateHandler("revenue", "FINANCIAL_STATEMENT_UPDATE") to get the specific handler.
-    - Calls the handler to update the card's data if necessary.
-    - Updates the activeCards state.
-  - Ensured handleStaticProfileUpdate also iterates and applies updates to "revenue" cards if their companyName or logoUrl needs changing based on a profile update.
-  - Added onFinancialStatementUpdate: handleFinancialStatementUpdate to the stockDataCallbacks object returned by the hook.
-- **src/app/workspace/page.tsx**:
-  - When rendering StockDataHandler components, it now passes stockDataCallbacks.onFinancialStatementUpdate as the onFinancialStatementUpdate prop.
+- **`src/lib/supabase/realtime-service.ts`**:
+  - Define necessary database row and payload types (e.g., `FinancialStatementDBRow`, `FinancialStatementPayload`).
+  - Implement a new subscription function (e.g., `subscribeToFinancialStatementUpdates`).
+- **`src/hooks/useStockData.ts`**:
+  - Add a new callback prop for the new data type (e.g., `onFinancialStatementUpdate`).
+  - Use `useEffect` to manage the lifecycle of the new subscription, calling the function from `realtime-service.ts`.
+- **`src/components/workspace/StockDataHandler.tsx`**:
+  - Add the new callback prop and pass it to `useStockData`.
+- **`src/hooks/useWorkspaceManager.ts`**:
+  - Define a handler for the new data type (e.g., `handleFinancialStatementUpdate`).
+  - This handler uses `getCardUpdateHandler` to find the appropriate function and update active cards.
+  - Add this new handler to the `stockDataCallbacks` object.
+- **`src/app/workspace/page.tsx`**:
+  - Pass the new callback from `stockDataCallbacks` to `StockDataHandler` instances.
 
 ## **7\. Create Storybook Story**
 
-To visualize and test the card in isolation.
+Visualizing and testing the new card in isolation using Storybook.
 
-- **File**: src/components/game/cards/revenue-card/RevenueCardContainer.stories.tsx
+- **File**: e.g., `src/components/game/cards/revenue-card/RevenueCardContainer.stories.tsx`
 - **Setup**:
-  - Created mock data for RevenueCardData (including staticData, liveData, backData).
-  - Used a RevenueCardStoryWrapper component to manage the local isFlipped state for Storybook controls, similar to other card stories.
-  - Defined stories for "Default", "Flipped", and "MinimalData" states.
-  - Configured argTypes for Storybook controls.
+  - Create mock data for `[CardName]Data`.
+  - Use a `[CardName]StoryWrapper` component to manage local state for `isFlipped` and the `currentCardData` being passed to the container.
+  - Define stories for different states (e.g., "Default", "Flipped", "MinimalData").
+  - Configure `argTypes` for Storybook controls, focusing on props like `initialCardData`, `cardContext`, and `onGenericInteraction`. Card-specific interaction props are no longer part of the container's direct API.
 
 ## **8\. Make Card Selectable in UI**
 
-The final step to allow users to add the new card.
+Allow users to add the new card type to their workspace.
 
-- **File**: src/components/workspace/AddCardForm.tsx
-- **Change**: Added { value: "revenue", label: "Revenue Card" } to the AVAILABLE_CARD_TYPES array. This makes "Revenue Card" an option in the "Add New Card" dialog.
-
-This comprehensive process ensures that the new "Revenue Card" is fully defined, renderable, updatable via real-time events, persistable, and user-selectable within the application.
+- **File**: `src/components/workspace/AddCardForm.tsx`
+- **Change**: Add an entry for the new card type to the `AVAILABLE_CARD_TYPES` array (e.g., `{ value: "revenue", label: "Revenue Card" }`).

@@ -1,5 +1,5 @@
 // src/components/game/cards/price-card/price-card.types.ts
-import type { BaseCardData } from "../base-card/base-card.types";
+import type { BaseCardData } from "../base-card/base-card.types"; //
 
 /**
  * Defines the static, less frequently changing data specific to a price card.
@@ -37,28 +37,8 @@ export interface PriceCardLiveData {
  * The `backData` (for description) is inherited from BaseCardData.
  */
 export interface PriceCardData extends BaseCardData {
+  //
   readonly type: "price";
   readonly staticData: PriceCardStaticData;
-  liveData: PriceCardLiveData; // Mutable for live updates
-}
-
-/**
- * Defines specific interaction callbacks for a PriceCard.
- * These are actions unique to the PriceCard that aren't covered by generic interactions.
- */
-export interface PriceCardInteractions {
-  readonly onPriceCardSmaClick?: (
-    cardData: PriceCardData,
-    smaPeriod: 50 | 200,
-    smaValue: number
-  ) => void;
-  readonly onPriceCardRangeContextClick?: (
-    cardData: PriceCardData,
-    levelType: "High" | "Low" | "YearHigh" | "YearLow",
-    levelValue: number
-  ) => void;
-  readonly onPriceCardOpenPriceClick?: (cardData: PriceCardData) => void;
-  readonly onPriceCardGenerateDailyPerformanceSignal?: (
-    cardData: PriceCardData
-  ) => void;
+  liveData: PriceCardLiveData;
 }

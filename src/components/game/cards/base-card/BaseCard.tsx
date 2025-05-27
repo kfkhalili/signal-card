@@ -9,7 +9,8 @@ import Image from "next/image";
 import type {
   CardActionContext,
   OnGenericInteraction,
-  InteractionPayload,
+  RequestNewCardInteraction,
+  NavigateExternalInteraction,
 } from "./base-card.types";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
 
@@ -20,11 +21,10 @@ interface BaseCardProps {
   cardContext: CardActionContext;
   onDeleteRequest?: (context: CardActionContext) => void;
   onFlip: () => void;
-  onHeaderClick?: (context: CardActionContext) => void;
   className?: string;
   innerCardClassName?: string;
   children?: React.ReactNode;
-  onGenericInteraction?: OnGenericInteraction;
+  onGenericInteraction: OnGenericInteraction;
 }
 
 const outerStyle: React.CSSProperties = {
@@ -56,18 +56,18 @@ const BaseCard: React.FC<BaseCardProps> = ({
   cardContext,
   onDeleteRequest,
   onFlip,
-  onHeaderClick,
   className,
   innerCardClassName,
   children,
   onGenericInteraction,
 }) => {
   const {
-    symbol,
+    id: sourceCardId,
+    symbol: sourceCardSymbol,
+    type: sourceCardType,
     companyName,
     logoUrl,
     websiteUrl,
-    type: cardType,
   } = cardContext;
 
   const frontFaceRef = useRef<HTMLDivElement>(null);
@@ -92,7 +92,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
     <button
       onClick={handleDeleteClick}
       title="Delete Card"
-      aria-label={`Delete ${symbol} card`}
+      aria-label={`Delete ${sourceCardSymbol} card`}
       className={cn(
         "absolute top-1 right-1 z-30 p-1 flex items-center justify-center transition-all",
         "text-muted-foreground/60 hover:text-destructive rounded-full hover:bg-destructive/10",
@@ -110,13 +110,32 @@ const BaseCard: React.FC<BaseCardProps> = ({
       | React.KeyboardEvent<HTMLDivElement>
   ) => {
     event.stopPropagation();
-    if (onGenericInteraction) {
-      const payload: InteractionPayload = {
-        sourceCardId: cardContext.id,
-        sourceCardSymbol: cardContext.symbol,
-        sourceCardType: cardContext.type,
-        interactionTarget: "card",
-        targetType: "profile", // Default: header click on any card requests a profile card for that symbol
+    const payload: RequestNewCardInteraction = {
+      intent: "REQUEST_NEW_CARD",
+      sourceCardId,
+      sourceCardSymbol,
+      sourceCardType,
+      targetCardType: "profile",
+      originatingElement: "cardHeaderNameSymbol",
+    };
+    onGenericInteraction(payload);
+  };
+
+  const handleLogoClick = (
+    event:
+      | React.MouseEvent<HTMLDivElement> // ClickableDataItem onClickHandler provides this
+      | React.KeyboardEvent<HTMLDivElement>
+  ) => {
+    event.stopPropagation();
+    if (websiteUrl) {
+      const payload: NavigateExternalInteraction = {
+        intent: "NAVIGATE_EXTERNAL",
+        sourceCardId,
+        sourceCardSymbol,
+        sourceCardType,
+        url: websiteUrl,
+        navigationTargetName: `${companyName || sourceCardSymbol} website`,
+        originatingElement: "cardHeaderLogo",
       };
       onGenericInteraction(payload);
     }
@@ -129,36 +148,37 @@ const BaseCard: React.FC<BaseCardProps> = ({
     <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 relative shrink-0">
       <Image
         src={logoUrl}
-        alt={`${companyName || symbol} logo`}
+        alt={`${companyName || sourceCardSymbol} logo`}
         fill
         sizes="(max-width: 640px) 28px, (max-width: 768px) 32px, 40px"
         className="object-contain rounded"
-        onError={(e) => (e.currentTarget.style.display = "none")}
+        onError={(e) => {
+          const target = e.target as HTMLImageElement;
+          target.style.display = "none";
+        }}
         priority={false}
       />
     </div>
   ) : (
     <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 shrink-0 bg-muted rounded-full flex items-center justify-center text-muted-foreground text-sm">
-      {symbol ? symbol.charAt(0) : "?"}
+      {sourceCardSymbol ? sourceCardSymbol.charAt(0) : "?"}
     </div>
   );
 
-  const clickableLogoElement =
-    logoUrl && websiteUrl ? (
-      <a
-        href={websiteUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={(e) => e.stopPropagation()}
-        className="cursor-pointer hover:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-full"
-        aria-label={`Visit ${companyName || symbol} website`}
-        data-interactive-child="true"
-        title={`Visit ${companyName || symbol} website`}>
-        {logoImageElement}
-      </a>
-    ) : (
-      logoImageElement
-    );
+  const clickableLogoElement = websiteUrl ? (
+    <ClickableDataItem
+      isInteractive={true}
+      onClickHandler={handleLogoClick} // Updated to use ClickableDataItem's event type
+      baseClassName="cursor-pointer hover:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-full"
+      aria-label={`Visit ${companyName || sourceCardSymbol} website`}
+      data-interactive-child="true"
+      title={`Visit ${companyName || sourceCardSymbol} website`}
+      role="link">
+      {logoImageElement}
+    </ClickableDataItem>
+  ) : (
+    logoImageElement
+  );
 
   const identityHeaderContent = (
     <>
@@ -166,45 +186,44 @@ const BaseCard: React.FC<BaseCardProps> = ({
         {clickableLogoElement}
       </div>
       <ClickableDataItem
-        isInteractive={!!onGenericInteraction}
-        onClickHandler={
-          onGenericInteraction ? handleHeaderTextClick : undefined
-        }
+        isInteractive={true}
+        onClickHandler={handleHeaderTextClick}
         className={cn(
           "text-right min-w-0 max-w-[calc(100%-3rem-12px)] sm:max-w-[calc(100%-3.5rem-12px)] md:max-w-[calc(100%-4rem-12px)]",
           "flex flex-col justify-center"
         )}
         style={{ minHeight: "4.25rem" }}
-        aria-label={
-          onHeaderClick
-            ? `View details for ${companyName || symbol}`
-            : undefined
-        }
-        data-interactive-child={!!onHeaderClick}
+        aria-label={`View profile for ${companyName || sourceCardSymbol}`}
+        data-interactive-child="true"
         data-testid="header-text-clickable">
         <CardTitle
           className={cn(
             "text-sm sm:text-base md:text-lg font-semibold leading-tight line-clamp-2 text-right"
           )}
-          title={companyName || symbol}>
-          {companyName || symbol}
+          title={companyName || sourceCardSymbol}>
+          {companyName || sourceCardSymbol}
         </CardTitle>
         <div className="h-[1.1em] sm:h-[1.2em] md:h-[1.25em] flex items-end justify-end">
           {companyName && (
             <p
               className="text-xs sm:text-sm text-muted-foreground truncate leading-tight pt-[1px] sm:pt-[2px]"
-              title={symbol}>
-              ({symbol})
+              title={sourceCardSymbol}>
+              ({sourceCardSymbol})
             </p>
           )}
-          {!companyName && cardType === "price" && (
+          {!companyName && sourceCardType === "price" && (
             <p className="text-xs sm:text-sm text-muted-foreground leading-tight pt-[1px] sm:pt-[2px] capitalize">
-              {cardType} Quote
+              {sourceCardType} Quote
             </p>
           )}
-          {!companyName && cardType === "profile" && (
+          {!companyName && sourceCardType === "profile" && (
             <p className="text-xs sm:text-sm text-muted-foreground leading-tight pt-[1px] sm:pt-[2px] capitalize">
-              {symbol} Profile
+              {sourceCardSymbol} Profile
+            </p>
+          )}
+          {!companyName && sourceCardType === "revenue" && (
+            <p className="text-xs sm:text-sm text-muted-foreground leading-tight pt-[1px] sm:pt-[2px] capitalize">
+              {sourceCardSymbol} Financials
             </p>
           )}
         </div>
@@ -228,11 +247,12 @@ const BaseCard: React.FC<BaseCardProps> = ({
       aria-hidden="true">
       <div className="flex justify-between items-start">
         <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0 mr-2 sm:mr-3">
-          <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10"></div>
+          <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10" />
         </div>
         <div
           className="min-w-0 max-w-[calc(100%-3rem-12px)] sm:max-w-[calc(100%-3.5rem-12px)] md:max-w-[calc(100%-4rem-12px)]"
-          style={{ minHeight: "4.25rem" }}></div>
+          style={{ minHeight: "4.25rem" }}
+        />
       </div>
     </div>
   );
@@ -241,13 +261,14 @@ const BaseCard: React.FC<BaseCardProps> = ({
     e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>
   ) => {
     let target = e.target as HTMLElement;
-    while (target && target !== (e.currentTarget as HTMLElement)) {
+    while (target && target !== e.currentTarget) {
       if (
         target.dataset.interactiveChild === "true" ||
         ["BUTTON", "A", "INPUT", "TEXTAREA", "SELECT"].includes(
           target.tagName
         ) ||
         target.getAttribute("role") === "button" ||
+        target.getAttribute("role") === "link" ||
         target.closest("[data-radix-interactive]")
       ) {
         return;
@@ -277,15 +298,15 @@ const BaseCard: React.FC<BaseCardProps> = ({
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (isFlipped) {
-        // Focus logic for back face
-      } else {
-        // Focus logic for front face
-      }
+      // Focus logic can be added here if needed after flip
     }, 0);
 
     return () => clearTimeout(timer);
   }, [isFlipped]);
+
+  // Correct usage of the inert attribute with boolean values
+  const frontFaceInert = isFlipped;
+  const backFaceInert = !isFlipped;
 
   return (
     <div style={outerStyle} className={cn("group", className)}>
@@ -309,11 +330,11 @@ const BaseCard: React.FC<BaseCardProps> = ({
           tabIndex={!isFlipped ? 0 : -1}
           aria-label={
             isFlipped
-              ? `Show ${symbol} front details`
-              : `Show ${symbol} back details`
+              ? `Show ${sourceCardSymbol} front details`
+              : `Show ${sourceCardSymbol} back details`
           }
           aria-pressed={isFlipped}
-          inert={isFlipped ? true : undefined}
+          inert={frontFaceInert ? true : undefined} // Use boolean for React prop
           aria-hidden={isFlipped ? "true" : "false"}>
           {deleteButtonElement}
           {actualIdentityHeaderElement}
@@ -338,10 +359,10 @@ const BaseCard: React.FC<BaseCardProps> = ({
           tabIndex={isFlipped ? 0 : -1}
           aria-label={
             isFlipped
-              ? `Show ${symbol} front details`
-              : `Show ${symbol} back details`
+              ? `Show ${sourceCardSymbol} front details`
+              : `Show ${sourceCardSymbol} back details`
           }
-          inert={!isFlipped ? true : undefined}
+          inert={backFaceInert ? true : undefined} // Use boolean for React prop
           aria-hidden={!isFlipped ? "true" : "false"}>
           {deleteButtonElement}
           {headerPlaceholderElementForBack}

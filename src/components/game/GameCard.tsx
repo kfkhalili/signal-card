@@ -4,29 +4,20 @@ import type { DisplayableCard } from "@/components/game/types";
 import type { ProfileCardData } from "./cards/profile-card/profile-card.types";
 import type {
   CardActionContext,
-  OnGenericInteraction, // Ensure this is imported
+  OnGenericInteraction,
 } from "./cards/base-card/base-card.types";
 import { cn } from "@/lib/utils";
 import {
   getCardRenderer,
   type RegisteredCardRendererProps,
-} from "@/components/game/cardRenderers"; // Import RegisteredCardRendererProps for type safety
+} from "@/components/game/cardRenderers";
 import "@/components/game/cards/rendererRegistryInitializer";
 
-// Removed PriceSpecificInteractionsForContainer if not used
-
-// Update GameCardProps to align with what it needs to pass to RegisteredCardRendererProps
-// It should expect onGenericInteraction and other common props.
 interface GameCardProps {
   readonly card: DisplayableCard;
   readonly onToggleFlip: (id: string) => void;
-  readonly onDeleteCardRequest: (id: string) => void; // Handler in GameCard's parent
-  readonly onHeaderIdentityClick?: (context: CardActionContext) => void; // Could also use onGenericInteraction
-
-  // The crucial generic interaction handler
+  readonly onDeleteCardRequest: (id: string) => void;
   readonly onGenericInteraction: OnGenericInteraction;
-
-  // Optional styling passthrough
   readonly className?: string;
   readonly innerCardClassName?: string;
 }
@@ -35,7 +26,6 @@ const GameCard: React.FC<GameCardProps> = ({
   card,
   onToggleFlip,
   onDeleteCardRequest,
-  onHeaderIdentityClick,
   onGenericInteraction,
   className,
   innerCardClassName,
@@ -56,11 +46,10 @@ const GameCard: React.FC<GameCardProps> = ({
       type: card.type,
       companyName: card.companyName ?? null,
       logoUrl: card.logoUrl ?? null,
-      websiteUrl: websiteUrlForContext ?? null,
+      websiteUrl: websiteUrlForContext ?? card.websiteUrl ?? null, // Prioritize specific, then generic
     };
   }, [card]);
 
-  // This adapter is for BaseCard's onDeleteRequest, which expects a CardActionContext
   const handleDeleteRequestWithContextAdapter = React.useCallback(
     (context: CardActionContext) => {
       onDeleteCardRequest(context.id);
@@ -96,22 +85,15 @@ const GameCard: React.FC<GameCardProps> = ({
     );
   }
 
-  // Construct props that match RegisteredCardRendererProps
   const rendererProps: RegisteredCardRendererProps = {
-    cardData: card, // Pass the full DisplayableCard object
+    cardData: card,
     isFlipped: card.isFlipped,
     onFlip: handleFlip,
     cardContext: cardActionContextValue,
     onDeleteRequest: handleDeleteRequestWithContextAdapter,
-    onHeaderIdentityClick: onHeaderIdentityClick, // This could also be refactored to use onGenericInteraction if BaseCard handles it
-    className: cardWrapperClassName, // Or pass undefined if GameCard is the one using this className
+    className: cardWrapperClassName,
     innerCardClassName: innerCardClassName,
-
-    // Ensure these are passed FORWARD to the renderer
     onGenericInteraction: onGenericInteraction,
-    sourceCardId: card.id,
-    sourceCardSymbol: card.symbol,
-    sourceCardType: card.type,
   };
 
   return <CardRenderer {...rendererProps} />;

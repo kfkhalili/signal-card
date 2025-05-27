@@ -1,25 +1,21 @@
 // src/components/game/cards/profile-card/ProfileCardContainer.tsx
 import React from "react";
-import BaseCard from "../base-card/BaseCard";
-import type {
-  ProfileCardData,
-  ProfileCardInteractions,
-} from "./profile-card.types";
+import BaseCard from "../base-card/BaseCard"; //
+import type { ProfileCardData } from "./profile-card.types";
+// ProfileCardInteractions is removed
 import { ProfileCardContent } from "./ProfileCardContent";
-import type { DisplayableCard } from "../../types"; // Import DisplayableCard
-import type { RegisteredCardRendererProps } from "../../cardRenderers"; // Import the generic props
-import { CardType, OnGenericInteraction } from "../base-card/base-card.types";
+import type { DisplayableCard } from "../../types"; //
+import type { RegisteredCardRendererProps } from "../../cardRenderers"; //
+import type { OnGenericInteraction } from "../base-card/base-card.types"; //
+
 interface ProfileCardContainerProps
   extends Omit<
     RegisteredCardRendererProps,
-    "cardData" | "specificInteractions" | "priceSpecificInteractions"
+    "cardData" | "specificInteractions" | "priceSpecificInteractions" // Ensure all specific interaction props are omitted
   > {
-  cardData: DisplayableCard; // Accept generic DisplayableCard
+  cardData: DisplayableCard; // This will be cast to ProfileCardData inside
   onGenericInteraction: OnGenericInteraction;
-  sourceCardId: string;
-  sourceCardSymbol: string;
-  sourceCardType: CardType;
-  specificInteractions?: ProfileCardInteractions;
+  // No specificInteractions prop
 }
 
 export const ProfileCardContainer = React.memo<ProfileCardContainerProps>(
@@ -29,22 +25,16 @@ export const ProfileCardContainer = React.memo<ProfileCardContainerProps>(
     onFlip,
     cardContext,
     onDeleteRequest,
-    onHeaderIdentityClick,
     className,
     innerCardClassName,
     children,
-    onGenericInteraction,
-    sourceCardId,
-    sourceCardSymbol,
-    sourceCardType,
+    onGenericInteraction, // This is the key prop
   }) => {
-    // Type guard and assertion
     if (cardData.type !== "profile") {
       console.error(
         "[ProfileCardContainer] Received incorrect card type:",
         cardData.type
       );
-      // Optionally render an error message or null
       return null;
     }
     const specificCardData = cardData as ProfileCardData;
@@ -52,9 +42,6 @@ export const ProfileCardContainer = React.memo<ProfileCardContainerProps>(
     const contentProps = {
       cardData: specificCardData,
       onGenericInteraction,
-      sourceCardId,
-      sourceCardSymbol,
-      sourceCardType,
     };
 
     const faceContentForBaseCard = (
@@ -72,10 +59,10 @@ export const ProfileCardContainer = React.memo<ProfileCardContainerProps>(
         onFlip={onFlip}
         cardContext={cardContext}
         onDeleteRequest={onDeleteRequest}
-        onHeaderClick={onHeaderIdentityClick}
         className={className}
         innerCardClassName={innerCardClassName}
-        onGenericInteraction={onGenericInteraction}>
+        onGenericInteraction={onGenericInteraction} // Pass down to BaseCard
+      >
         {children}
       </BaseCard>
     );

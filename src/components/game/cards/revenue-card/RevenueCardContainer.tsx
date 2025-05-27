@@ -28,15 +28,10 @@ export const RevenueCardContainer: React.FC<RevenueCardContainerProps> =
       onFlip,
       cardContext,
       onDeleteRequest,
-      onHeaderIdentityClick,
       className,
       innerCardClassName,
       children,
       onGenericInteraction,
-      // sourceCardId, // These are available via cardData or cardContext if needed by BaseCard directly
-      // sourceCardSymbol,
-      // sourceCardType,
-      // specificInteractions, // Not used for now
     }) => {
       if (cardData.type !== "revenue") {
         // This check is more for type safety during development.
@@ -70,7 +65,6 @@ export const RevenueCardContainer: React.FC<RevenueCardContainerProps> =
           onFlip={onFlip}
           cardContext={cardContext}
           onDeleteRequest={onDeleteRequest}
-          onHeaderClick={onHeaderIdentityClick}
           className={className}
           innerCardClassName={innerCardClassName}
           onGenericInteraction={onGenericInteraction}>
