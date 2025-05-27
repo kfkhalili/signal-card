@@ -114,9 +114,11 @@ export default function WorkspacePage() {
 
   return (
     <div className="space-y-6 pb-10">
-      <div className="px-2 sm:px-4 pt-4 flex flex-col sm:flex-row justify-between items-center gap-3">
-        <div className="flex gap-2 items-center" style={{ minHeight: "32px" }}>
-          {activeCards.length > 0 && (
+      {activeCards.length > 0 && (
+        <div className="px-2 sm:px-4 pt-4 flex flex-col sm:flex-row sm:justify-end items-center gap-3">
+          <div
+            className="flex gap-2 items-center"
+            style={{ minHeight: "32px" }}>
             <Button
               variant="outline"
               size="sm"
@@ -124,17 +126,18 @@ export default function WorkspacePage() {
               disabled={isAddingCardInProgress}>
               <RefreshCw className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Clear All
             </Button>
-          )}
-          {/* AddCardForm is available even if workspaceSymbolForRegularUser is set,
+
+            {/* AddCardForm is available even if workspaceSymbolForRegularUser is set,
               but its symbol input will be locked for non-premium users */}
-          <AddCardForm
-            onAddCard={addCardToWorkspace} // No need for async here, addCardToWorkspace is async
-            existingCards={activeCards}
-            isPremiumUser={isPremiumUser}
-            lockedSymbolForRegularUser={workspaceSymbolForRegularUser}
-          />
+            <AddCardForm
+              onAddCard={addCardToWorkspace} // No need for async here, addCardToWorkspace is async
+              existingCards={activeCards}
+              isPremiumUser={isPremiumUser}
+              lockedSymbolForRegularUser={workspaceSymbolForRegularUser}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Map over unique symbols to create a StockDataHandler for each */}
       {uniqueSymbolsInWorkspace.map((s) => {
