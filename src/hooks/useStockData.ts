@@ -1,11 +1,14 @@
 // src/hooks/useStockData.ts
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import type { SupabaseClient, RealtimeChannel } from "@supabase/supabase-js";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import {
   subscribeToQuoteUpdates as subscribeToLiveQuoteIndicators,
   type LiveQuotePayload,
   type SubscriptionStatus as LiveQuoteSubscriptionStatus,
+  subscribeToFinancialStatementUpdates,
+  type FinancialStatementPayload,
+  type FinancialStatementDBRow,
 } from "@/lib/supabase/realtime-service";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -33,6 +36,7 @@ interface UseStockDataProps {
     source: "fetch" | "realtime"
   ) => void;
   onExchangeStatusUpdate?: (status: ExchangeMarketStatusRecord) => void;
+  onFinancialStatementUpdate?: (statement: FinancialStatementDBRow) => void;
 }
 
 interface UseStockDataReturn {
@@ -45,6 +49,7 @@ export function useStockData({
   onProfileUpdate,
   onLiveQuoteUpdate,
   onExchangeStatusUpdate,
+  onFinancialStatementUpdate,
 }: UseStockDataProps): UseStockDataReturn {
   const instanceIdRef = useRef(Math.random().toString(36).substring(2, 7));
 
@@ -60,30 +65,29 @@ export function useStockData({
     "Initializing..."
   );
 
-  const supabaseClientRef = useRef<SupabaseClient<Database>>(
-    createSupabaseBrowserClient()
-  );
+  // Memoize the Supabase client instance to prevent re-creation on every render.
+  const supabaseClient = useMemo(() => createSupabaseBrowserClient(), []);
   const isMountedRef = useRef<boolean>(false);
 
   const profileChannelRef = useRef<RealtimeChannel | null>(null);
   const liveQuoteUnsubscribeRef = useRef<(() => void) | null>(null);
   const exchangeStatusChannelRef = useRef<RealtimeChannel | null>(null);
+  const financialStatementUnsubscribeRef = useRef<(() => void) | null>(null);
 
   const currentSubscribedExchangeCode = useRef<string | null>(null);
   const exchangeStatusRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     isMountedRef.current = true;
-    const client = supabaseClientRef.current; // Capture the ref value
-
+    // The supabaseClient is stable due to useMemo, no need to capture it here.
     return () => {
       isMountedRef.current = false;
       if (profileChannelRef.current) {
-        client // Use captured value
+        supabaseClient
           .removeChannel(profileChannelRef.current)
           .catch((err) =>
             console.error(
-              `Error removing profile channel for ${symbol}:`,
+              `[useStockData ${symbol}] Error removing profile channel:`,
               (err as Error).message
             )
           );
@@ -94,22 +98,29 @@ export function useStockData({
         liveQuoteUnsubscribeRef.current = null;
       }
       if (exchangeStatusChannelRef.current) {
-        client // Use captured value
+        supabaseClient
           .removeChannel(exchangeStatusChannelRef.current)
           .catch((err) =>
             console.error(
-              `Error removing exchange status channel for ${currentSubscribedExchangeCode.current}:`,
+              `[useStockData ${
+                currentSubscribedExchangeCode.current || symbol
+              }] Error removing exchange status channel:`,
               (err as Error).message
             )
           );
         exchangeStatusChannelRef.current = null;
+      }
+      if (financialStatementUnsubscribeRef.current) {
+        // New cleanup
+        financialStatementUnsubscribeRef.current();
+        financialStatementUnsubscribeRef.current = null;
       }
       currentSubscribedExchangeCode.current = null;
       if (exchangeStatusRetryTimeoutRef.current) {
         clearTimeout(exchangeStatusRetryTimeoutRef.current);
       }
     };
-  }, [symbol]); // supabaseClientRef is stable, symbol is the key dependency
+  }, [symbol, supabaseClient]);
 
   useEffect(() => {
     if (!isMountedRef.current) return;
@@ -197,7 +208,6 @@ export function useStockData({
   const setupExchangeStatusSubscription = useCallback(
     async (exchangeCodeToSubscribe: string | undefined | null) => {
       if (!isMountedRef.current) return;
-      const client = supabaseClientRef.current; // Capture ref value
 
       if (exchangeStatusRetryTimeoutRef.current) {
         clearTimeout(exchangeStatusRetryTimeoutRef.current);
@@ -210,11 +220,11 @@ export function useStockData({
           !exchangeCodeToSubscribe)
       ) {
         if (exchangeStatusChannelRef.current) {
-          await client // Use captured value
+          await supabaseClient
             .removeChannel(exchangeStatusChannelRef.current)
             .catch((e) =>
               console.error(
-                "Error removing old exchange status channel",
+                "[useStockData] Error removing old exchange status channel",
                 (e as Error).message
               )
             );
@@ -241,12 +251,12 @@ export function useStockData({
       if (isMountedRef.current) {
         setDerivedMarketStatus("Connecting");
         setMarketStatusMessage(
-          `Workspaceing market status for ${exchangeCodeToSubscribe}...`
+          `Subscribing to market status for ${exchangeCodeToSubscribe}...`
         );
       }
 
       try {
-        const { data, error } = await client // Use captured value
+        const { data, error } = await supabaseClient
           .from("exchange_market_status")
           .select("*")
           .eq("exchange_code", exchangeCodeToSubscribe)
@@ -255,6 +265,7 @@ export function useStockData({
         if (!isMountedRef.current) return;
 
         if (error && error.code !== "PGRST116") {
+          // PGRST116: "Fetched result consists of 0 rows"
           throw error;
         }
 
@@ -276,17 +287,17 @@ export function useStockData({
           setExchangeStatus(null);
           setDerivedMarketStatus("Error");
           setMarketStatusMessage(
-            `Exception fetching market status for ${exchangeCodeToSubscribe}: ${errorMessage}`
+            `[useStockData] Exception fetching market status for ${exchangeCodeToSubscribe}: ${errorMessage}`
           );
         }
       }
 
       if (exchangeStatusChannelRef.current) {
-        await client // Use captured value
+        await supabaseClient
           .removeChannel(exchangeStatusChannelRef.current)
           .catch((e) =>
             console.error(
-              "Error removing stale exchange status channel",
+              "[useStockData] Error removing stale exchange status channel",
               (e as Error).message
             )
           );
@@ -296,7 +307,7 @@ export function useStockData({
       const channelName = `exchange-status-${exchangeCodeToSubscribe
         .toLowerCase()
         .replace(/[^a-z0-9_.-]/gi, "-")}-${instanceIdRef.current}`;
-      const channel = client // Use captured value
+      const channel = supabaseClient
         .channel(channelName)
         .on<ExchangeMarketStatusRecord>(
           "postgres_changes",
@@ -341,7 +352,7 @@ export function useStockData({
             if (isMountedRef.current) {
               setDerivedMarketStatus("Error");
               setMarketStatusMessage(
-                `Market status connection issue for ${exchangeCodeToSubscribe}.`
+                `Market status connection issue for ${exchangeCodeToSubscribe}. Retrying...`
               );
               retrySubscription();
             }
@@ -362,24 +373,23 @@ export function useStockData({
         });
       exchangeStatusChannelRef.current = channel;
     },
-    [onExchangeStatusUpdate]
+    [onExchangeStatusUpdate, supabaseClient]
   );
 
   useEffect(() => {
     if (!symbol) {
       setProfileData(null);
       setLatestQuote(null);
-      setupExchangeStatusSubscription(null);
+      setupExchangeStatusSubscription(null); // Ensure cleanup if symbol becomes null
       return;
     }
     let profileSubActive = true;
-    const client = supabaseClientRef.current; // Capture ref value
 
     const fetchInitialProfileAndSubscribe = async () => {
       try {
-        const { data, error } = await client // Use captured value
+        const { data, error } = await supabaseClient
           .from("profiles")
-          .select("*")
+          .select("*") // Select all for ProfileDBRow
           .eq("symbol", symbol)
           .maybeSingle();
 
@@ -396,12 +406,12 @@ export function useStockData({
             currentExchange &&
             currentSubscribedExchangeCode.current !== currentExchange
           ) {
-            setupExchangeStatusSubscription(currentExchange);
+            await setupExchangeStatusSubscription(currentExchange);
           } else if (
             !currentExchange &&
             currentSubscribedExchangeCode.current
           ) {
-            setupExchangeStatusSubscription(null);
+            await setupExchangeStatusSubscription(null);
           }
         }
       } catch (error: unknown) {
@@ -409,18 +419,18 @@ export function useStockData({
           error instanceof Error ? error.message : "An unknown error occurred";
         if (!profileSubActive || !isMountedRef.current) return;
         console.error(
-          `Exception during initial profile fetch for ${symbol}:`,
+          `[useStockData ${symbol}] Exception during initial profile fetch:`,
           errorMessage
         );
         if (isMountedRef.current) setProfileData(null);
       }
 
       if (profileChannelRef.current) {
-        await client // Use captured value
+        await supabaseClient
           .removeChannel(profileChannelRef.current)
           .catch((e) =>
             console.error(
-              "Error removing stale profile channel",
+              "[useStockData] Error removing stale profile channel",
               (e as Error).message
             )
           );
@@ -430,12 +440,12 @@ export function useStockData({
       const channelName = `profile-${symbol
         .toLowerCase()
         .replace(/[^a-z0-9_.-]/gi, "-")}-${instanceIdRef.current}`;
-      const channel = client // Use captured value
+      const channel = supabaseClient
         .channel(channelName)
         .on<ProfileDBRow>(
           "postgres_changes",
           {
-            event: "UPDATE",
+            event: "UPDATE", // Only listen to updates for profiles
             schema: "public",
             table: "profiles",
             filter: `symbol=eq.${symbol}`,
@@ -469,7 +479,10 @@ export function useStockData({
             isMountedRef.current &&
             profileSubActive
           ) {
-            console.error(`Profile channel error for ${symbol}:`, err?.message);
+            console.error(
+              `[useStockData ${symbol}] Profile channel error:`,
+              err?.message
+            );
           }
         });
       profileChannelRef.current = channel;
@@ -479,20 +492,24 @@ export function useStockData({
 
     return () => {
       profileSubActive = false;
-      // client is already captured
       if (profileChannelRef.current) {
-        client
+        supabaseClient
           .removeChannel(profileChannelRef.current)
           .catch((e) =>
             console.error(
-              "Error removing profile channel on cleanup",
+              "[useStockData] Error removing profile channel on cleanup",
               (e as Error).message
             )
           );
         profileChannelRef.current = null;
       }
     };
-  }, [symbol, onProfileUpdate, setupExchangeStatusSubscription]);
+  }, [
+    symbol,
+    onProfileUpdate,
+    setupExchangeStatusSubscription,
+    supabaseClient,
+  ]);
 
   useEffect(() => {
     if (!symbol) {
@@ -500,7 +517,6 @@ export function useStockData({
       return;
     }
     let quoteSubActive = true;
-    const client = supabaseClientRef.current; // Capture ref value
 
     const setupQuoteSub = async () => {
       if (liveQuoteUnsubscribeRef.current) {
@@ -509,9 +525,9 @@ export function useStockData({
       }
 
       try {
-        const { data, error } = await client // Use captured value
+        const { data, error } = await supabaseClient
           .from("live_quote_indicators")
-          .select("*")
+          .select("*") // Select all for LiveQuoteIndicatorDBRow
           .eq("symbol", symbol)
           .order("fetched_at", { ascending: false })
           .limit(1)
@@ -531,13 +547,13 @@ export function useStockData({
             currentExchange &&
             currentSubscribedExchangeCode.current !== currentExchange
           ) {
-            setupExchangeStatusSubscription(currentExchange);
+            await setupExchangeStatusSubscription(currentExchange);
           } else if (
             !currentExchange &&
             currentSubscribedExchangeCode.current &&
-            !profileData?.exchange // Check profileData as well before nullifying
+            !profileData?.exchange
           ) {
-            setupExchangeStatusSubscription(null);
+            await setupExchangeStatusSubscription(null);
           }
         }
       } catch (error: unknown) {
@@ -545,7 +561,7 @@ export function useStockData({
           error instanceof Error ? error.message : "An unknown error occurred";
         if (isMountedRef.current && quoteSubActive) {
           console.error(
-            `Exception fetching initial quote for ${symbol}:`,
+            `[useStockData ${symbol}] Exception fetching initial quote:`,
             errorMessage
           );
           if (isMountedRef.current) setLatestQuote(null);
@@ -578,7 +594,7 @@ export function useStockData({
             } else if (
               !newExchange &&
               currentSubscribedExchangeCode.current &&
-              !profileData?.exchange // Check profileData as well
+              !profileData?.exchange
             ) {
               setupExchangeStatusSubscription(null);
             }
@@ -613,7 +629,70 @@ export function useStockData({
         liveQuoteUnsubscribeRef.current = null;
       }
     };
-  }, [symbol, onLiveQuoteUpdate, setupExchangeStatusSubscription, profileData]); // Added profileData
+  }, [
+    symbol,
+    onLiveQuoteUpdate,
+    setupExchangeStatusSubscription,
+    profileData,
+    supabaseClient,
+  ]);
+
+  // New useEffect for financial statement subscription
+  useEffect(() => {
+    if (!symbol || !onFinancialStatementUpdate) {
+      if (financialStatementUnsubscribeRef.current) {
+        financialStatementUnsubscribeRef.current();
+        financialStatementUnsubscribeRef.current = null;
+      }
+      return;
+    }
+    let subActive = true;
+
+    if (financialStatementUnsubscribeRef.current) {
+      financialStatementUnsubscribeRef.current(); // Clean up previous if symbol changes
+    }
+
+    financialStatementUnsubscribeRef.current =
+      subscribeToFinancialStatementUpdates(
+        symbol,
+        (payload: FinancialStatementPayload) => {
+          if (!isMountedRef.current || !subActive) return;
+
+          if (
+            (payload.eventType === "INSERT" ||
+              payload.eventType === "UPDATE") &&
+            payload.new
+          ) {
+            const newStatement = payload.new as FinancialStatementDBRow;
+            onFinancialStatementUpdate(newStatement);
+          }
+        },
+        (status: LiveQuoteSubscriptionStatus, err?: Error) => {
+          if (!isMountedRef.current || !subActive) return;
+          if (process.env.NODE_ENV === "development") {
+            console.debug(
+              `[useStockData ${symbol}] Financial statement subscription status: ${status}`,
+              err || ""
+            );
+          }
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            console.error(
+              `[useStockData ${symbol}] Financial statement channel error or timeout:`,
+              err
+            );
+            // Optionally implement retry logic here if desired
+          }
+        }
+      );
+
+    return () => {
+      subActive = false;
+      if (financialStatementUnsubscribeRef.current) {
+        financialStatementUnsubscribeRef.current();
+        financialStatementUnsubscribeRef.current = null;
+      }
+    };
+  }, [symbol, onFinancialStatementUpdate, supabaseClient]);
 
   return { derivedMarketStatus, marketStatusMessage };
 }

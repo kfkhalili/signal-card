@@ -13,12 +13,17 @@ import type {
 } from "@/components/game/types";
 import type { AddCardFormValues } from "@/components/workspace/AddCardForm";
 import type { PriceCardData } from "@/components/game/cards/price-card/price-card.types";
+import type { RevenueCardData } from "@/components/game/cards/revenue-card/revenue-card.types"; // New
 import type { OnGenericInteraction } from "@/components/game/cards/base-card/base-card.types";
 
 import { rehydrateCardFromStorage } from "@/components/game/cardRehydration";
 import type { ProfileDBRow } from "@/hooks/useStockData";
-import type { LiveQuoteIndicatorDBRow } from "@/lib/supabase/realtime-service";
+import type {
+  LiveQuoteIndicatorDBRow,
+  FinancialStatementDBRow, // New
+} from "@/lib/supabase/realtime-service";
 
+import type { Database } from "@/lib/supabase/database.types";
 type ExchangeMarketStatusRecord =
   Database["public"]["Tables"]["exchange_market_status"]["Row"];
 
@@ -34,11 +39,11 @@ import {
   type CardUpdateEventType,
 } from "@/components/game/cardUpdateHandler.types";
 import "@/components/game/cards/updateHandlerInitializer";
-import { Database } from "@/lib/supabase/database.types";
 
 const INITIAL_ACTIVE_CARDS: DisplayableCard[] = [];
 const WORKSPACE_LOCAL_STORAGE_KEY = "finSignal-mainWorkspace-v1";
 
+// Type for raw card data stored in local storage
 type StoredCardRaw = Record<string, unknown>;
 
 interface UseWorkspaceManagerProps {
@@ -49,8 +54,10 @@ interface AddCardOptions {
   requestingCardId?: string;
 }
 
+// Helper to get the concrete data part of a displayable card
 const getConcreteCardData = (card: DisplayableCard): ConcreteCardData => {
   const cardClone = { ...card };
+  // Remove UI state properties to get the core data structure
   delete (cardClone as Partial<DisplayableCardState>).isFlipped;
   return cardClone as ConcreteCardData;
 };
@@ -93,6 +100,8 @@ export function useWorkspaceManager({
   }, [activeCards, isPremiumUser]);
 
   useEffect(() => {
+    // Persist active cards to local storage whenever they change.
+    // The `StoredCardRaw[]` cast is because local storage stores plain objects.
     setCardsInLocalStorage(activeCards as unknown as StoredCardRaw[]);
   }, [activeCards, setCardsInLocalStorage]);
 
@@ -120,6 +129,7 @@ export function useWorkspaceManager({
       if (existingCardIndex !== -1) {
         const existingCard = activeCards[existingCardIndex];
         if (requestingCardId && existingCard.id !== requestingCardId) {
+          // Logic to reorder card if it exists and is requested from another card
           setActiveCards((prevCards) => {
             const currentCards = [...prevCards];
             const sourceCardActualIndex = currentCards.findIndex(
@@ -139,8 +149,8 @@ export function useWorkspaceManager({
               );
               const insertAtIndex =
                 targetCardActualIndex < sourceCardActualIndex
-                  ? sourceCardActualIndex
-                  : sourceCardActualIndex + 1;
+                  ? sourceCardActualIndex // If target was before source, insert at source's original position
+                  : sourceCardActualIndex + 1; // If target was after source, insert after source
               currentCards.splice(insertAtIndex, 0, cardToMove);
               setTimeout(
                 () =>
@@ -154,9 +164,10 @@ export function useWorkspaceManager({
               );
               return currentCards;
             }
-            return prevCards;
+            return prevCards; // No reorder needed or possible
           });
         } else {
+          // Card already exists and no specific reordering context
           setTimeout(
             () =>
               toast({
@@ -193,7 +204,7 @@ export function useWorkspaceManager({
           symbol: determinedSymbol,
           supabase,
           toast,
-          activeCards,
+          // activeCards, // Removed as per self-containment principle for initializers
         };
         newCardToAdd = await initializer(initContext);
 
@@ -207,6 +218,7 @@ export function useWorkspaceManager({
               if (sourceIndex !== -1 && newCardToAdd) {
                 updatedCards.splice(sourceIndex + 1, 0, newCardToAdd);
               } else if (newCardToAdd) {
+                // Fallback if source card not found or no requesting card ID
                 updatedCards.push(newCardToAdd);
               }
             } else if (newCardToAdd) {
@@ -215,24 +227,11 @@ export function useWorkspaceManager({
             return updatedCards;
           });
 
+          // Toast for successful addition, unless it's a shell price card
           if (newCardToAdd) {
-            const isPriceCard = newCardToAdd.type === "price";
-            let isPriceCardShell = false;
-            if (isPriceCard) {
-              const priceCardData = newCardToAdd as PriceCardData;
-              if (
-                priceCardData.liveData &&
-                priceCardData.liveData.price === null
-              ) {
-                isPriceCardShell = true;
-              } else if (!priceCardData.liveData) {
-                console.error(
-                  "Price card is missing liveData object:",
-                  priceCardData
-                );
-                isPriceCardShell = true;
-              }
-            }
+            const isPriceCardShell =
+              newCardToAdd.type === "price" &&
+              (newCardToAdd as PriceCardData).liveData?.price === null;
 
             if (!isPriceCardShell) {
               setTimeout(
@@ -261,12 +260,12 @@ export function useWorkspaceManager({
       }
     },
     [
-      activeCards,
+      activeCards, // Dependency for checking existing cards and reordering
       supabase,
       toast,
       isPremiumUser,
       workspaceSymbolForRegularUser,
-      setActiveCards,
+      setActiveCards, // To update the state
     ]
   );
 
@@ -274,14 +273,13 @@ export function useWorkspaceManager({
     async (payload) => {
       if (payload.interactionTarget === "card") {
         const { sourceCardSymbol, targetType, sourceCardId } = payload;
-
         const values: AddCardFormValues = {
           symbol: sourceCardSymbol,
           cardType: targetType,
         };
-
         await addCardToWorkspace(values, { requestingCardId: sourceCardId });
       }
+      // Future: Handle other interaction targets or types
     },
     [addCardToWorkspace]
   );
@@ -298,25 +296,19 @@ export function useWorkspaceManager({
             const handler = getCardUpdateHandler(card.type, eventType);
             if (handler) {
               const concreteCardDataForHandler = getConcreteCardData(card);
-
               const updatedConcreteData = handler(
                 concreteCardDataForHandler,
                 leanQuoteData,
-                card,
+                card, // Pass the full displayable card for context
                 updateContext
               );
-
               if (updatedConcreteData !== concreteCardDataForHandler) {
                 if (
                   JSON.stringify(updatedConcreteData) !==
                   JSON.stringify(concreteCardDataForHandler)
                 ) {
                   overallChanged = true;
-                  const newCard: DisplayableCard = {
-                    ...(card as DisplayableCard),
-                    ...updatedConcreteData,
-                  };
-                  return newCard;
+                  return { ...card, ...updatedConcreteData }; // Retain isFlipped by spreading card first
                 }
               }
             }
@@ -338,11 +330,11 @@ export function useWorkspaceManager({
         let overallChanged = false;
         const updatedCards = prevActiveCards.map((card) => {
           if (card.symbol === updatedProfileDBRow.symbol) {
-            const universalHandler = getCardUpdateHandler(card.type, eventType);
-            if (universalHandler) {
+            // This handler can be called for any card type that might use profile info (e.g., PriceCard, RevenueCard)
+            const handler = getCardUpdateHandler(card.type, eventType);
+            if (handler) {
               const concreteCardDataForHandler = getConcreteCardData(card);
-
-              const updatedConcreteData = universalHandler(
+              const updatedConcreteData = handler(
                 concreteCardDataForHandler,
                 updatedProfileDBRow,
                 card,
@@ -355,6 +347,7 @@ export function useWorkspaceManager({
                 ) {
                   overallChanged = true;
                   if (card.type === "profile") {
+                    // Specific toast for profile card itself
                     setTimeout(
                       () =>
                         toast({
@@ -364,11 +357,50 @@ export function useWorkspaceManager({
                       0
                     );
                   }
-                  const newCard: DisplayableCard = {
-                    ...(card as DisplayableCard),
-                    ...updatedConcreteData,
-                  };
-                  return newCard;
+                  return { ...card, ...updatedConcreteData };
+                }
+              }
+            }
+          }
+          return card;
+        });
+        return overallChanged ? updatedCards : prevActiveCards;
+      });
+    },
+    [setActiveCards, toast]
+  );
+
+  // New handler for financial statement updates
+  const handleFinancialStatementUpdate = useCallback(
+    (updatedStatementDBRow: FinancialStatementDBRow) => {
+      const updateContext: CardUpdateContext = { toast };
+      const eventType: CardUpdateEventType = "FINANCIAL_STATEMENT_UPDATE";
+
+      setActiveCards((prevActiveCards) => {
+        let overallChanged = false;
+        const updatedCards = prevActiveCards.map((card) => {
+          if (
+            card.symbol === updatedStatementDBRow.symbol &&
+            card.type === "revenue"
+          ) {
+            const handler = getCardUpdateHandler(card.type, eventType);
+            if (handler) {
+              const concreteCardDataForHandler = getConcreteCardData(
+                card
+              ) as RevenueCardData;
+              const updatedConcreteData = handler(
+                concreteCardDataForHandler,
+                updatedStatementDBRow,
+                card,
+                updateContext
+              );
+              if (updatedConcreteData !== concreteCardDataForHandler) {
+                if (
+                  JSON.stringify(updatedConcreteData) !==
+                  JSON.stringify(concreteCardDataForHandler)
+                ) {
+                  overallChanged = true;
+                  return { ...card, ...updatedConcreteData };
                 }
               }
             }
@@ -388,13 +420,13 @@ export function useWorkspaceManager({
         [status.exchange_code]: status,
       }));
     },
-    []
+    [] // No dependencies, setExchangeStatuses is stable
   );
 
   const clearWorkspace = useCallback(() => {
     setActiveCards(INITIAL_ACTIVE_CARDS);
     setWorkspaceSymbolForRegularUser(null);
-    setCardsInLocalStorage([]);
+    setCardsInLocalStorage([]); // Also clear from local storage
     setTimeout(
       () =>
         toast({
@@ -404,10 +436,10 @@ export function useWorkspaceManager({
       0
     );
   }, [
-    setActiveCards,
-    setCardsInLocalStorage,
-    toast,
-    setWorkspaceSymbolForRegularUser,
+    setActiveCards, // Dependency
+    setCardsInLocalStorage, // Dependency
+    toast, // Dependency
+    setWorkspaceSymbolForRegularUser, // Dependency
   ]);
 
   const stockDataCallbacks = useMemo(
@@ -415,17 +447,19 @@ export function useWorkspaceManager({
       onProfileUpdate: handleStaticProfileUpdate,
       onLiveQuoteUpdate: handleLiveQuoteUpdate,
       onExchangeStatusUpdate: handleExchangeStatusUpdate,
+      onFinancialStatementUpdate: handleFinancialStatementUpdate, // Add new callback
     }),
     [
       handleStaticProfileUpdate,
       handleLiveQuoteUpdate,
       handleExchangeStatusUpdate,
+      handleFinancialStatementUpdate, // Add to dependencies
     ]
   );
 
   return {
     activeCards,
-    setActiveCards,
+    setActiveCards, // Expose setActiveCards for direct manipulation if needed (e.g., reordering)
     workspaceSymbolForRegularUser,
     isAddingCardInProgress,
     addCardToWorkspace,

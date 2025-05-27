@@ -34,6 +34,7 @@ import type { DisplayableCard } from "@/components/game/types";
 const AVAILABLE_CARD_TYPES: { value: CardType; label: string }[] = [
   { value: "profile", label: "Profile Card" },
   { value: "price", label: "Price Card" },
+  { value: "revenue", label: "Revenue Card" },
 ];
 
 const AddCardFormSchema = z.object({

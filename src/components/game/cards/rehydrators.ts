@@ -4,6 +4,7 @@
 // This ensures their `registerCardRehydrator` calls are executed.
 import "./price-card/priceCardRehydrator";
 import "./profile-card/profileCardRehydrator";
+import "./revenue-card/revenueCardRehydrator";
 
 // Add imports for future card rehydrators here
 // e.g., import "./news-card/newsCardRehydrator";

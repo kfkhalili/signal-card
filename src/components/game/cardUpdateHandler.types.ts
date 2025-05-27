@@ -12,7 +12,8 @@ import type { CardType } from "@/components/game/cards/base-card/base-card.types
 export type CardUpdateEventType =
   | "LIVE_QUOTE_UPDATE"
   | "STATIC_PROFILE_UPDATE"
-  | "EXCHANGE_STATUS_UPDATE";
+  | "EXCHANGE_STATUS_UPDATE"
+  | "FINANCIAL_STATEMENT_UPDATE";
 
 /**
  * Context provided to card update handler functions.

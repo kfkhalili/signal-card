@@ -7,7 +7,10 @@ import {
   type DerivedMarketStatus,
   type ProfileDBRow,
 } from "@/hooks/useStockData";
-import type { LiveQuoteIndicatorDBRow } from "@/lib/supabase/realtime-service";
+import type {
+  LiveQuoteIndicatorDBRow,
+  FinancialStatementDBRow,
+} from "@/lib/supabase/realtime-service";
 
 interface StockDataHandlerProps {
   symbol: string;
@@ -21,6 +24,7 @@ interface StockDataHandlerProps {
     status: DerivedMarketStatus,
     message: string | null
   ) => void;
+  onFinancialStatementUpdate: (statement: FinancialStatementDBRow) => void;
 }
 
 export const StockDataHandler: React.FC<StockDataHandlerProps> = ({
@@ -28,15 +32,13 @@ export const StockDataHandler: React.FC<StockDataHandlerProps> = ({
   onQuoteReceived,
   onStaticProfileUpdate,
   onMarketStatusChange,
+  onFinancialStatementUpdate,
 }) => {
-  // if (process.env.NODE_ENV === 'development') {
-  //   console.log(`[StockDataHandler ${symbol}] Rendering. Type of onQuoteReceived prop: ${typeof onQuoteReceived}`);
-  // }
-
   const { derivedMarketStatus, marketStatusMessage } = useStockData({
     symbol: symbol,
     onLiveQuoteUpdate: onQuoteReceived,
     onProfileUpdate: onStaticProfileUpdate,
+    onFinancialStatementUpdate: onFinancialStatementUpdate,
   });
 
   useEffect(() => {

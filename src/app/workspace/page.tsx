@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useRouter } from "next/navigation"; // Import useRouter
+import { useRouter } from "next/navigation";
 
 import { AddCardForm } from "@/components/workspace/AddCardForm";
 import { StockDataHandler } from "@/components/workspace/StockDataHandler";
@@ -22,9 +22,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+// Ensure card rehydrators and initializers are loaded
 import "@/components/game/cards/rehydrators";
+import "@/components/game/cards/initializers"; // This should pull in revenueCardUtils
+import "@/components/game/cards/updateHandlerInitializer"; // This should pull in revenueCardUtils
+
 import ActiveCardsSection from "@/components/game/ActiveCardsSection";
 import type { DerivedMarketStatus } from "@/hooks/useStockData";
+import type { FinancialStatementDBRow } from "@/lib/supabase/realtime-service"; // Ensure this type is available
 
 type MarketStatus = Record<
   string,
@@ -36,16 +41,14 @@ type MarketStatus = Record<
 
 export default function WorkspacePage() {
   const { user, isLoading: isAuthLoading } = useAuth();
-  const router = useRouter(); // Initialize router
+  const router = useRouter();
 
   const [hasMounted, setHasMounted] = useState<boolean>(false);
   useEffect(() => {
     setHasMounted(true);
   }, []);
 
-  // Effect to handle redirection when user logs out
   useEffect(() => {
-    // Ensure this runs only after initial mount and auth state is resolved
     if (hasMounted && !isAuthLoading && !user) {
       router.push("/");
     }
@@ -83,11 +86,10 @@ export default function WorkspacePage() {
 
   const confirmedClearWorkspace = () => {
     clearWorkspace();
-    setMarketStatuses({});
+    setMarketStatuses({}); // Reset market statuses as well
     setIsClearConfirmOpen(false);
   };
 
-  // Initial loading state for the page or auth
   if (!hasMounted || isAuthLoading) {
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
@@ -99,8 +101,6 @@ export default function WorkspacePage() {
     );
   }
 
-  // If auth is resolved, user is null (logged out), and page has mounted,
-  // show a redirecting message. The useEffect above will handle the redirect.
   if (hasMounted && !isAuthLoading && !user) {
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
@@ -112,7 +112,6 @@ export default function WorkspacePage() {
     );
   }
 
-  // If user is present, render the workspace content
   return (
     <div className="space-y-6 pb-10">
       <div className="px-2 sm:px-4 pt-4 flex flex-col sm:flex-row justify-between items-center gap-3">
@@ -126,19 +125,21 @@ export default function WorkspacePage() {
               <RefreshCw className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Clear All
             </Button>
           )}
-          {activeCards.length > 0 && (
-            <AddCardForm
-              onAddCard={(formValues) => addCardToWorkspace(formValues)}
-              existingCards={activeCards}
-              isPremiumUser={isPremiumUser}
-              lockedSymbolForRegularUser={workspaceSymbolForRegularUser}
-            />
-          )}
+          {/* AddCardForm is available even if workspaceSymbolForRegularUser is set,
+              but its symbol input will be locked for non-premium users */}
+          <AddCardForm
+            onAddCard={addCardToWorkspace} // No need for async here, addCardToWorkspace is async
+            existingCards={activeCards}
+            isPremiumUser={isPremiumUser}
+            lockedSymbolForRegularUser={workspaceSymbolForRegularUser}
+          />
         </div>
       </div>
 
+      {/* Map over unique symbols to create a StockDataHandler for each */}
       {uniqueSymbolsInWorkspace.map((s) => {
         if (!stockDataCallbacks) {
+          // This check might be redundant if stockDataCallbacks is guaranteed to be initialized
           return null;
         }
         return (
@@ -148,6 +149,11 @@ export default function WorkspacePage() {
             onQuoteReceived={stockDataCallbacks.onLiveQuoteUpdate}
             onStaticProfileUpdate={stockDataCallbacks.onProfileUpdate}
             onMarketStatusChange={handleMarketStatusChange}
+            onFinancialStatementUpdate={
+              stockDataCallbacks.onFinancialStatementUpdate as (
+                statement: FinancialStatementDBRow
+              ) => void
+            }
           />
         );
       })}
@@ -163,7 +169,7 @@ export default function WorkspacePage() {
       <div className="px-2 sm:px-0">
         {activeCards.length === 0 && !isAddingCardInProgress ? (
           <div className="text-center py-16 sm:py-20">
-            <RefreshCw
+            <RefreshCw // Using RefreshCw as a placeholder icon
               size={48}
               className="mx-auto text-muted-foreground mb-4"
               strokeWidth={1.5}
@@ -172,9 +178,10 @@ export default function WorkspacePage() {
               Your workspace is currently empty.
             </p>
             <AddCardForm
-              onAddCard={(formValues) => addCardToWorkspace(formValues)}
+              onAddCard={addCardToWorkspace}
               existingCards={activeCards}
               isPremiumUser={isPremiumUser}
+              lockedSymbolForRegularUser={workspaceSymbolForRegularUser} // Pass this down
               triggerButton={
                 <Button size="lg">
                   <PlusCircle className="mr-2 h-5 w-5" /> Add Your First Card

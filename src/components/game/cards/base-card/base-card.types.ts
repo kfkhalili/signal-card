@@ -1,6 +1,6 @@
 // src/components/game/cards/base-card/base-card.types.ts
 
-export type CardType = "profile" | "price";
+export type CardType = "profile" | "price" | "revenue";
 
 export interface BaseCardBackData {
   readonly description?: string;

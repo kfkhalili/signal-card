@@ -4,10 +4,12 @@ import { registerCardRenderer } from "@/components/game/cardRenderers"; // Adjus
 // Import the actual container components
 import { PriceCardContainer } from "./price-card/PriceCardContainer";
 import { ProfileCardContainer } from "./profile-card/ProfileCardContainer";
+import { RevenueCardContainer } from "./revenue-card/RevenueCardContainer";
 
 // --- Register known card types ---
 registerCardRenderer("price", PriceCardContainer);
 registerCardRenderer("profile", ProfileCardContainer);
+registerCardRenderer("revenue", RevenueCardContainer);
 
 // As you create new card types (e.g., NewsCard, EarningsCard):
 // 1. Create their ...Container.tsx component.
