@@ -4,10 +4,7 @@
 import React from "react";
 import GameCard from "@/components/game/GameCard";
 import type { DisplayableCard } from "./types";
-import type {
-  CardActionContext,
-  OnGenericInteraction,
-} from "./cards/base-card/base-card.types";
+import type { OnGenericInteraction } from "./cards/base-card/base-card.types";
 
 import {
   AlertDialog,
@@ -24,7 +21,6 @@ interface ActiveCardsProps {
   cards: DisplayableCard[];
   onToggleFlipCard: (id: string) => void;
   onDeleteCardRequest: (id: string) => void;
-  onHeaderIdentityClick?: (context: CardActionContext) => void;
   cardIdToConfirmDelete: string | null;
   onConfirmDeletion: () => void;
   onCancelDeletion: () => void;
@@ -35,7 +31,6 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
   cards,
   onToggleFlipCard,
   onDeleteCardRequest,
-  onHeaderIdentityClick,
   cardIdToConfirmDelete,
   onConfirmDeletion,
   onCancelDeletion,
@@ -72,7 +67,6 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
                 card={card}
                 onToggleFlip={onToggleFlipCard}
                 onDeleteCardRequest={onDeleteCardRequest}
-                onHeaderIdentityClick={onHeaderIdentityClick}
                 onGenericInteraction={onGenericInteraction}
               />
             </div>

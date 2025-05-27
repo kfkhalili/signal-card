@@ -11,8 +11,8 @@ import { formatNumberWithAbbreviations } from "@/lib/formatters";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
 import type {
   OnGenericInteraction,
-  CardType as BaseCardType,
-  InteractionPayload,
+  CardType,
+  RequestNewCardInteraction,
 } from "../base-card/base-card.types";
 
 interface DataRowProps {
@@ -58,7 +58,6 @@ const DataRow: React.FC<DataRowProps> = ({
     <div
       className={cn(
         "flex justify-between items-baseline py-0.5 group/datarow",
-        // Hover effect: Only text color change, no background. Applied to the whole row for larger hit area.
         isInteractive && onClick ? "cursor-pointer rounded px-1 -mx-1" : "",
         className
       )}
@@ -68,7 +67,10 @@ const DataRow: React.FC<DataRowProps> = ({
       onKeyDown={
         isInteractive && onClick
           ? (e) => {
-              if (e.key === "Enter" || e.key === " ") onClick();
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick();
+              }
             }
           : undefined
       }
@@ -76,23 +78,21 @@ const DataRow: React.FC<DataRowProps> = ({
       tabIndex={isInteractive && onClick ? 0 : undefined}>
       <span
         className={cn(
-          "text-muted-foreground mr-2", // Default label styling
-          // Text color change on hover for interactive rows
+          "text-muted-foreground mr-2",
           isInteractive && onClick
             ? "group-hover/datarow:text-primary transition-colors"
             : "",
-          labelClassName // Allow specific override
+          labelClassName
         )}>
         {label}
       </span>
       <span
         className={cn(
           "font-semibold text-foreground text-right",
-          // Text color change on hover for interactive rows
           isInteractive && onClick
             ? "group-hover/datarow:text-primary transition-colors"
             : "",
-          valueClassName // Allow specific override
+          valueClassName
         )}>
         {formattedValue}
       </span>
@@ -108,21 +108,31 @@ interface RevenueCardContentProps {
 
 export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
   ({ cardData, isBackFace, onGenericInteraction }) => {
-    const { staticData, liveData, symbol, companyName, backData } = cardData;
+    const {
+      staticData,
+      liveData,
+      symbol,
+      companyName,
+      backData,
+      id,
+      type: cardType,
+    } = cardData;
     const currency = staticData.reportedCurrency;
 
-    const createInteractionPayload = (
-      targetType: BaseCardType
-    ): InteractionPayload => ({
-      interactionTarget: "card",
-      targetType,
-      sourceCardId: cardData.id,
-      sourceCardSymbol: cardData.symbol,
-      sourceCardType: cardData.type,
-    });
-
-    const handleRowInteraction = (targetType: BaseCardType): void => {
-      onGenericInteraction(createInteractionPayload(targetType));
+    // Updated helper to use the new InteractionPayload structure
+    const handleInteraction = (
+      targetCardType: CardType,
+      originatingElement?: string
+    ): void => {
+      const payload: RequestNewCardInteraction = {
+        intent: "REQUEST_NEW_CARD",
+        targetCardType,
+        sourceCardId: id,
+        sourceCardSymbol: symbol,
+        sourceCardType: cardType,
+        originatingElement: originatingElement || "dataRow",
+      };
+      onGenericInteraction(payload);
     };
 
     if (isBackFace) {
@@ -178,7 +188,7 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
               <ClickableDataItem
                 isInteractive={true}
                 onClickHandler={() =>
-                  onGenericInteraction(createInteractionPayload("profile"))
+                  handleInteraction("profile", "periodLabelBadge")
                 }
                 title={`View profile for ${companyName || symbol}`}
                 baseClassName="inline-block">
@@ -195,11 +205,11 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
               value={liveData.revenue}
               currency={currency}
               className="mb-1"
-              labelClassName="text-base sm:text-lg md:text-xl" // Matching value size
+              labelClassName="text-base sm:text-lg md:text-xl"
               valueClassName="text-base sm:text-lg md:text-xl"
               data-testid="revenue-value-front"
               isInteractive={true}
-              onClick={() => handleRowInteraction("price")}
+              onClick={() => handleInteraction("price", "revenueMetric")}
             />
             <DataRow
               label="Gross Profit"
@@ -209,7 +219,7 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
               valueClassName="text-sm sm:text-base"
               data-testid="gross-profit-value-front"
               isInteractive={true}
-              onClick={() => handleRowInteraction("price")}
+              onClick={() => handleInteraction("price", "grossProfitMetric")}
             />
             <DataRow
               label="Operating Income"
@@ -219,7 +229,9 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
               valueClassName="text-sm sm:text-base"
               data-testid="operating-income-value-front"
               isInteractive={true}
-              onClick={() => handleRowInteraction("price")}
+              onClick={() =>
+                handleInteraction("price", "operatingIncomeMetric")
+              }
             />
             <DataRow
               label="Net Income"
@@ -229,7 +241,7 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
               valueClassName="text-sm sm:text-base"
               data-testid="net-income-value-front"
               isInteractive={true}
-              onClick={() => handleRowInteraction("price")}
+              onClick={() => handleInteraction("price", "netIncomeMetric")}
             />
             <DataRow
               label="Free Cash Flow"
@@ -239,7 +251,7 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
               valueClassName="text-sm sm:text-base"
               data-testid="fcf-value-front"
               isInteractive={true}
-              onClick={() => handleRowInteraction("price")}
+              onClick={() => handleInteraction("price", "fcfMetric")}
             />
           </ShadCardContent>
           <div className="px-0 pt-1 text-[10px] text-center text-muted-foreground/80">
