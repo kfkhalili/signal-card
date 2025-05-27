@@ -24,10 +24,11 @@ export interface ProfileCardStaticData {
 }
 
 // Defines the live, frequently updated data for a ProfileCard.
-// Currently, this might include the latest price if displayed on the profile card itself.
 export interface ProfileCardLiveData {
   price?: number | null;
-  // Potentially other live data relevant to a profile summary
+  marketCap?: number | null;
+  revenue?: number | null;
+  eps?: number | null;
 }
 
 // Main interface for the complete ProfileCard data structure

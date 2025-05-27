@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
-import useLocalStorage from "@/hooks/use-local-storage";
+import useLocalStorage from "@/hooks/use-local-storage"; // Uses the cleaned-up version
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -51,25 +51,15 @@ import "@/components/game/cards/updateHandlerInitializer";
 const INITIAL_ACTIVE_CARDS: DisplayableCard[] = [];
 const WORKSPACE_LOCAL_STORAGE_KEY = "finSignal-mainWorkspace-v1";
 
-// Define StoredCardRaw more appropriately for JSON serialization
-// It can be a record of known primitive types or nested structures of the same.
-// For simplicity, if the exact structure of stored cards is complex and varies,
-// using a less specific but not 'any' type might be a pragmatic first step,
-// to be refined later if possible.
-// A common approach is to define it based on what JSON.stringify produces.
-// For now, let's use a base type that can hold common card properties.
 interface BaseStoredCard {
   id: string;
-  type: CardType; // Use the CardType union
+  type: CardType;
   symbol: string;
   createdAt: number;
   isFlipped: boolean;
   companyName?: string | null;
   logoUrl?: string | null;
-  // Other fields are card-specific and would be part of `cardFromStorage` in rehydrateCardFromStorage
-  // This StoredCardRaw is for the array stored in localStorage.
-  // The individual items will be Records, but the array itself is of these base items.
-  [key: string]: unknown; // Allows for additional card-specific properties
+  [key: string]: unknown;
 }
 type StoredCardRawArray = BaseStoredCard[];
 
@@ -93,16 +83,18 @@ export function useWorkspaceManager({
   );
 
   const [rawCardsFromStorage, setCardsInLocalStorage] =
-    useLocalStorage<StoredCardRawArray>(WORKSPACE_LOCAL_STORAGE_KEY, []); // Use the new array type
+    useLocalStorage<StoredCardRawArray>(WORKSPACE_LOCAL_STORAGE_KEY, []);
 
   const [activeCards, setActiveCards] = useState<DisplayableCard[]>(() => {
+    // Cleaned-up initializer
     if (Array.isArray(rawCardsFromStorage)) {
       const rehydrated: DisplayableCard[] = rawCardsFromStorage
-        .map((card): DisplayableCard | null => {
-          // Ensure card is treated as Record<string, unknown> for rehydrateCardFromStorage
-          return rehydrateCardFromStorage(card as Record<string, unknown>);
+        .map((cardObject): DisplayableCard | null => {
+          return rehydrateCardFromStorage(
+            cardObject as Record<string, unknown>
+          );
         })
-        .filter((card): card is DisplayableCard => card !== null); // Correctly filter out nulls
+        .filter((card): card is DisplayableCard => card !== null);
       return rehydrated;
     }
     return INITIAL_ACTIVE_CARDS;
@@ -126,8 +118,6 @@ export function useWorkspaceManager({
   }, [activeCards, isPremiumUser]);
 
   useEffect(() => {
-    // When persisting, we cast to unknown first, then to StoredCardRawArray
-    // This satisfies TypeScript that the array elements match the expected stored type.
     setCardsInLocalStorage(activeCards as unknown as StoredCardRawArray);
   }, [activeCards, setCardsInLocalStorage]);
 
@@ -144,7 +134,7 @@ export function useWorkspaceManager({
     ) => {
       setIsAddingCardInProgress(true);
       let determinedSymbol = values.symbol;
-      const cardTypeFromForm = values.cardType; // Renamed to avoid conflict
+      const cardTypeFromForm = values.cardType;
       const requestingCardId = options?.requestingCardId;
 
       if (!isPremiumUser && workspaceSymbolForRegularUser) {
@@ -246,20 +236,16 @@ export function useWorkspaceManager({
                 (c) => c.id === requestingCardId
               );
               if (sourceIndex !== -1 && newCardToAdd !== null) {
-                // Check newCardToAdd is not null
                 updatedCards.splice(sourceIndex + 1, 0, newCardToAdd);
               } else if (newCardToAdd !== null) {
-                // Check newCardToAdd is not null
                 updatedCards.push(newCardToAdd);
               }
             } else if (newCardToAdd !== null) {
-              // Check newCardToAdd is not null
               updatedCards.push(newCardToAdd);
             }
             return updatedCards;
           });
 
-          // Type assertion for shell card check
           const newCardDataForShellCheck = newCardToAdd as DisplayableCard & {
             liveData?: { price?: number | null };
           };
@@ -357,10 +343,6 @@ export function useWorkspaceManager({
           break;
         }
         default: {
-          // This default case handles any intents not explicitly covered.
-          // The 'never' type helps ensure all defined intents are handled,
-          // but since payload can be any of the union members, we need a type assertion
-          // for the unhandled case's message if we want to access payload.intent.
           const unhandledPayload = payload as { intent: string };
           if (process.env.NODE_ENV === "development") {
             console.warn(
@@ -395,7 +377,7 @@ export function useWorkspaceManager({
               const updatedConcreteData = handler(
                 concreteCardDataForHandler,
                 leanQuoteData,
-                card, // Pass the full DisplayableCard
+                card,
                 updateContext
               );
               if (updatedConcreteData !== concreteCardDataForHandler) {
@@ -414,7 +396,7 @@ export function useWorkspaceManager({
         return overallChanged ? updatedCards : prevActiveCards;
       });
     },
-    [setActiveCards, toast]
+    [toast, setActiveCards]
   );
 
   const handleStaticProfileUpdate = useCallback(
@@ -432,7 +414,7 @@ export function useWorkspaceManager({
               const updatedConcreteData = handler(
                 concreteCardDataForHandler,
                 updatedProfileDBRow,
-                card, // Pass the full DisplayableCard
+                card,
                 updateContext
               );
               if (updatedConcreteData !== concreteCardDataForHandler) {
@@ -461,7 +443,7 @@ export function useWorkspaceManager({
         return overallChanged ? updatedCards : prevActiveCards;
       });
     },
-    [setActiveCards, toast]
+    [toast, setActiveCards]
   );
 
   const handleFinancialStatementUpdate = useCallback(
@@ -479,7 +461,7 @@ export function useWorkspaceManager({
               const updatedConcreteData = handler(
                 concreteCardDataForHandler,
                 updatedStatementDBRow,
-                card, // Pass the full DisplayableCard
+                card,
                 updateContext
               );
               if (updatedConcreteData !== concreteCardDataForHandler) {
@@ -498,7 +480,7 @@ export function useWorkspaceManager({
         return overallChanged ? updatedCards : prevActiveCards;
       });
     },
-    [setActiveCards, toast]
+    [toast, setActiveCards]
   );
 
   const handleExchangeStatusUpdate = useCallback(
@@ -514,7 +496,6 @@ export function useWorkspaceManager({
   const clearWorkspace = useCallback(() => {
     setActiveCards(INITIAL_ACTIVE_CARDS);
     setWorkspaceSymbolForRegularUser(null);
-    setCardsInLocalStorage([]);
     setTimeout(
       () =>
         toast({
@@ -523,12 +504,7 @@ export function useWorkspaceManager({
         }),
       0
     );
-  }, [
-    setActiveCards,
-    setCardsInLocalStorage,
-    toast,
-    setWorkspaceSymbolForRegularUser,
-  ]);
+  }, [toast, setActiveCards, setWorkspaceSymbolForRegularUser]);
 
   const stockDataCallbacks = useMemo(
     () => ({

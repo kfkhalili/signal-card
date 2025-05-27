@@ -2,25 +2,15 @@
 import React from "react";
 import { CardContent as ShadCardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
+import { ClickableDataItem } from "@/components/ui/ClickableDataItem"; //
 import type { ProfileCardData } from "./profile-card.types";
-import {
-  Users,
-  CalendarDays,
-  Building,
-  TrendingUp,
-  UserCheck,
-} from "lucide-react";
-import { getFlagEmoji, getCountryName } from "@/lib/utils";
-import {
-  SectorIconDisplay,
-  type SectorName,
-} from "@/components/workspace/SectorIconDisplay";
+import { getFlagEmoji, getCountryName, cn } from "@/lib/utils";
+import { formatNumberWithAbbreviations } from "@/lib/formatters";
 import type {
   OnGenericInteraction,
-  InteractionPayload,
   RequestNewCardInteraction,
   FilterWorkspaceDataInteraction,
+  TriggerCardActionInteraction,
 } from "../base-card/base-card.types";
 
 const truncateText = (
@@ -50,71 +40,68 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
       companyName,
     } = cardData;
 
-    // Helper to construct and dispatch payloads
-    const handleInteraction = (
-      intent: InteractionPayload["intent"],
-      details: Omit<
-        InteractionPayload,
-        "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType"
-      >
-    ) => {
-      const payload: InteractionPayload = {
-        intent,
-        sourceCardId: id,
-        sourceCardSymbol: symbol,
-        sourceCardType: cardType,
-        ...details,
-      } as InteractionPayload; // Cast is acceptable here due to the discriminated union logic in handler
-      onGenericInteraction(payload);
-    };
-
     if (!isBackFace) {
       const description = staticData?.description;
-      const countryFlag = getFlagEmoji(staticData?.country); //
+      const countryFlag = getFlagEmoji(staticData?.country);
       const fullCountryName = staticData?.country
-        ? getCountryName(staticData.country) //
+        ? getCountryName(staticData.country)
         : "N/A";
+
+      // Define a common base class for interactive items if they should share a default color
+      const interactiveItemBaseColor = "text-foreground"; // Or "text-muted-foreground" if that's the default
+      const interactiveHoverColor = "hover:text-primary cursor-pointer";
 
       return (
         <div
           data-testid={`profile-card-front-${symbol}`}
           className="pointer-events-auto flex flex-col h-full justify-between text-xs">
-          <ShadCardContent className="pt-1 pb-1 px-0 space-y-1.5 flex-grow">
+          <ShadCardContent className="pt-1 pb-1 px-0 space-y-1 flex-grow">
             {description && (
               <p
-                className="text-muted-foreground text-sm leading-tight line-clamp-5"
-                style={{ minHeight: "6.25em" }}
+                className="text-muted-foreground text-xs leading-snug line-clamp-3"
+                style={{ minHeight: "2.25rem" }}
                 title={description || undefined}>
                 {description}
               </p>
             )}
 
-            <div className="space-y-1 mt-1">
+            <div className="space-y-0.5 mt-0.5">
               <ClickableDataItem
                 isInteractive={!!staticData?.industry}
                 onClickHandler={() => {
                   if (staticData?.industry) {
-                    handleInteraction("FILTER_WORKSPACE_DATA", {
+                    const payload: FilterWorkspaceDataInteraction = {
+                      intent: "FILTER_WORKSPACE_DATA",
+                      sourceCardId: id,
+                      sourceCardSymbol: symbol,
+                      sourceCardType: cardType,
                       filterField: "industry",
                       filterValue: staticData.industry,
                       originatingElement: "industryLink",
-                    } as Omit<FilterWorkspaceDataInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                    };
+                    onGenericInteraction(payload);
                   }
                 }}
                 title={`Industry: ${staticData?.industry || "N/A"}${
                   staticData?.sector ? ` (Sector: ${staticData.sector})` : ""
                 }`}
-                baseClassName="flex items-center min-w-0 gap-1.5"
-                interactiveClassName="hover:text-primary cursor-pointer"
+                baseClassName={cn(
+                  "flex items-baseline min-w-0 gap-1",
+                  interactiveItemBaseColor
+                )}
+                interactiveClassName={interactiveHoverColor}
                 aria-label={`Filter by industry: ${
                   staticData?.industry || "N/A"
                 }`}>
-                <SectorIconDisplay
-                  sector={staticData?.sector as SectorName}
-                  iconSize={14}
-                />
-                <span className="truncate text-foreground">
-                  {truncateText(staticData?.industry, 28)}
+                <span className="text-xs font-medium shrink-0">Industry:</span>
+                <span className="truncate text-xs">
+                  {truncateText(staticData?.industry, 22)}
+                  {staticData?.sector && (
+                    <span className="text-xs">
+                      {" "}
+                      ({truncateText(staticData.sector, 15)})
+                    </span>
+                  )}
                 </span>
               </ClickableDataItem>
 
@@ -123,55 +110,156 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                   isInteractive={true}
                   onClickHandler={() => {
                     if (staticData?.country) {
-                      handleInteraction("FILTER_WORKSPACE_DATA", {
+                      const payload: FilterWorkspaceDataInteraction = {
+                        intent: "FILTER_WORKSPACE_DATA",
+                        sourceCardId: id,
+                        sourceCardSymbol: symbol,
+                        sourceCardType: cardType,
                         filterField: "country",
                         filterValue: staticData.country,
                         originatingElement: "countryLink",
-                      } as Omit<FilterWorkspaceDataInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                      };
+                      onGenericInteraction(payload);
                     }
                   }}
                   title={`Country: ${fullCountryName}`}
-                  baseClassName="flex items-center min-w-0 gap-1.5 pt-0.5"
-                  interactiveClassName="hover:text-primary cursor-pointer"
+                  baseClassName={cn(
+                    "flex items-baseline min-w-0 gap-1",
+                    interactiveItemBaseColor
+                  )}
+                  interactiveClassName={interactiveHoverColor}
                   aria-label={`Filter by country: ${fullCountryName}`}>
-                  <span className="text-base leading-none">{countryFlag}</span>
-                  <span
-                    className="truncate text-foreground"
-                    title={fullCountryName}>
+                  <span className="text-xs font-medium shrink-0">Country:</span>
+                  <span className="text-sm leading-none mr-0.5">
+                    {countryFlag}
+                  </span>
+                  <span className="truncate text-xs" title={fullCountryName}>
                     {fullCountryName}
                   </span>
                 </ClickableDataItem>
               )}
 
               {staticData?.formatted_full_time_employees && (
-                <div
-                  className="flex items-center text-muted-foreground min-w-0 pt-0.5"
-                  title={`${staticData.formatted_full_time_employees} employees`}>
-                  <Users size={12} className="mr-1.5 shrink-0" />
-                  <span className="truncate text-foreground">
+                <ClickableDataItem
+                  isInteractive={true}
+                  onClickHandler={() => {
+                    const payload: TriggerCardActionInteraction = {
+                      intent: "TRIGGER_CARD_ACTION",
+                      sourceCardId: id,
+                      sourceCardSymbol: symbol,
+                      sourceCardType: cardType,
+                      actionName: "viewEmployeeData",
+                      actionData: {
+                        employees: staticData.formatted_full_time_employees,
+                      },
+                    };
+                    onGenericInteraction(payload);
+                  }}
+                  title={`${staticData.formatted_full_time_employees} employees`}
+                  baseClassName={cn(
+                    "flex items-baseline min-w-0 gap-1",
+                    interactiveItemBaseColor
+                  )}
+                  interactiveClassName={interactiveHoverColor}
+                  aria-label={`Employee count: ${staticData.formatted_full_time_employees}`}>
+                  <span className="text-xs font-medium shrink-0">
+                    Employees:
+                  </span>
+                  <span className="truncate text-xs">
                     {staticData.formatted_full_time_employees}
                   </span>
-                </div>
+                </ClickableDataItem>
+              )}
+
+              {liveData?.revenue !== null &&
+                liveData?.revenue !== undefined && (
+                  <ClickableDataItem
+                    isInteractive={true}
+                    onClickHandler={() => {
+                      const payload: RequestNewCardInteraction = {
+                        intent: "REQUEST_NEW_CARD",
+                        sourceCardId: id,
+                        sourceCardSymbol: symbol,
+                        sourceCardType: cardType,
+                        targetCardType: "revenue",
+                        originatingElement: "revenueDisplayTrigger",
+                      };
+                      onGenericInteraction(payload);
+                    }}
+                    title={`Revenue (TTM/Latest): ${formatNumberWithAbbreviations(
+                      liveData.revenue
+                    )}`}
+                    baseClassName={cn(
+                      "flex items-baseline min-w-0 gap-1",
+                      interactiveItemBaseColor
+                    )}
+                    interactiveClassName={interactiveHoverColor}
+                    aria-label={`Request Revenue Card for ${symbol}`}>
+                    <span className="text-xs font-medium shrink-0">
+                      Revenue:
+                    </span>
+                    <span className="truncate text-xs">
+                      {formatNumberWithAbbreviations(liveData.revenue)}
+                    </span>
+                  </ClickableDataItem>
+                )}
+
+              {liveData?.eps !== null && liveData?.eps !== undefined && (
+                <ClickableDataItem
+                  isInteractive={true}
+                  onClickHandler={() => {
+                    const payload: RequestNewCardInteraction = {
+                      intent: "REQUEST_NEW_CARD",
+                      sourceCardId: id,
+                      sourceCardSymbol: symbol,
+                      sourceCardType: cardType,
+                      targetCardType: "revenue",
+                      originatingElement: "epsDisplayTrigger",
+                    };
+                    onGenericInteraction(payload);
+                  }}
+                  title={`EPS (TTM/Latest): ${
+                    staticData?.currency ?? ""
+                  }${liveData.eps.toFixed(2)}`}
+                  baseClassName={cn(
+                    "flex items-baseline min-w-0 gap-1",
+                    interactiveItemBaseColor
+                  )}
+                  interactiveClassName={interactiveHoverColor}
+                  aria-label={`Request Revenue card for EPS details of ${symbol}`}>
+                  <span className="text-xs font-medium shrink-0">EPS:</span>
+                  <span className="truncate text-xs">
+                    {staticData?.currency ?? ""}
+                    {liveData.eps.toFixed(2)}
+                  </span>
+                </ClickableDataItem>
               )}
             </div>
           </ShadCardContent>
 
-          <div className="px-0 pt-1">
-            <div className="flex justify-between items-center text-xs mb-0.5">
+          <div className="px-0 pt-1 mt-auto">
+            <div className="grid grid-cols-2 gap-x-2 items-center text-xs mb-0.5">
               <ClickableDataItem
                 isInteractive={true}
-                onClickHandler={() =>
-                  handleInteraction("REQUEST_NEW_CARD", {
+                onClickHandler={() => {
+                  const payload: RequestNewCardInteraction = {
+                    intent: "REQUEST_NEW_CARD",
+                    sourceCardId: id,
+                    sourceCardSymbol: symbol,
+                    sourceCardType: cardType,
                     targetCardType: "price",
                     originatingElement: "priceDisplayTrigger",
-                  } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-                }
-                baseClassName="py-0.5"
-                interactiveClassName="hover:text-primary cursor-pointer"
+                  };
+                  onGenericInteraction(payload);
+                }}
+                baseClassName={cn("py-0.5", interactiveItemBaseColor)} // Apply base color
+                interactiveClassName={interactiveHoverColor}
                 aria-label={`Request Price Card for ${symbol}`}>
-                <div className="flex items-center">
-                  <TrendingUp size={14} className="mr-1 shrink-0" />
+                <div className="flex items-baseline gap-1">
+                  <span className="text-xs font-medium shrink-0">Price:</span>
                   <span className="font-semibold text-sm">
+                    {" "}
+                    {/* font-semibold might have its own color, check if it overrides */}
                     {staticData?.currency === "USD"
                       ? "$"
                       : staticData?.currency || "$"}
@@ -179,28 +267,60 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                   </span>
                 </div>
               </ClickableDataItem>
-              <div></div>{" "}
-              {/* Placeholder for potential right-aligned content */}
+              {liveData?.marketCap !== null &&
+                liveData?.marketCap !== undefined && (
+                  <ClickableDataItem
+                    isInteractive={true}
+                    onClickHandler={() => {
+                      const payload: RequestNewCardInteraction = {
+                        intent: "REQUEST_NEW_CARD",
+                        sourceCardId: id,
+                        sourceCardSymbol: symbol,
+                        sourceCardType: cardType,
+                        targetCardType: "price",
+                        originatingElement: "marketCapDisplayTrigger",
+                      };
+                      onGenericInteraction(payload);
+                    }}
+                    title={`Market Cap: ${formatNumberWithAbbreviations(
+                      liveData.marketCap
+                    )}`}
+                    baseClassName={cn(
+                      "flex items-baseline justify-end min-w-0 py-0.5 gap-1",
+                      interactiveItemBaseColor
+                    )} // Apply base color
+                    interactiveClassName={interactiveHoverColor}
+                    aria-label={`Request Price card for Market Cap details of ${symbol}`}>
+                    <span className="text-xs font-medium shrink-0">
+                      Market Cap:
+                    </span>
+                    <span className="font-semibold text-sm">
+                      {" "}
+                      {/* font-semibold might have its own color */}
+                      {formatNumberWithAbbreviations(liveData.marketCap)}
+                    </span>
+                  </ClickableDataItem>
+                )}
             </div>
-            <div className="flex flex-wrap gap-0.5 justify-end">
+            <div className="flex flex-wrap gap-0.5 justify-end mt-0.5">
               {staticData?.is_etf && (
                 <Badge
                   variant="outline"
-                  className="px-1 py-0 text-[9px] leading-tight">
+                  className="px-1 py-0 text-[8px] leading-tight">
                   ETF
                 </Badge>
               )}
               {staticData?.is_adr && (
                 <Badge
                   variant="outline"
-                  className="px-1 py-0 text-[9px] leading-tight">
+                  className="px-1 py-0 text-[8px] leading-tight">
                   ADR
                 </Badge>
               )}
               {staticData?.is_fund && (
                 <Badge
                   variant="outline"
-                  className="px-1 py-0 text-[9px] leading-tight">
+                  className="px-1 py-0 text-[8px] leading-tight">
                   Fund
                 </Badge>
               )}
@@ -210,6 +330,13 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
       );
     } else {
       // Back Face
+      // For consistency, if these items on the back were also meant to be interactive
+      // and have hover effects, a similar approach would be needed.
+      // For now, focusing on the front face as per the immediate issue.
+      const nonInteractiveItemColor = "text-foreground"; // Default color for non-interactive items on back
+      const interactiveItemBaseColorBack = "text-muted-foreground";
+      const interactiveHoverColorBack = "hover:text-primary cursor-pointer";
+
       return (
         <div
           data-testid={`profile-card-back-${symbol}`}
@@ -219,41 +346,35 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
               {backData.description ||
                 `Profile details for ${companyName || symbol}.`}
             </p>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {staticData?.ceo && (
                 <div
-                  className="flex items-start min-w-0"
-                  title={`CEO: ${staticData.ceo}`}>
-                  <UserCheck
-                    size={14}
-                    className="mr-1.5 mt-px text-muted-foreground shrink-0"
-                  />
-                  <div>
-                    <span className="font-medium text-muted-foreground block leading-tight">
-                      CEO
-                    </span>
-                    <span className="text-foreground leading-tight line-clamp-2">
-                      {staticData.ceo}
-                    </span>
-                  </div>
+                  title={`CEO: ${staticData.ceo}`}
+                  className={cn(
+                    "flex items-start min-w-0 gap-1",
+                    nonInteractiveItemColor
+                  )}>
+                  <span className="font-medium block leading-tight shrink-0">
+                    CEO:
+                  </span>
+                  <span className="leading-tight line-clamp-2">
+                    {staticData.ceo}
+                  </span>
                 </div>
               )}
               {staticData?.formatted_ipo_date && (
                 <div
-                  className="flex items-start min-w-0"
-                  title={`IPO: ${staticData.formatted_ipo_date}`}>
-                  <CalendarDays
-                    size={14}
-                    className="mr-1.5 mt-px text-muted-foreground shrink-0"
-                  />
-                  <div>
-                    <span className="font-medium text-muted-foreground block leading-tight">
-                      IPO Date
-                    </span>
-                    <span className="text-foreground leading-tight">
-                      {staticData.formatted_ipo_date}
-                    </span>
-                  </div>
+                  title={`IPO: ${staticData.formatted_ipo_date}`}
+                  className={cn(
+                    "flex items-start min-w-0 gap-1",
+                    nonInteractiveItemColor
+                  )}>
+                  <span className="font-medium block leading-tight shrink-0">
+                    IPO:
+                  </span>
+                  <span className="leading-tight">
+                    {staticData.formatted_ipo_date}
+                  </span>
                 </div>
               )}
               {staticData?.exchange_full_name && (
@@ -261,34 +382,39 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                   isInteractive={!!staticData.exchange}
                   onClickHandler={() => {
                     if (staticData.exchange) {
-                      handleInteraction("FILTER_WORKSPACE_DATA", {
+                      const payload: FilterWorkspaceDataInteraction = {
+                        intent: "FILTER_WORKSPACE_DATA",
+                        sourceCardId: id,
+                        sourceCardSymbol: symbol,
+                        sourceCardType: cardType,
                         filterField: "exchange",
                         filterValue: staticData.exchange,
                         originatingElement: "exchangeLink",
-                      } as Omit<FilterWorkspaceDataInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                      };
+                      onGenericInteraction(payload);
                     }
                   }}
                   title={`Exchange: ${staticData.exchange_full_name}`}
-                  baseClassName="min-w-0">
-                  <div className="flex items-start">
-                    <Building
-                      size={14}
-                      className="mr-1.5 mt-px text-muted-foreground shrink-0"
-                    />
-                    <div>
-                      <span className="font-medium text-muted-foreground block leading-tight">
-                        Exchange
-                      </span>
-                      <span className="text-foreground leading-tight line-clamp-2">
-                        {staticData.exchange_full_name}
-                      </span>
-                    </div>
+                  baseClassName={cn(
+                    "min-w-0",
+                    staticData.exchange
+                      ? interactiveItemBaseColorBack
+                      : nonInteractiveItemColor
+                  )}
+                  interactiveClassName={interactiveHoverColorBack}>
+                  <div className="flex items-start gap-1">
+                    <span className="font-medium block leading-tight shrink-0">
+                      Exchange:
+                    </span>
+                    <span className="leading-tight line-clamp-2">
+                      {staticData.exchange_full_name}
+                    </span>
                   </div>
                 </ClickableDataItem>
               )}
             </div>
           </ShadCardContent>
-          <div className="px-0 pt-0.5 text-center">
+          <div className="px-0 pt-0.5 text-center mt-auto">
             {staticData?.profile_last_updated && (
               <p className="text-[9px] text-muted-foreground/80 leading-tight">
                 Profile as of: {staticData.profile_last_updated}

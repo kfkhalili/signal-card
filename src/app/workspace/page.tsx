@@ -8,7 +8,6 @@ import { useRouter } from "next/navigation";
 import { AddCardForm } from "@/components/workspace/AddCardForm";
 import { StockDataHandler } from "@/components/workspace/StockDataHandler";
 import MarketDataStatusBanner from "@/components/workspace/MarketStatusBanner";
-import { useWorkspaceManager } from "@/hooks/useWorkspaceManager";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, RefreshCw, Loader2 } from "lucide-react";
 import {
@@ -22,14 +21,15 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-// Ensure card rehydrators and initializers are loaded
 import "@/components/game/cards/rehydrators";
-import "@/components/game/cards/initializers"; // This should pull in revenueCardUtils
-import "@/components/game/cards/updateHandlerInitializer"; // This should pull in revenueCardUtils
+import "@/components/game/cards/initializers";
+import "@/components/game/cards/updateHandlerInitializer";
+
+import { useWorkspaceManager } from "@/hooks/useWorkspaceManager";
 
 import ActiveCardsSection from "@/components/game/ActiveCardsSection";
 import type { DerivedMarketStatus } from "@/hooks/useStockData";
-import type { FinancialStatementDBRow } from "@/lib/supabase/realtime-service"; // Ensure this type is available
+import type { FinancialStatementDBRow } from "@/lib/supabase/realtime-service";
 
 type MarketStatus = Record<
   string,
@@ -86,7 +86,7 @@ export default function WorkspacePage() {
 
   const confirmedClearWorkspace = () => {
     clearWorkspace();
-    setMarketStatuses({}); // Reset market statuses as well
+    setMarketStatuses({});
     setIsClearConfirmOpen(false);
   };
 
@@ -130,7 +130,7 @@ export default function WorkspacePage() {
             {/* AddCardForm is available even if workspaceSymbolForRegularUser is set,
               but its symbol input will be locked for non-premium users */}
             <AddCardForm
-              onAddCard={addCardToWorkspace} // No need for async here, addCardToWorkspace is async
+              onAddCard={addCardToWorkspace}
               existingCards={activeCards}
               isPremiumUser={isPremiumUser}
               lockedSymbolForRegularUser={workspaceSymbolForRegularUser}
@@ -172,7 +172,7 @@ export default function WorkspacePage() {
       <div className="px-2 sm:px-0">
         {activeCards.length === 0 && !isAddingCardInProgress ? (
           <div className="text-center py-16 sm:py-20">
-            <RefreshCw // Using RefreshCw as a placeholder icon
+            <RefreshCw
               size={48}
               className="mx-auto text-muted-foreground mb-4"
               strokeWidth={1.5}
@@ -184,7 +184,7 @@ export default function WorkspacePage() {
               onAddCard={addCardToWorkspace}
               existingCards={activeCards}
               isPremiumUser={isPremiumUser}
-              lockedSymbolForRegularUser={workspaceSymbolForRegularUser} // Pass this down
+              lockedSymbolForRegularUser={workspaceSymbolForRegularUser}
               triggerButton={
                 <Button size="lg">
                   <PlusCircle className="mr-2 h-5 w-5" /> Add Your First Card

@@ -5,30 +5,27 @@ import { useState, useEffect, useCallback } from "react";
 
 type SetValue<T> = (value: T | ((val: T) => T)) => void;
 
-// Reviver function to convert ISO date strings to Date objects
-const dateReviver = (value: unknown): unknown => {
-  const isoDatePattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/;
-  if (typeof value === "string" && isoDatePattern.test(value)) {
-    return new Date(value);
-  }
-  return value;
-};
-
 function useLocalStorage<T>(key: string, initialValue: T): [T, SetValue<T>] {
-  const readValue = useCallback((): T => {
+  const [storedValue, setStoredValue] = useState<T>(() => {
     if (typeof window === "undefined") {
       return initialValue;
     }
-    try {
-      const item = window.localStorage.getItem(key);
-      return item ? (JSON.parse(item, dateReviver) as T) : initialValue;
-    } catch (error) {
-      console.warn(`Error reading localStorage key “${key}”:`, error);
+    const item = window.localStorage.getItem(key);
+    if (!item) {
       return initialValue;
     }
-  }, [initialValue, key]);
-
-  const [storedValue, setStoredValue] = useState<T>(readValue);
+    try {
+      // Parse WITHOUT the dateReviver for the main localStorage item
+      return JSON.parse(item) as T;
+    } catch (error) {
+      console.warn(
+        `[useLocalStorage] Error parsing localStorage item for key “${key}”. Error:`,
+        error
+      );
+      console.error(`[useLocalStorage] Item that failed to parse:`, item);
+      return initialValue;
+    }
+  });
 
   const setValue: SetValue<T> = useCallback(
     (valueOrFn) => {
@@ -44,59 +41,49 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, SetValue<T>] {
             typeof valueOrFn === "function"
               ? (valueOrFn as (val: T) => T)(currentState)
               : valueOrFn;
-
           window.localStorage.setItem(key, JSON.stringify(newValue));
-          window.dispatchEvent(new Event("local-storage")); // Dispatch custom event
-
+          window.dispatchEvent(new Event("local-storage")); // For cross-tab sync if needed
           return newValue;
         });
       } catch (error) {
-        console.warn(`Error setting localStorage key “${key}”:`, error);
+        console.warn(
+          `[useLocalStorage] Error setting localStorage key “${key}”:`,
+          error
+        );
       }
     },
     [key]
   );
 
-  // Effect to sync state from localStorage when key or initialValue (via readValue) changes
-  useEffect(() => {
-    setStoredValue((currentVal) => {
-      const valFromStorage = readValue();
-      // Only update if the stringified value has actually changed
-      // This prevents updates if readValue() returns a new reference to an identical object/array
-      if (JSON.stringify(currentVal) !== JSON.stringify(valFromStorage)) {
-        return valFromStorage;
-      }
-      return currentVal;
-    });
-  }, [readValue]); // Runs when readValue reference changes (i.e. initialValue or key changes)
+  // Read value for effects, also without the top-level reviver
+  const readValueForEffects = useCallback((): T => {
+    if (typeof window === "undefined") return initialValue;
+    const item = window.localStorage.getItem(key);
+    if (!item) return initialValue;
+    try {
+      return JSON.parse(item) as T; // Parse WITHOUT reviver
+    } catch {
+      return initialValue;
+    }
+  }, [initialValue, key]);
 
-  // Effect to listen for storage events from other tabs/windows or custom events
   useEffect(() => {
     const handleStorageChange = (event: Event): void => {
       if (typeof window === "undefined") return;
-
-      let shouldAttemptRead = false;
+      let shouldReRead = false;
       if (event instanceof StorageEvent) {
         // Standard 'storage' event from other tabs/windows
-        if (event.key === key) {
-          shouldAttemptRead = true;
+        // event.key is null if localStorage.clear() was called
+        if (event.key === null || event.key === key) {
+          shouldReRead = true;
         }
       } else if (event.type === "local-storage") {
-        // Custom 'local-storage' event dispatched by setValue in this or another instance of the hook
-        // We always attempt to re-read to ensure synchronization,
-        // but the setStoredValue below will guard against unnecessary updates.
-        shouldAttemptRead = true;
+        // Custom 'local-storage' event from setValue in the same tab or other instances of the hook
+        shouldReRead = true;
       }
 
-      if (shouldAttemptRead) {
-        setStoredValue((currentVal) => {
-          const valFromStorage = readValue();
-          // Only update if the stringified value has actually changed
-          if (JSON.stringify(currentVal) !== JSON.stringify(valFromStorage)) {
-            return valFromStorage;
-          }
-          return currentVal;
-        });
+      if (shouldReRead) {
+        setStoredValue(readValueForEffects());
       }
     };
 
@@ -107,7 +94,7 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, SetValue<T>] {
       window.removeEventListener("storage", handleStorageChange);
       window.removeEventListener("local-storage", handleStorageChange);
     };
-  }, [key, readValue]); // readValue reference is stable if initialValue & key are stable.
+  }, [key, initialValue, readValueForEffects]); // readValueForEffects is stable if initialValue/key are
 
   return [storedValue, setValue];
 }

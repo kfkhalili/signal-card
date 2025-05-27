@@ -5,6 +5,7 @@ import type {
   ConcreteCardData,
 } from "@/components/game/types";
 import { parseTimestampSafe } from "@/lib/formatters";
+import type { CardType } from "./cards/base-card/base-card.types";
 
 export interface CommonCardPropsForRehydration extends DisplayableCardState {
   id: string;
@@ -19,15 +20,18 @@ export type SpecificCardRehydrator = (
   commonProps: CommonCardPropsForRehydration
 ) => ConcreteCardData | null;
 
-const cardRehydratorRegistry = new Map<string, SpecificCardRehydrator>();
+// Using CardType for the key provides better type safety if CardType is a union of string literals
+const cardRehydratorRegistry = new Map<CardType, SpecificCardRehydrator>();
 
 export function registerCardRehydrator(
-  cardType: string,
+  cardType: CardType, // Use the imported CardType
   rehydrator: SpecificCardRehydrator
 ): void {
   if (cardRehydratorRegistry.has(cardType)) {
+    // This warning can be useful during development if rehydrators are accidentally overwritten.
+    // For production, you might choose to remove it or make it conditional.
     console.warn(
-      `Rehydrator for card type "${cardType}" is being overwritten.`
+      `[cardRehydration] Rehydrator for card type "${cardType}" is being overwritten.`
     );
   }
   cardRehydratorRegistry.set(cardType, rehydrator);
@@ -39,58 +43,66 @@ export function rehydrateCardFromStorage(
   if (
     !cardFromStorage ||
     typeof cardFromStorage.id !== "string" ||
-    typeof cardFromStorage.type !== "string" ||
+    typeof cardFromStorage.type !== "string" || // This 'type' is used as CardType
     typeof cardFromStorage.symbol !== "string"
   ) {
+    // It's good practice to warn about invalid data structures if they are encountered.
     console.warn(
-      "Invalid card structure in local storage, skipping rehydration for:",
+      "[cardRehydration] Invalid card structure in local storage, skipping rehydration for:",
       cardFromStorage
     );
     return null;
   }
 
-  const cardType = cardFromStorage.type;
+  // Cast the string 'type' from storage to your CardType union for use with the registry.
+  const cardType = cardFromStorage.type as CardType;
   const specificRehydrator = cardRehydratorRegistry.get(cardType);
 
   if (!specificRehydrator) {
     console.warn(
-      `No rehydrator registered for card type "${cardType}". Skipping card ID: ${cardFromStorage.id}`
+      `[cardRehydration] No rehydrator registered for card type "${cardType}". Skipping card ID: ${cardFromStorage.id}`
     );
     return null;
   }
 
+  // Ensure createdAt is a number. parseTimestampSafe handles various input types.
+  // If cardFromStorage.createdAt is undefined or invalid, finalCreatedAt defaults to Date.now().
   const parsedCreatedAt = parseTimestampSafe(cardFromStorage.createdAt);
   const finalCreatedAt = parsedCreatedAt ?? Date.now();
 
   const commonProps: CommonCardPropsForRehydration = {
-    id: cardFromStorage.id,
-    symbol: cardFromStorage.symbol,
+    id: cardFromStorage.id as string, // Already validated as string
+    symbol: cardFromStorage.symbol as string, // Already validated as string
     isFlipped:
       typeof cardFromStorage.isFlipped === "boolean"
         ? cardFromStorage.isFlipped
-        : false,
+        : false, // Default to false if not a boolean
     createdAt: finalCreatedAt,
-    companyName: (cardFromStorage.companyName as string | undefined) ?? null,
-    logoUrl: (cardFromStorage.logoUrl as string | undefined) ?? null,
+    companyName: (cardFromStorage.companyName as string | undefined) ?? null, // Ensure null if not present
+    logoUrl: (cardFromStorage.logoUrl as string | undefined) ?? null, // Ensure null if not present
   };
 
   try {
     const concreteCardData = specificRehydrator(cardFromStorage, commonProps);
 
     if (!concreteCardData) {
+      // This warning helps identify if a specific rehydrator fails internally.
       console.warn(
-        `Specific rehydrator for type "${cardType}" returned null for card ID: ${commonProps.id}`
+        `[cardRehydration] Specific rehydrator for type "${cardType}" returned null for card ID: ${commonProps.id}`
       );
       return null;
     }
 
-    return {
+    // Combine the rehydrated concrete data with common stateful properties like isFlipped.
+    const displayableCard: DisplayableCard = {
       ...concreteCardData,
       isFlipped: commonProps.isFlipped,
-    } as DisplayableCard;
+    };
+    return displayableCard;
   } catch (error) {
+    // Catching errors within a specific rehydrator is crucial.
     console.error(
-      `Error during specific rehydration for type "${cardType}", card ID: ${commonProps.id}:`,
+      `[cardRehydration] Error during specific rehydration for type "${cardType}", card ID: ${commonProps.id}:`,
       error
     );
     return null;

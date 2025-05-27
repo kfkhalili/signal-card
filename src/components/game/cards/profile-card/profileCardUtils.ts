@@ -1,6 +1,6 @@
 // src/components/game/cards/profile-card/profileCardUtils.ts
 import { format, parseISO, isValid as isValidDate } from "date-fns";
-import type { ProfileDBRow } from "@/hooks/useStockData"; // Defines the structure of data from 'profiles' table
+import type { ProfileDBRow } from "@/hooks/useStockData";
 import type {
   DisplayableCard,
   DisplayableCardState,
@@ -18,21 +18,81 @@ import {
 import {
   registerCardUpdateHandler,
   type CardUpdateHandler,
+  type CardUpdateContext,
 } from "@/components/game/cardUpdateHandler.types";
-import type { LiveQuoteIndicatorDBRow } from "@/lib/supabase/realtime-service";
+import type {
+  LiveQuoteIndicatorDBRow,
+  FinancialStatementDBRow as FinancialStatementDBRowFromRealtime, // Renamed to avoid conflict
+} from "@/lib/supabase/realtime-service";
+import type { Json } from "@/lib/supabase/database.types";
 
-// Interface for the minimal data structure needed to create ProfileCardLiveData
-interface QuoteSource {
-  current_price: number | null;
-  // Other fields might be present but are not used by createProfileCardLiveDataFromLiveQuote
+// Specific type for the income statement payload relevant to ProfileCard
+interface ProfileCardFmpIncomeStatementPayload {
+  revenue?: number | null;
+  eps?: number | null; // Assuming 'eps' is a field name. Common alternatives: 'epsdiluted', 'earningsPerShare'
+  earningsPerShare?: number | null; // Adding another common variant for EPS
+  // Add other fields if they become necessary for the ProfileCard
 }
 
-// Updated local utility function to accept an object with at least a 'current_price' property
+// Type for the source of financial statement data for ProfileCard
+interface ProfileFinancialStatementSource {
+  income_statement_payload: Json | null; // Use Json type from database.types.ts
+}
+
+function parseFmpIncomePayloadForProfile(
+  payload: Json | null
+): ProfileCardFmpIncomeStatementPayload {
+  const defaultResult: ProfileCardFmpIncomeStatementPayload = {
+    revenue: null,
+    eps: null,
+  };
+  if (typeof payload !== "object" || payload === null) {
+    return defaultResult;
+  }
+  // Type assertion: We are asserting that 'payload' matches the structure we expect.
+  const assertedPayload = payload as Record<
+    string,
+    string | number | boolean | null | undefined | Json[]
+  >;
+
+  const revenue =
+    typeof assertedPayload.revenue === "number"
+      ? assertedPayload.revenue
+      : null;
+  const eps =
+    typeof assertedPayload.eps === "number"
+      ? assertedPayload.eps
+      : typeof assertedPayload.earningsPerShare === "number"
+      ? assertedPayload.earningsPerShare
+      : null;
+
+  return { revenue, eps };
+}
+
 function createProfileCardLiveDataFromLiveQuote(
-  quote: QuoteSource
+  quote: LiveQuoteIndicatorDBRow,
+  currentLiveData?: Readonly<Partial<ProfileCardLiveData>>
 ): ProfileCardLiveData {
   return {
-    price: quote.current_price,
+    price: quote.current_price ?? null,
+    marketCap: quote.market_cap ?? null,
+    revenue: currentLiveData?.revenue ?? null, // Preserve existing
+    eps: currentLiveData?.eps ?? null, // Preserve existing
+  };
+}
+
+function createProfileCardLiveDataFromFinancialStatement(
+  statementSource: ProfileFinancialStatementSource,
+  currentLiveData?: Readonly<Partial<ProfileCardLiveData>>
+): ProfileCardLiveData {
+  const parsedPayload = parseFmpIncomePayloadForProfile(
+    statementSource.income_statement_payload
+  );
+  return {
+    price: currentLiveData?.price ?? null, // Preserve existing
+    marketCap: currentLiveData?.marketCap ?? null, // Preserve existing
+    revenue: parsedPayload.revenue,
+    eps: parsedPayload.eps,
   };
 }
 
@@ -50,28 +110,16 @@ function transformProfileDBRowToStaticData(
       try {
         date = parseISO(dateString);
       } catch {
-        /* Ignore parsing error */
+        // ignore
       }
     }
 
     if (isValidDate(date)) {
       try {
         return format(date, formatString);
-      } catch (e) {
-        if (process.env.NODE_ENV === "development") {
-          console.warn(
-            `[transformProfileDBRowToStaticData] Error formatting date string: ${dateString}`,
-            e
-          );
-        }
+      } catch {
         return dateString;
       }
-    }
-
-    if (process.env.NODE_ENV === "development") {
-      console.warn(
-        `[transformProfileDBRowToStaticData] Invalid or unparseable date string encountered: ${dateString}`
-      );
     }
     return undefined;
   };
@@ -107,7 +155,8 @@ function transformProfileDBRowToStaticData(
 }
 
 function createDisplayableProfileCardFromDB(
-  dbData: ProfileDBRow
+  dbData: ProfileDBRow,
+  initialLiveData: Readonly<ProfileCardLiveData> // Now requires fully formed initialLiveData
 ): ProfileCardData & Pick<DisplayableCardState, "isFlipped"> {
   const staticData: ProfileCardStaticData =
     transformProfileDBRowToStaticData(dbData);
@@ -121,14 +170,14 @@ function createDisplayableProfileCardFromDB(
   };
 
   const concreteCardData: ProfileCardData = {
-    id: `profile-<span class="math-inline">{dbData.symbol}-</span>{Date.now()}`,
+    id: `profile-${dbData.symbol}-${Date.now()}`,
     type: "profile",
     symbol: dbData.symbol,
     companyName: dbData.company_name,
     logoUrl: dbData.image,
     createdAt: Date.now(),
     staticData,
-    liveData: { price: dbData.price }, // Initialize with price from ProfileDBRow
+    liveData: initialLiveData, // Use the passed-in live data
     backData: cardBackData,
     websiteUrl: dbData.website,
   };
@@ -147,12 +196,7 @@ async function initializeProfileCard({
   try {
     const { data: profileData, error: profileError } = await supabase
       .from("profiles")
-      .select(
-        "id, symbol, company_name, image, exchange, sector, industry, website, description, country, \
-        market_cap, beta, last_dividend, range, change, change_percentage, volume, average_volume, currency, cik, isin, \
-        cusip, exchange_full_name, ceo, full_time_employees, phone, address, city, state, zip, ipo_date, default_image, is_etf, \
-        is_actively_trading, is_adr, is_fund, modified_at"
-      )
+      .select("*") // Select all profile fields initially
       .eq("symbol", symbol)
       .maybeSingle();
 
@@ -160,21 +204,24 @@ async function initializeProfileCard({
 
     if (profileData) {
       const profile = profileData as ProfileDBRow;
-      const displayableCard = createDisplayableProfileCardFromDB(
-        profile
-      ) as ProfileCardData & Pick<DisplayableCardState, "isFlipped">;
 
-      // Attempt to get a more current price from live_quote_indicators
-      // Select only 'price' and 'api_timestamp' (for ordering).
+      // Start with defaults or data from profile table
+      let liveDataForCard: ProfileCardLiveData = {
+        price: profile.price ?? null,
+        marketCap: profile.market_cap ?? null,
+        revenue: null,
+        eps: null,
+      };
+
+      // Fetch latest live quote
       const { data: initialQuoteData, error: initialQuoteError } =
         await supabase
           .from("live_quote_indicators")
-          .select("current_price, api_timestamp") // Fetch only necessary fields
+          .select("current_price, market_cap, api_timestamp")
           .eq("symbol", symbol)
           .order("api_timestamp", { ascending: false })
           .limit(1)
-          .maybeSingle(); // Type of initialQuoteData will be:
-      // { price: number | null; api_timestamp: string | number | null } | null
+          .maybeSingle();
 
       if (initialQuoteError && process.env.NODE_ENV === "development") {
         console.warn(
@@ -184,14 +231,42 @@ async function initializeProfileCard({
       }
 
       if (initialQuoteData) {
-        // initialQuoteData (if not null) is guaranteed to have a 'price' property,
-        // so it satisfies the 'QuoteSource' interface.
-        displayableCard.liveData =
-          createProfileCardLiveDataFromLiveQuote(initialQuoteData);
+        liveDataForCard = createProfileCardLiveDataFromLiveQuote(
+          initialQuoteData as LiveQuoteIndicatorDBRow, // Cast needed as select is partial
+          liveDataForCard
+        );
       }
-      // If initialQuoteData is not found, liveData.price remains as initialized from profiles.price
 
-      return displayableCard as DisplayableCard;
+      // Fetch latest financial statement
+      const { data: financialStatementData, error: fsError } = await supabase
+        .from("financial_statements")
+        .select("income_statement_payload, period, date")
+        .eq("symbol", symbol)
+        .order("date", { ascending: false })
+        .order("period", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (fsError && process.env.NODE_ENV === "development") {
+        console.warn(
+          `[initializeProfileCard] Error fetching financial statement for ${symbol}:`,
+          fsError.message
+        );
+      }
+
+      if (financialStatementData) {
+        liveDataForCard = createProfileCardLiveDataFromFinancialStatement(
+          financialStatementData as ProfileFinancialStatementSource, // Cast to defined source type
+          liveDataForCard
+        );
+      }
+
+      const displayableCard = createDisplayableProfileCardFromDB(
+        profile,
+        liveDataForCard // Pass fully formed liveData
+      );
+
+      return displayableCard as DisplayableCard; // Final cast
     } else {
       if (toast) {
         toast({
@@ -219,25 +294,74 @@ async function initializeProfileCard({
 }
 registerCardInitializer("profile", initializeProfileCard);
 
-// Realtime updates are expected to send the full LiveQuoteIndicatorDBRow.
-// This row structure naturally satisfies the 'QuoteSource' interface as it includes 'price'.
 const handleProfileCardLiveQuoteUpdate: CardUpdateHandler<
   ProfileCardData,
-  LiveQuoteIndicatorDBRow // Payload from Supabase realtime
+  LiveQuoteIndicatorDBRow
 > = (currentProfileCardData, leanQuotePayload): ProfileCardData => {
-  const newLiveData = createProfileCardLiveDataFromLiveQuote(leanQuotePayload);
+  // Use a read-only version of liveData for merging to prevent accidental direct mutation
+  const currentLiveDataReadOnly = { ...currentProfileCardData.liveData };
 
-  if (currentProfileCardData.liveData?.price !== newLiveData.price) {
+  const newLiveData = createProfileCardLiveDataFromLiveQuote(
+    leanQuotePayload,
+    currentLiveDataReadOnly
+  );
+
+  if (
+    currentProfileCardData.liveData.price !== newLiveData.price ||
+    currentProfileCardData.liveData.marketCap !== newLiveData.marketCap
+  ) {
     return {
       ...currentProfileCardData,
       liveData: newLiveData,
     };
   }
-
   return currentProfileCardData;
 };
 registerCardUpdateHandler(
   "profile",
   "LIVE_QUOTE_UPDATE",
   handleProfileCardLiveQuoteUpdate
+);
+
+const handleProfileCardFinancialStatementUpdate: CardUpdateHandler<
+  ProfileCardData,
+  FinancialStatementDBRowFromRealtime // Use the specific type from realtime-service
+> = (
+  currentProfileCardData,
+  financialStatementRow, // This is now correctly typed
+  _currentDisplayableCard, // Unused parameter
+  context: CardUpdateContext
+): ProfileCardData => {
+  // Adapt the incoming row to the source structure expected by the creator function
+  const statementSource: ProfileFinancialStatementSource = {
+    income_statement_payload: financialStatementRow.income_statement_payload,
+  };
+  const currentLiveDataReadOnly = { ...currentProfileCardData.liveData };
+
+  const newLiveData = createProfileCardLiveDataFromFinancialStatement(
+    statementSource,
+    currentLiveDataReadOnly
+  );
+
+  if (
+    currentProfileCardData.liveData.revenue !== newLiveData.revenue ||
+    currentProfileCardData.liveData.eps !== newLiveData.eps
+  ) {
+    if (context.toast) {
+      context.toast({
+        title: `Financials Updated: ${currentProfileCardData.symbol}`,
+        description: `Data from statement ending ${financialStatementRow.date} (${financialStatementRow.period}) applied. Revenue or EPS changed.`,
+      });
+    }
+    return {
+      ...currentProfileCardData,
+      liveData: newLiveData,
+    };
+  }
+  return currentProfileCardData;
+};
+registerCardUpdateHandler(
+  "profile",
+  "FINANCIAL_STATEMENT_UPDATE",
+  handleProfileCardFinancialStatementUpdate
 );

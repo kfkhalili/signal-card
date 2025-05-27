@@ -10,21 +10,18 @@ import type {
   ProfileCardLiveData,
 } from "./profile-card.types";
 import type { BaseCardBackData } from "../base-card/base-card.types";
-// DisplayableCard is not directly used for parameter typing here anymore,
-// but ProfileCardData might extend or relate to it.
 
 // Define an interim type for what we expect cardFromStorage to look like
-// after casting from Record<string, unknown> for profile cards.
-// This helps in safely accessing nested properties.
+// This helps in safely accessing nested properties, including the new liveData fields.
 interface StoredProfileCardShape {
   staticData?: Partial<ProfileCardStaticData>;
-  liveData?: Partial<ProfileCardLiveData>;
-  // Add other properties if they are expected at the top level of cardFromStorage
-  // for profile cards, beyond what's in CommonCardPropsForRehydration.
+  liveData?: Partial<ProfileCardLiveData>; // Will now look for marketCap, revenue, eps
+  // Ensure other top-level properties are included if they are part of the stored object
+  // beyond what's in CommonCardPropsForRehydration.
 }
 
 const rehydrateProfileCardInstance: SpecificCardRehydrator = (
-  cardFromStorage: Record<string, unknown>, // Changed to match SpecificCardRehydrator
+  cardFromStorage: Record<string, unknown>,
   commonProps: CommonCardPropsForRehydration
 ): ProfileCardData | null => {
   // Assert the shape of cardFromStorage for profile-specific data
@@ -34,29 +31,97 @@ const rehydrateProfileCardInstance: SpecificCardRehydrator = (
   const liveDataFromStorage = profileStorageData.liveData || {};
 
   const rehydratedStaticData: ProfileCardStaticData = {
-    db_id: staticDataFromStorage.db_id || "", // Ensure db_id is always a string
-    sector: staticDataFromStorage.sector ?? null,
-    industry: staticDataFromStorage.industry ?? null,
-    country: staticDataFromStorage.country ?? null,
-    exchange_full_name: staticDataFromStorage.exchange_full_name ?? null,
-    exchange: staticDataFromStorage.exchange ?? null,
-    website: staticDataFromStorage.website ?? null,
-    description: staticDataFromStorage.description ?? null,
-    ceo: staticDataFromStorage.ceo ?? null,
-    full_address: staticDataFromStorage.full_address ?? null,
-    phone: staticDataFromStorage.phone ?? null,
-    profile_last_updated: staticDataFromStorage.profile_last_updated ?? null,
-    currency: staticDataFromStorage.currency ?? null,
-    formatted_ipo_date: staticDataFromStorage.formatted_ipo_date ?? null,
+    db_id:
+      typeof staticDataFromStorage.db_id === "string"
+        ? staticDataFromStorage.db_id
+        : "",
+    sector:
+      typeof staticDataFromStorage.sector === "string"
+        ? staticDataFromStorage.sector
+        : null,
+    industry:
+      typeof staticDataFromStorage.industry === "string"
+        ? staticDataFromStorage.industry
+        : null,
+    country:
+      typeof staticDataFromStorage.country === "string"
+        ? staticDataFromStorage.country
+        : null,
+    exchange_full_name:
+      typeof staticDataFromStorage.exchange_full_name === "string"
+        ? staticDataFromStorage.exchange_full_name
+        : null,
+    exchange:
+      typeof staticDataFromStorage.exchange === "string"
+        ? staticDataFromStorage.exchange
+        : null,
+    website:
+      typeof staticDataFromStorage.website === "string"
+        ? staticDataFromStorage.website
+        : null,
+    description:
+      typeof staticDataFromStorage.description === "string"
+        ? staticDataFromStorage.description
+        : null,
+    ceo:
+      typeof staticDataFromStorage.ceo === "string"
+        ? staticDataFromStorage.ceo
+        : null,
+    full_address:
+      typeof staticDataFromStorage.full_address === "string"
+        ? staticDataFromStorage.full_address
+        : null,
+    phone:
+      typeof staticDataFromStorage.phone === "string"
+        ? staticDataFromStorage.phone
+        : null,
+    profile_last_updated:
+      typeof staticDataFromStorage.profile_last_updated === "string"
+        ? staticDataFromStorage.profile_last_updated
+        : null,
+    currency:
+      typeof staticDataFromStorage.currency === "string"
+        ? staticDataFromStorage.currency
+        : null,
+    formatted_ipo_date:
+      typeof staticDataFromStorage.formatted_ipo_date === "string"
+        ? staticDataFromStorage.formatted_ipo_date
+        : null,
     formatted_full_time_employees:
-      staticDataFromStorage.formatted_full_time_employees ?? null,
-    is_etf: staticDataFromStorage.is_etf ?? null,
-    is_adr: staticDataFromStorage.is_adr ?? null,
-    is_fund: staticDataFromStorage.is_fund ?? null,
+      typeof staticDataFromStorage.formatted_full_time_employees === "string"
+        ? staticDataFromStorage.formatted_full_time_employees
+        : null,
+    is_etf:
+      typeof staticDataFromStorage.is_etf === "boolean"
+        ? staticDataFromStorage.is_etf
+        : null,
+    is_adr:
+      typeof staticDataFromStorage.is_adr === "boolean"
+        ? staticDataFromStorage.is_adr
+        : null,
+    is_fund:
+      typeof staticDataFromStorage.is_fund === "boolean"
+        ? staticDataFromStorage.is_fund
+        : null,
   };
 
   const rehydratedLiveData: ProfileCardLiveData = {
-    price: liveDataFromStorage.price ?? null,
+    price:
+      typeof liveDataFromStorage.price === "number"
+        ? liveDataFromStorage.price
+        : null,
+    marketCap:
+      typeof liveDataFromStorage.marketCap === "number"
+        ? liveDataFromStorage.marketCap
+        : null,
+    revenue:
+      typeof liveDataFromStorage.revenue === "number"
+        ? liveDataFromStorage.revenue
+        : null,
+    eps:
+      typeof liveDataFromStorage.eps === "number"
+        ? liveDataFromStorage.eps
+        : null,
   };
 
   const cardTypeDescription = `Provides an overview of ${
@@ -69,7 +134,7 @@ const rehydrateProfileCardInstance: SpecificCardRehydrator = (
 
   const rehydratedCard: ProfileCardData = {
     id: commonProps.id,
-    type: "profile", // Crucially set the type for the concrete card data
+    type: "profile",
     symbol: commonProps.symbol,
     createdAt: commonProps.createdAt,
     companyName: commonProps.companyName,
@@ -77,7 +142,7 @@ const rehydrateProfileCardInstance: SpecificCardRehydrator = (
     staticData: rehydratedStaticData,
     liveData: rehydratedLiveData,
     backData: rehydratedBackData,
-    websiteUrl: rehydratedStaticData.website, // Use the rehydrated static data
+    websiteUrl: rehydratedStaticData.website,
   };
 
   return rehydratedCard;

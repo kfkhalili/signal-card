@@ -83,7 +83,7 @@ function createDisplayablePriceCard(
   };
 
   const concreteCardData: PriceCardData = {
-    id: `${leanQuote.symbol}-price-${Date.now()}`,
+    id: `price-${leanQuote.symbol}-${Date.now()}`,
     type: "price",
     symbol: leanQuote.symbol,
     createdAt: Date.now(),
