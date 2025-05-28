@@ -35,6 +35,7 @@ const AVAILABLE_CARD_TYPES: { value: CardType; label: string }[] = [
   { value: "profile", label: "Profile Card" },
   { value: "price", label: "Price Card" },
   { value: "revenue", label: "Revenue Card" },
+  { value: "solvency", label: "Solvency Card" }, // Added
 ];
 
 const AddCardFormSchema = z.object({
@@ -78,20 +79,19 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
         lockedSymbolForRegularUser && !isPremiumUser
           ? lockedSymbolForRegularUser
           : "",
-      cardType: "profile",
+      cardType: "profile", // Default to profile or consider making it undefined
     },
   });
 
-  // Effect to update form defaults if lockedSymbolForRegularUser changes (e.g., after workspace clear)
-  // or when dialog opens.
   useEffect(() => {
     if (isOpen) {
       const defaultSymbol =
         lockedSymbolForRegularUser && !isPremiumUser
           ? lockedSymbolForRegularUser
           : "";
+      // Keep current card type if premium, otherwise reset to profile (or a sensible default)
       const defaultCardType = isPremiumUser
-        ? form.getValues("cardType")
+        ? form.getValues("cardType") || "profile" // Ensure a fallback if current value is undefined
         : "profile";
 
       form.reset({
@@ -103,7 +103,6 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
 
   const handleSubmit = async (values: AddCardFormValues) => {
     setIsSubmitting(true);
-    // Ensure the submitted symbol is the locked one for regular users if applicable
     const finalValues = {
       ...values,
       symbol:
@@ -129,8 +128,9 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
     await onAddCard(finalValues);
     setIsSubmitting(false);
     setIsOpen(false);
-    // form.reset() is now handled by the useEffect on isOpen
   };
+
+  const NON_PREMIUM_LOCKED_TYPES: CardType[] = ["revenue", "solvency"]; // Add other types as needed
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -164,7 +164,6 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
                     <Input
                       placeholder="e.g., AAPL, BTC-USD"
                       {...field}
-                      // Lock symbol input if lockedSymbolForRegularUser is set and user is not premium
                       disabled={
                         isSubmitting ||
                         (!!lockedSymbolForRegularUser && !isPremiumUser)
@@ -188,38 +187,38 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
                       onValueChange={field.onChange}
                       value={field.value}
                       className="flex flex-col space-y-1"
-                      disabled={isSubmitting} // General submission lock
-                    >
-                      {AVAILABLE_CARD_TYPES.map((typeOpt) => (
-                        <FormItem
-                          key={typeOpt.value}
-                          className="flex items-center space-x-3 space-y-0">
-                          <FormControl>
-                            <RadioGroupItem
-                              value={typeOpt.value}
-                              // Disable if not premium AND type is not 'profile'
-                              disabled={
-                                isSubmitting ||
-                                (!isPremiumUser && typeOpt.value !== "profile")
-                              }
-                            />
-                          </FormControl>
-                          <FormLabel className="font-normal flex items-center">
-                            {typeOpt.label}
-                            {!isPremiumUser && typeOpt.value !== "profile" && (
-                              <Lock
-                                size={12}
-                                className="ml-2 text-muted-foreground"
+                      disabled={isSubmitting}>
+                      {AVAILABLE_CARD_TYPES.map((typeOpt) => {
+                        const isLockedForNonPremium =
+                          !isPremiumUser &&
+                          NON_PREMIUM_LOCKED_TYPES.includes(typeOpt.value);
+                        return (
+                          <FormItem
+                            key={typeOpt.value}
+                            className="flex items-center space-x-3 space-y-0">
+                            <FormControl>
+                              <RadioGroupItem
+                                value={typeOpt.value}
+                                disabled={isSubmitting || isLockedForNonPremium}
                               />
-                            )}
-                          </FormLabel>
-                        </FormItem>
-                      ))}
+                            </FormControl>
+                            <FormLabel className="font-normal flex items-center">
+                              {typeOpt.label}
+                              {isLockedForNonPremium && (
+                                <Lock
+                                  size={12}
+                                  className="ml-2 text-muted-foreground"
+                                />
+                              )}
+                            </FormLabel>
+                          </FormItem>
+                        );
+                      })}
                     </RadioGroup>
                   </FormControl>
                   {!isPremiumUser && (
                     <FormDescription className="flex items-center text-xs">
-                      Card type is locked to Profile. Symbol is locked once
+                      Some card types are Premium only. Symbol is locked once
                       first card is added.
                       <Lock size={12} className="ml-1 text-muted-foreground" />
                     </FormDescription>
