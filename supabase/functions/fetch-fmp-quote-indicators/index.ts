@@ -1,4 +1,5 @@
 // supabase/functions/fetch-fmp-quote-indicators/index.ts
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import type {
   FmpQuoteData,

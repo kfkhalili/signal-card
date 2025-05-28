@@ -1,33 +1,39 @@
 [edge_runtime]
-deno_version = 2
+deno_version = 2.1
+
 [functions.fetch-fmp-quote-indicators]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/fetch-fmp-quote-indicators/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
 entrypoint = "./functions/fetch-fmp-quote-indicators/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/fetch-fmp-quote-indicators/*.html" ]
+static_files = [ "./functions/fetch-fmp-quote-indicators/types.ts" ]
 
-[functions.fetch-all-exchange-market-status]
+[functions.fetch-fmp-all-exchange-market-status]
+enabled = true
+verify_jwt = false
+import_map = "./functions/fetch-fmp-all-exchange-market-status/deno.json"
+entrypoint = "./functions/fetch-fmp-all-exchange-market-status/index.ts"
+
+[functions.fetch-fmp-financial-statements]
+enabled = true
+verify_jwt = false
+import_map = "./functions/fetch-fmp-financial-statements/deno.json"
+entrypoint = "./functions/fetch-fmp-financial-statements/index.ts"
+static_files = [ "./functions/fetch-fmp-financial-statements/types.ts" ]
+
+[functions.fetch-fmp-profiles]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/fetch-fmp-profiles/index.ts"
+static_files = [ "./functions/fetch-fmp-profiles/types.ts" ]
+
+[functions.test-fun]
 enabled = true
 verify_jwt = true
-import_map = "./functions/fetch-all-exchange-market-status/deno.json"
+import_map = "./functions/test-fun/deno.json"
 # Uncomment to specify a custom file path to the entrypoint.
 # Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
-entrypoint = "./functions/fetch-all-exchange-market-status/index.ts"
+entrypoint = "./functions/test-fun/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/fetch-all-exchange-market-status/*.html" ]
-[functions.fetch-financial-statements]
-enabled = true
-verify_jwt = true
-import_map = "./functions/fetch-financial-statements/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
-entrypoint = "./functions/fetch-financial-statements/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/fetch-financial-statements/*.html" ]
+# static_files = [ "./functions/test-fun/*.html" ]
