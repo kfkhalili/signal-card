@@ -226,6 +226,91 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                   </span>
                 </ClickableDataItem>
               )}
+              {staticData?.last_dividend !== null &&
+                staticData?.last_dividend !== undefined && (
+                  <ClickableDataItem
+                    isInteractive={true}
+                    onClickHandler={() => {
+                      handleInteraction("TRIGGER_CARD_ACTION", {
+                        actionName: "viewDividendHistory",
+                        actionData: { dividend: staticData.last_dividend },
+                      } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                    }}
+                    title={`Last Dividend: ${
+                      staticData?.currency ?? ""
+                    }${staticData.last_dividend.toFixed(2)}`}
+                    baseClassName={cn(
+                      "flex items-baseline min-w-0 gap-1",
+                      interactiveItemBaseColor
+                    )}
+                    interactiveClassName={interactiveHoverColor}
+                    aria-label={`Last Dividend for ${symbol}: ${
+                      staticData?.currency ?? ""
+                    }${staticData.last_dividend.toFixed(2)}`}>
+                    <span className="text-xs font-medium shrink-0">
+                      Last Div:
+                    </span>
+                    <span className="truncate text-xs">
+                      {staticData?.currency ?? ""}
+                      {staticData.last_dividend.toFixed(2)}
+                    </span>
+                  </ClickableDataItem>
+                )}
+
+              {staticData?.beta !== null && staticData?.beta !== undefined && (
+                <ClickableDataItem
+                  isInteractive={true}
+                  onClickHandler={() => {
+                    handleInteraction("TRIGGER_CARD_ACTION", {
+                      actionName: "viewVolatilityAnalysis",
+                      actionData: { beta: staticData.beta },
+                    } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                  }}
+                  title={`1 Year Beta: ${staticData.beta.toFixed(2)}`}
+                  baseClassName={cn(
+                    "flex items-baseline min-w-0 gap-1",
+                    interactiveItemBaseColor
+                  )}
+                  interactiveClassName={interactiveHoverColor}
+                  aria-label={`1 Year Beta for ${symbol}: ${staticData.beta.toFixed(
+                    2
+                  )}`}>
+                  <span className="text-xs font-medium shrink-0">1Y Beta:</span>
+                  <span className="truncate text-xs">
+                    {staticData.beta.toFixed(2)}
+                  </span>
+                </ClickableDataItem>
+              )}
+
+              {staticData?.average_volume !== null &&
+                staticData?.average_volume !== undefined && (
+                  <ClickableDataItem
+                    isInteractive={true}
+                    onClickHandler={() => {
+                      handleInteraction("REQUEST_NEW_CARD", {
+                        targetCardType: "price", // Or a specific volume chart card if you plan one
+                        originatingElement: "avgVolumeDisplayTrigger",
+                      } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                    }}
+                    title={`Avg Volume: ${formatNumberWithAbbreviations(
+                      staticData.average_volume
+                    )}`}
+                    baseClassName={cn(
+                      "flex items-baseline min-w-0 gap-1",
+                      interactiveItemBaseColor
+                    )}
+                    interactiveClassName={interactiveHoverColor}
+                    aria-label={`Average Volume for ${symbol}: ${formatNumberWithAbbreviations(
+                      staticData.average_volume
+                    )}`}>
+                    <span className="text-xs font-medium shrink-0">
+                      Avg Vol:
+                    </span>
+                    <span className="truncate text-xs">
+                      {formatNumberWithAbbreviations(staticData.average_volume)}
+                    </span>
+                  </ClickableDataItem>
+                )}
             </div>
           </ShadCardContent>
 
@@ -406,6 +491,20 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                     <span className="leading-tight line-clamp-2">
                       {staticData.exchange_full_name}
                     </span>
+                  </div>
+                </ClickableDataItem>
+              )}
+              {staticData?.isin && (
+                <ClickableDataItem
+                  isInteractive={false} // ISIN is usually not interactive for filtering/card creation
+                  title={`ISIN: ${staticData.isin}`}
+                  baseClassName={cn("min-w-0", nonInteractiveItemColor)}
+                  aria-label={`ISIN: ${staticData.isin}`}>
+                  <div className="flex items-start gap-1">
+                    <span className="font-medium block leading-tight shrink-0">
+                      ISIN:
+                    </span>
+                    <span className="leading-tight">{staticData.isin}</span>
                   </div>
                 </ClickableDataItem>
               )}

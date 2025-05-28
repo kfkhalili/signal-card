@@ -21,6 +21,10 @@ export interface ProfileCardStaticData {
   readonly is_etf?: boolean | null;
   readonly is_adr?: boolean | null;
   readonly is_fund?: boolean | null;
+  readonly last_dividend?: number | null;
+  readonly beta?: number | null;
+  readonly average_volume?: number | null;
+  readonly isin?: string | null;
 }
 
 // Defines the live, frequently updated data for a ProfileCard.

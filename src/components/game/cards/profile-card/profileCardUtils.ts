@@ -151,6 +151,10 @@ function transformProfileDBRowToStaticData(
     is_etf: dbData.is_etf,
     is_adr: dbData.is_adr,
     is_fund: dbData.is_fund,
+    last_dividend: dbData.last_dividend,
+    beta: dbData.beta,
+    average_volume: dbData.average_volume,
+    isin: dbData.isin,
   };
 }
 
@@ -196,7 +200,9 @@ async function initializeProfileCard({
   try {
     const { data: profileData, error: profileError } = await supabase
       .from("profiles")
-      .select("*") // Select all profile fields initially
+      .select(
+        "*, last_dividend, beta, average_volume, isin" // Ensure new fields are selected
+      )
       .eq("symbol", symbol)
       .maybeSingle();
 

@@ -103,6 +103,22 @@ const rehydrateProfileCardInstance: SpecificCardRehydrator = (
       typeof staticDataFromStorage.is_fund === "boolean"
         ? staticDataFromStorage.is_fund
         : null,
+    last_dividend:
+      typeof staticDataFromStorage.last_dividend === "number"
+        ? staticDataFromStorage.last_dividend
+        : null,
+    beta:
+      typeof staticDataFromStorage.beta === "number"
+        ? staticDataFromStorage.beta
+        : null,
+    average_volume:
+      typeof staticDataFromStorage.average_volume === "number"
+        ? staticDataFromStorage.average_volume
+        : null,
+    isin:
+      typeof staticDataFromStorage.isin === "string"
+        ? staticDataFromStorage.isin
+        : null,
   };
 
   const rehydratedLiveData: ProfileCardLiveData = {

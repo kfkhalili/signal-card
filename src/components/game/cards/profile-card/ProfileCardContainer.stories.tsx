@@ -196,10 +196,17 @@ const mockStaticData: ProfileCardStaticData = {
   is_fund: false,
   full_address: "One Apple Park Way, Cupertino, CA 95014",
   phone: "408-996-1010",
+  last_dividend: 0.96,
+  beta: 1.28,
+  average_volume: 58000000,
+  isin: "US0378331005",
 };
 
 const mockLiveData: ProfileCardLiveData = {
   price: 170.34,
+  marketCap: 2600000000000,
+  revenue: 383285000000,
+  eps: 6.13,
 };
 
 const mockBaseBackData: BaseCardBackData = {
@@ -277,6 +284,9 @@ export const MinimalLiveDataStory: Story = {
       websiteUrl: null,
       liveData: {
         price: 100.0,
+        marketCap: 50000000, // Added marketCap for minimal
+        revenue: 10000000, // Added revenue for minimal
+        eps: 0.5, // Added eps for minimal
       },
       staticData: {
         ...initialMockProfileCardData.staticData, // Keep other static data
@@ -286,6 +296,10 @@ export const MinimalLiveDataStory: Story = {
         sector: undefined,
         ceo: undefined,
         website: undefined,
+        last_dividend: 0.1,
+        beta: 0.5,
+        average_volume: 100000,
+        isin: "US12345MIN01",
       },
       isFlipped: false, // Ensure flip state is set
     },
