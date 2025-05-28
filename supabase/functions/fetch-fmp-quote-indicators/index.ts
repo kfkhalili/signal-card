@@ -22,8 +22,7 @@ const SUPABASE_SERVICE_ROLE_KEY: string | undefined = Deno.env.get(
 );
 
 // Use FMP Stable Endpoint for quotes
-const FMP_QUOTE_BASE_URL =
-  "[https://financialmodelingprep.com/stable/quote](https://financialmodelingprep.com/stable/quote)";
+const FMP_QUOTE_BASE_URL = "https://financialmodelingprep.com/stable/quote";
 
 // Delay between API calls to FMP to avoid rate limiting
 const FMP_API_DELAY_MS = 250; // 0.25 seconds, adjust as needed
@@ -57,8 +56,8 @@ async function fetchAndProcessSymbolQuote(
   apiKey: string,
   supabaseAdmin: SupabaseClient
 ): Promise<SymbolQuoteProcessingResult> {
-  // The FMP /stable/quote/{SYMBOL} endpoint is used here.
-  const quoteUrl = `${FMP_QUOTE_BASE_URL}/${symbolToRequest}?apikey=${apiKey}`;
+  // The FMP /stable/quote?symbol={SYMBOL} endpoint is used here.
+  const quoteUrl = `${FMP_QUOTE_BASE_URL}?symbol=${symbolToRequest}&apikey=${apiKey}`;
 
   try {
     if (ENV_CONTEXT === "DEV") {
