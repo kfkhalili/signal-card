@@ -49,9 +49,9 @@ function censorApiKey(url: string, apiKey: string | undefined): string {
 }
 
 function parseFmpFullTimeEmployees(
-  employeesStr: string | null | undefined
+  employeesStr: string | undefined // FmpProfileData.fullTimeEmployees is now string, not string | null | undefined
 ): number | null {
-  if (employeesStr === null || employeesStr === undefined) return null;
+  if (employeesStr === undefined) return null; // Should not happen if FmpProfileData is strictly followed
   const num = parseInt(employeesStr.replace(/,/g, ""), 10);
   return isNaN(num) ? null : num;
 }
@@ -85,8 +85,6 @@ async function fetchAndProcessSymbolProfile(
     const fmpProfileResult: unknown = await profileResponse.json();
 
     if (!Array.isArray(fmpProfileResult) || fmpProfileResult.length === 0) {
-      // FMP /profile/SYMBOL often returns an array with one object.
-      // If it's not an array or is empty, it's an issue.
       throw new Error(
         `No profile data array returned or empty array from FMP for ${symbolToRequest}. Response: ${JSON.stringify(
           fmpProfileResult
@@ -97,8 +95,8 @@ async function fetchAndProcessSymbolProfile(
     const profileData = fmpProfileResult[0] as FmpProfileData;
 
     if (
-      !profileData ||
-      typeof profileData.symbol !== "string" ||
+      !profileData || // Basic sanity check
+      typeof profileData.symbol !== "string" || // `symbol` is string in FmpProfileData
       profileData.symbol.trim() === ""
     ) {
       throw new Error(
@@ -109,47 +107,44 @@ async function fetchAndProcessSymbolProfile(
     }
 
     const recordToUpsert: SupabaseProfileRecord = {
-      symbol: profileData.symbol, // Use symbol from FMP response
-      price: profileData.price ?? null,
-      beta: profileData.beta ?? null,
-      average_volume: profileData.volAvg ?? null,
-      market_cap: profileData.mktCap ?? null,
-      last_dividend: profileData.lastDiv ?? null,
-      range: profileData.range ?? null,
-      change: profileData.changes ?? null,
-      change_percentage:
-        profileData.changesPercentage ?? profileData.changesPercentage ?? null, // FMP sometimes uses 'changesPercentage'
-      company_name: profileData.companyName ?? null,
-      currency: profileData.currency ?? null,
-      cik: profileData.cik ?? null,
-      isin: profileData.isin ?? null,
-      cusip: profileData.cusip ?? null,
-      exchange: profileData.exchange ?? null,
-      exchange_full_name:
-        profileData.exchangeShortName ?? profileData.exchange ?? null,
-      industry: profileData.industry ?? null,
-      website: profileData.website ?? null,
-      description: profileData.description ?? null,
-      ceo: profileData.ceo ?? null,
-      sector: profileData.sector ?? null,
-      country: profileData.country ?? null,
+      symbol: profileData.symbol,
+      price: profileData.price,
+      beta: profileData.beta,
+      average_volume: profileData.averageVolume, // Was profileData.volAvg
+      market_cap: profileData.marketCap,
+      last_dividend: profileData.lastDividend,
+      range: profileData.range,
+      change: profileData.change,
+      change_percentage: profileData.changePercentage, // Was profileData.changePercentage ?? profileData.changePercentage
+      company_name: profileData.companyName,
+      currency: profileData.currency,
+      cik: profileData.cik,
+      isin: profileData.isin,
+      cusip: profileData.cusip,
+      exchange: profileData.exchange,
+      exchange_full_name: profileData.exchangeFullName, // Was profileData.exchangeShortName ?? profileData.exchange
+      industry: profileData.industry,
+      website: profileData.website,
+      description: profileData.description,
+      ceo: profileData.ceo,
+      sector: profileData.sector,
+      country: profileData.country,
       full_time_employees: parseFmpFullTimeEmployees(
         profileData.fullTimeEmployees
       ),
-      phone: profileData.phone ?? null,
-      address: profileData.address ?? null,
-      city: profileData.city ?? null,
-      state: profileData.state ?? null,
-      zip: profileData.zip ?? null,
-      image: profileData.image ?? null,
-      ipo_date: profileData.ipoDate ?? null, // Assuming FMP format is "YYYY-MM-DD" or null
-      default_image: profileData.defaultImage ?? false,
-      is_etf: profileData.isEtf ?? false,
-      is_actively_trading: profileData.isActivelyTrading ?? true,
-      is_adr: profileData.isAdr ?? false,
-      is_fund: profileData.isFund ?? false,
-      volume: profileData.volume ?? null,
-      // id and modified_at are handled by the database
+      phone: profileData.phone,
+      address: profileData.address,
+      city: profileData.city,
+      state: profileData.state,
+      zip: profileData.zip,
+      image: profileData.image,
+      ipo_date: profileData.ipoDate,
+      default_image: profileData.defaultImage, // Was profileData.defaultImage ?? false
+      is_etf: profileData.isEtf, // Was profileData.isEtf ?? false
+      is_actively_trading: profileData.isActivelyTrading, // Was profileData.isActivelyTrading ?? true
+      is_adr: profileData.isAdr, // Was profileData.isAdr ?? false
+      is_fund: profileData.isFund, // Was profileData.isFund ?? false
+      volume: profileData.volume,
     };
 
     const { error: upsertError, count } = await supabaseAdmin
@@ -275,9 +270,7 @@ Deno.serve(async (_req: Request) => {
       processingPromises
     );
     const totalSucceeded = results.filter((r) => r.success).length;
-    // Assuming 1 upsert per successful processing.
-    // If FMP can return multiple profiles for one symbol (unlikely for /profile/SYMBOL) adjust logic.
-    const totalUpserted = totalSucceeded;
+    const totalUpserted = totalSucceeded; // Assumes one upsert per success
 
     const overallMessage = `Profile processing complete. Processed: ${activeSymbols.length}, Succeeded: ${totalSucceeded}, Upserted: ${totalUpserted}.`;
     console.log(overallMessage);

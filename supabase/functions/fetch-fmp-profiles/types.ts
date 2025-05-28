@@ -4,43 +4,41 @@
 // Based on the provided schema and typical FMP responses.
 export interface FmpProfileData {
   symbol: string;
-  price?: number | null;
-  beta?: number | null;
-  volAvg?: number | null; // Corresponds to average_volume
-  mktCap?: number | null; // Corresponds to market_cap
-  lastDiv?: number | null; // Corresponds to last_dividend
-  range?: string | null;
-  changes?: number | null; // Corresponds to change
-  changesPercentage?: number | null; // FMP often uses this for change_percentage
-  companyName?: string | null;
-  currency?: string | null;
-  cik?: string | null;
-  isin?: string | null;
-  cusip?: string | null;
-  exchange?: string | null; // Short exchange code
-  exchangeShortName?: string | null; // Often the same as 'exchange' or a slightly more descriptive version
-  industry?: string | null;
-  website?: string | null;
-  description?: string | null;
-  ceo?: string | null;
-  sector?: string | null;
-  country?: string | null;
-  fullTimeEmployees?: string | null; // FMP might return this as string
-  phone?: string | null;
-  address?: string | null;
-  city?: string | null;
-  state?: string | null;
-  zip?: string | null;
-  image?: string | null;
-  ipoDate?: string | null; // "YYYY-MM-DD"
-  defaultImage?: boolean | null;
-  isEtf?: boolean | null;
-  isActivelyTrading?: boolean | null;
-  isAdr?: boolean | null;
-  isFund?: boolean | null;
-  // Ensure all fields you expect from FMP that map to your DB are here
-  // volume is often separate in /quote endpoint, but check /profile if it's included
-  volume?: number | null;
+  price: number;
+  marketCap: number;
+  beta: number;
+  lastDividend: number;
+  range: string;
+  change: number;
+  changePercentage: number;
+  volume: number;
+  averageVolume: number;
+  companyName: string;
+  currency: string;
+  cik: string;
+  isin: string;
+  cusip: string;
+  exchangeFullName: string;
+  exchange: string;
+  industry: string;
+  website: string;
+  description: string;
+  ceo: string;
+  sector: string;
+  country: string;
+  fullTimeEmployees: string; // FMP provides this as a string in the example
+  phone: string;
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  image: string;
+  ipoDate: string; // "YYYY-MM-DD"
+  defaultImage: boolean;
+  isEtf: boolean;
+  isActivelyTrading: boolean;
+  isAdr: boolean;
+  isFund: boolean;
 }
 
 // Interface for the record to be upserted into your 'profiles' table
@@ -61,8 +59,8 @@ export interface SupabaseProfileRecord {
   cik?: string | null;
   isin?: string | null;
   cusip?: string | null;
-  exchange_full_name?: string | null; // FMP's exchangeShortName or exchange
-  exchange?: string | null; // FMP's exchange
+  exchange_full_name?: string | null;
+  exchange?: string | null;
   industry?: string | null;
   website?: string | null;
   description?: string | null;
