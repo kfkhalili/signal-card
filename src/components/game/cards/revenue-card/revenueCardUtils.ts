@@ -9,7 +9,6 @@ import type {
 import type {
   DisplayableCard,
   DisplayableCardState,
-  DisplayableRevenueCard,
 } from "@/components/game/types";
 import type { BaseCardBackData } from "../base-card/base-card.types";
 import {
@@ -167,7 +166,7 @@ async function initializeRevenueCard({
       return {
         ...concreteCardData,
         ...cardState,
-      } as DisplayableRevenueCard;
+      } as RevenueCardData & DisplayableCardState;
     } else {
       if (toast) {
         toast({

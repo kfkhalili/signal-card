@@ -14,8 +14,3 @@ export interface DisplayableCardState {
 
 // DisplayableCard combines the core data of a card with its UI/interaction state
 export type DisplayableCard = ConcreteCardData & DisplayableCardState;
-
-// Specific aliases for convenience, inheriting all properties
-export type DisplayableLivePriceCard = PriceCardData & DisplayableCardState;
-export type DisplayableProfileCard = ProfileCardData & DisplayableCardState;
-export type DisplayableRevenueCard = RevenueCardData & DisplayableCardState;

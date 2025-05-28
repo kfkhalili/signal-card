@@ -7,7 +7,6 @@ import type {
 } from "./price-card.types";
 import type {
   DisplayableCardState,
-  DisplayableLivePriceCard,
   DisplayableCard,
 } from "@/components/game/types";
 import type { BaseCardBackData } from "../base-card/base-card.types";
@@ -58,7 +57,7 @@ function createDisplayablePriceCard(
   apiTimestampMillis: number | null,
   profileContext?: Pick<ProfileDBRow, "company_name" | "image" | "exchange">,
   isShell = false
-): DisplayableLivePriceCard {
+): PriceCardData & DisplayableCardState {
   let liveData = createPriceCardLiveData(
     leanQuote,
     isShell ? null : apiTimestampMillis // Use null timestamp for shell if price is null
@@ -98,7 +97,7 @@ function createDisplayablePriceCard(
   return {
     ...concreteCardData,
     ...cardState,
-  } as DisplayableLivePriceCard;
+  } as PriceCardData & DisplayableCardState;
 }
 
 async function initializePriceCard({
