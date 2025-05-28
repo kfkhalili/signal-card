@@ -2,12 +2,13 @@
 import React from "react";
 import { CardContent as ShadCardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ClickableDataItem } from "@/components/ui/ClickableDataItem"; //
+import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
 import type { ProfileCardData } from "./profile-card.types";
 import { getFlagEmoji, getCountryName, cn } from "@/lib/utils";
 import { formatNumberWithAbbreviations } from "@/lib/formatters";
 import type {
   OnGenericInteraction,
+  InteractionPayload,
   RequestNewCardInteraction,
   FilterWorkspaceDataInteraction,
   TriggerCardActionInteraction,
@@ -40,6 +41,23 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
       companyName,
     } = cardData;
 
+    const handleInteraction = (
+      intent: InteractionPayload["intent"],
+      details: Omit<
+        InteractionPayload,
+        "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType"
+      >
+    ) => {
+      const payload: InteractionPayload = {
+        intent,
+        sourceCardId: id,
+        sourceCardSymbol: symbol,
+        sourceCardType: cardType,
+        ...details,
+      } as InteractionPayload;
+      onGenericInteraction(payload);
+    };
+
     if (!isBackFace) {
       const description = staticData?.description;
       const countryFlag = getFlagEmoji(staticData?.country);
@@ -47,8 +65,7 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
         ? getCountryName(staticData.country)
         : "N/A";
 
-      // Define a common base class for interactive items if they should share a default color
-      const interactiveItemBaseColor = "text-foreground"; // Or "text-muted-foreground" if that's the default
+      const interactiveItemBaseColor = "text-foreground";
       const interactiveHoverColor = "hover:text-primary cursor-pointer";
 
       return (
@@ -70,16 +87,11 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                 isInteractive={!!staticData?.industry}
                 onClickHandler={() => {
                   if (staticData?.industry) {
-                    const payload: FilterWorkspaceDataInteraction = {
-                      intent: "FILTER_WORKSPACE_DATA",
-                      sourceCardId: id,
-                      sourceCardSymbol: symbol,
-                      sourceCardType: cardType,
+                    handleInteraction("FILTER_WORKSPACE_DATA", {
                       filterField: "industry",
                       filterValue: staticData.industry,
                       originatingElement: "industryLink",
-                    };
-                    onGenericInteraction(payload);
+                    } as Omit<FilterWorkspaceDataInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
                   }
                 }}
                 title={`Industry: ${staticData?.industry || "N/A"}${
@@ -110,16 +122,11 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                   isInteractive={true}
                   onClickHandler={() => {
                     if (staticData?.country) {
-                      const payload: FilterWorkspaceDataInteraction = {
-                        intent: "FILTER_WORKSPACE_DATA",
-                        sourceCardId: id,
-                        sourceCardSymbol: symbol,
-                        sourceCardType: cardType,
+                      handleInteraction("FILTER_WORKSPACE_DATA", {
                         filterField: "country",
                         filterValue: staticData.country,
                         originatingElement: "countryLink",
-                      };
-                      onGenericInteraction(payload);
+                      } as Omit<FilterWorkspaceDataInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
                     }
                   }}
                   title={`Country: ${fullCountryName}`}
@@ -143,17 +150,12 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                 <ClickableDataItem
                   isInteractive={true}
                   onClickHandler={() => {
-                    const payload: TriggerCardActionInteraction = {
-                      intent: "TRIGGER_CARD_ACTION",
-                      sourceCardId: id,
-                      sourceCardSymbol: symbol,
-                      sourceCardType: cardType,
+                    handleInteraction("TRIGGER_CARD_ACTION", {
                       actionName: "viewEmployeeData",
                       actionData: {
                         employees: staticData.formatted_full_time_employees,
                       },
-                    };
-                    onGenericInteraction(payload);
+                    } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
                   }}
                   title={`${staticData.formatted_full_time_employees} employees`}
                   baseClassName={cn(
@@ -176,15 +178,10 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                   <ClickableDataItem
                     isInteractive={true}
                     onClickHandler={() => {
-                      const payload: RequestNewCardInteraction = {
-                        intent: "REQUEST_NEW_CARD",
-                        sourceCardId: id,
-                        sourceCardSymbol: symbol,
-                        sourceCardType: cardType,
+                      handleInteraction("REQUEST_NEW_CARD", {
                         targetCardType: "revenue",
                         originatingElement: "revenueDisplayTrigger",
-                      };
-                      onGenericInteraction(payload);
+                      } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
                     }}
                     title={`Revenue (TTM/Latest): ${formatNumberWithAbbreviations(
                       liveData.revenue
@@ -208,15 +205,10 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                 <ClickableDataItem
                   isInteractive={true}
                   onClickHandler={() => {
-                    const payload: RequestNewCardInteraction = {
-                      intent: "REQUEST_NEW_CARD",
-                      sourceCardId: id,
-                      sourceCardSymbol: symbol,
-                      sourceCardType: cardType,
+                    handleInteraction("REQUEST_NEW_CARD", {
                       targetCardType: "revenue",
                       originatingElement: "epsDisplayTrigger",
-                    };
-                    onGenericInteraction(payload);
+                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
                   }}
                   title={`EPS (TTM/Latest): ${
                     staticData?.currency ?? ""
@@ -242,24 +234,17 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
               <ClickableDataItem
                 isInteractive={true}
                 onClickHandler={() => {
-                  const payload: RequestNewCardInteraction = {
-                    intent: "REQUEST_NEW_CARD",
-                    sourceCardId: id,
-                    sourceCardSymbol: symbol,
-                    sourceCardType: cardType,
+                  handleInteraction("REQUEST_NEW_CARD", {
                     targetCardType: "price",
                     originatingElement: "priceDisplayTrigger",
-                  };
-                  onGenericInteraction(payload);
+                  } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
                 }}
-                baseClassName={cn("py-0.5", interactiveItemBaseColor)} // Apply base color
+                baseClassName={cn("py-0.5", interactiveItemBaseColor)}
                 interactiveClassName={interactiveHoverColor}
                 aria-label={`Request Price Card for ${symbol}`}>
                 <div className="flex items-baseline gap-1">
                   <span className="text-xs font-medium shrink-0">Price:</span>
                   <span className="font-semibold text-sm">
-                    {" "}
-                    {/* font-semibold might have its own color, check if it overrides */}
                     {staticData?.currency === "USD"
                       ? "$"
                       : staticData?.currency || "$"}
@@ -272,15 +257,10 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                   <ClickableDataItem
                     isInteractive={true}
                     onClickHandler={() => {
-                      const payload: RequestNewCardInteraction = {
-                        intent: "REQUEST_NEW_CARD",
-                        sourceCardId: id,
-                        sourceCardSymbol: symbol,
-                        sourceCardType: cardType,
+                      handleInteraction("REQUEST_NEW_CARD", {
                         targetCardType: "price",
                         originatingElement: "marketCapDisplayTrigger",
-                      };
-                      onGenericInteraction(payload);
+                      } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
                     }}
                     title={`Market Cap: ${formatNumberWithAbbreviations(
                       liveData.marketCap
@@ -288,15 +268,13 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                     baseClassName={cn(
                       "flex items-baseline justify-end min-w-0 py-0.5 gap-1",
                       interactiveItemBaseColor
-                    )} // Apply base color
+                    )}
                     interactiveClassName={interactiveHoverColor}
                     aria-label={`Request Price card for Market Cap details of ${symbol}`}>
                     <span className="text-xs font-medium shrink-0">
                       Market Cap:
                     </span>
                     <span className="font-semibold text-sm">
-                      {" "}
-                      {/* font-semibold might have its own color */}
                       {formatNumberWithAbbreviations(liveData.marketCap)}
                     </span>
                   </ClickableDataItem>
@@ -330,12 +308,9 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
       );
     } else {
       // Back Face
-      // For consistency, if these items on the back were also meant to be interactive
-      // and have hover effects, a similar approach would be needed.
-      // For now, focusing on the front face as per the immediate issue.
-      const nonInteractiveItemColor = "text-foreground"; // Default color for non-interactive items on back
-      const interactiveItemBaseColorBack = "text-muted-foreground";
+      const interactiveItemBaseColorBack = "text-muted-foreground"; // For items that become interactive
       const interactiveHoverColorBack = "hover:text-primary cursor-pointer";
+      const nonInteractiveItemColor = "text-foreground"; // For items that remain non-interactive or their base color
 
       return (
         <div
@@ -348,60 +323,82 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
             </p>
             <div className="space-y-1.5">
               {staticData?.ceo && (
-                <div
+                <ClickableDataItem
+                  isInteractive={!!staticData.ceo}
+                  onClickHandler={() => {
+                    if (staticData.ceo) {
+                      handleInteraction("REQUEST_NEW_CARD", {
+                        targetCardType: "profile",
+                        originatingElement: "ceoValueBack",
+                      } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                    }
+                  }}
                   title={`CEO: ${staticData.ceo}`}
-                  className={cn(
-                    "flex items-start min-w-0 gap-1",
-                    nonInteractiveItemColor
-                  )}>
-                  <span className="font-medium block leading-tight shrink-0">
-                    CEO:
-                  </span>
-                  <span className="leading-tight line-clamp-2">
-                    {staticData.ceo}
-                  </span>
-                </div>
+                  baseClassName={cn("min-w-0", interactiveItemBaseColorBack)}
+                  interactiveClassName={interactiveHoverColorBack}
+                  aria-label={`View full profile for CEO: ${staticData.ceo}`}>
+                  <div className="flex items-start gap-1">
+                    <span className="font-medium block leading-tight shrink-0">
+                      CEO:
+                    </span>
+                    <span className="leading-tight line-clamp-2">
+                      {staticData.ceo}
+                    </span>
+                  </div>
+                </ClickableDataItem>
               )}
               {staticData?.formatted_ipo_date && (
-                <div
-                  title={`IPO: ${staticData.formatted_ipo_date}`}
-                  className={cn(
-                    "flex items-start min-w-0 gap-1",
-                    nonInteractiveItemColor
-                  )}>
-                  <span className="font-medium block leading-tight shrink-0">
-                    IPO:
-                  </span>
-                  <span className="leading-tight">
-                    {staticData.formatted_ipo_date}
-                  </span>
-                </div>
+                <ClickableDataItem
+                  isInteractive={!!staticData.formatted_ipo_date}
+                  onClickHandler={() => {
+                    if (staticData.formatted_ipo_date) {
+                      handleInteraction("REQUEST_NEW_CARD", {
+                        targetCardType: "profile",
+                        originatingElement: "ipoDateValueBack",
+                      } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                    }
+                  }}
+                  title={`IPO Date: ${staticData.formatted_ipo_date}`}
+                  baseClassName={cn("min-w-0", interactiveItemBaseColorBack)}
+                  interactiveClassName={interactiveHoverColorBack}
+                  aria-label={`View full profile for IPO details`}>
+                  <div className="flex items-start gap-1">
+                    <span className="font-medium block leading-tight shrink-0">
+                      IPO:
+                    </span>
+                    <span className="leading-tight">
+                      {staticData.formatted_ipo_date}
+                    </span>
+                  </div>
+                </ClickableDataItem>
               )}
               {staticData?.exchange_full_name && (
                 <ClickableDataItem
                   isInteractive={!!staticData.exchange}
                   onClickHandler={() => {
                     if (staticData.exchange) {
-                      const payload: FilterWorkspaceDataInteraction = {
-                        intent: "FILTER_WORKSPACE_DATA",
-                        sourceCardId: id,
-                        sourceCardSymbol: symbol,
-                        sourceCardType: cardType,
+                      handleInteraction("FILTER_WORKSPACE_DATA", {
                         filterField: "exchange",
                         filterValue: staticData.exchange,
                         originatingElement: "exchangeLink",
-                      };
-                      onGenericInteraction(payload);
+                      } as Omit<FilterWorkspaceDataInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
                     }
                   }}
                   title={`Exchange: ${staticData.exchange_full_name}`}
                   baseClassName={cn(
-                    "min-w-0",
-                    staticData.exchange
+                    "min-w-0", // Keep min-w-0 for layout consistency
+                    staticData.exchange // If exchange exists (for filtering), apply interactive base color
                       ? interactiveItemBaseColorBack
-                      : nonInteractiveItemColor
+                      : nonInteractiveItemColor // Otherwise, use non-interactive color
                   )}
-                  interactiveClassName={interactiveHoverColorBack}>
+                  interactiveClassName={
+                    staticData.exchange ? interactiveHoverColorBack : ""
+                  } // Apply hover only if interactive
+                  aria-label={
+                    staticData.exchange
+                      ? `Filter by exchange: ${staticData.exchange_full_name}`
+                      : `Exchange: ${staticData.exchange_full_name}`
+                  }>
                   <div className="flex items-start gap-1">
                     <span className="font-medium block leading-tight shrink-0">
                       Exchange:

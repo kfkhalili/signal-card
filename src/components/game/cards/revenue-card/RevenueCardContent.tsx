@@ -11,7 +11,7 @@ import { formatNumberWithAbbreviations } from "@/lib/formatters";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
 import type {
   OnGenericInteraction,
-  CardType,
+  InteractionPayload,
   RequestNewCardInteraction,
 } from "../base-card/base-card.types";
 
@@ -52,13 +52,15 @@ const DataRow: React.FC<DataRowProps> = ({
           value as number,
           2
         )}`
+      : typeof value === "string"
+      ? value
       : formatNumberWithAbbreviations(value as number, 2);
 
   return (
     <div
       className={cn(
         "flex justify-between items-baseline py-0.5 group/datarow",
-        isInteractive && onClick ? "cursor-pointer rounded px-1 -mx-1" : "",
+        isInteractive && onClick ? "cursor-pointer rounded px-1 -mx-1" : "", // Removed hover:bg-muted/50 dark:hover:bg-muted/20
         className
       )}
       data-testid={dataTestId}
@@ -119,19 +121,20 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
     } = cardData;
     const currency = staticData.reportedCurrency;
 
-    // Updated helper to use the new InteractionPayload structure
     const handleInteraction = (
-      targetCardType: CardType,
-      originatingElement?: string
-    ): void => {
-      const payload: RequestNewCardInteraction = {
-        intent: "REQUEST_NEW_CARD",
-        targetCardType,
+      intent: InteractionPayload["intent"],
+      details: Omit<
+        InteractionPayload,
+        "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType"
+      >
+    ) => {
+      const payload: InteractionPayload = {
+        intent,
         sourceCardId: id,
         sourceCardSymbol: symbol,
         sourceCardType: cardType,
-        originatingElement: originatingElement || "dataRow",
-      };
+        ...details,
+      } as InteractionPayload;
       onGenericInteraction(payload);
     };
 
@@ -146,39 +149,93 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
                 `Financial highlights for ${companyName || symbol}.`}
             </CardDescription>
 
-            <div className="pt-1.5 space-y-0.5 text-[10px] sm:text-xs text-muted-foreground/90 border-t mt-1.5">
-              <div className="flex items-center justify-between font-medium text-foreground">
-                <span>Period:</span>
-                <span>{staticData.periodLabel}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Currency:</span>
-                <span>{staticData.reportedCurrency || "N/A"}</span>
-              </div>
+            <div className="pt-1.5 space-y-0.5 text-[10px] sm:text-xs border-t mt-1.5">
+              <DataRow
+                label="Period:"
+                value={staticData.periodLabel}
+                isMonetary={false}
+                isInteractive={!!staticData.periodLabel}
+                onClick={() => {
+                  if (staticData.periodLabel) {
+                    handleInteraction("REQUEST_NEW_CARD", {
+                      targetCardType: "revenue",
+                      originatingElement: "periodLabelBack",
+                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                  }
+                }}
+                labelClassName="text-muted-foreground/90"
+                valueClassName="text-foreground font-medium"
+              />
+              <DataRow
+                label="Currency:"
+                value={staticData.reportedCurrency || "N/A"}
+                isMonetary={false}
+                isInteractive={!!staticData.reportedCurrency}
+                onClick={() => {
+                  if (staticData.reportedCurrency) {
+                    handleInteraction("REQUEST_NEW_CARD", {
+                      targetCardType: "revenue",
+                      originatingElement: "currencyValueBack",
+                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                  }
+                }}
+                labelClassName="text-muted-foreground/90"
+                valueClassName="text-foreground"
+              />
               {staticData.statementDate && (
-                <div className="flex items-center justify-between">
-                  <span>Statement Date:</span>
-                  <span>{staticData.statementDate}</span>
-                </div>
+                <DataRow
+                  label="Statement Date:"
+                  value={staticData.statementDate}
+                  isMonetary={false}
+                  isInteractive={true}
+                  onClick={() =>
+                    handleInteraction("REQUEST_NEW_CARD", {
+                      targetCardType: "revenue",
+                      originatingElement: "statementDateBack",
+                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                  }
+                  labelClassName="text-muted-foreground/90"
+                  valueClassName="text-foreground"
+                />
               )}
               {staticData.filingDate && (
-                <div className="flex items-center justify-between">
-                  <span>Filing Date:</span>
-                  <span>{staticData.filingDate}</span>
-                </div>
+                <DataRow
+                  label="Filing Date:"
+                  value={staticData.filingDate}
+                  isMonetary={false}
+                  isInteractive={true}
+                  onClick={() =>
+                    handleInteraction("REQUEST_NEW_CARD", {
+                      targetCardType: "revenue",
+                      originatingElement: "filingDateBack",
+                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                  }
+                  labelClassName="text-muted-foreground/90"
+                  valueClassName="text-foreground"
+                />
               )}
               {staticData.acceptedDate && (
-                <div className="flex items-center justify-between">
-                  <span>Accepted Date:</span>
-                  <span>{staticData.acceptedDate.substring(0, 10)}</span>
-                </div>
+                <DataRow
+                  label="Accepted Date:"
+                  value={staticData.acceptedDate.substring(0, 10)}
+                  isMonetary={false}
+                  isInteractive={true}
+                  onClick={() =>
+                    handleInteraction("REQUEST_NEW_CARD", {
+                      targetCardType: "revenue",
+                      originatingElement: "acceptedDateBack",
+                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                  }
+                  labelClassName="text-muted-foreground/90"
+                  valueClassName="text-foreground"
+                />
               )}
             </div>
           </ShadCardContent>
         </div>
       );
     } else {
-      // Front Face
+      // Front Face (remains unchanged)
       return (
         <div
           data-testid={`revenue-card-front-${symbol}`}
@@ -188,7 +245,10 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
               <ClickableDataItem
                 isInteractive={true}
                 onClickHandler={() =>
-                  handleInteraction("profile", "periodLabelBadge")
+                  handleInteraction("REQUEST_NEW_CARD", {
+                    targetCardType: "profile",
+                    originatingElement: "periodLabelBadge",
+                  } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
                 }
                 title={`View profile for ${companyName || symbol}`}
                 baseClassName="inline-block">
@@ -209,7 +269,12 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
               valueClassName="text-base sm:text-lg md:text-xl"
               data-testid="revenue-value-front"
               isInteractive={true}
-              onClick={() => handleInteraction("price", "revenueMetric")}
+              onClick={() =>
+                handleInteraction("REQUEST_NEW_CARD", {
+                  targetCardType: "price",
+                  originatingElement: "revenueMetric",
+                } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+              }
             />
             <DataRow
               label="Gross Profit"
@@ -219,7 +284,12 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
               valueClassName="text-sm sm:text-base"
               data-testid="gross-profit-value-front"
               isInteractive={true}
-              onClick={() => handleInteraction("price", "grossProfitMetric")}
+              onClick={() =>
+                handleInteraction("REQUEST_NEW_CARD", {
+                  targetCardType: "price",
+                  originatingElement: "grossProfitMetric",
+                } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+              }
             />
             <DataRow
               label="Operating Income"
@@ -230,7 +300,10 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
               data-testid="operating-income-value-front"
               isInteractive={true}
               onClick={() =>
-                handleInteraction("price", "operatingIncomeMetric")
+                handleInteraction("REQUEST_NEW_CARD", {
+                  targetCardType: "price",
+                  originatingElement: "operatingIncomeMetric",
+                } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
               }
             />
             <DataRow
@@ -241,7 +314,12 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
               valueClassName="text-sm sm:text-base"
               data-testid="net-income-value-front"
               isInteractive={true}
-              onClick={() => handleInteraction("price", "netIncomeMetric")}
+              onClick={() =>
+                handleInteraction("REQUEST_NEW_CARD", {
+                  targetCardType: "price",
+                  originatingElement: "netIncomeMetric",
+                } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+              }
             />
             <DataRow
               label="Free Cash Flow"
@@ -251,7 +329,12 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
               valueClassName="text-sm sm:text-base"
               data-testid="fcf-value-front"
               isInteractive={true}
-              onClick={() => handleInteraction("price", "fcfMetric")}
+              onClick={() =>
+                handleInteraction("REQUEST_NEW_CARD", {
+                  targetCardType: "price",
+                  originatingElement: "fcfMetric",
+                } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+              }
             />
           </ShadCardContent>
           <div className="px-0 pt-1 text-[10px] text-center text-muted-foreground/80">

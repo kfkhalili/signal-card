@@ -31,7 +31,6 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
     const { liveData, symbol, id, type, backData } = cardData;
     const gridCellClass = "min-w-0";
 
-    // Helper to construct and dispatch payloads
     const handleInteraction = (
       intent: InteractionPayload["intent"],
       details: Omit<
@@ -45,7 +44,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
         sourceCardSymbol: symbol,
         sourceCardType: type,
         ...details,
-      } as InteractionPayload; // Cast is okay due to discriminated union logic in handler
+      } as InteractionPayload;
       onGenericInteraction(payload);
     };
 
@@ -83,20 +82,72 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                   <span>${liveData.dayOpen?.toFixed(2) ?? "N/A"}</span>
                 </ClickableDataItem>
               </div>
-              <div className={cn(gridCellClass, "py-0.5")}>
-                <span className="font-semibold block">Prev Close</span>
-                <span>${liveData.previousClose?.toFixed(2) ?? "N/A"}</span>
+
+              <div className={cn(gridCellClass)}>
+                <ClickableDataItem
+                  isInteractive={liveData.previousClose != null}
+                  onClickHandler={() => {
+                    if (liveData.previousClose != null) {
+                      handleInteraction("REQUEST_NEW_CARD", {
+                        targetCardType: "price",
+                        originatingElement: "previousCloseValue",
+                      } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                    }
+                  }}
+                  baseClassName="transition-colors w-full"
+                  data-testid="previous-close-interactive-area"
+                  title={`Previous Close: ${liveData.previousClose?.toFixed(
+                    2
+                  )}`}>
+                  <span className="font-semibold block">Prev Close</span>
+                  <span>${liveData.previousClose?.toFixed(2) ?? "N/A"}</span>
+                </ClickableDataItem>
               </div>
-              <div className={cn(gridCellClass, "py-0.5")}>
-                <span className="font-semibold block">Volume</span>
-                <span>{formatNumberWithAbbreviations(liveData.volume)}</span>
+
+              <div className={cn(gridCellClass)}>
+                <ClickableDataItem
+                  isInteractive={liveData.volume != null}
+                  onClickHandler={() => {
+                    if (liveData.volume != null) {
+                      handleInteraction("REQUEST_NEW_CARD", {
+                        targetCardType: "price",
+                        originatingElement: "volumeValue",
+                      } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                    }
+                  }}
+                  baseClassName="transition-colors w-full"
+                  data-testid="volume-interactive-area"
+                  title={`Volume: ${formatNumberWithAbbreviations(
+                    liveData.volume
+                  )}`}>
+                  <span className="font-semibold block">Volume</span>
+                  <span>{formatNumberWithAbbreviations(liveData.volume)}</span>
+                </ClickableDataItem>
               </div>
-              <div className={cn(gridCellClass, "py-0.5")}>
-                <span className="font-semibold block">Market Cap</span>
-                <span>
-                  ${formatNumberWithAbbreviations(liveData.marketCap)}
-                </span>
+
+              <div className={cn(gridCellClass)}>
+                <ClickableDataItem
+                  isInteractive={liveData.marketCap != null}
+                  onClickHandler={() => {
+                    if (liveData.marketCap != null) {
+                      handleInteraction("REQUEST_NEW_CARD", {
+                        targetCardType: "revenue",
+                        originatingElement: "marketCapValue",
+                      } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                    }
+                  }}
+                  baseClassName="transition-colors w-full"
+                  data-testid="market-cap-interactive-area"
+                  title={`Market Cap: $${formatNumberWithAbbreviations(
+                    liveData.marketCap
+                  )}`}>
+                  <span className="font-semibold block">Market Cap</span>
+                  <span>
+                    ${formatNumberWithAbbreviations(liveData.marketCap)}
+                  </span>
+                </ClickableDataItem>
               </div>
+
               <div className={cn(gridCellClass)}>
                 <ClickableDataItem
                   isInteractive={liveData.sma50d != null}
@@ -138,7 +189,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
         </div>
       );
     } else {
-      // Front Face
+      // Front Face (remains unchanged)
       const currentPrice = liveData.price;
       const dayLow = liveData.dayLow;
       const dayHigh = liveData.dayHigh;
@@ -147,7 +198,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
 
       const PriceDisplayBlock = (
         <ClickableDataItem
-          isInteractive={true} // Price display is always interactive to request profile
+          isInteractive={true}
           baseClassName={cn("w-fit group/textgroup")}
           data-testid="price-display-interactive-area"
           onClickHandler={() =>
@@ -204,15 +255,15 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
           className="pointer-events-auto">
           <ShadCardContent className="px-0 pt-0 pb-0">
             <div
-              className="rounded-md p-2 -mx-2 -my-1 mb-2" // Added padding, negative margin for larger hit area
+              className="rounded-md p-2 -mx-2 -my-1 mb-2"
               data-testid="daily-performance-layout-area"
               onClick={() =>
                 handleInteraction("TRIGGER_CARD_ACTION", {
                   actionName: "generateDailyPerformanceSignal",
                 } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
               }
-              role="button" // Make it behave like a button
-              tabIndex={0} // Make it focusable
+              role="button"
+              tabIndex={0}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
@@ -221,8 +272,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                   } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
                 }
               }}
-              style={{ cursor: "pointer" }} // Explicit cursor
-            >
+              style={{ cursor: "pointer" }}>
               {PriceDisplayBlock}
             </div>
 
