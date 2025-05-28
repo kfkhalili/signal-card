@@ -293,6 +293,36 @@ export type Database = {
         }
         Relationships: []
       }
+      shares_float: {
+        Row: {
+          date: string
+          fetched_at: string
+          float_shares: number | null
+          free_float: number | null
+          outstanding_shares: number | null
+          symbol: string
+          updated_at: string
+        }
+        Insert: {
+          date: string
+          fetched_at?: string
+          float_shares?: number | null
+          free_float?: number | null
+          outstanding_shares?: number | null
+          symbol: string
+          updated_at?: string
+        }
+        Update: {
+          date?: string
+          fetched_at?: string
+          float_shares?: number | null
+          free_float?: number | null
+          outstanding_shares?: number | null
+          symbol?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       supported_symbols: {
         Row: {
           added_at: string
