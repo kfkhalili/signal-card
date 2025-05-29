@@ -4,3 +4,4 @@ import "./profile-card/profileCardUtils";
 import "./revenue-card/revenueCardUtils";
 import "./solvency-card/solvencyCardUtils";
 import "./cash-use-card/cashUseCardUtils";
+import "./key-ratios-card/keyRatiosCardUtils";
