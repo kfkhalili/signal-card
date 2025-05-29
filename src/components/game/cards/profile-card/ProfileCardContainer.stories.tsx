@@ -30,39 +30,18 @@ const meta: Meta<typeof ProfileCardContainer> = {
     layout: "centered",
   },
   argTypes: {
-    // Props of ProfileCardContainer after refactor
-    cardData: {
-      control: "object",
-      description:
-        "The full data for the profile card, including its type and flip state.",
-    },
-    isFlipped: {
-      control: "boolean",
-      description: "Controls the flipped state of the card.",
-    },
-    cardContext: {
-      control: "object",
-      description: "Contextual information about the card for actions.",
-    },
-    onGenericInteraction: {
-      action: "onGenericInteraction",
-      description: "Handles all generic interactions from the card.",
-    },
-    onDeleteRequest: {
-      action: "onDeleteRequest",
-      description: "Callback for when card deletion is requested.",
-    },
-    className: { control: "text", description: "Optional outer class names." },
-    innerCardClassName: {
-      control: "text",
-      description: "Optional inner class names for styling.",
-    },
+    cardData: { control: "object" },
+    isFlipped: { control: "boolean" },
+    cardContext: { control: "object" },
+    onGenericInteraction: { action: "onGenericInteraction" },
+    onDeleteRequest: { action: "onDeleteRequest" },
+    className: { control: "text" },
+    innerCardClassName: { control: "text" },
   },
 };
 
 export default meta;
 
-// Adjusted Props for the Storybook wrapper component
 type ProfileCardStoryWrapperProps = Pick<
   ComponentProps<typeof ProfileCardContainer>,
   | "cardContext"
@@ -73,7 +52,6 @@ type ProfileCardStoryWrapperProps = Pick<
   | "children"
 > & {
   initialIsFlipped: boolean;
-  // The wrapper will receive the full card data for initial setup
   initialCardData: ProfileCardData & DisplayableCardState;
 };
 
@@ -82,9 +60,9 @@ const ProfileCardStoryWrapper: React.FC<ProfileCardStoryWrapperProps> = (
 ) => {
   const {
     initialIsFlipped,
-    initialCardData, // Use this for initial state and as the base for currentCardData
+    initialCardData,
     onGenericInteraction,
-    cardContext: propCardContext, // Rename to avoid conflict with derived context
+    cardContext: propCardContext,
     onDeleteRequest,
     className,
     innerCardClassName,
@@ -92,7 +70,6 @@ const ProfileCardStoryWrapper: React.FC<ProfileCardStoryWrapperProps> = (
   } = props;
 
   const [localIsFlipped, setLocalIsFlipped] = useState(initialIsFlipped);
-  // currentCardData now combines initialCardData with the localIsFlipped state
   const [currentCardData, setCurrentCardData] = useState<
     ProfileCardData & DisplayableCardState
   >({
@@ -106,7 +83,6 @@ const ProfileCardStoryWrapper: React.FC<ProfileCardStoryWrapperProps> = (
   }, [initialIsFlipped]);
 
   useEffect(() => {
-    // If initialCardData itself changes (e.g., from story args), update local state
     setCurrentCardData({ ...initialCardData, isFlipped: localIsFlipped });
   }, [initialCardData, localIsFlipped]);
 
@@ -114,7 +90,6 @@ const ProfileCardStoryWrapper: React.FC<ProfileCardStoryWrapperProps> = (
     setLocalIsFlipped((prevFlipped) => {
       const newFlippedState = !prevFlipped;
       action("onFlip")(initialCardData.id);
-      // Update the cardData prop passed to the container to reflect the flip
       setCurrentCardData((prevCardData) => ({
         ...prevCardData,
         isFlipped: newFlippedState,
@@ -125,7 +100,7 @@ const ProfileCardStoryWrapper: React.FC<ProfileCardStoryWrapperProps> = (
 
   if (
     !onGenericInteraction ||
-    !propCardContext || // Check propCardContext
+    !propCardContext ||
     !currentCardData ||
     !onDeleteRequest
   ) {
@@ -150,19 +125,18 @@ const ProfileCardStoryWrapper: React.FC<ProfileCardStoryWrapperProps> = (
           maxWidth: "300px",
           textAlign: "center",
         }}>
-        {" "}
-        Error in story setup. Check console.{" "}
+        Error in story setup. Check console.
       </div>
     );
   }
 
   return (
     <ProfileCardContainer
-      cardData={currentCardData} // Pass the stateful cardData
-      isFlipped={localIsFlipped} // isFlipped is now consistent with cardData.isFlipped
+      cardData={currentCardData}
+      isFlipped={localIsFlipped}
       onFlip={handleFlip}
       onGenericInteraction={onGenericInteraction}
-      cardContext={propCardContext} // Use the prop directly
+      cardContext={propCardContext}
       onDeleteRequest={onDeleteRequest}
       className={className}
       innerCardClassName={innerCardClassName}>
@@ -205,8 +179,10 @@ const mockStaticData: ProfileCardStaticData = {
 const mockLiveData: ProfileCardLiveData = {
   price: 170.34,
   marketCap: 2600000000000,
-  revenue: 383285000000,
-  eps: 6.13,
+  revenue: 383285000000, // TTM Revenue
+  eps: 6.13, // TTM EPS from ratios_ttm
+  priceToEarningsRatioTTM: 27.79, // Example TTM P/E
+  priceToBookRatioTTM: 42.5, // Example TTM P/B
 };
 
 const mockBaseBackData: BaseCardBackData = {
@@ -246,7 +222,7 @@ const mockOnGenericInteraction: OnGenericInteraction = (
 const mockOnDeleteRequest = (context: CardActionContext) =>
   action("onDeleteRequest")(context);
 
-type Story = StoryObj<ProfileCardStoryWrapperProps>; // Use the wrapper's props type
+type Story = StoryObj<ProfileCardStoryWrapperProps>;
 
 export const Default: Story = {
   render: (args) => <ProfileCardStoryWrapper {...args} />,
@@ -263,36 +239,39 @@ export const Default: Story = {
 export const Flipped: Story = {
   render: (args) => <ProfileCardStoryWrapper {...args} />,
   args: {
-    ...Default.args, // Spread default args
+    ...Default.args,
     initialIsFlipped: true,
     initialCardData: { ...initialMockProfileCardData, isFlipped: true },
   },
 };
 
 export const MinimalLiveDataStory: Story = {
-  name: "Minimal Live Data", // Name for Storybook display
+  name: "Minimal Live Data",
   render: (args) => <ProfileCardStoryWrapper {...args} />,
   args: {
-    ...Default.args, // Spread default args
+    ...Default.args,
     initialIsFlipped: false,
     initialCardData: {
-      ...initialMockProfileCardData, // Start with full mock
+      ...initialMockProfileCardData,
       id: "profile-min-live",
       symbol: "MIN",
       companyName: "Minimal Inc.",
       logoUrl: null,
       websiteUrl: null,
       liveData: {
+        // Includes new ratios as potentially null
         price: 100.0,
-        marketCap: 50000000, // Added marketCap for minimal
-        revenue: 10000000, // Added revenue for minimal
-        eps: 0.5, // Added eps for minimal
+        marketCap: 50000000,
+        revenue: 10000000,
+        eps: 0.5, // TTM EPS
+        priceToEarningsRatioTTM: 200.0, // Calculated from price and EPS
+        priceToBookRatioTTM: null, // Example of a missing ratio
       },
       staticData: {
-        ...initialMockProfileCardData.staticData, // Keep other static data
+        ...initialMockProfileCardData.staticData,
         db_id: "min-data-id",
         description: "A company with minimal profile data available currently.",
-        industry: undefined, // Explicitly undefined for minimal
+        industry: undefined,
         sector: undefined,
         ceo: undefined,
         website: undefined,
@@ -300,8 +279,9 @@ export const MinimalLiveDataStory: Story = {
         beta: 0.5,
         average_volume: 100000,
         isin: "US12345MIN01",
+        currency: "USD", // Added currency for minimal data
       },
-      isFlipped: false, // Ensure flip state is set
+      isFlipped: false,
     },
     cardContext: {
       id: "profile-min-live",
@@ -315,15 +295,13 @@ export const MinimalLiveDataStory: Story = {
 };
 
 export const NoInteractionsStory: Story = {
-  // Renamed to avoid conflict
   render: (args) => <ProfileCardStoryWrapper {...args} />,
   args: {
-    ...Default.args, // Spread default args
+    ...Default.args,
     initialIsFlipped: false,
     initialCardData: { ...initialMockProfileCardData, isFlipped: false },
     onGenericInteraction: (payload: InteractionPayload) => {
       action("onGenericInteraction (NoInteractionsStory)")(payload);
-      // No actual interaction handling for this story, just logging
     },
   },
 };

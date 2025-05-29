@@ -278,8 +278,8 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
                 isInteractive={true}
                 onClickHandler={() =>
                   handleInteraction("REQUEST_NEW_CARD", {
-                    targetCardType: "profile",
-                    originatingElement: "ttmBadge",
+                    targetCardType: "keyratios",
+                    originatingElement: "keyRatiosBadge",
                   } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
                 }
                 title={`View profile for ${companyName || symbol}`}
@@ -287,7 +287,7 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
                 <Badge
                   variant="outline"
                   className="text-xs sm:text-sm px-2 py-0.5">
-                  TTM Ratios
+                  Key Ratios (TTM)
                 </Badge>
               </ClickableDataItem>
             </div>

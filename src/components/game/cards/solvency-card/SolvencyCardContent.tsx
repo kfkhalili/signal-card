@@ -253,8 +253,8 @@ export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
                 isInteractive={true}
                 onClickHandler={() =>
                   handleInteraction("REQUEST_NEW_CARD", {
-                    targetCardType: "profile",
-                    originatingElement: "periodLabelBadge",
+                    targetCardType: "solvency",
+                    originatingElement: "solvencyBadge",
                   } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
                 }
                 title={`View profile for ${companyName || symbol}`}
@@ -262,7 +262,7 @@ export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
                 <Badge
                   variant="outline"
                   className="text-xs sm:text-sm px-2 py-0.5">
-                  {staticData.periodLabel}
+                  Solvency
                 </Badge>
               </ClickableDataItem>
             </div>

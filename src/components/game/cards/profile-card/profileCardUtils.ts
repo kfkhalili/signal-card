@@ -22,21 +22,18 @@ import {
 } from "@/components/game/cardUpdateHandler.types";
 import type {
   LiveQuoteIndicatorDBRow,
-  FinancialStatementDBRow as FinancialStatementDBRowFromRealtime, // Renamed to avoid conflict
+  FinancialStatementDBRow as FinancialStatementDBRowFromRealtime,
 } from "@/lib/supabase/realtime-service";
-import type { Json } from "@/lib/supabase/database.types";
+import type { Database, Json } from "@/lib/supabase/database.types";
 
-// Specific type for the income statement payload relevant to ProfileCard
+type RatiosTtmDBRow = Database["public"]["Tables"]["ratios_ttm"]["Row"];
+
 interface ProfileCardFmpIncomeStatementPayload {
   revenue?: number | null;
-  eps?: number | null; // Assuming 'eps' is a field name. Common alternatives: 'epsdiluted', 'earningsPerShare'
-  earningsPerShare?: number | null; // Adding another common variant for EPS
-  // Add other fields if they become necessary for the ProfileCard
 }
 
-// Type for the source of financial statement data for ProfileCard
 interface ProfileFinancialStatementSource {
-  income_statement_payload: Json | null; // Use Json type from database.types.ts
+  income_statement_payload: Json | null;
 }
 
 function parseFmpIncomePayloadForProfile(
@@ -44,55 +41,46 @@ function parseFmpIncomePayloadForProfile(
 ): ProfileCardFmpIncomeStatementPayload {
   const defaultResult: ProfileCardFmpIncomeStatementPayload = {
     revenue: null,
-    eps: null,
   };
   if (typeof payload !== "object" || payload === null) {
     return defaultResult;
   }
-  // Type assertion: We are asserting that 'payload' matches the structure we expect.
   const assertedPayload = payload as Record<
     string,
     string | number | boolean | null | undefined | Json[]
   >;
-
   const revenue =
     typeof assertedPayload.revenue === "number"
       ? assertedPayload.revenue
       : null;
-  const eps =
-    typeof assertedPayload.eps === "number"
-      ? assertedPayload.eps
-      : typeof assertedPayload.earningsPerShare === "number"
-      ? assertedPayload.earningsPerShare
-      : null;
-
-  return { revenue, eps };
+  return { revenue };
 }
 
-function createProfileCardLiveDataFromLiveQuote(
-  quote: LiveQuoteIndicatorDBRow,
+function createProfileCardLiveData(
+  quote?: Readonly<Partial<LiveQuoteIndicatorDBRow>> | null,
+  statementSource?: Readonly<Partial<ProfileFinancialStatementSource>> | null,
+  ratiosSource?: Readonly<Partial<RatiosTtmDBRow>> | null,
   currentLiveData?: Readonly<Partial<ProfileCardLiveData>>
 ): ProfileCardLiveData {
-  return {
-    price: quote.current_price ?? null,
-    marketCap: quote.market_cap ?? null,
-    revenue: currentLiveData?.revenue ?? null, // Preserve existing
-    eps: currentLiveData?.eps ?? null, // Preserve existing
-  };
-}
+  const parsedIncomePayload = statementSource
+    ? parseFmpIncomePayloadForProfile(
+        statementSource.income_statement_payload ?? null // Corrected line: Ensure null if undefined
+      )
+    : { revenue: null };
 
-function createProfileCardLiveDataFromFinancialStatement(
-  statementSource: ProfileFinancialStatementSource,
-  currentLiveData?: Readonly<Partial<ProfileCardLiveData>>
-): ProfileCardLiveData {
-  const parsedPayload = parseFmpIncomePayloadForProfile(
-    statementSource.income_statement_payload
-  );
   return {
-    price: currentLiveData?.price ?? null, // Preserve existing
-    marketCap: currentLiveData?.marketCap ?? null, // Preserve existing
-    revenue: parsedPayload.revenue,
-    eps: parsedPayload.eps,
+    price: quote?.current_price ?? currentLiveData?.price ?? null,
+    marketCap: quote?.market_cap ?? currentLiveData?.marketCap ?? null,
+    revenue: parsedIncomePayload.revenue ?? currentLiveData?.revenue ?? null,
+    eps: ratiosSource?.net_income_per_share_ttm ?? currentLiveData?.eps ?? null,
+    priceToEarningsRatioTTM:
+      ratiosSource?.price_to_earnings_ratio_ttm ??
+      currentLiveData?.priceToEarningsRatioTTM ??
+      null,
+    priceToBookRatioTTM:
+      ratiosSource?.price_to_book_ratio_ttm ??
+      currentLiveData?.priceToBookRatioTTM ??
+      null,
   };
 }
 
@@ -105,7 +93,6 @@ function transformProfileDBRowToStaticData(
   ): string | undefined => {
     if (!dateString) return undefined;
     let date = new Date(dateString);
-
     if (!isValidDate(date)) {
       try {
         date = parseISO(dateString);
@@ -113,7 +100,6 @@ function transformProfileDBRowToStaticData(
         // ignore
       }
     }
-
     if (isValidDate(date)) {
       try {
         return format(date, formatString);
@@ -160,19 +146,16 @@ function transformProfileDBRowToStaticData(
 
 function createDisplayableProfileCardFromDB(
   dbData: ProfileDBRow,
-  initialLiveData: Readonly<ProfileCardLiveData> // Now requires fully formed initialLiveData
+  initialLiveData: Readonly<ProfileCardLiveData>
 ): ProfileCardData & Pick<DisplayableCardState, "isFlipped"> {
   const staticData: ProfileCardStaticData =
     transformProfileDBRowToStaticData(dbData);
-
   const cardTypeDescription = `Provides an overview of ${
     dbData.company_name || dbData.symbol
   }'s company profile, including sector, industry, and key operational highlights.`;
-
   const cardBackData: BaseCardBackData = {
     description: cardTypeDescription,
   };
-
   const concreteCardData: ProfileCardData = {
     id: `profile-${dbData.symbol}-${Date.now()}`,
     type: "profile",
@@ -181,11 +164,10 @@ function createDisplayableProfileCardFromDB(
     logoUrl: dbData.image,
     createdAt: Date.now(),
     staticData,
-    liveData: initialLiveData, // Use the passed-in live data
+    liveData: initialLiveData,
     backData: cardBackData,
     websiteUrl: dbData.website,
   };
-
   return {
     ...concreteCardData,
     isFlipped: false,
@@ -200,9 +182,7 @@ async function initializeProfileCard({
   try {
     const { data: profileData, error: profileError } = await supabase
       .from("profiles")
-      .select(
-        "*, last_dividend, beta, average_volume, isin" // Ensure new fields are selected
-      )
+      .select("*, last_dividend, beta, average_volume, isin")
       .eq("symbol", symbol)
       .maybeSingle();
 
@@ -210,40 +190,36 @@ async function initializeProfileCard({
 
     if (profileData) {
       const profile = profileData as ProfileDBRow;
-
-      // Start with defaults or data from profile table
       let liveDataForCard: ProfileCardLiveData = {
         price: profile.price ?? null,
         marketCap: profile.market_cap ?? null,
         revenue: null,
         eps: null,
+        priceToEarningsRatioTTM: null,
+        priceToBookRatioTTM: null,
       };
 
-      // Fetch latest live quote
       const { data: initialQuoteData, error: initialQuoteError } =
         await supabase
           .from("live_quote_indicators")
-          .select("current_price, market_cap, api_timestamp")
+          .select("current_price, market_cap")
           .eq("symbol", symbol)
           .order("api_timestamp", { ascending: false })
           .limit(1)
           .maybeSingle();
-
-      if (initialQuoteError && process.env.NODE_ENV === "development") {
+      if (initialQuoteError)
         console.warn(
-          `[initializeProfileCard] Error fetching initial quote for ${symbol}:`,
-          initialQuoteError.message
+          `Error fetching initial quote for ${symbol}: ${initialQuoteError.message}`
         );
-      }
-
       if (initialQuoteData) {
-        liveDataForCard = createProfileCardLiveDataFromLiveQuote(
-          initialQuoteData as LiveQuoteIndicatorDBRow, // Cast needed as select is partial
+        liveDataForCard = createProfileCardLiveData(
+          initialQuoteData,
+          null,
+          null,
           liveDataForCard
         );
       }
 
-      // Fetch latest financial statement
       const { data: financialStatementData, error: fsError } = await supabase
         .from("financial_statements")
         .select("income_statement_payload, period, date")
@@ -252,35 +228,50 @@ async function initializeProfileCard({
         .order("period", { ascending: false })
         .limit(1)
         .maybeSingle();
-
-      if (fsError && process.env.NODE_ENV === "development") {
+      if (fsError)
         console.warn(
-          `[initializeProfileCard] Error fetching financial statement for ${symbol}:`,
-          fsError.message
+          `Error fetching financial statement for ${symbol}: ${fsError.message}`
+        );
+      if (financialStatementData) {
+        liveDataForCard = createProfileCardLiveData(
+          null,
+          financialStatementData as ProfileFinancialStatementSource,
+          null,
+          liveDataForCard
         );
       }
 
-      if (financialStatementData) {
-        liveDataForCard = createProfileCardLiveDataFromFinancialStatement(
-          financialStatementData as ProfileFinancialStatementSource, // Cast to defined source type
+      const { data: ratiosData, error: ratiosError } = await supabase
+        .from("ratios_ttm")
+        .select(
+          "price_to_earnings_ratio_ttm, net_income_per_share_ttm, price_to_book_ratio_ttm"
+        )
+        .eq("symbol", symbol)
+        .maybeSingle();
+      if (ratiosError)
+        console.warn(
+          `Error fetching TTM ratios for ${symbol}: ${ratiosError.message}`
+        );
+      if (ratiosData) {
+        liveDataForCard = createProfileCardLiveData(
+          null,
+          null,
+          ratiosData as RatiosTtmDBRow,
           liveDataForCard
         );
       }
 
       const displayableCard = createDisplayableProfileCardFromDB(
         profile,
-        liveDataForCard // Pass fully formed liveData
+        liveDataForCard
       );
-
-      return displayableCard as DisplayableCard; // Final cast
+      return displayableCard as DisplayableCard;
     } else {
-      if (toast) {
+      if (toast)
         toast({
           title: "Profile Not Found",
-          description: `No profile data for ${symbol}. Card not added.`,
-          variant: "destructive",
+          description: `No profile data for ${symbol}.`,
         });
-      }
       return null;
     }
   } catch (error: unknown) {
@@ -288,13 +279,12 @@ async function initializeProfileCard({
       error instanceof Error
         ? error.message
         : `Could not initialize profile for ${symbol}.`;
-    if (toast) {
+    if (toast)
       toast({
         title: "Error Initializing Profile",
         description: errorMessage,
         variant: "destructive",
       });
-    }
     return null;
   }
 }
@@ -304,22 +294,18 @@ const handleProfileCardLiveQuoteUpdate: CardUpdateHandler<
   ProfileCardData,
   LiveQuoteIndicatorDBRow
 > = (currentProfileCardData, leanQuotePayload): ProfileCardData => {
-  // Use a read-only version of liveData for merging to prevent accidental direct mutation
   const currentLiveDataReadOnly = { ...currentProfileCardData.liveData };
-
-  const newLiveData = createProfileCardLiveDataFromLiveQuote(
+  const newLiveData = createProfileCardLiveData(
     leanQuotePayload,
+    null,
+    null,
     currentLiveDataReadOnly
   );
-
   if (
     currentProfileCardData.liveData.price !== newLiveData.price ||
     currentProfileCardData.liveData.marketCap !== newLiveData.marketCap
   ) {
-    return {
-      ...currentProfileCardData,
-      liveData: newLiveData,
-    };
+    return { ...currentProfileCardData, liveData: newLiveData };
   }
   return currentProfileCardData;
 };
@@ -331,38 +317,31 @@ registerCardUpdateHandler(
 
 const handleProfileCardFinancialStatementUpdate: CardUpdateHandler<
   ProfileCardData,
-  FinancialStatementDBRowFromRealtime // Use the specific type from realtime-service
+  FinancialStatementDBRowFromRealtime
 > = (
   currentProfileCardData,
-  financialStatementRow, // This is now correctly typed
-  _currentDisplayableCard, // Unused parameter
+  financialStatementRow,
+  _currentDisplayableCard,
   context: CardUpdateContext
 ): ProfileCardData => {
-  // Adapt the incoming row to the source structure expected by the creator function
   const statementSource: ProfileFinancialStatementSource = {
     income_statement_payload: financialStatementRow.income_statement_payload,
   };
   const currentLiveDataReadOnly = { ...currentProfileCardData.liveData };
-
-  const newLiveData = createProfileCardLiveDataFromFinancialStatement(
+  const newLiveData = createProfileCardLiveData(
+    null,
     statementSource,
+    null,
     currentLiveDataReadOnly
   );
-
-  if (
-    currentProfileCardData.liveData.revenue !== newLiveData.revenue ||
-    currentProfileCardData.liveData.eps !== newLiveData.eps
-  ) {
+  if (currentProfileCardData.liveData.revenue !== newLiveData.revenue) {
     if (context.toast) {
       context.toast({
-        title: `Financials Updated: ${currentProfileCardData.symbol}`,
-        description: `Data from statement ending ${financialStatementRow.date} (${financialStatementRow.period}) applied. Revenue or EPS changed.`,
+        title: `Revenue Updated: ${currentProfileCardData.symbol}`,
+        description: `TTM Revenue from statement ${financialStatementRow.date} (${financialStatementRow.period}) applied.`,
       });
     }
-    return {
-      ...currentProfileCardData,
-      liveData: newLiveData,
-    };
+    return { ...currentProfileCardData, liveData: newLiveData };
   }
   return currentProfileCardData;
 };
@@ -370,4 +349,51 @@ registerCardUpdateHandler(
   "profile",
   "FINANCIAL_STATEMENT_UPDATE",
   handleProfileCardFinancialStatementUpdate
+);
+
+const handleProfileCardRatiosTTMUpdate: CardUpdateHandler<
+  ProfileCardData,
+  RatiosTtmDBRow
+> = (
+  currentProfileCardData,
+  ratiosTtmPayload,
+  _currentDisplayableCard,
+  context: CardUpdateContext
+): ProfileCardData => {
+  const currentLiveDataReadOnly = { ...currentProfileCardData.liveData };
+  const newLiveData = createProfileCardLiveData(
+    null,
+    null,
+    ratiosTtmPayload,
+    currentLiveDataReadOnly
+  );
+
+  let changed = false;
+  if (currentProfileCardData.liveData.eps !== newLiveData.eps) changed = true;
+  if (
+    currentProfileCardData.liveData.priceToEarningsRatioTTM !==
+    newLiveData.priceToEarningsRatioTTM
+  )
+    changed = true;
+  if (
+    currentProfileCardData.liveData.priceToBookRatioTTM !==
+    newLiveData.priceToBookRatioTTM
+  )
+    changed = true;
+
+  if (changed) {
+    if (context.toast) {
+      context.toast({
+        title: `Key Ratios Updated: ${currentProfileCardData.symbol}`,
+        description: `P/E, EPS (TTM), or P/B ratios have been refreshed.`,
+      });
+    }
+    return { ...currentProfileCardData, liveData: newLiveData };
+  }
+  return currentProfileCardData;
+};
+registerCardUpdateHandler(
+  "profile",
+  "RATIOS_TTM_UPDATE",
+  handleProfileCardRatiosTTMUpdate
 );
