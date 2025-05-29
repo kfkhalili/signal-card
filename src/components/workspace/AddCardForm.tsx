@@ -35,7 +35,8 @@ const AVAILABLE_CARD_TYPES: { value: CardType; label: string }[] = [
   { value: "profile", label: "Profile Card" },
   { value: "price", label: "Price Card" },
   { value: "revenue", label: "Revenue Card" },
-  { value: "solvency", label: "Solvency Card" }, // Added
+  { value: "solvency", label: "Solvency Card" },
+  { value: "cashuse", label: "Cash Use Card" },
 ];
 
 const AddCardFormSchema = z.object({
@@ -162,7 +163,7 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
                   <FormLabel>Symbol</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="e.g., AAPL, BTC-USD"
+                      placeholder="e.g., AAPL, GOOG, TSLA"
                       {...field}
                       disabled={
                         isSubmitting ||

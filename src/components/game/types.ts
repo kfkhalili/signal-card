@@ -3,12 +3,14 @@ import type { PriceCardData } from "@/components/game/cards/price-card/price-car
 import type { ProfileCardData } from "@/components/game/cards/profile-card/profile-card.types";
 import type { RevenueCardData } from "@/components/game/cards/revenue-card/revenue-card.types";
 import type { SolvencyCardData } from "./cards/solvency-card/solvency-card.types";
+import type { CashUseCardData } from "./cards/cash-use-card/cash-use-card.types";
 
 export type ConcreteCardData =
   | PriceCardData
   | ProfileCardData
   | RevenueCardData
-  | SolvencyCardData;
+  | SolvencyCardData
+  | CashUseCardData;
 
 export interface DisplayableCardState {
   isFlipped: boolean;

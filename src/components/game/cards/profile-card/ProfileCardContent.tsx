@@ -231,10 +231,10 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                   <ClickableDataItem
                     isInteractive={true}
                     onClickHandler={() => {
-                      handleInteraction("TRIGGER_CARD_ACTION", {
-                        actionName: "viewDividendHistory",
-                        actionData: { dividend: staticData.last_dividend },
-                      } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                      handleInteraction("REQUEST_NEW_CARD", {
+                        targetCardType: "cashuse",
+                        originatingElement: "lastDividendDisplayTrigger",
+                      } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
                     }}
                     title={`Last Dividend: ${
                       staticData?.currency ?? ""

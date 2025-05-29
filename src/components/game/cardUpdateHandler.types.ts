@@ -13,7 +13,8 @@ export type CardUpdateEventType =
   | "LIVE_QUOTE_UPDATE"
   | "STATIC_PROFILE_UPDATE"
   | "EXCHANGE_STATUS_UPDATE"
-  | "FINANCIAL_STATEMENT_UPDATE";
+  | "FINANCIAL_STATEMENT_UPDATE"
+  | "SHARES_FLOAT_UPDATE";
 
 /**
  * Context provided to card update handler functions.
