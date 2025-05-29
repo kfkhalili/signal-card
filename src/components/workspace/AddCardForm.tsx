@@ -74,8 +74,9 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
 }) => {
   const [isOpen, setIsOpen] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
-  // Ref is kept for potential future use, but not actively preventing dialog close here
-  const comboboxPopoverContentRef = useRef<HTMLDivElement>(null);
+
+  // Ref for the "Add Card" button
+  const submitButtonRef = useRef<HTMLButtonElement>(null);
 
   const form = useForm<AddCardFormValues>({
     resolver: zodResolver(AddCardFormSchema),
@@ -92,6 +93,16 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
         symbol: defaultSymbol,
         cardType: form.getValues("cardType") || "profile",
       });
+
+      // Initial focus logic when dialog opens
+      if (lockedSymbolForRegularUser) {
+        // If symbol is locked, focus the submit button
+        setTimeout(() => {
+          submitButtonRef.current?.focus();
+        }, 50); // Delay to ensure button is rendered
+      }
+      // If symbol is NOT locked, SymbolSearchComboBox will handle its own focus
+      // via the autoFocusOnMount prop passed to it.
     }
   }, [isOpen, lockedSymbolForRegularUser, form]);
 
@@ -124,11 +135,7 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent
-        className="sm:max-w-[425px]"
-        // onInteractOutside handler removed as the inner Popover is now modal
-        // and should handle its own boundary interactions.
-      >
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Add New Card to Workspace</DialogTitle>
           <DialogDescription>
@@ -150,12 +157,13 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
                   <FormControl>
                     <SymbolSearchComboBox
                       id="symbol-search-combobox"
-                      forwardedPopoverContentRef={comboboxPopoverContentRef}
                       placeholder="Search or type symbol..."
                       value={field.value}
                       onChange={field.onChange}
                       disabled={isSubmitting || !!lockedSymbolForRegularUser}
                       containerClassName="w-full"
+                      autoFocusOnMount={isOpen && !lockedSymbolForRegularUser} // Control autofocus
+                      focusAfterCloseRef={submitButtonRef} // Pass ref for focus after popover close
                     />
                   </FormControl>
                   <FormMessage />
@@ -196,6 +204,7 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
                 </Button>
               </DialogClose>
               <Button
+                ref={submitButtonRef} // Assign ref to the submit button
                 type="submit"
                 disabled={
                   isSubmitting ||

@@ -37,6 +37,8 @@ interface SymbolSearchComboBoxProps {
   triggerClassName?: string;
   popoverContentClassName?: string;
   forwardedPopoverContentRef?: React.Ref<HTMLDivElement>;
+  autoFocusOnMount?: boolean;
+  focusAfterCloseRef?: React.RefObject<HTMLElement>;
 }
 
 export const SymbolSearchComboBox: React.FC<SymbolSearchComboBoxProps> = ({
@@ -50,6 +52,8 @@ export const SymbolSearchComboBox: React.FC<SymbolSearchComboBoxProps> = ({
   triggerClassName,
   popoverContentClassName,
   forwardedPopoverContentRef,
+  autoFocusOnMount = false,
+  focusAfterCloseRef,
 }) => {
   const { supabase } = useAuth();
   const [open, setOpen] = React.useState(false);
@@ -127,10 +131,16 @@ export const SymbolSearchComboBox: React.FC<SymbolSearchComboBoxProps> = ({
     }
   }, [open]);
 
+  React.useEffect(() => {
+    if (autoFocusOnMount && !disabled) {
+      setOpen(true);
+    }
+  }, [autoFocusOnMount, disabled]);
+
   const handleItemSelect = React.useCallback(
     (selectedValue: string) => {
       if (!selectedValue && selectedValue !== "") {
-        setOpen(false); // Close if selection is invalid or empty
+        setOpen(false);
         return;
       }
       if (onFormChange) {
@@ -138,12 +148,15 @@ export const SymbolSearchComboBox: React.FC<SymbolSearchComboBoxProps> = ({
       } else {
         console.error("onFormChange is undefined in handleItemSelect!");
       }
-      setOpen(false); // Close the popover. This will trigger onOpenChange, then onCloseAutoFocus.
+      setOpen(false);
     },
-    [onFormChange] // Removed setOpen from dependencies as it's from useState
+    [onFormChange]
   );
 
   const displayLabel = controlledFormValue || placeholder;
+
+  // Determine if the CommandList should be visible
+  const showCommandList = open && (isLoading || inputValue.trim().length > 0);
 
   return (
     <div className={cn("w-full", containerClassName)}>
@@ -174,45 +187,50 @@ export const SymbolSearchComboBox: React.FC<SymbolSearchComboBoxProps> = ({
           className={cn(
             "w-[--radix-popover-trigger-width] p-0",
             popoverContentClassName
-          )}>
+          )}
+          onCloseAutoFocus={(e) => {
+            if (focusAfterCloseRef?.current) {
+              e.preventDefault();
+              focusAfterCloseRef.current.focus();
+            }
+          }}>
           <Command shouldFilter={false}>
             <CommandInput
               ref={commandInputRef}
-              placeholder="Search symbol..."
               value={inputValue}
               onValueChange={setInputValue}
               disabled={disabled}
             />
-            <CommandList>
-              {isLoading && <CommandEmpty>Loading...</CommandEmpty>}
-              {!isLoading && suggestions.length === 0 && inputValue.trim() && (
-                <CommandEmpty>No symbol found.</CommandEmpty>
-              )}
-              {!isLoading &&
-                suggestions.length === 0 &&
-                !inputValue.trim() &&
-                open && <CommandEmpty>Type to search symbols.</CommandEmpty>}
-              <CommandGroup>
-                {suggestions.map((suggestion) => (
-                  <CommandItem
-                    key={suggestion.value}
-                    value={suggestion.value}
-                    onSelect={handleItemSelect}
-                    disabled={disabled}>
-                    <Check
-                      className={cn(
-                        "mr-2 h-4 w-4",
-                        controlledFormValue.toLowerCase() ===
-                          suggestion.value.toLowerCase()
-                          ? "opacity-100"
-                          : "opacity-0"
-                      )}
-                    />
-                    {suggestion.label}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
+            {showCommandList && (
+              <CommandList>
+                {isLoading && <CommandEmpty>Loading...</CommandEmpty>}
+                {!isLoading &&
+                  suggestions.length === 0 &&
+                  inputValue.trim() && (
+                    <CommandEmpty>No symbol found.</CommandEmpty>
+                  )}
+                <CommandGroup>
+                  {suggestions.map((suggestion) => (
+                    <CommandItem
+                      key={suggestion.value}
+                      value={suggestion.value}
+                      onSelect={handleItemSelect}
+                      disabled={disabled}>
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          controlledFormValue.toLowerCase() ===
+                            suggestion.value.toLowerCase()
+                            ? "opacity-100"
+                            : "opacity-0"
+                        )}
+                      />
+                      {suggestion.label}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            )}
           </Command>
         </PopoverContent>
       </Popover>
