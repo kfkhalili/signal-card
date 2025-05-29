@@ -1,12 +1,6 @@
 // src/components/ui/ClickableDataItem.tsx
 import React from "react";
 import { cn } from "@/lib/utils";
-// No longer needs to know about InteractionPayload or OnGenericInteraction directly
-// import type {
-//   CardType,
-//   OnGenericInteraction,
-//   InteractionPayload,
-// } from "@/components/game/cards/base-card/base-card.types";
 
 interface ClickableDataItemProps extends React.HTMLAttributes<HTMLDivElement> {
   isInteractive: boolean;
@@ -21,13 +15,6 @@ interface ClickableDataItemProps extends React.HTMLAttributes<HTMLDivElement> {
   interactiveClassName?: string;
   "data-testid"?: string;
   "aria-label"?: string;
-  // Removed props related to constructing InteractionPayload:
-  // interactionTarget?: "card";
-  // targetType?: CardType;
-  // sourceCardId?: string;
-  // sourceCardSymbol?: string;
-  // sourceCardType?: CardType;
-  // onGenericInteraction?: OnGenericInteraction;
 }
 
 const DEFAULT_INTERACTIVE_CLASSES =
@@ -41,12 +28,8 @@ export const ClickableDataItem: React.FC<ClickableDataItemProps> = ({
   interactiveClassName,
   "data-testid": dataTestId,
   "aria-label": ariaLabel,
-  // Removed destructured props for generic interaction
   ...rest
 }) => {
-  // The handleInteraction logic is removed. ClickableDataItem now only calls onClickHandler.
-  // The parent component (e.g., PriceCardContent) is responsible for calling onGenericInteraction.
-
   const handleClick = (event: React.MouseEvent<HTMLDivElement>) => {
     if (isInteractive && onClickHandler) {
       event.stopPropagation(); // Still good to prevent unintended parent triggers
@@ -79,8 +62,7 @@ export const ClickableDataItem: React.FC<ClickableDataItemProps> = ({
       aria-label={isInteractive ? ariaLabel : undefined}
       // Ensure aria-disabled is correctly set based on isInteractive
       aria-disabled={!isInteractive ? true : undefined}
-      data-interactive-child={isInteractive ? "true" : undefined} // Mark as interactive child if it is
-    >
+      data-interactive-child={isInteractive ? "true" : undefined}>
       {children}
     </div>
   );
