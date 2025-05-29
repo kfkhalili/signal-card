@@ -79,3 +79,20 @@ SELECT
       ) AS request_id;
     $$
   );
+
+SELECT
+  cron.schedule(
+    'daily-fetch-fmp-ratios-ttm',
+    '0 2 * * *', -- Every day at 2:00 AM UTC
+    $$
+    SELECT
+      net.http_post(
+          url := current_setting('supabase.functions.url') || '/fetch-fmp-ratios-ttm', -- Ensure Edge Function name matches
+          headers := jsonb_build_object(
+            'Content-Type', 'application/json',
+            'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'supabase_service_role_key') -- Ensure service_role_key is in vault
+          ),
+          body := '{}'::jsonb -- Empty body or any required payload
+      ) AS request_id;
+    $$
+  );
