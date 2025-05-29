@@ -54,11 +54,6 @@ export default function WorkspacePage() {
     }
   }, [user, isAuthLoading, router, hasMounted]);
 
-  const isPremiumUser =
-    hasMounted && !isAuthLoading
-      ? user?.app_metadata?.is_premium ?? false
-      : false;
-
   const {
     activeCards,
     setActiveCards,
@@ -69,7 +64,7 @@ export default function WorkspacePage() {
     stockDataCallbacks,
     uniqueSymbolsInWorkspace,
     onGenericInteraction,
-  } = useWorkspaceManager({ isPremiumUser });
+  } = useWorkspaceManager();
 
   const [marketStatuses, setMarketStatuses] = useState<MarketStatus>({});
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState<boolean>(false);
@@ -126,23 +121,17 @@ export default function WorkspacePage() {
               disabled={isAddingCardInProgress}>
               <RefreshCw className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Clear All
             </Button>
-
-            {/* AddCardForm is available even if workspaceSymbolForRegularUser is set,
-              but its symbol input will be locked for non-premium users */}
             <AddCardForm
               onAddCard={addCardToWorkspace}
               existingCards={activeCards}
-              isPremiumUser={isPremiumUser}
               lockedSymbolForRegularUser={workspaceSymbolForRegularUser}
             />
           </div>
         </div>
       )}
 
-      {/* Map over unique symbols to create a StockDataHandler for each */}
       {uniqueSymbolsInWorkspace.map((s) => {
         if (!stockDataCallbacks) {
-          // This check might be redundant if stockDataCallbacks is guaranteed to be initialized
           return null;
         }
         return (
@@ -183,7 +172,6 @@ export default function WorkspacePage() {
             <AddCardForm
               onAddCard={addCardToWorkspace}
               existingCards={activeCards}
-              isPremiumUser={isPremiumUser}
               lockedSymbolForRegularUser={workspaceSymbolForRegularUser}
               triggerButton={
                 <Button size="lg">
@@ -191,13 +179,9 @@ export default function WorkspacePage() {
                 </Button>
               }
             />
-            {!isPremiumUser && (
-              <p className="text-xs text-muted-foreground mt-3">
-                You can add one symbol at a time.
-                <br />
-                Clear workspace to change symbol.
-              </p>
-            )}
+            <p className="text-xs text-muted-foreground mt-3">
+              You can add multiple symbols.
+            </p>
           </div>
         ) : (
           <ActiveCardsSection

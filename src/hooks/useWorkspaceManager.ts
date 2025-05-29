@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
-import useLocalStorage from "@/hooks/use-local-storage"; // Uses the cleaned-up version
+import useLocalStorage from "@/hooks/use-local-storage";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -63,19 +63,13 @@ interface BaseStoredCard {
 }
 type StoredCardRawArray = BaseStoredCard[];
 
-interface UseWorkspaceManagerProps {
-  isPremiumUser: boolean;
-}
-
 const getConcreteCardData = (card: DisplayableCard): ConcreteCardData => {
   const cardClone = { ...card };
   delete (cardClone as Partial<DisplayableCardState>).isFlipped;
   return cardClone as ConcreteCardData;
 };
 
-export function useWorkspaceManager({
-  isPremiumUser,
-}: UseWorkspaceManagerProps) {
+export function useWorkspaceManager() {
   const { toast } = useToast();
   const supabase: SupabaseClient<Database> = useMemo(
     () => createSupabaseBrowserClient(),
@@ -86,7 +80,6 @@ export function useWorkspaceManager({
     useLocalStorage<StoredCardRawArray>(WORKSPACE_LOCAL_STORAGE_KEY, []);
 
   const [activeCards, setActiveCards] = useState<DisplayableCard[]>(() => {
-    // Cleaned-up initializer
     if (Array.isArray(rawCardsFromStorage)) {
       const rehydrated: DisplayableCard[] = rawCardsFromStorage
         .map((cardObject): DisplayableCard | null => {
@@ -110,12 +103,12 @@ export function useWorkspaceManager({
   >({});
 
   useEffect(() => {
-    if (!isPremiumUser && activeCards.length > 0) {
+    if (activeCards.length > 0) {
       setWorkspaceSymbolForRegularUser(activeCards[0].symbol);
     } else if (activeCards.length === 0) {
       setWorkspaceSymbolForRegularUser(null);
     }
-  }, [activeCards, isPremiumUser]);
+  }, [activeCards]);
 
   useEffect(() => {
     setCardsInLocalStorage(activeCards as unknown as StoredCardRawArray);
@@ -133,13 +126,9 @@ export function useWorkspaceManager({
       options?: { requestingCardId?: string }
     ) => {
       setIsAddingCardInProgress(true);
-      let determinedSymbol = values.symbol;
+      const determinedSymbol = values.symbol; // Keep determinedSymbol logic simple
       const cardTypeFromForm = values.cardType;
       const requestingCardId = options?.requestingCardId;
-
-      if (!isPremiumUser && workspaceSymbolForRegularUser) {
-        determinedSymbol = workspaceSymbolForRegularUser;
-      }
 
       const existingCardIndex = activeCards.findIndex(
         (card) =>
@@ -279,14 +268,7 @@ export function useWorkspaceManager({
         setIsAddingCardInProgress(false);
       }
     },
-    [
-      activeCards,
-      supabase,
-      toast,
-      isPremiumUser,
-      workspaceSymbolForRegularUser,
-      setActiveCards,
-    ]
+    [activeCards, supabase, toast, setActiveCards]
   );
 
   const onGenericInteraction: OnGenericInteraction = useCallback(

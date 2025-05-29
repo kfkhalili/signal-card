@@ -1,7 +1,7 @@
 // src/components/workspace/AddCardForm.tsx
 "use client";
 
-import React, { useEffect } from "react"; // Added useEffect
+import React, { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -19,7 +19,6 @@ import {
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -27,7 +26,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { PlusCircle, Lock } from "lucide-react";
+import { PlusCircle } from "lucide-react"; // Lock icon removed as it's no longer used
 import type { CardType } from "@/components/game/cards/base-card/base-card.types";
 import type { DisplayableCard } from "@/components/game/types";
 
@@ -57,16 +56,13 @@ export type AddCardFormValues = z.infer<typeof AddCardFormSchema>;
 interface AddCardFormProps {
   onAddCard: (values: AddCardFormValues) => Promise<void>;
   existingCards: DisplayableCard[];
-  isPremiumUser: boolean;
   triggerButton?: React.ReactNode;
-  /** If provided and user is not premium, symbol field is locked to this value */
-  lockedSymbolForRegularUser?: string | null;
+  lockedSymbolForRegularUser?: string | null; // This can now be simplified or removed if not needed
 }
 
 export const AddCardForm: React.FC<AddCardFormProps> = ({
   onAddCard,
   existingCards,
-  isPremiumUser,
   triggerButton,
   lockedSymbolForRegularUser,
 }) => {
@@ -76,40 +72,30 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
   const form = useForm<AddCardFormValues>({
     resolver: zodResolver(AddCardFormSchema),
     defaultValues: {
-      symbol:
-        lockedSymbolForRegularUser && !isPremiumUser
-          ? lockedSymbolForRegularUser
-          : "",
-      cardType: "profile", // Default to profile or consider making it undefined
+      symbol: lockedSymbolForRegularUser || "", // Simplified default symbol
+      cardType: "profile",
     },
   });
 
   useEffect(() => {
     if (isOpen) {
-      const defaultSymbol =
-        lockedSymbolForRegularUser && !isPremiumUser
-          ? lockedSymbolForRegularUser
-          : "";
-      // Keep current card type if premium, otherwise reset to profile (or a sensible default)
-      const defaultCardType = isPremiumUser
-        ? form.getValues("cardType") || "profile" // Ensure a fallback if current value is undefined
-        : "profile";
+      const defaultSymbol = lockedSymbolForRegularUser || "";
+      const defaultCardType = form.getValues("cardType") || "profile";
 
       form.reset({
         symbol: defaultSymbol,
         cardType: defaultCardType,
       });
     }
-  }, [isOpen, lockedSymbolForRegularUser, isPremiumUser, form]);
+  }, [isOpen, lockedSymbolForRegularUser, form]);
 
   const handleSubmit = async (values: AddCardFormValues) => {
     setIsSubmitting(true);
     const finalValues = {
       ...values,
-      symbol:
-        lockedSymbolForRegularUser && !isPremiumUser
-          ? lockedSymbolForRegularUser
-          : values.symbol,
+      symbol: lockedSymbolForRegularUser
+        ? lockedSymbolForRegularUser
+        : values.symbol,
     };
 
     const cardExists = existingCards.some(
@@ -131,8 +117,6 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
     setIsOpen(false);
   };
 
-  const NON_PREMIUM_LOCKED_TYPES: CardType[] = ["revenue", "solvency"]; // Add other types as needed
-
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
@@ -146,7 +130,7 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
         <DialogHeader>
           <DialogTitle>Add New Card to Workspace</DialogTitle>
           <DialogDescription>
-            {lockedSymbolForRegularUser && !isPremiumUser
+            {lockedSymbolForRegularUser // Simplified description
               ? `Adding card for symbol: ${lockedSymbolForRegularUser}. Select card type.`
               : "Enter a symbol and select the card type."}
           </DialogDescription>
@@ -166,10 +150,9 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
                       placeholder="e.g., AAPL, GOOG, TSLA"
                       {...field}
                       disabled={
-                        isSubmitting ||
-                        (!!lockedSymbolForRegularUser && !isPremiumUser)
+                        isSubmitting || !!lockedSymbolForRegularUser // Symbol is locked if lockedSymbolForRegularUser is present
                       }
-                      autoFocus={!lockedSymbolForRegularUser || isPremiumUser}
+                      autoFocus={!lockedSymbolForRegularUser}
                     />
                   </FormControl>
                   <FormMessage />
@@ -190,9 +173,6 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
                       className="flex flex-col space-y-1"
                       disabled={isSubmitting}>
                       {AVAILABLE_CARD_TYPES.map((typeOpt) => {
-                        const isLockedForNonPremium =
-                          !isPremiumUser &&
-                          NON_PREMIUM_LOCKED_TYPES.includes(typeOpt.value);
                         return (
                           <FormItem
                             key={typeOpt.value}
@@ -200,30 +180,18 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
                             <FormControl>
                               <RadioGroupItem
                                 value={typeOpt.value}
-                                disabled={isSubmitting || isLockedForNonPremium}
+                                disabled={isSubmitting} // Only disabled if submitting
                               />
                             </FormControl>
                             <FormLabel className="font-normal flex items-center">
                               {typeOpt.label}
-                              {isLockedForNonPremium && (
-                                <Lock
-                                  size={12}
-                                  className="ml-2 text-muted-foreground"
-                                />
-                              )}
+                              {/* Lock icon removed */}
                             </FormLabel>
                           </FormItem>
                         );
                       })}
                     </RadioGroup>
                   </FormControl>
-                  {!isPremiumUser && (
-                    <FormDescription className="flex items-center text-xs">
-                      Some card types are Premium only. Symbol is locked once
-                      first card is added.
-                      <Lock size={12} className="ml-1 text-muted-foreground" />
-                    </FormDescription>
-                  )}
                   <FormMessage />
                 </FormItem>
               )}
