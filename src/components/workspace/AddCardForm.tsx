@@ -1,7 +1,7 @@
 // src/components/workspace/AddCardForm.tsx
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -24,11 +24,17 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { PlusCircle } from "lucide-react"; // Lock icon removed as it's no longer used
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { PlusCircle } from "lucide-react";
 import type { CardType } from "@/components/game/cards/base-card/base-card.types";
 import type { DisplayableCard } from "@/components/game/types";
+import { SymbolSearchComboBox } from "@/components/ui/SymbolSearchComboBox";
 
 const AVAILABLE_CARD_TYPES: { value: CardType; label: string }[] = [
   { value: "profile", label: "Profile Card" },
@@ -57,7 +63,7 @@ interface AddCardFormProps {
   onAddCard: (values: AddCardFormValues) => Promise<void>;
   existingCards: DisplayableCard[];
   triggerButton?: React.ReactNode;
-  lockedSymbolForRegularUser?: string | null; // This can now be simplified or removed if not needed
+  lockedSymbolForRegularUser?: string | null;
 }
 
 export const AddCardForm: React.FC<AddCardFormProps> = ({
@@ -68,11 +74,13 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
 }) => {
   const [isOpen, setIsOpen] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  // Ref is kept for potential future use, but not actively preventing dialog close here
+  const comboboxPopoverContentRef = useRef<HTMLDivElement>(null);
 
   const form = useForm<AddCardFormValues>({
     resolver: zodResolver(AddCardFormSchema),
     defaultValues: {
-      symbol: lockedSymbolForRegularUser || "", // Simplified default symbol
+      symbol: lockedSymbolForRegularUser || "",
       cardType: "profile",
     },
   });
@@ -80,39 +88,29 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
   useEffect(() => {
     if (isOpen) {
       const defaultSymbol = lockedSymbolForRegularUser || "";
-      const defaultCardType = form.getValues("cardType") || "profile";
-
       form.reset({
         symbol: defaultSymbol,
-        cardType: defaultCardType,
+        cardType: form.getValues("cardType") || "profile",
       });
     }
   }, [isOpen, lockedSymbolForRegularUser, form]);
 
   const handleSubmit = async (values: AddCardFormValues) => {
     setIsSubmitting(true);
-    const finalValues = {
-      ...values,
-      symbol: lockedSymbolForRegularUser
-        ? lockedSymbolForRegularUser
-        : values.symbol,
-    };
-
+    const finalSymbol = lockedSymbolForRegularUser || values.symbol;
+    const validatedSymbol = finalSymbol.toUpperCase();
     const cardExists = existingCards.some(
-      (card) =>
-        card.symbol === finalValues.symbol && card.type === finalValues.cardType
+      (card) => card.symbol === validatedSymbol && card.type === values.cardType
     );
-
     if (cardExists) {
       form.setError("symbol", {
         type: "manual",
-        message: `A ${finalValues.cardType} card for ${finalValues.symbol} already exists.`,
+        message: `A ${values.cardType} card for ${validatedSymbol} already exists.`,
       });
       setIsSubmitting(false);
       return;
     }
-
-    await onAddCard(finalValues);
+    await onAddCard({ ...values, symbol: validatedSymbol });
     setIsSubmitting(false);
     setIsOpen(false);
   };
@@ -126,11 +124,15 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent
+        className="sm:max-w-[425px]"
+        // onInteractOutside handler removed as the inner Popover is now modal
+        // and should handle its own boundary interactions.
+      >
         <DialogHeader>
           <DialogTitle>Add New Card to Workspace</DialogTitle>
           <DialogDescription>
-            {lockedSymbolForRegularUser // Simplified description
+            {lockedSymbolForRegularUser
               ? `Adding card for symbol: ${lockedSymbolForRegularUser}. Select card type.`
               : "Enter a symbol and select the card type."}
           </DialogDescription>
@@ -143,55 +145,46 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
               control={form.control}
               name="symbol"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="flex flex-col">
                   <FormLabel>Symbol</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="e.g., AAPL, GOOG, TSLA"
-                      {...field}
-                      disabled={
-                        isSubmitting || !!lockedSymbolForRegularUser // Symbol is locked if lockedSymbolForRegularUser is present
-                      }
-                      autoFocus={!lockedSymbolForRegularUser}
+                    <SymbolSearchComboBox
+                      id="symbol-search-combobox"
+                      forwardedPopoverContentRef={comboboxPopoverContentRef}
+                      placeholder="Search or type symbol..."
+                      value={field.value}
+                      onChange={field.onChange}
+                      disabled={isSubmitting || !!lockedSymbolForRegularUser}
+                      containerClassName="w-full"
                     />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-
             <FormField
               control={form.control}
               name="cardType"
               render={({ field }) => (
-                <FormItem className="space-y-2">
+                <FormItem>
                   <FormLabel>Card Type</FormLabel>
-                  <FormControl>
-                    <RadioGroup
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      className="flex flex-col space-y-1"
-                      disabled={isSubmitting}>
-                      {AVAILABLE_CARD_TYPES.map((typeOpt) => {
-                        return (
-                          <FormItem
-                            key={typeOpt.value}
-                            className="flex items-center space-x-3 space-y-0">
-                            <FormControl>
-                              <RadioGroupItem
-                                value={typeOpt.value}
-                                disabled={isSubmitting} // Only disabled if submitting
-                              />
-                            </FormControl>
-                            <FormLabel className="font-normal flex items-center">
-                              {typeOpt.label}
-                              {/* Lock icon removed */}
-                            </FormLabel>
-                          </FormItem>
-                        );
-                      })}
-                    </RadioGroup>
-                  </FormControl>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value || ""}
+                    disabled={isSubmitting}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a card type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {AVAILABLE_CARD_TYPES.map((typeOpt) => (
+                        <SelectItem key={typeOpt.value} value={typeOpt.value}>
+                          {typeOpt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
@@ -202,7 +195,12 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
                   Cancel
                 </Button>
               </DialogClose>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button
+                type="submit"
+                disabled={
+                  isSubmitting ||
+                  (!form.getValues("symbol") && !lockedSymbolForRegularUser)
+                }>
                 {isSubmitting ? "Adding..." : "Add Card"}
               </Button>
             </DialogFooter>
