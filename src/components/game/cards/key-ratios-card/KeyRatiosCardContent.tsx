@@ -149,7 +149,7 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
     ) => (
       <DataRow
         label={label}
-        value={value}
+        value={value && unit === "%" ? value * 100 : value}
         unit={unit}
         precision={precision}
         tooltip={tooltip}
