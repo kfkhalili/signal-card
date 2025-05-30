@@ -4,13 +4,15 @@ import type { ProfileCardData } from "@/components/game/cards/profile-card/profi
 import type { RevenueCardData } from "@/components/game/cards/revenue-card/revenue-card.types";
 import type { SolvencyCardData } from "./cards/solvency-card/solvency-card.types";
 import type { CashUseCardData } from "./cards/cash-use-card/cash-use-card.types";
+import type { KeyRatiosCardData } from "./cards/key-ratios-card/key-ratios-card.types";
 
 export type ConcreteCardData =
   | PriceCardData
   | ProfileCardData
   | RevenueCardData
   | SolvencyCardData
-  | CashUseCardData;
+  | CashUseCardData
+  | KeyRatiosCardData;
 
 export interface DisplayableCardState {
   isFlipped: boolean;

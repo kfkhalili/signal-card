@@ -1,6 +1,12 @@
 // src/components/game/cards/base-card/base-card.types.ts
 
-export type CardType = "profile" | "price" | "revenue" | "solvency" | "cashuse"; // Add new card types here
+export type CardType =
+  | "profile"
+  | "price"
+  | "revenue"
+  | "solvency"
+  | "cashuse"
+  | "keyratios"; // Add new card types here
 
 export interface BaseCardBackData {
   readonly description?: string;

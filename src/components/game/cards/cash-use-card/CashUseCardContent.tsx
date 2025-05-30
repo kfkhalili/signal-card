@@ -4,7 +4,6 @@ import {
   CardDescription,
   CardContent as ShadCardContent,
 } from "@/components/ui/card";
-// import { Badge } from "@/components/ui/badge"; // No longer needed for period label for shares
 import type { CashUseCardData } from "./cash-use-card.types";
 import { cn } from "@/lib/utils";
 import { formatNumberWithAbbreviations } from "@/lib/formatters";
@@ -16,6 +15,7 @@ import type {
   RequestNewCardInteraction,
   TriggerCardActionInteraction,
 } from "../base-card/base-card.types";
+import { Badge } from "@/components/ui/badge";
 
 // MetricDisplay is for items WITH a RangeIndicator (financials)
 interface MetricDisplayWithRangeProps {
@@ -270,6 +270,24 @@ export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
           data-testid={`cashuse-card-front-${symbol}`}
           className="pointer-events-auto flex flex-col h-full justify-between">
           <ShadCardContent className="pt-0 pb-1 px-0 space-y-1 sm:space-y-1.5 flex-grow">
+            <div className="text-center mb-1.5">
+              <ClickableDataItem
+                isInteractive={true}
+                onClickHandler={() =>
+                  handleInteraction("REQUEST_NEW_CARD", {
+                    targetCardType: "cashuse",
+                    originatingElement: "cashUseBadge",
+                  } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                }
+                title={`View profile for ${companyName || symbol}`}
+                baseClassName="inline-block">
+                <Badge
+                  variant="outline"
+                  className="text-xs sm:text-sm px-2 py-0.5">
+                  Cash Use
+                </Badge>
+              </ClickableDataItem>
+            </div>
             <SimpleMetricDisplay
               label="Outstanding Shares"
               value={liveData.currentOutstandingShares}

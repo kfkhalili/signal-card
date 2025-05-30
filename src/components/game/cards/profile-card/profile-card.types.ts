@@ -31,8 +31,10 @@ export interface ProfileCardStaticData {
 export interface ProfileCardLiveData {
   price?: number | null;
   marketCap?: number | null;
-  revenue?: number | null;
-  eps?: number | null;
+  revenue?: number | null; // TTM Revenue, if available from financial_statements
+  eps?: number | null; // EPS TTM from ratios_ttm table
+  priceToEarningsRatioTTM?: number | null; // From ratios_ttm
+  priceToBookRatioTTM?: number | null; // From ratios_ttm
 }
 
 // Main interface for the complete ProfileCard data structure

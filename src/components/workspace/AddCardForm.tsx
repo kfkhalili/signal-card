@@ -42,6 +42,7 @@ const AVAILABLE_CARD_TYPES: { value: CardType; label: string }[] = [
   { value: "revenue", label: "Revenue Card" },
   { value: "solvency", label: "Solvency Card" },
   { value: "cashuse", label: "Cash Use Card" },
+  { value: "keyratios", label: "Key Ratios Card" },
 ];
 
 const AddCardFormSchema = z.object({

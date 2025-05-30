@@ -246,16 +246,16 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
                 isInteractive={true}
                 onClickHandler={() =>
                   handleInteraction("REQUEST_NEW_CARD", {
-                    targetCardType: "profile",
-                    originatingElement: "periodLabelBadge",
+                    targetCardType: "revenue",
+                    originatingElement: "revenueBadge",
                   } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
                 }
-                title={`View profile for ${companyName || symbol}`}
+                title={"Revenue Card"}
                 baseClassName="inline-block">
                 <Badge
                   variant="outline"
                   className="text-xs sm:text-sm px-2 py-0.5">
-                  {staticData.periodLabel}
+                  Revenue
                 </Badge>
               </ClickableDataItem>
             </div>

@@ -11,24 +11,21 @@ import type {
 } from "./profile-card.types";
 import type { BaseCardBackData } from "../base-card/base-card.types";
 
-// Define an interim type for what we expect cardFromStorage to look like
-// This helps in safely accessing nested properties, including the new liveData fields.
 interface StoredProfileCardShape {
   staticData?: Partial<ProfileCardStaticData>;
-  liveData?: Partial<ProfileCardLiveData>; // Will now look for marketCap, revenue, eps
-  // Ensure other top-level properties are included if they are part of the stored object
-  // beyond what's in CommonCardPropsForRehydration.
+  liveData?: Partial<ProfileCardLiveData>;
+  backData?: Partial<BaseCardBackData>;
+  websiteUrl?: string | null;
 }
 
 const rehydrateProfileCardInstance: SpecificCardRehydrator = (
   cardFromStorage: Record<string, unknown>,
   commonProps: CommonCardPropsForRehydration
 ): ProfileCardData | null => {
-  // Assert the shape of cardFromStorage for profile-specific data
   const profileStorageData = cardFromStorage as StoredProfileCardShape;
-
   const staticDataFromStorage = profileStorageData.staticData || {};
   const liveDataFromStorage = profileStorageData.liveData || {};
+  const backDataFromStorage = profileStorageData.backData || {};
 
   const rehydratedStaticData: ProfileCardStaticData = {
     db_id:
@@ -138,14 +135,21 @@ const rehydrateProfileCardInstance: SpecificCardRehydrator = (
       typeof liveDataFromStorage.eps === "number"
         ? liveDataFromStorage.eps
         : null,
+    priceToEarningsRatioTTM:
+      typeof liveDataFromStorage.priceToEarningsRatioTTM === "number"
+        ? liveDataFromStorage.priceToEarningsRatioTTM
+        : null,
+    priceToBookRatioTTM:
+      typeof liveDataFromStorage.priceToBookRatioTTM === "number"
+        ? liveDataFromStorage.priceToBookRatioTTM
+        : null,
   };
 
   const cardTypeDescription = `Provides an overview of ${
     commonProps.companyName || commonProps.symbol
   }'s company profile, including sector, industry, and key operational highlights.`;
-
   const rehydratedBackData: BaseCardBackData = {
-    description: cardTypeDescription,
+    description: backDataFromStorage.description || cardTypeDescription,
   };
 
   const rehydratedCard: ProfileCardData = {
@@ -158,9 +162,8 @@ const rehydrateProfileCardInstance: SpecificCardRehydrator = (
     staticData: rehydratedStaticData,
     liveData: rehydratedLiveData,
     backData: rehydratedBackData,
-    websiteUrl: rehydratedStaticData.website,
+    websiteUrl: profileStorageData.websiteUrl ?? rehydratedStaticData.website, // Prefer specific, then static
   };
-
   return rehydratedCard;
 };
 
