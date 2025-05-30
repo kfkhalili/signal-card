@@ -123,7 +123,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
 
   const handleLogoClick = (
     event:
-      | React.MouseEvent<HTMLDivElement> // ClickableDataItem onClickHandler provides this
+      | React.MouseEvent<HTMLDivElement>
       | React.KeyboardEvent<HTMLDivElement>
   ) => {
     event.stopPropagation();
@@ -168,7 +168,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
   const clickableLogoElement = websiteUrl ? (
     <ClickableDataItem
       isInteractive={true}
-      onClickHandler={handleLogoClick} // Updated to use ClickableDataItem's event type
+      onClickHandler={handleLogoClick}
       baseClassName="cursor-pointer hover:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-full"
       aria-label={`Visit ${companyName || sourceCardSymbol} website`}
       data-interactive-child="true"
@@ -304,7 +304,6 @@ const BaseCard: React.FC<BaseCardProps> = ({
     return () => clearTimeout(timer);
   }, [isFlipped]);
 
-  // Correct usage of the inert attribute with boolean values
   const frontFaceInert = isFlipped;
   const backFaceInert = !isFlipped;
 
@@ -334,7 +333,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
               : `Show ${sourceCardSymbol} back details`
           }
           aria-pressed={isFlipped}
-          inert={frontFaceInert ? true : undefined} // Use boolean for React prop
+          inert={frontFaceInert ? true : undefined}
           aria-hidden={isFlipped ? "true" : "false"}>
           {deleteButtonElement}
           {actualIdentityHeaderElement}
@@ -362,7 +361,8 @@ const BaseCard: React.FC<BaseCardProps> = ({
               ? `Show ${sourceCardSymbol} front details`
               : `Show ${sourceCardSymbol} back details`
           }
-          inert={backFaceInert ? true : undefined} // Use boolean for React prop
+          aria-pressed={!isFlipped}
+          inert={backFaceInert ? true : undefined}
           aria-hidden={!isFlipped ? "true" : "false"}>
           {deleteButtonElement}
           {headerPlaceholderElementForBack}

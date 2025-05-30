@@ -6,4 +6,5 @@ set -e
 
 # Run lint-staged
 npx lint-staged
+npx playwright test
 npm run build
