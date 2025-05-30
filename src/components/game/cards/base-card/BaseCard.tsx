@@ -46,7 +46,7 @@ const cardSurfaceBaseStyle: React.CSSProperties = {
 };
 
 const backFaceTransformStyle: React.CSSProperties = {
-  transform: "rotateY(180deg)",
+  transform: "rotateY(180deg) translateZ(0px)",
 };
 
 const BaseCard: React.FC<BaseCardProps> = ({
@@ -318,6 +318,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
           ref={frontFaceRef}
           style={{
             ...cardSurfaceBaseStyle,
+            transform: "translateZ(0px)",
             pointerEvents: isFlipped ? "none" : "auto",
           }}
           className={cn(
