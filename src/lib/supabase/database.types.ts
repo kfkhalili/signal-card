@@ -9,6 +9,56 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      dividend_history: {
+        Row: {
+          adj_dividend: number | null
+          date: string
+          declaration_date: string | null
+          dividend: number | null
+          fetched_at: string
+          frequency: string | null
+          payment_date: string | null
+          record_date: string | null
+          symbol: string
+          updated_at: string
+          yield: number | null
+        }
+        Insert: {
+          adj_dividend?: number | null
+          date: string
+          declaration_date?: string | null
+          dividend?: number | null
+          fetched_at?: string
+          frequency?: string | null
+          payment_date?: string | null
+          record_date?: string | null
+          symbol: string
+          updated_at?: string
+          yield?: number | null
+        }
+        Update: {
+          adj_dividend?: number | null
+          date?: string
+          declaration_date?: string | null
+          dividend?: number | null
+          fetched_at?: string
+          frequency?: string | null
+          payment_date?: string | null
+          record_date?: string | null
+          symbol?: string
+          updated_at?: string
+          yield?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_dividend_history_symbol"
+            columns: ["symbol"]
+            isOneToOne: false
+            referencedRelation: "supported_symbols"
+            referencedColumns: ["symbol"]
+          },
+        ]
+      }
       exchange_market_status: {
         Row: {
           closing_time_local: string | null
@@ -100,6 +150,50 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "fk_financial_statements_symbol"
+            columns: ["symbol"]
+            isOneToOne: false
+            referencedRelation: "supported_symbols"
+            referencedColumns: ["symbol"]
+          },
+        ]
+      }
+      grades_historical: {
+        Row: {
+          analyst_ratings_buy: number | null
+          analyst_ratings_hold: number | null
+          analyst_ratings_sell: number | null
+          analyst_ratings_strong_buy: number | null
+          analyst_ratings_strong_sell: number | null
+          date: string
+          fetched_at: string
+          symbol: string
+          updated_at: string
+        }
+        Insert: {
+          analyst_ratings_buy?: number | null
+          analyst_ratings_hold?: number | null
+          analyst_ratings_sell?: number | null
+          analyst_ratings_strong_buy?: number | null
+          analyst_ratings_strong_sell?: number | null
+          date: string
+          fetched_at?: string
+          symbol: string
+          updated_at?: string
+        }
+        Update: {
+          analyst_ratings_buy?: number | null
+          analyst_ratings_hold?: number | null
+          analyst_ratings_sell?: number | null
+          analyst_ratings_strong_buy?: number | null
+          analyst_ratings_strong_sell?: number | null
+          date?: string
+          fetched_at?: string
+          symbol?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_grades_historical_symbol"
             columns: ["symbol"]
             isOneToOne: false
             referencedRelation: "supported_symbols"
@@ -491,6 +585,47 @@ export type Database = {
             foreignKeyName: "fk_ratios_ttm_symbol"
             columns: ["symbol"]
             isOneToOne: true
+            referencedRelation: "supported_symbols"
+            referencedColumns: ["symbol"]
+          },
+        ]
+      }
+      revenue_product_segmentation: {
+        Row: {
+          data: Json | null
+          date: string
+          fetched_at: string
+          fiscal_year: number
+          period: string
+          reported_currency: string | null
+          symbol: string
+          updated_at: string
+        }
+        Insert: {
+          data?: Json | null
+          date: string
+          fetched_at?: string
+          fiscal_year: number
+          period: string
+          reported_currency?: string | null
+          symbol: string
+          updated_at?: string
+        }
+        Update: {
+          data?: Json | null
+          date?: string
+          fetched_at?: string
+          fiscal_year?: number
+          period?: string
+          reported_currency?: string | null
+          symbol?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_revenue_product_segmentation_symbol"
+            columns: ["symbol"]
+            isOneToOne: false
             referencedRelation: "supported_symbols"
             referencedColumns: ["symbol"]
           },

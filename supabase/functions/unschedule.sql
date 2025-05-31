@@ -4,3 +4,6 @@ select cron.unschedule('monthly-fetch-financial-statements');
 select cron.unschedule('hourly-fetch-fmp-profiles');
 SELECT cron.unschedule('daily-fetch-fmp-shares-float');
 SELECT cron.unschedule('daily-fetch-fmp-ratios-ttm');
+SELECT cron.unschedule('quarterly-fetch-fmp-dividend-history');
+SELECT cron.unschedule('yearly-fetch-fmp-revenue-segmentation');
+SELECT cron.unschedule('yearly-fetch-fmp-grades-historical');

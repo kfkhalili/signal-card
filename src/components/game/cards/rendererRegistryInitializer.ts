@@ -7,6 +7,9 @@ import { RevenueCardContainer } from "./revenue-card/RevenueCardContainer";
 import { SolvencyCardContainer } from "./solvency-card/SolvencyCardContainer";
 import { CashUseCardContainer } from "./cash-use-card/CashUseCardContainer";
 import { KeyRatiosCardContainer } from "./key-ratios-card/KeyRatiosCardContainer";
+import { DividendsHistoryCardContainer } from "./dividends-history-card/DividendsHistoryCardContainer";
+import { RevenueBreakdownCardContainer } from "./revenue-breakdown-card/RevenueBreakdownCardContainer";
+import { AnalystGradesCardContainer } from "./analyst-grades-card/AnalystGradesCardContainer";
 
 registerCardRenderer("price", PriceCardContainer);
 registerCardRenderer("profile", ProfileCardContainer);
@@ -14,3 +17,6 @@ registerCardRenderer("revenue", RevenueCardContainer);
 registerCardRenderer("solvency", SolvencyCardContainer);
 registerCardRenderer("cashuse", CashUseCardContainer);
 registerCardRenderer("keyratios", KeyRatiosCardContainer);
+registerCardRenderer("dividendshistory", DividendsHistoryCardContainer);
+registerCardRenderer("revenuebreakdown", RevenueBreakdownCardContainer);
+registerCardRenderer("analystgrades", AnalystGradesCardContainer);

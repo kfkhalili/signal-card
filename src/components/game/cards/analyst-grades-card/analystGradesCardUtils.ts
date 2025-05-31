@@ -1,0 +1,315 @@
+// src/components/game/cards/analyst-grades-card/analystGradesCardUtils.ts
+import type {
+  AnalystGradesCardData,
+  AnalystGradesCardStaticData,
+  AnalystGradesCardLiveData,
+  AnalystRatingDetail,
+  RatingCategory,
+} from "./analyst-grades-card.types";
+import type {
+  DisplayableCard,
+  DisplayableCardState,
+} from "@/components/game/types";
+import type { BaseCardBackData } from "../base-card/base-card.types";
+import {
+  registerCardInitializer,
+  type CardInitializationContext,
+} from "@/components/game/cardInitializer.types";
+import {
+  registerCardUpdateHandler,
+  type CardUpdateHandler,
+} from "@/components/game/cardUpdateHandler.types";
+import type { Database } from "@/lib/supabase/database.types";
+import type { ProfileDBRow } from "@/hooks/useStockData";
+
+type GradesHistoricalDBRow =
+  Database["public"]["Tables"]["grades_historical"]["Row"];
+type ProfileDBRowFromSupabase = Database["public"]["Tables"]["profiles"]["Row"];
+
+const RATING_CATEGORIES_ORDERED: readonly {
+  category: RatingCategory;
+  label: string;
+  colorClass: string;
+}[] = [
+  {
+    category: "strongBuy",
+    label: "Strong Buy",
+    colorClass: "bg-green-500 dark:bg-green-400",
+  },
+  {
+    category: "buy",
+    label: "Buy",
+    colorClass: "bg-green-400 dark:bg-green-300",
+  },
+  {
+    category: "hold",
+    label: "Hold",
+    colorClass: "bg-yellow-400 dark:bg-yellow-300",
+  },
+  { category: "sell", label: "Sell", colorClass: "bg-red-400 dark:bg-red-300" },
+  {
+    category: "strongSell",
+    label: "Strong Sell",
+    colorClass: "bg-red-500 dark:bg-red-400",
+  },
+];
+
+function mapDbRowToRatingCounts(
+  row: GradesHistoricalDBRow | null
+): Record<RatingCategory, number | null> {
+  return {
+    strongBuy: row?.analyst_ratings_strong_buy ?? null,
+    buy: row?.analyst_ratings_buy ?? null,
+    hold: row?.analyst_ratings_hold ?? null,
+    sell: row?.analyst_ratings_sell ?? null,
+    strongSell: row?.analyst_ratings_strong_sell ?? null,
+  };
+}
+
+function calculateTotalAnalysts(
+  counts: Record<RatingCategory, number | null>
+): number {
+  // Get an array of all rating count values, which can be number or null
+  const ratingValues: (number | null)[] = Object.values(counts);
+  return ratingValues.reduce((sum: number, current: number | null): number => {
+    const currentValueAsNumber = current ?? 0; // Ensures current is a number
+    return sum + currentValueAsNumber;
+  }, 0);
+}
+
+function deriveConsensusLabel(
+  distribution: readonly AnalystRatingDetail[],
+  totalAnalysts: number
+): string {
+  if (totalAnalysts === 0) return "N/A";
+
+  let weightedSum = 0;
+  const weights: Record<RatingCategory, number> = {
+    strongBuy: 5,
+    buy: 4,
+    hold: 3,
+    sell: 2,
+    strongSell: 1,
+  };
+
+  distribution.forEach((item) => {
+    weightedSum += (item.currentValue ?? 0) * weights[item.category];
+  });
+
+  const averageScore = totalAnalysts > 0 ? weightedSum / totalAnalysts : 0;
+
+  if (averageScore >= 4.5) return "Strong Buy Consensus";
+  if (averageScore >= 3.5) return "Buy Consensus";
+  if (averageScore >= 2.5) return "Hold Consensus";
+  if (averageScore >= 1.5) return "Sell Consensus";
+  return "Strong Sell Consensus";
+}
+
+async function fetchAnalystGradesData(
+  symbol: string,
+  supabase: CardInitializationContext["supabase"]
+): Promise<{
+  profileInfo: { companyName?: string | null; logoUrl?: string | null };
+  latestGrading: GradesHistoricalDBRow | null;
+  previousGrading: GradesHistoricalDBRow | null;
+}> {
+  const { data: profileData } = await supabase
+    .from("profiles")
+    .select("company_name, image")
+    .eq("symbol", symbol)
+    .maybeSingle();
+
+  const profileInfo = {
+    companyName:
+      (profileData as ProfileDBRowFromSupabase | null)?.company_name ?? symbol,
+    logoUrl: (profileData as ProfileDBRowFromSupabase | null)?.image ?? null,
+  };
+
+  const { data: gradesRows, error: gradesError } = await supabase
+    .from("grades_historical")
+    .select("*")
+    .eq("symbol", symbol)
+    .order("date", { ascending: false })
+    .limit(2);
+
+  if (gradesError) {
+    console.error(
+      `[AnalystGradesCard] Error fetching grades for ${symbol}:`,
+      gradesError.message
+    );
+    throw gradesError;
+  }
+
+  return {
+    profileInfo,
+    latestGrading: gradesRows && gradesRows.length > 0 ? gradesRows[0] : null,
+    previousGrading: gradesRows && gradesRows.length > 1 ? gradesRows[1] : null,
+  };
+}
+
+function formatPeriodDate(dateString: string | null): string {
+  if (!dateString) return "N/A";
+  try {
+    const date = new Date(dateString + "T00:00:00Z"); // Assume UTC date if no time
+    return date.toLocaleDateString(undefined, {
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+  } catch {
+    return dateString; // Fallback
+  }
+}
+
+function constructAnalystGradesCardData(
+  symbol: string,
+  profileInfo: { companyName?: string | null; logoUrl?: string | null },
+  latestGrading: GradesHistoricalDBRow | null,
+  previousGrading: GradesHistoricalDBRow | null,
+  idOverride?: string | null,
+  existingCreatedAt?: number | null
+): AnalystGradesCardData | null {
+  if (!latestGrading) return null;
+
+  const currentCounts = mapDbRowToRatingCounts(latestGrading);
+  const previousCounts = mapDbRowToRatingCounts(previousGrading);
+
+  const ratingsDistribution: AnalystRatingDetail[] =
+    RATING_CATEGORIES_ORDERED.map(({ category, label, colorClass }) => {
+      const currentValue = currentCounts[category] ?? 0;
+      const previousValue = previousCounts[category] ?? null; // Keep null if prev month no data for this category
+      let change: number | null = null;
+      if (previousValue !== null) {
+        change = currentValue - previousValue;
+      }
+      return {
+        category,
+        label,
+        currentValue,
+        previousValue,
+        change,
+        colorClass,
+      };
+    });
+
+  const totalAnalystsCurrent = calculateTotalAnalysts(currentCounts);
+  const totalAnalystsPrevious = previousGrading
+    ? calculateTotalAnalysts(previousCounts)
+    : null;
+  const consensusLabelCurrent = deriveConsensusLabel(
+    ratingsDistribution,
+    totalAnalystsCurrent
+  );
+
+  const staticData: AnalystGradesCardStaticData = {
+    currentPeriodDate: formatPeriodDate(latestGrading.date),
+    previousPeriodDate: previousGrading
+      ? formatPeriodDate(previousGrading.date)
+      : null,
+  };
+
+  const liveData: AnalystGradesCardLiveData = {
+    ratingsDistribution,
+    totalAnalystsCurrent,
+    totalAnalystsPrevious,
+    consensusLabelCurrent,
+    lastUpdated: latestGrading.updated_at,
+  };
+
+  const cardBackData: BaseCardBackData = {
+    description: `Analyst rating distribution for ${
+      profileInfo.companyName || symbol
+    } as of ${
+      staticData.currentPeriodDate
+    }, with changes from the previous period.`,
+  };
+
+  return {
+    id: idOverride || `analystgrades-${symbol}-${Date.now()}`,
+    type: "analystgrades",
+    symbol,
+    companyName: profileInfo.companyName ?? symbol,
+    logoUrl: profileInfo.logoUrl ?? null,
+    createdAt: existingCreatedAt ?? Date.now(),
+    staticData,
+    liveData,
+    backData: cardBackData,
+    websiteUrl: null,
+  };
+}
+
+async function initializeAnalystGradesCard({
+  symbol,
+  supabase,
+  toast,
+}: CardInitializationContext): Promise<DisplayableCard | null> {
+  try {
+    const { profileInfo, latestGrading, previousGrading } =
+      await fetchAnalystGradesData(symbol, supabase);
+
+    if (!latestGrading) {
+      if (toast) {
+        toast({
+          title: "No Analyst Grades Data",
+          description: `No analyst grades found for ${symbol}.`,
+        });
+      }
+      return null;
+    }
+
+    const concreteCardData = constructAnalystGradesCardData(
+      symbol,
+      profileInfo,
+      latestGrading,
+      previousGrading
+    );
+
+    if (!concreteCardData) return null;
+
+    const cardState: Pick<DisplayableCardState, "isFlipped"> = {
+      isFlipped: false,
+    };
+    return { ...concreteCardData, ...cardState };
+  } catch (error: unknown) {
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred.";
+    if (toast) {
+      toast({
+        title: "Error Initializing Analyst Grades",
+        description: `Could not fetch data for ${symbol}: ${errorMessage}`,
+        variant: "destructive",
+      });
+    }
+    return null;
+  }
+}
+registerCardInitializer("analystgrades", initializeAnalystGradesCard);
+
+const handleAnalystGradesProfileUpdate: CardUpdateHandler<
+  AnalystGradesCardData,
+  ProfileDBRow
+> = (currentCardData, profilePayload): AnalystGradesCardData => {
+  const newCompanyName = profilePayload.company_name ?? currentCardData.symbol;
+  const newLogoUrl = profilePayload.image ?? null;
+
+  if (
+    currentCardData.companyName !== newCompanyName ||
+    currentCardData.logoUrl !== newLogoUrl
+  ) {
+    const newBackData: BaseCardBackData = {
+      description: `Analyst rating distribution for ${newCompanyName} as of ${currentCardData.staticData.currentPeriodDate}, with changes from the previous period.`,
+    };
+    return {
+      ...currentCardData,
+      companyName: newCompanyName,
+      logoUrl: newLogoUrl,
+      backData: newBackData,
+    };
+  }
+  return currentCardData;
+};
+registerCardUpdateHandler(
+  "analystgrades",
+  "STATIC_PROFILE_UPDATE",
+  handleAnalystGradesProfileUpdate
+);
