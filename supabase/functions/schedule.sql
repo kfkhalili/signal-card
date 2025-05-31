@@ -96,3 +96,20 @@ SELECT
       ) AS request_id;
     $$
   );
+
+  SELECT
+  cron.schedule(
+    'quarterly-fetch-fmp-dividend-history',
+    '0 0 1 1,4,7,10 *', -- At 00:00 on day-of-month 1 in January, April, July, and October.
+    $$
+    SELECT
+      net.http_post(
+          url := current_setting('supabase.functions.url') || '/fetch-fmp-dividend-history',
+          headers := jsonb_build_object(
+            'Content-Type', 'application/json',
+            'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'supabase_service_role_key')
+          ),
+          body := '{}'::jsonb -- Empty body, or pass parameters if needed
+      ) AS request_id;
+    $$
+  );
