@@ -5,3 +5,4 @@ import "./revenue-card/revenueCardRehydrator";
 import "./solvency-card/solvencyCardRehydrator";
 import "./cash-use-card/cashUseCardRehydrator";
 import "./key-ratios-card/keyRatiosCardRehydrator";
+import "./dividends-history-card/dividendsHistoryCardRehydrator";

@@ -5,6 +5,7 @@ import type { RevenueCardData } from "@/components/game/cards/revenue-card/reven
 import type { SolvencyCardData } from "./cards/solvency-card/solvency-card.types";
 import type { CashUseCardData } from "./cards/cash-use-card/cash-use-card.types";
 import type { KeyRatiosCardData } from "./cards/key-ratios-card/key-ratios-card.types";
+import type { DividendsHistoryCardData } from "./cards/dividends-history-card/dividends-history-card.types";
 
 export type ConcreteCardData =
   | PriceCardData
@@ -12,7 +13,8 @@ export type ConcreteCardData =
   | RevenueCardData
   | SolvencyCardData
   | CashUseCardData
-  | KeyRatiosCardData;
+  | KeyRatiosCardData
+  | DividendsHistoryCardData;
 
 export interface DisplayableCardState {
   isFlipped: boolean;

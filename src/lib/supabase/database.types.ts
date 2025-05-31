@@ -9,6 +9,56 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      dividend_history: {
+        Row: {
+          adj_dividend: number | null
+          date: string
+          declaration_date: string | null
+          dividend: number | null
+          fetched_at: string
+          frequency: string | null
+          payment_date: string | null
+          record_date: string | null
+          symbol: string
+          updated_at: string
+          yield: number | null
+        }
+        Insert: {
+          adj_dividend?: number | null
+          date: string
+          declaration_date?: string | null
+          dividend?: number | null
+          fetched_at?: string
+          frequency?: string | null
+          payment_date?: string | null
+          record_date?: string | null
+          symbol: string
+          updated_at?: string
+          yield?: number | null
+        }
+        Update: {
+          adj_dividend?: number | null
+          date?: string
+          declaration_date?: string | null
+          dividend?: number | null
+          fetched_at?: string
+          frequency?: string | null
+          payment_date?: string | null
+          record_date?: string | null
+          symbol?: string
+          updated_at?: string
+          yield?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_dividend_history_symbol"
+            columns: ["symbol"]
+            isOneToOne: false
+            referencedRelation: "supported_symbols"
+            referencedColumns: ["symbol"]
+          },
+        ]
+      }
       exchange_market_status: {
         Row: {
           closing_time_local: string | null
