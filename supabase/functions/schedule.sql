@@ -113,3 +113,20 @@ SELECT
       ) AS request_id;
     $$
   );
+
+SELECT
+  cron.schedule(
+    'yearly-fetch-fmp-revenue-segmentation',
+    '0 1 1 1 *', -- At 01:00 AM on day-of-month 1 in January.
+    $$
+    SELECT
+      net.http_post(
+          url := current_setting('supabase.functions.url') || '/fetch-fmp-revenue-segmentation',
+          headers := jsonb_build_object(
+            'Content-Type', 'application/json',
+            'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'supabase_service_role_key')
+          ),
+          body := '{}'::jsonb
+      ) AS request_id;
+    $$
+  );
