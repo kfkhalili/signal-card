@@ -546,6 +546,47 @@ export type Database = {
           },
         ]
       }
+      revenue_product_segmentation: {
+        Row: {
+          data: Json | null
+          date: string
+          fetched_at: string
+          fiscal_year: number
+          period: string
+          reported_currency: string | null
+          symbol: string
+          updated_at: string
+        }
+        Insert: {
+          data?: Json | null
+          date: string
+          fetched_at?: string
+          fiscal_year: number
+          period: string
+          reported_currency?: string | null
+          symbol: string
+          updated_at?: string
+        }
+        Update: {
+          data?: Json | null
+          date?: string
+          fetched_at?: string
+          fiscal_year?: number
+          period?: string
+          reported_currency?: string | null
+          symbol?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_revenue_product_segmentation_symbol"
+            columns: ["symbol"]
+            isOneToOne: false
+            referencedRelation: "supported_symbols"
+            referencedColumns: ["symbol"]
+          },
+        ]
+      }
       shares_float: {
         Row: {
           date: string

@@ -7,7 +7,8 @@ export type CardType =
   | "solvency"
   | "cashuse"
   | "keyratios"
-  | "dividendshistory"; // Add new card types here
+  | "dividendshistory"
+  | "revenuebreakdown"; // Add new card types here
 
 export interface BaseCardBackData {
   readonly description?: string;
