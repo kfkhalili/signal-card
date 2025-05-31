@@ -6,8 +6,6 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { SolvencyCardData } from "./solvency-card.types";
-import { cn } from "@/lib/utils";
-import { formatNumberWithAbbreviations } from "@/lib/formatters";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
 import type {
   OnGenericInteraction,
@@ -15,99 +13,7 @@ import type {
   RequestNewCardInteraction,
   TriggerCardActionInteraction,
 } from "../base-card/base-card.types";
-
-interface DataRowProps {
-  label: string;
-  value: string | number | null | undefined;
-  currency?: string | null;
-  isMonetary?: boolean;
-  className?: string;
-  labelClassName?: string;
-  valueClassName?: string;
-  "data-testid"?: string;
-  title?: string;
-  onClick?: () => void;
-  isInteractive?: boolean;
-  tooltip?: string; // Added for tooltip
-}
-
-const DataRow: React.FC<DataRowProps> = ({
-  label,
-  value,
-  currency,
-  isMonetary = true,
-  className,
-  labelClassName,
-  valueClassName,
-  "data-testid": dataTestId,
-  title,
-  onClick,
-  isInteractive,
-  tooltip,
-}) => {
-  const displayCurrencySymbol = currency === "USD" ? "$" : currency || "$";
-
-  const formattedValue =
-    value === null || value === undefined || Number.isNaN(value)
-      ? "N/A"
-      : isMonetary
-      ? `${displayCurrencySymbol}${formatNumberWithAbbreviations(
-          value as number,
-          2
-        )}`
-      : typeof value === "string"
-      ? value
-      : formatNumberWithAbbreviations(value as number, 2);
-
-  const effectiveTitle = tooltip
-    ? `${label}: ${value ?? "N/A"} (${tooltip})`
-    : title || `${label}: ${value ?? "N/A"}`;
-
-  return (
-    <div
-      className={cn(
-        "flex justify-between items-baseline py-0.5 group/datarow",
-        isInteractive && onClick ? "cursor-pointer rounded px-1 -mx-1" : "",
-        className
-      )}
-      data-testid={dataTestId}
-      title={effectiveTitle}
-      onClick={isInteractive && onClick ? onClick : undefined}
-      onKeyDown={
-        isInteractive && onClick
-          ? (e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onClick();
-              }
-            }
-          : undefined
-      }
-      role={isInteractive && onClick ? "button" : undefined}
-      tabIndex={isInteractive && onClick ? 0 : undefined}>
-      <span
-        className={cn(
-          "text-muted-foreground mr-2",
-          isInteractive && onClick
-            ? "group-hover/datarow:text-primary transition-colors"
-            : "",
-          labelClassName
-        )}>
-        {label}
-      </span>
-      <span
-        className={cn(
-          "font-semibold text-foreground text-right",
-          isInteractive && onClick
-            ? "group-hover/datarow:text-primary transition-colors"
-            : "",
-          valueClassName
-        )}>
-        {formattedValue}
-      </span>
-    </div>
-  );
-};
+import { DataRow } from "@/components/ui/DataRow";
 
 interface SolvencyCardContentProps {
   cardData: SolvencyCardData;
