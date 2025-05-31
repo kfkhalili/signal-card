@@ -140,9 +140,10 @@ const mockLatestDividend: LatestDividendInfo = {
 };
 
 const mockAnnualTotals: AnnualDividendTotal[] = [
-  { year: 2023, totalDividend: 2.79 },
-  { year: 2022, totalDividend: 2.48 },
-  { year: 2021, totalDividend: 2.24 },
+  { year: 2025, totalDividend: 3.0, isEstimate: true }, // Future projection
+  { year: 2024, totalDividend: 2.79 },
+  { year: 2023, totalDividend: 2.48 },
+  { year: 2022, totalDividend: 2.24 },
 ];
 
 const mockStaticData: DividendsHistoryCardStaticData = {
@@ -152,7 +153,7 @@ const mockStaticData: DividendsHistoryCardStaticData = {
 
 const mockLiveData: DividendsHistoryCardLiveData = {
   latestDividend: mockLatestDividend,
-  annualTotalsLast3Years: mockAnnualTotals,
+  annualDividendFigures: mockAnnualTotals,
   lastFullYearDividendGrowthYoY: (2.79 - 2.48) / 2.48, // Approx 0.125
   lastUpdated: new Date().toISOString(),
 };
@@ -232,7 +233,7 @@ export const MinimalData: Story = {
       },
       liveData: {
         latestDividend: null,
-        annualTotalsLast3Years: [
+        annualDividendFigures: [
           { year: 2023, totalDividend: 0 },
           { year: 2022, totalDividend: 0 },
           { year: 2021, totalDividend: 0 },

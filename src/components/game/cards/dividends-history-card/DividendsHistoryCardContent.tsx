@@ -27,7 +27,7 @@ interface DataRowProps {
   onClick?: () => void;
   isInteractive?: boolean;
   precision?: number;
-  isValueAsPercentage?: boolean; // New prop
+  isValueAsPercentage?: boolean;
 }
 
 const DataRow: React.FC<DataRowProps> = ({
@@ -42,7 +42,7 @@ const DataRow: React.FC<DataRowProps> = ({
   onClick,
   isInteractive,
   precision = 2,
-  isValueAsPercentage = false, // Default to false
+  isValueAsPercentage = false,
 }) => {
   const displayCurrencySymbol =
     currency === "USD" ? "$" : currency || (isMonetary ? "$" : "");
@@ -57,13 +57,10 @@ const DataRow: React.FC<DataRowProps> = ({
         precision
       )}`;
     } else if (isValueAsPercentage) {
-      // If value is already a direct percentage
       formattedValue = `${value.toFixed(precision)}%`;
     } else if (label.toLowerCase().includes("growth")) {
-      // Growth rates are usually decimals needing *100
       formattedValue = `${(value * 100).toFixed(precision)}%`;
     } else {
-      // For other numbers that are not monetary and not specific percentages
       formattedValue = value.toFixed(precision);
     }
   } else {
@@ -120,6 +117,7 @@ interface HistogramBarProps {
   totalDividend: number;
   maxValue: number;
   currency: string | null;
+  isEstimate?: boolean;
 }
 
 const HistogramBar: React.FC<HistogramBarProps> = ({
@@ -127,28 +125,37 @@ const HistogramBar: React.FC<HistogramBarProps> = ({
   totalDividend,
   maxValue,
   currency,
+  isEstimate = false,
 }) => {
   const barHeightPercentage =
     maxValue > 0 ? (totalDividend / maxValue) * 100 : 0;
   const displayCurrencySymbol = currency === "USD" ? "$" : currency || "$";
+  const barColor = isEstimate ? "bg-primary/50" : "bg-primary";
 
   return (
     <div
-      className="flex flex-col items-center w-1/3 px-1"
-      title={`Year: ${year}\nTotal: ${displayCurrencySymbol}${totalDividend.toFixed(
-        2
-      )}`}>
+      className="flex flex-col items-center w-1/4 px-1"
+      title={`Year: ${year}${
+        isEstimate ? " (Est.)" : ""
+      }\nTotal: ${displayCurrencySymbol}${totalDividend.toFixed(2)}`}>
       <span className="text-[10px] font-semibold text-foreground">
         {displayCurrencySymbol}
         {formatNumberWithAbbreviations(totalDividend, 2)}
       </span>
-      <div className="w-full h-24 bg-muted rounded flex items-end">
+      <div
+        className={cn(
+          "w-full h-24 bg-muted rounded flex items-end",
+          isEstimate ? "border-2 border-primary/50 border-dashed" : ""
+        )}>
         <div
-          className="w-full bg-primary rounded-t"
+          className={cn("w-full rounded-t", barColor)}
           style={{ height: `${barHeightPercentage}%` }}
         />
       </div>
-      <span className="text-xs mt-1 text-muted-foreground">{year}</span>
+      <span className="text-xs mt-1 text-muted-foreground">
+        {year}
+        {isEstimate ? <span className="text-[9px]"> (Est.)</span> : ""}
+      </span>
     </div>
   );
 };
@@ -189,14 +196,13 @@ export const DividendsHistoryCardContent: React.FC<DividendsHistoryCardContentPr
       onGenericInteraction(payload);
     };
 
-    const {
-      latestDividend,
-      annualTotalsLast3Years,
-      lastFullYearDividendGrowthYoY,
-    } = liveData;
+    // Ensure liveData and its properties are correctly accessed with defaults
+    const latestDividend = liveData?.latestDividend || null;
+    const annualDividendFigures = liveData?.annualDividendFigures || []; // Default to empty array
+    const lastFullYearDividendGrowthYoY =
+      liveData?.lastFullYearDividendGrowthYoY || null;
 
     if (isBackFace) {
-      // Content previously on the front face, now on the back (Latest Dividend Details)
       return (
         <div
           data-testid={`dividendshistory-card-back-${symbol}`}
@@ -254,14 +260,14 @@ export const DividendsHistoryCardContent: React.FC<DividendsHistoryCardContentPr
             <DataRow
               label="Yield (at dist.)"
               value={latestDividend?.yieldAtDistribution}
-              isValueAsPercentage={true} // Correctly handle pre-formatted percentage
+              isValueAsPercentage={true}
               labelClassName="text-xs sm:text-sm"
               valueClassName="text-xs sm:text-sm"
               title={
                 latestDividend && latestDividend.yieldAtDistribution !== null
                   ? `Yield at distribution: ${latestDividend.yieldAtDistribution.toFixed(
                       2
-                    )}%` // No *100
+                    )}%`
                   : "Yield at distribution: N/A"
               }
             />
@@ -284,12 +290,14 @@ export const DividendsHistoryCardContent: React.FC<DividendsHistoryCardContentPr
         </div>
       );
     } else {
-      // Front Face (Content previously on the back, now on the front - Histogram & Growth)
+      // Front Face: Histogram & Growth YoY
+      const safeAnnualDividendFigures = Array.isArray(annualDividendFigures)
+        ? annualDividendFigures
+        : [];
       const maxAnnualTotal = Math.max(
-        ...annualTotalsLast3Years.map((at) => at.totalDividend),
+        ...safeAnnualDividendFigures.map((at) => at.totalDividend),
         0
       );
-      const displayableAnnualTotals = annualTotalsLast3Years.slice().reverse();
 
       return (
         <div
@@ -315,24 +323,33 @@ export const DividendsHistoryCardContent: React.FC<DividendsHistoryCardContentPr
               </ClickableDataItem>
             </div>
 
-            {displayableAnnualTotals && displayableAnnualTotals.length > 0 && (
-              <div className="flex justify-around items-end h-32 sm:h-36 my-1 px-0.5">
-                {displayableAnnualTotals.map((item) => (
-                  <HistogramBar
-                    key={item.year}
-                    year={item.year}
-                    totalDividend={item.totalDividend}
-                    maxValue={maxAnnualTotal}
-                    currency={currency}
-                  />
-                ))}
-              </div>
+            {safeAnnualDividendFigures.length > 0 ? (
+              <>
+                <h4 className="text-xs font-semibold text-center text-muted-foreground mb-1 mt-1">
+                  Annual Dividends Paid
+                </h4>
+                <div className="flex justify-around items-end h-32 sm:h-36 my-1 px-0.5">
+                  {safeAnnualDividendFigures.map((item) => (
+                    <HistogramBar
+                      key={item.year}
+                      year={item.year}
+                      totalDividend={item.totalDividend}
+                      maxValue={maxAnnualTotal}
+                      currency={currency}
+                      isEstimate={item.isEstimate}
+                    />
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground text-center py-4">
+                No annual dividend data to display.
+              </p>
             )}
-            <br />
             <div className="mt-2">
               <DataRow
-                label="Growth (YoY)" // Growth rates are typically decimals, so they DO need *100
-                value={lastFullYearDividendGrowthYoY} // This is correctly handled by the label.toLowerCase().includes("growth") in DataRow
+                label="Growth (YoY)"
+                value={lastFullYearDividendGrowthYoY}
                 labelClassName="text-xs sm:text-sm"
                 valueClassName="text-xs sm:text-sm font-semibold"
                 title={

@@ -52,11 +52,11 @@ function getTypicalFrequency(
   return mostCommonFrequency;
 }
 
-function calculateAnnualTotals(
+function calculatePastAnnualTotals( // Renamed for clarity
   historicalRecords: readonly Pick<DividendHistoryDBRow, "date" | "dividend">[],
   currentYear: number
 ): {
-  annualTotals: readonly AnnualDividendTotal[];
+  pastTotals: readonly AnnualDividendTotal[];
   growthYoY: number | null;
 } {
   const yearlyData: Record<number, number> = {};
@@ -67,19 +67,17 @@ function calculateAnnualTotals(
     }
   });
 
-  const annualTotals: AnnualDividendTotal[] = [];
+  const pastTotals: AnnualDividendTotal[] = [];
   for (let i = 0; i < 3; i++) {
     const targetYear = currentYear - 1 - i;
-    if (yearlyData[targetYear] !== undefined) {
-      annualTotals.push({
-        year: targetYear,
-        totalDividend: yearlyData[targetYear],
-      });
-    } else {
-      annualTotals.push({ year: targetYear, totalDividend: 0 });
-    }
+    pastTotals.push({
+      year: targetYear,
+      totalDividend: yearlyData[targetYear] ?? 0, // Default to 0 if no data
+      isEstimate: false,
+    });
   }
-  annualTotals.sort((a, b) => b.year - a.year);
+  // These are already effectively sorted with newest past year first if loop is as is,
+  // but we will sort the final combined array later.
 
   let growthYoY: number | null = null;
   const lastFullYear = currentYear - 1;
@@ -96,7 +94,36 @@ function calculateAnnualTotals(
     growthYoY = (lastFullYearTotal - prevFullYearTotal) / prevFullYearTotal;
   }
 
-  return { annualTotals, growthYoY };
+  return { pastTotals, growthYoY };
+}
+
+function calculateNextYearEstimate(
+  latestDividend: LatestDividendInfo | null
+): number | null {
+  if (
+    !latestDividend ||
+    latestDividend.amount === null ||
+    !latestDividend.frequency
+  ) {
+    return null;
+  }
+  const amount = latestDividend.amount;
+  switch (latestDividend.frequency.toLowerCase()) {
+    case "quarterly":
+      return amount * 4;
+    case "annually":
+    case "annual": // FMP might use 'Annual'
+      return amount * 1;
+    case "semi-annually":
+    case "semi-annual": // FMP might use 'Semi-Annual'
+      return amount * 2;
+    case "monthly":
+      return amount * 12;
+    default:
+      // If frequency is unknown or irregular, cannot reliably estimate annual from single payment.
+      // Could try to sum last 4 quarters if available, but that's more complex from just 'latestDividend'
+      return null;
+  }
 }
 
 async function fetchAndProcessDividendsData(
@@ -154,7 +181,7 @@ async function fetchAndProcessDividendsData(
     .from("dividend_history")
     .select("*")
     .eq("symbol", symbol)
-    .gte("date", startDate)
+    .gte("date", startDate) // Fetch enough data for 3 past full years
     .order("date", { ascending: false });
 
   if (histDivError) {
@@ -183,10 +210,10 @@ function constructDividendsHistoryCardData(
   idOverride?: string | null,
   existingCreatedAt?: number | null
 ): DividendsHistoryCardData {
-  const currentYear = new Date().getUTCFullYear();
-  const { annualTotals, growthYoY } = calculateAnnualTotals(
+  const currentUtcYear = new Date().getUTCFullYear();
+  const { pastTotals, growthYoY } = calculatePastAnnualTotals(
     historicalRows,
-    currentYear
+    currentUtcYear
   );
 
   const latestDividendInfo: LatestDividendInfo | null = latestDividendRow
@@ -201,6 +228,21 @@ function constructDividendsHistoryCardData(
       }
     : null;
 
+  const nextYearEstimateValue = calculateNextYearEstimate(latestDividendInfo);
+  const annualDividendFigures: AnnualDividendTotal[] = [
+    ...pastTotals.map((pt) => ({ ...pt, isEstimate: false })),
+  ];
+
+  if (nextYearEstimateValue !== null) {
+    annualDividendFigures.push({
+      year: currentUtcYear + 1, // Estimate for the next calendar year
+      totalDividend: nextYearEstimateValue,
+      isEstimate: true,
+    });
+  }
+  // Sort by year ascending for consistent display order (oldest to newest)
+  annualDividendFigures.sort((a, b) => a.year - b.year);
+
   const staticData: DividendsHistoryCardStaticData = {
     reportedCurrency: profileInfo.reportedCurrency,
     typicalFrequency: getTypicalFrequency(
@@ -211,7 +253,7 @@ function constructDividendsHistoryCardData(
 
   const liveData: DividendsHistoryCardLiveData = {
     latestDividend: latestDividendInfo,
-    annualTotalsLast3Years: annualTotals,
+    annualDividendFigures: annualDividendFigures,
     lastFullYearDividendGrowthYoY: growthYoY,
     lastUpdated:
       latestDividendRow?.fetched_at || latestDividendRow?.updated_at || null,
@@ -220,7 +262,7 @@ function constructDividendsHistoryCardData(
   const cardBackData: BaseCardBackData = {
     description: `Historical dividend payments and trends for ${
       profileInfo.companyName || symbol
-    }, including recent payments and annual totals.`,
+    }, including recent payments and annual totals. Next year estimate based on latest payment.`,
   };
 
   return {
@@ -286,23 +328,111 @@ async function initializeDividendsHistoryCard({
 }
 registerCardInitializer("dividendshistory", initializeDividendsHistoryCard);
 
-// To make this handler functional, you'll need to:
-// 1. Define a new CardUpdateEventType, e.g., 'DIVIDEND_ROW_UPDATE'.
-//    In `src/components/game/cardUpdateHandler.types.ts`:
-//    export type CardUpdateEventType = ... | "DIVIDEND_ROW_UPDATE";
-// 2. Ensure your real-time subscription system (likely in `useStockData.ts` or `useWorkspaceManager.ts`)
-//    listens for changes to the `dividend_history` table and, when a change occurs for a relevant symbol,
-//    dispatches an event with this `CardUpdateEventType` and the `DividendHistoryDBRow` as payload.
-//    This dispatched event will then be caught by `useWorkspaceManager` which calls this handler.
-//
-// Example of registration (replace 'DIVIDEND_ROW_UPDATE' if you use a different event type name):
-/*
+const handleSingleDividendRowUpdate: CardUpdateHandler<
+  DividendsHistoryCardData,
+  DividendHistoryDBRow
+> = (
+  currentCardData,
+  newDividendRow,
+  _currentDisplayableCard,
+  context
+): DividendsHistoryCardData => {
+  const updatedLiveData = { ...currentCardData.liveData };
+  let hasChanged = false;
+  const currentUtcYear = new Date().getUTCFullYear();
+
+  const newIsLaterOrSameDateButNewerTimestamp =
+    new Date(newDividendRow.date) >
+      new Date(updatedLiveData.latestDividend?.exDividendDate || 0) ||
+    (new Date(newDividendRow.date).getTime() ===
+      new Date(updatedLiveData.latestDividend?.exDividendDate || 0).getTime() &&
+      new Date(newDividendRow.updated_at || newDividendRow.fetched_at) >
+        new Date(updatedLiveData.lastUpdated || 0));
+
+  if (newIsLaterOrSameDateButNewerTimestamp) {
+    const newLatestDividendInfo: LatestDividendInfo = {
+      amount: newDividendRow.dividend,
+      adjAmount: newDividendRow.adj_dividend,
+      exDividendDate: newDividendRow.date,
+      paymentDate: newDividendRow.payment_date,
+      declarationDate: newDividendRow.declaration_date,
+      yieldAtDistribution: newDividendRow.yield,
+      frequency: newDividendRow.frequency,
+    };
+    updatedLiveData.latestDividend = newLatestDividendInfo;
+    updatedLiveData.lastUpdated =
+      newDividendRow.updated_at ||
+      newDividendRow.fetched_at ||
+      new Date().toISOString();
+    hasChanged = true;
+
+    // Recalculate next year estimate based on the new latest dividend
+    const nextYearEstimateValue = calculateNextYearEstimate(
+      newLatestDividendInfo
+    );
+    const currentAnnualFigures = [...updatedLiveData.annualDividendFigures];
+    const estimateIndex = currentAnnualFigures.findIndex(
+      (item) => item.isEstimate
+    );
+
+    if (nextYearEstimateValue !== null) {
+      const estimateEntry: AnnualDividendTotal = {
+        year: currentUtcYear + 1,
+        totalDividend: nextYearEstimateValue,
+        isEstimate: true,
+      };
+      if (estimateIndex !== -1) {
+        // Update existing estimate if year matches, or if only one estimate exists
+        if (currentAnnualFigures[estimateIndex].year === currentUtcYear + 1) {
+          currentAnnualFigures[estimateIndex] = estimateEntry;
+        } else {
+          // year changed, replace
+          currentAnnualFigures.splice(estimateIndex, 1, estimateEntry);
+        }
+      } else {
+        currentAnnualFigures.push(estimateEntry);
+      }
+    } else if (estimateIndex !== -1) {
+      // Remove estimate if it can no longer be calculated
+      currentAnnualFigures.splice(estimateIndex, 1);
+    }
+    currentAnnualFigures.sort((a, b) => a.year - b.year);
+    updatedLiveData.annualDividendFigures = currentAnnualFigures;
+  }
+
+  const updatedStaticData = { ...currentCardData.staticData };
+  if (
+    newIsLaterOrSameDateButNewerTimestamp &&
+    newDividendRow.frequency &&
+    currentCardData.staticData.typicalFrequency !== newDividendRow.frequency
+  ) {
+    updatedStaticData.typicalFrequency = newDividendRow.frequency;
+  }
+
+  if (hasChanged) {
+    if (context.toast) {
+      context.toast({
+        title: "Dividend Info Updated",
+        description: `Latest dividend for ${currentCardData.symbol} processed for ${newDividendRow.date}. Next year estimate may have updated.`,
+      });
+    }
+    return {
+      ...currentCardData,
+      liveData: updatedLiveData,
+      staticData: updatedStaticData,
+    };
+  }
+
+  return currentCardData;
+};
+
+// Register with a specific event type for dividend row updates
+// Ensure this event type is defined in CardUpdateEventType and dispatched correctly
 registerCardUpdateHandler(
   "dividendshistory",
-  "DIVIDEND_ROW_UPDATE", // This should be your actual event type
+  "DIVIDEND_ROW_UPDATE", // Example: Replace with your actual specific event type
   handleSingleDividendRowUpdate
 );
-*/
 
 const handleDividendsHistoryProfileUpdate: CardUpdateHandler<
   DividendsHistoryCardData,
@@ -329,7 +459,7 @@ const handleDividendsHistoryProfileUpdate: CardUpdateHandler<
         reportedCurrency: newReportedCurrency,
       },
       backData: {
-        description: `Historical dividend payments and trends for ${newCompanyName}, including recent payments and annual totals.`,
+        description: `Historical dividend payments and trends for ${newCompanyName}, including recent payments and annual totals. Next year estimate based on latest payment.`,
       },
     };
   }

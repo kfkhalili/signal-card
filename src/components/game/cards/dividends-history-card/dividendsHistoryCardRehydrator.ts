@@ -24,9 +24,11 @@ interface StoredLatestDividendInfoShape {
   frequency?: string | null;
 }
 
+// Updated to include isEstimate
 interface StoredAnnualDividendTotalShape {
   year?: number;
   totalDividend?: number;
+  isEstimate?: boolean; // Added
 }
 
 interface StoredDividendsHistoryStaticDataShape {
@@ -36,9 +38,9 @@ interface StoredDividendsHistoryStaticDataShape {
 
 interface StoredDividendsHistoryLiveDataShape {
   latestDividend?: StoredLatestDividendInfoShape | null;
-  annualTotalsLast3Years?: readonly StoredAnnualDividendTotalShape[];
+  annualDividendFigures?: readonly StoredAnnualDividendTotalShape[];
   lastFullYearDividendGrowthYoY?: number | null;
-  lastUpdated?: string | number | null; // Can be string or number from storage
+  lastUpdated?: string | number | null;
 }
 
 interface StoredBaseCardBackDataShape {
@@ -81,20 +83,23 @@ const rehydrateDividendsHistoryCardInstance: SpecificCardRehydrator = (
     };
   }
 
-  const rehydratedAnnualTotals: AnnualDividendTotal[] = (
-    liveDataSource.annualTotalsLast3Years || []
-  )
-    .map((item) => ({
-      year: item.year ?? 0,
-      totalDividend: item.totalDividend ?? 0,
-    }))
-    .filter((item) => item.year !== 0); // Filter out invalid entries
+  // Use the correct property name 'annualDividendFigures'
+  // Ensure it defaults to an empty array if not present in liveDataSource
+  const figuresFromStorage = liveDataSource.annualDividendFigures || [];
+  const rehydratedAnnualDividendFigures: AnnualDividendTotal[] =
+    figuresFromStorage
+      .map((item) => ({
+        year: item.year ?? 0, // Default year to 0 if undefined
+        totalDividend: item.totalDividend ?? 0, // Default dividend to 0 if undefined
+        isEstimate: item.isEstimate ?? false, // Default isEstimate to false
+      }))
+      .filter((item) => item.year !== 0); // Filter out entries with a year of 0 (likely invalid)
 
   const lastUpdatedTimestamp = parseTimestampSafe(liveDataSource.lastUpdated);
 
   const rehydratedLiveData: DividendsHistoryCardLiveData = {
     latestDividend: rehydratedLatestDividend,
-    annualTotalsLast3Years: rehydratedAnnualTotals,
+    annualDividendFigures: rehydratedAnnualDividendFigures, // Correctly assigned
     lastFullYearDividendGrowthYoY:
       liveDataSource.lastFullYearDividendGrowthYoY ?? null,
     lastUpdated: lastUpdatedTimestamp
