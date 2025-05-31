@@ -130,3 +130,20 @@ SELECT
       ) AS request_id;
     $$
   );
+
+  SELECT
+  cron.schedule(
+    'monthly-fetch-fmp-grades-historical',
+    '0 0 2 * *', -- At 00:00 on day-of-month 2.
+    $$
+    SELECT
+      net.http_post(
+          url := current_setting('supabase.functions.url') || '/fetch-fmp-grades-historical',
+          headers := jsonb_build_object(
+            'Content-Type', 'application/json',
+            'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'supabase_service_role_key')
+          ),
+          body := '{}'::jsonb
+      ) AS request_id;
+    $$
+  );
