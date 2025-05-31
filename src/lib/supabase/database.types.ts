@@ -157,6 +157,50 @@ export type Database = {
           },
         ]
       }
+      grades_historical: {
+        Row: {
+          analyst_ratings_buy: number | null
+          analyst_ratings_hold: number | null
+          analyst_ratings_sell: number | null
+          analyst_ratings_strong_buy: number | null
+          analyst_ratings_strong_sell: number | null
+          date: string
+          fetched_at: string
+          symbol: string
+          updated_at: string
+        }
+        Insert: {
+          analyst_ratings_buy?: number | null
+          analyst_ratings_hold?: number | null
+          analyst_ratings_sell?: number | null
+          analyst_ratings_strong_buy?: number | null
+          analyst_ratings_strong_sell?: number | null
+          date: string
+          fetched_at?: string
+          symbol: string
+          updated_at?: string
+        }
+        Update: {
+          analyst_ratings_buy?: number | null
+          analyst_ratings_hold?: number | null
+          analyst_ratings_sell?: number | null
+          analyst_ratings_strong_buy?: number | null
+          analyst_ratings_strong_sell?: number | null
+          date?: string
+          fetched_at?: string
+          symbol?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_grades_historical_symbol"
+            columns: ["symbol"]
+            isOneToOne: false
+            referencedRelation: "supported_symbols"
+            referencedColumns: ["symbol"]
+          },
+        ]
+      }
       live_quote_indicators: {
         Row: {
           api_timestamp: number

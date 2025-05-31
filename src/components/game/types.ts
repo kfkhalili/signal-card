@@ -7,6 +7,7 @@ import type { CashUseCardData } from "./cards/cash-use-card/cash-use-card.types"
 import type { KeyRatiosCardData } from "./cards/key-ratios-card/key-ratios-card.types";
 import type { DividendsHistoryCardData } from "./cards/dividends-history-card/dividends-history-card.types";
 import type { RevenueBreakdownCardData } from "./cards/revenue-breakdown-card/revenue-breakdown-card.types";
+import type { AnalystGradesCardData } from "./cards/analyst-grades-card/analyst-grades-card.types";
 
 export type ConcreteCardData =
   | PriceCardData
@@ -16,7 +17,8 @@ export type ConcreteCardData =
   | CashUseCardData
   | KeyRatiosCardData
   | DividendsHistoryCardData
-  | RevenueBreakdownCardData;
+  | RevenueBreakdownCardData
+  | AnalystGradesCardData;
 
 export interface DisplayableCardState {
   isFlipped: boolean;

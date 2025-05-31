@@ -8,7 +8,8 @@ export type CardType =
   | "cashuse"
   | "keyratios"
   | "dividendshistory"
-  | "revenuebreakdown"; // Add new card types here
+  | "revenuebreakdown"
+  | "analystgrades"; // Add new card types here
 
 export interface BaseCardBackData {
   readonly description?: string;

@@ -7,4 +7,5 @@ import "./cash-use-card/cashUseCardUtils";
 import "./dividends-history-card/dividendsHistoryCardUtils";
 import "./key-ratios-card/keyRatiosCardUtils";
 import "./revenue-breakdown-card/revenueBreakdownCardUtils";
+import "./analyst-grades-card/analystGradesCardUtils";
 // Add imports for other card types' utils files as they are created

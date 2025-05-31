@@ -45,6 +45,7 @@ const AVAILABLE_CARD_TYPES: { value: CardType; label: string }[] = [
   { value: "keyratios", label: "Key Ratios Card" },
   { value: "dividendshistory", label: "Dividends History Card" },
   { value: "revenuebreakdown", label: "Revenue Breakdown Card" },
+  { value: "analystgrades", label: "Analyst Grades Card" },
 ];
 
 const AddCardFormSchema = z.object({
