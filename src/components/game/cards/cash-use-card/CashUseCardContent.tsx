@@ -291,11 +291,6 @@ export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
             <SimpleMetricDisplay
               label="Outstanding Shares"
               value={liveData.currentOutstandingShares}
-              dateLabel={
-                staticData.latestSharesFloatDate
-                  ? `As of ${staticData.latestSharesFloatDate}`
-                  : null
-              }
               data-testid="outstanding-shares-metric"
               onMetricClick={() =>
                 handleInteraction("TRIGGER_CARD_ACTION", {
