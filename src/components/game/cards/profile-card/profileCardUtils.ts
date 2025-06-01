@@ -25,6 +25,7 @@ import type {
   FinancialStatementDBRow as FinancialStatementDBRowFromRealtime,
 } from "@/lib/supabase/realtime-service";
 import type { Database, Json } from "@/lib/supabase/database.types";
+import { applyProfileCoreUpdates } from "../cardUtils";
 
 type RatiosTtmDBRow = Database["public"]["Tables"]["ratios_ttm"]["Row"];
 
@@ -64,7 +65,7 @@ function createProfileCardLiveData(
 ): ProfileCardLiveData {
   const parsedIncomePayload = statementSource
     ? parseFmpIncomePayloadForProfile(
-        statementSource.income_statement_payload ?? null // Corrected line: Ensure null if undefined
+        statementSource.income_statement_payload ?? null
       )
     : { revenue: null };
 
@@ -146,23 +147,27 @@ function transformProfileDBRowToStaticData(
 
 function createDisplayableProfileCardFromDB(
   dbData: ProfileDBRow,
-  initialLiveData: Readonly<ProfileCardLiveData>
+  initialLiveData: Readonly<ProfileCardLiveData>,
+  existingCardId?: string,
+  existingCreatedAt?: number
 ): ProfileCardData & Pick<DisplayableCardState, "isFlipped"> {
   const staticData: ProfileCardStaticData =
     transformProfileDBRowToStaticData(dbData);
+
   const cardTypeDescription = `Provides an overview of ${
     dbData.company_name || dbData.symbol
   }'s company profile, including sector, industry, and key operational highlights.`;
   const cardBackData: BaseCardBackData = {
     description: cardTypeDescription,
   };
+
   const concreteCardData: ProfileCardData = {
-    id: `profile-${dbData.symbol}-${Date.now()}`,
+    id: existingCardId || `profile-${dbData.symbol}-${Date.now()}`,
     type: "profile",
     symbol: dbData.symbol,
     companyName: dbData.company_name,
     logoUrl: dbData.image,
-    createdAt: Date.now(),
+    createdAt: existingCreatedAt ?? Date.now(),
     staticData,
     liveData: initialLiveData,
     backData: cardBackData,
@@ -170,7 +175,7 @@ function createDisplayableProfileCardFromDB(
   };
   return {
     ...concreteCardData,
-    isFlipped: false,
+    isFlipped: false, // Default isFlipped, can be overridden if needed
   };
 }
 
@@ -289,6 +294,43 @@ async function initializeProfileCard({
   }
 }
 registerCardInitializer("profile", initializeProfileCard);
+
+// Handler for when the underlying ProfileDBRow itself is updated
+const handleProfileCardStaticProfileUpdate: CardUpdateHandler<
+  ProfileCardData,
+  ProfileDBRow
+> = (currentProfileCardData, profilePayload): ProfileCardData => {
+  // Regenerate static data from the new profile payload
+  const newStaticData = transformProfileDBRowToStaticData(profilePayload);
+
+  // Apply core updates (companyName, logoUrl, websiteUrl) to the root of the card data
+  const { updatedCardData: cardWithCoreUpdates } = applyProfileCoreUpdates(
+    currentProfileCardData,
+    profilePayload
+  );
+
+  // Recreate backData description with potentially new company name
+  const newBackDataDescription = `Provides an overview of ${
+    cardWithCoreUpdates.companyName || cardWithCoreUpdates.symbol
+  }'s company profile, including sector, industry, and key operational highlights.`;
+
+  // Return a new card object with updated staticData, core properties, and backData
+  // LiveData is assumed to be updated by its own dedicated handlers (LIVE_QUOTE_UPDATE, etc.)
+  // but we preserve the existing liveData here.
+  return {
+    ...cardWithCoreUpdates, // Contains updated root companyName, logoUrl, websiteUrl
+    staticData: newStaticData, // Overwrite with new static data
+    backData: { description: newBackDataDescription },
+    // liveData: currentProfileCardData.liveData, // Retain existing live data
+    // createdAt should probably be updated if the profile itself changes substantially
+    createdAt: Date.now(),
+  };
+};
+registerCardUpdateHandler(
+  "profile",
+  "STATIC_PROFILE_UPDATE",
+  handleProfileCardStaticProfileUpdate
+);
 
 const handleProfileCardLiveQuoteUpdate: CardUpdateHandler<
   ProfileCardData,

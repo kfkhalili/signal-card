@@ -13,6 +13,7 @@ import type {
   RequestNewCardInteraction,
 } from "../base-card/base-card.types";
 import { DataRow } from "@/components/ui/DataRow";
+import { formatFinancialValue } from "./revenueCardUtils";
 
 interface RevenueCardContentProps {
   cardData: RevenueCardData;
@@ -31,7 +32,7 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
       id,
       type: cardType,
     } = cardData;
-    const currency = staticData.reportedCurrency;
+    const currencyCode = staticData.reportedCurrency;
 
     const handleInteraction = (
       intent: InteractionPayload["intent"],
@@ -147,7 +148,7 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
         </div>
       );
     } else {
-      // Front Face (remains unchanged)
+      // Front Face
       return (
         <div
           data-testid={`revenue-card-front-${symbol}`}
@@ -174,8 +175,8 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
 
             <DataRow
               label="Revenue"
-              value={liveData.revenue}
-              currency={currency}
+              value={formatFinancialValue(liveData.revenue, currencyCode)}
+              // currency prop is no longer needed if formatFinancialValue includes the symbol
               className="mb-1"
               labelClassName="text-base sm:text-lg md:text-xl"
               valueClassName="text-base sm:text-lg md:text-xl"
@@ -190,8 +191,7 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
             />
             <DataRow
               label="Gross Profit"
-              value={liveData.grossProfit}
-              currency={currency}
+              value={formatFinancialValue(liveData.grossProfit, currencyCode)}
               labelClassName="text-xs sm:text-sm"
               valueClassName="text-sm sm:text-base"
               data-testid="gross-profit-value-front"
@@ -205,8 +205,10 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
             />
             <DataRow
               label="Operating Income"
-              value={liveData.operatingIncome}
-              currency={currency}
+              value={formatFinancialValue(
+                liveData.operatingIncome,
+                currencyCode
+              )}
               labelClassName="text-xs sm:text-sm"
               valueClassName="text-sm sm:text-base"
               data-testid="operating-income-value-front"
@@ -220,8 +222,7 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
             />
             <DataRow
               label="Net Income"
-              value={liveData.netIncome}
-              currency={currency}
+              value={formatFinancialValue(liveData.netIncome, currencyCode)}
               labelClassName="text-xs sm:text-sm"
               valueClassName="text-sm sm:text-base"
               data-testid="net-income-value-front"
@@ -235,8 +236,7 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
             />
             <DataRow
               label="Free Cash Flow"
-              value={liveData.freeCashFlow}
-              currency={currency}
+              value={formatFinancialValue(liveData.freeCashFlow, currencyCode)}
               labelClassName="text-xs sm:text-sm"
               valueClassName="text-sm sm:text-base"
               data-testid="fcf-value-front"

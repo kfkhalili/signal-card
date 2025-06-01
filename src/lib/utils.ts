@@ -8,15 +8,15 @@ export function cn(...inputs: ClassValue[]) {
 
 /**
  * Converts a 2-letter ISO 3166-1 alpha-2 country code to its flag emoji.
- * Example: "US" -> "🇺🇸"
- * @param countryCode The 2-letter country code (e.g., "US", "DE", "JP").
- * @returns The flag emoji string, or a default flag/empty string if conversion fails.
+ * Example: "US" -> "🇺🇸" // This part is fine (example)
+ * @param countryCode The 2-letter country code (e.g., "US", "DE", "JP"). // "What"
+ * @returns The flag emoji string, or a default flag/empty string if conversion fails. // "What"
  */
 export function getFlagEmoji(countryCode: string | null | undefined): string {
   if (!countryCode || countryCode.length !== 2) {
-    return "🏳️"; // Default: white flag or return empty/placeholder
+    return "🏳️"; // Default: white flag or return empty/placeholder // "Why" this fallback is chosen could be added if not obvious.
   }
-  // Ensure countryCode is uppercase for correct regional indicator symbol calculation
+  // Ensure countryCode is uppercase for correct regional indicator symbol calculation // "Why".
   const upperCountryCode = countryCode.toUpperCase();
   const codePoints = Array.from(upperCountryCode).map(
     (char) => 0x1f1e6 + (char.charCodeAt(0) - "A".charCodeAt(0))

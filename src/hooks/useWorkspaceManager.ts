@@ -22,7 +22,7 @@ import type {
   FilterWorkspaceDataInteraction,
   TriggerCardActionInteraction,
   CardType,
-} from "@/components/game/cards/base-card/base-card.types.ts";
+} from "@/components/game/cards/base-card/base-card.types";
 
 import { rehydrateCardFromStorage } from "@/components/game/cardRehydration";
 import type { ProfileDBRow } from "@/hooks/useStockData";
@@ -39,14 +39,14 @@ import {
   getCardInitializer,
   type CardInitializationContext,
 } from "@/components/game/cardInitializer.types";
-import "@/components/game/cards/initializers";
+import "@/components/game/cards/initializers"; // Side-effect import
 
 import {
   getCardUpdateHandler,
   type CardUpdateContext,
   type CardUpdateEventType,
 } from "@/components/game/cardUpdateHandler.types";
-import "@/components/game/cards/updateHandlerInitializer";
+import "@/components/game/cards/updateHandlerInitializer"; // Side-effect import
 
 const INITIAL_ACTIVE_CARDS: DisplayableCard[] = [];
 const WORKSPACE_LOCAL_STORAGE_KEY = "finSignal-mainWorkspace-v1";
@@ -71,8 +71,8 @@ const getConcreteCardData = (card: DisplayableCard): ConcreteCardData => {
 
 export function useWorkspaceManager() {
   const { toast } = useToast();
-  const supabase: SupabaseClient<Database> = useMemo(
-    () => createSupabaseBrowserClient(),
+  const supabase: SupabaseClient<Database> | null = useMemo(
+    () => createSupabaseBrowserClient(false), // Pass false to prevent throwing on init failure
     []
   );
 
@@ -126,7 +126,20 @@ export function useWorkspaceManager() {
       options?: { requestingCardId?: string }
     ) => {
       setIsAddingCardInProgress(true);
-      const determinedSymbol = values.symbol; // Keep determinedSymbol logic simple
+
+      if (!supabase) {
+        // Guard clause for null Supabase client
+        toast({
+          title: "Service Unavailable",
+          description:
+            "Cannot add card: Data service is not properly initialized.",
+          variant: "destructive",
+        });
+        setIsAddingCardInProgress(false);
+        return;
+      }
+
+      const determinedSymbol = values.symbol;
       const cardTypeFromForm = values.cardType;
       const requestingCardId = options?.requestingCardId;
 
@@ -209,9 +222,10 @@ export function useWorkspaceManager() {
 
       let newCardToAdd: DisplayableCard | null = null;
       try {
+        // CardInitializationContext now accepts SupabaseClient | null
         const initContext: CardInitializationContext = {
           symbol: determinedSymbol,
-          supabase,
+          supabase, // supabase is SupabaseClient | null here
           toast,
           activeCards,
         };
@@ -362,14 +376,12 @@ export function useWorkspaceManager() {
                 card,
                 updateContext
               );
-              if (updatedConcreteData !== concreteCardDataForHandler) {
-                if (
-                  JSON.stringify(updatedConcreteData) !==
-                  JSON.stringify(concreteCardDataForHandler)
-                ) {
-                  overallChanged = true;
-                  return { ...card, ...updatedConcreteData };
-                }
+              if (
+                JSON.stringify(updatedConcreteData) !==
+                JSON.stringify(concreteCardDataForHandler)
+              ) {
+                overallChanged = true;
+                return { ...card, ...updatedConcreteData };
               }
             }
           }
@@ -399,24 +411,22 @@ export function useWorkspaceManager() {
                 card,
                 updateContext
               );
-              if (updatedConcreteData !== concreteCardDataForHandler) {
-                if (
-                  JSON.stringify(updatedConcreteData) !==
-                  JSON.stringify(concreteCardDataForHandler)
-                ) {
-                  overallChanged = true;
-                  if (card.type === "profile") {
-                    setTimeout(
-                      () =>
-                        toast({
-                          title: `Profile Updated: ${updatedProfileDBRow.symbol}`,
-                          description: "Company details have been refreshed.",
-                        }),
-                      0
-                    );
-                  }
-                  return { ...card, ...updatedConcreteData };
+              if (
+                JSON.stringify(updatedConcreteData) !==
+                JSON.stringify(concreteCardDataForHandler)
+              ) {
+                overallChanged = true;
+                if (card.type === "profile") {
+                  setTimeout(
+                    () =>
+                      toast({
+                        title: `Profile Updated: ${updatedProfileDBRow.symbol}`,
+                        description: "Company details have been refreshed.",
+                      }),
+                    0
+                  );
                 }
+                return { ...card, ...updatedConcreteData };
               }
             }
           }
@@ -446,14 +456,12 @@ export function useWorkspaceManager() {
                 card,
                 updateContext
               );
-              if (updatedConcreteData !== concreteCardDataForHandler) {
-                if (
-                  JSON.stringify(updatedConcreteData) !==
-                  JSON.stringify(concreteCardDataForHandler)
-                ) {
-                  overallChanged = true;
-                  return { ...card, ...updatedConcreteData };
-                }
+              if (
+                JSON.stringify(updatedConcreteData) !==
+                JSON.stringify(concreteCardDataForHandler)
+              ) {
+                overallChanged = true;
+                return { ...card, ...updatedConcreteData };
               }
             }
           }

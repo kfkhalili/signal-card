@@ -20,6 +20,7 @@ import {
 import type { Database, Json } from "@/lib/supabase/database.types";
 import type { FinancialStatementDBRow as FinancialStatementDBRowFromRealtime } from "@/lib/supabase/realtime-service";
 import type { ProfileDBRow as ProfileDBRowFromHook } from "@/hooks/useStockData";
+import { applyProfileCoreUpdates } from "../cardUtils";
 
 type FinancialStatementDBRowFromSupabase =
   Database["public"]["Tables"]["financial_statements"]["Row"];
@@ -184,7 +185,7 @@ function constructCashUseCardData(
   sharesData: SharesDataPoint,
   totalDebtData: MinMaxLatestResult<number | null>,
   freeCashFlowData: MinMaxLatestResult<number | null>,
-  netDividendsPaidData: MinMaxLatestResult<number | null>, // Values here are expected to be positive
+  netDividendsPaidData: MinMaxLatestResult<number | null>,
   latestFinancialStatementInfo: {
     reportedCurrency: string | null;
     statementDate: string | null;
@@ -211,9 +212,9 @@ function constructCashUseCardData(
     currentFreeCashFlow: freeCashFlowData.latest,
     freeCashFlow_5y_min: freeCashFlowData.min,
     freeCashFlow_5y_max: freeCashFlowData.max,
-    currentNetDividendsPaid: netDividendsPaidData.latest, // Stored as positive
-    netDividendsPaid_5y_min: netDividendsPaidData.min, // Stored as positive
-    netDividendsPaid_5y_max: netDividendsPaidData.max, // Stored as positive
+    currentNetDividendsPaid: netDividendsPaidData.latest,
+    netDividendsPaid_5y_min: netDividendsPaidData.min,
+    netDividendsPaid_5y_max: netDividendsPaidData.max,
   };
 
   const cardBackData: BaseCardBackData = {
@@ -242,12 +243,13 @@ function constructCashUseCardData(
 
 async function fetchAndProcessCashUseData(
   symbol: string,
-  supabase: CardInitializationContext["supabase"]
+  supabase: CardInitializationContext["supabase"],
+  activeCards?: DisplayableCard[]
 ): Promise<{
   sharesData: SharesDataPoint;
   totalDebtData: MinMaxLatestResult<number | null>;
   freeCashFlowData: MinMaxLatestResult<number | null>;
-  netDividendsPaidData: MinMaxLatestResult<number | null>; // Will contain positive dividend values
+  netDividendsPaidData: MinMaxLatestResult<number | null>;
   latestFinancialStatementInfo: {
     reportedCurrency: string | null;
     statementDate: string | null;
@@ -260,25 +262,38 @@ async function fetchAndProcessCashUseData(
   };
 } | null> {
   try {
-    const { data: profileData, error: profileError } = await supabase
-      .from("profiles")
-      .select("company_name, image, website")
-      .eq("symbol", symbol)
-      .maybeSingle();
+    const profileCardForSymbol = activeCards?.find(
+      (c) => c.symbol === symbol && c.type === "profile"
+    ) as ProfileDBRowFromSupabase | undefined;
 
-    if (profileError) {
-      console.warn(
-        `[CashUseCard] Error fetching profile for ${symbol}: ${profileError.message}`
-      );
-    }
-    const fetchedProfileInfo = {
-      companyName:
-        (profileData as ProfileDBRowFromSupabase | null)?.company_name ??
-        symbol,
-      logoUrl: (profileData as ProfileDBRowFromSupabase | null)?.image ?? null,
-      websiteUrl:
-        (profileData as ProfileDBRowFromSupabase | null)?.website ?? null,
+    let fetchedProfileInfo = {
+      companyName: profileCardForSymbol?.company_name ?? symbol,
+      logoUrl: profileCardForSymbol?.image ?? null,
+      websiteUrl: profileCardForSymbol?.website ?? null,
     };
+    if (!profileCardForSymbol) {
+      const { data: profileDataFromDB, error: profileError } = await supabase
+        .from("profiles")
+        .select("company_name, image, website")
+        .eq("symbol", symbol)
+        .maybeSingle();
+
+      if (profileError) {
+        console.warn(
+          `[CashUseCard] Error fetching profile for ${symbol}: ${profileError.message}`
+        );
+      }
+      fetchedProfileInfo = {
+        companyName:
+          (profileDataFromDB as ProfileDBRowFromSupabase | null)
+            ?.company_name ?? symbol,
+        logoUrl:
+          (profileDataFromDB as ProfileDBRowFromSupabase | null)?.image ?? null,
+        websiteUrl:
+          (profileDataFromDB as ProfileDBRowFromSupabase | null)?.website ??
+          null,
+      };
+    }
 
     const { data: fsRecords, error: fsError } = await supabase
       .from("financial_statements")
@@ -287,7 +302,7 @@ async function fetchAndProcessCashUseData(
       )
       .eq("symbol", symbol)
       .order("date", { ascending: false })
-      .limit(5);
+      .limit(20); // Fetch more for 5-year range potentially (5 years * 4 quarters)
 
     if (fsError) throw fsError;
     const financialStatements =
@@ -299,7 +314,7 @@ async function fetchAndProcessCashUseData(
       fiscal_year: fs.fiscal_year ?? undefined,
       totalDebt_value: safeJsonParse<number | null>(
         fs.balance_sheet_payload,
-        "totalDebt",
+        "totalDebt", // Ensure this key matches your JSONB structure
         null
       ),
     }));
@@ -309,21 +324,26 @@ async function fetchAndProcessCashUseData(
       fiscal_year: fs.fiscal_year ?? undefined,
       freeCashFlow_value: safeJsonParse<number | null>(
         fs.cash_flow_payload,
-        "freeCashFlow",
+        "freeCashFlow", // Ensure this key matches
         null
       ),
     }));
     const dividendRecords = financialStatements.map((fs) => {
       const rawValue = safeJsonParse<number | null>(
         fs.cash_flow_payload,
-        "netDividendsPaid",
+        "dividendsPaid", // FMP often uses "dividendsPaid" for this; Supabase has "netDividendsPaid" in type.
+        // For the sake of consistency, let's assume your DB payload also uses `netDividendsPaid`.
+        // If FMP directly stores a field like `dividendsPaid` that is negative, you'd use that.
+        // The current type `CashUseCardFmpCashFlowData` suggests `netDividendsPaid` is the FMP field.
         null
       );
       return {
         date: fs.date,
         period: fs.period ?? undefined,
         fiscal_year: fs.fiscal_year ?? undefined,
-        netDividendsPaid_value: rawValue !== null ? Math.abs(rawValue) : null, // Flip sign to positive
+        // Assuming "netDividendsPaid" from your types, usually negative in cash flow statements.
+        // The card displays it as a positive "use" of cash.
+        netDividendsPaid_value: rawValue !== null ? Math.abs(rawValue) : null,
       };
     });
 
@@ -382,8 +402,13 @@ async function initializeCashUseCard({
   symbol,
   supabase,
   toast,
+  activeCards,
 }: CardInitializationContext): Promise<DisplayableCard | null> {
-  const fetchedData = await fetchAndProcessCashUseData(symbol, supabase);
+  const fetchedData = await fetchAndProcessCashUseData(
+    symbol,
+    supabase,
+    activeCards
+  );
 
   if (!fetchedData) {
     if (toast) {
@@ -462,11 +487,11 @@ const handleCashUseCardFinancialStatementUpdate: CardUpdateHandler<
 
   const rawNewNetDividendsPaid = safeJsonParse<number | null>(
     newFinancialStatementRow.cash_flow_payload,
-    "netDividendsPaid",
+    "netDividendsPaid", // Assuming this key aligns with your type and typical FMP data for this field
     null
   );
   const newNetDividendsPaid =
-    rawNewNetDividendsPaid !== null ? Math.abs(rawNewNetDividendsPaid) : null; // Flip sign
+    rawNewNetDividendsPaid !== null ? Math.abs(rawNewNetDividendsPaid) : null;
 
   const newDate = newFinancialStatementRow.date;
   const newPeriod = newFinancialStatementRow.period;
@@ -481,12 +506,32 @@ const handleCashUseCardFinancialStatementUpdate: CardUpdateHandler<
     (!updatedStaticData.latestStatementDate ||
       new Date(newDate) >= new Date(updatedStaticData.latestStatementDate))
   ) {
-    if (newFinancialStatementRow.period) {
+    // Only update if the new statement is for the same or newer date,
+    // and if the values actually differ or it's a newer period for the same date.
+    // This simple check assumes newer date/period implies more relevant data.
+    // More complex logic might be needed if periods can arrive out of order for the same date.
+
+    let periodIsSameOrNewer = true;
+    if (
+      new Date(newDate).getTime() ===
+      new Date(updatedStaticData.latestStatementDate || 0).getTime()
+    ) {
+      const periodHierarchy = ["TTM", "FY", "H2", "H1", "Q4", "Q3", "Q2", "Q1"];
+      const currentPeriodIndex = periodHierarchy.indexOf(
+        updatedStaticData.latestStatementPeriod || ""
+      );
+      const newPeriodIndex = periodHierarchy.indexOf(newPeriod || "");
+      periodIsSameOrNewer = newPeriodIndex <= currentPeriodIndex; // Lower index means more comprehensive/recent
+    }
+
+    if (periodIsSameOrNewer) {
       if (
         newTotalDebt !== null &&
         updatedLiveData.currentTotalDebt !== newTotalDebt
       ) {
         updatedLiveData.currentTotalDebt = newTotalDebt;
+        // Note: Min/max for 5y range are NOT updated here as this handles single statement updates.
+        // Min/max would typically be recalculated if the entire historical dataset changed.
         hasChanged = true;
       }
       if (
@@ -505,15 +550,15 @@ const handleCashUseCardFinancialStatementUpdate: CardUpdateHandler<
       }
 
       if (
-        hasChanged ||
-        updatedStaticData.latestStatementDate !== newDate ||
-        updatedStaticData.latestStatementPeriod !== newPeriod
+        hasChanged || // If any value changed
+        updatedStaticData.latestStatementDate !== newDate || // Or if statement date is newer
+        updatedStaticData.latestStatementPeriod !== newPeriod // Or if period is different for same date
       ) {
         updatedStaticData.latestStatementDate = newDate;
         updatedStaticData.latestStatementPeriod = newPeriod;
         updatedStaticData.reportedCurrency =
           newReportedCurrency ?? updatedStaticData.reportedCurrency;
-        hasChanged = true;
+        hasChanged = true; // Ensure flag is set if only date/period changed
       }
     }
   }
@@ -524,13 +569,21 @@ const handleCashUseCardFinancialStatementUpdate: CardUpdateHandler<
         title: `Cash Use Figures Updated: ${currentCashUseCardData.symbol}`,
         description: `Latest statement data (${
           newPeriod ?? "N/A"
-        } ${newDate}) applied. 5-year ranges reflect initial card data.`,
+        } ${newDate}) applied. 5-year ranges are based on initial card data.`,
       });
     }
+    const newBackDataDescription = `Cash usage metrics for ${
+      currentCashUseCardData.companyName || currentCashUseCardData.symbol
+    }. Financial data from ${updatedStaticData.latestStatementDate || "N/A"} (${
+      updatedStaticData.latestStatementPeriod || "N/A"
+    }). Shares outstanding as of ${
+      updatedStaticData.latestSharesFloatDate || "N/A"
+    }.`;
     return {
       ...currentCashUseCardData,
       liveData: updatedLiveData,
       staticData: updatedStaticData,
+      backData: { description: newBackDataDescription },
     };
   }
 
@@ -586,17 +639,23 @@ const handleCashUseCardSharesFloatUpdate: CardUpdateHandler<
         description: `Data as of ${newDate} applied.`,
       });
     }
+    const newBackDataDescription = `Cash usage metrics for ${
+      currentCashUseCardData.companyName || currentCashUseCardData.symbol
+    }. Financial data from ${updatedStaticData.latestStatementDate || "N/A"} (${
+      updatedStaticData.latestStatementPeriod || "N/A"
+    }). Shares outstanding as of ${
+      updatedStaticData.latestSharesFloatDate || "N/A"
+    }.`;
     return {
       ...currentCashUseCardData,
       liveData: updatedLiveData,
       staticData: updatedStaticData,
+      backData: { description: newBackDataDescription },
     };
   }
   return currentCashUseCardData;
 };
 
-// This registration remains commented out until a dedicated "SHARES_FLOAT_UPDATE" event
-// and corresponding data pipeline in useStockData/useWorkspaceManager are implemented.
 registerCardUpdateHandler(
   "cashuse",
   "SHARES_FLOAT_UPDATE",
@@ -612,37 +671,50 @@ const handleCashUseCardProfileUpdate: CardUpdateHandler<
   _currentDisplayableCard,
   context
 ): CashUseCardData => {
-  const newCompanyName =
-    profilePayload.company_name ?? currentCashUseCardData.symbol;
-  const newLogoUrl = profilePayload.image ?? null;
-  const newWebsiteUrl = profilePayload.website ?? null;
+  const { updatedCardData, coreDataChanged } = applyProfileCoreUpdates(
+    currentCashUseCardData,
+    profilePayload
+  );
 
+  let currencyChanged = false;
+  const newReportedCurrency =
+    profilePayload.currency ??
+    currentCashUseCardData.staticData.reportedCurrency;
   if (
-    currentCashUseCardData.companyName !== newCompanyName ||
-    currentCashUseCardData.logoUrl !== newLogoUrl ||
-    currentCashUseCardData.websiteUrl !== newWebsiteUrl
+    currentCashUseCardData.staticData.reportedCurrency !== newReportedCurrency
   ) {
-    if (context.toast) {
+    currencyChanged = true;
+  }
+
+  if (coreDataChanged || currencyChanged) {
+    if (context.toast && coreDataChanged) {
+      // Only toast for core changes, currency is less visible
       context.toast({
         title: "Profile Info Updated",
         description: `Company details for ${currentCashUseCardData.symbol} card refreshed.`,
       });
     }
-    const newBackDataDescription = `Cash usage metrics for ${newCompanyName}. Financial data from ${
-      currentCashUseCardData.staticData.latestStatementDate || "N/A"
+    const finalCardData = {
+      ...updatedCardData,
+      staticData: {
+        ...updatedCardData.staticData,
+        reportedCurrency: newReportedCurrency,
+      },
+    };
+
+    const newBackDataDescription = `Cash usage metrics for ${
+      finalCardData.companyName // Use new name
+    }. Financial data from ${
+      finalCardData.staticData.latestStatementDate || "N/A"
     } (${
-      currentCashUseCardData.staticData.latestStatementPeriod || "N/A"
+      finalCardData.staticData.latestStatementPeriod || "N/A"
     }). Shares outstanding as of ${
-      currentCashUseCardData.staticData.latestSharesFloatDate || "N/A"
+      finalCardData.staticData.latestSharesFloatDate || "N/A"
     }.`;
 
     return {
-      ...currentCashUseCardData,
-      companyName: newCompanyName,
-      logoUrl: newLogoUrl,
-      websiteUrl: newWebsiteUrl,
+      ...finalCardData,
       backData: {
-        ...currentCashUseCardData.backData,
         description: newBackDataDescription,
       },
     };

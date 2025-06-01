@@ -20,6 +20,7 @@ import {
 } from "@/components/game/cardUpdateHandler.types";
 import type { Database } from "@/lib/supabase/database.types";
 import type { ProfileDBRow } from "@/hooks/useStockData";
+import { applyProfileCoreUpdates } from "../cardUtils";
 
 type RevenueSegmentationDBRow =
   Database["public"]["Tables"]["revenue_product_segmentation"]["Row"];
@@ -43,31 +44,56 @@ function parseSegmentData(jsonData: unknown): Record<string, number> {
 
 async function fetchAndProcessRevenueBreakdown(
   symbol: string,
-  supabase: CardInitializationContext["supabase"]
+  supabase: CardInitializationContext["supabase"],
+  activeCards?: DisplayableCard[]
 ): Promise<{
   profileInfo: {
     companyName?: string | null;
     logoUrl?: string | null;
+    websiteUrl?: string | null;
     currencySymbol: string;
   };
   latestRow: RevenueSegmentationDBRow | null;
   previousRow: RevenueSegmentationDBRow | null;
 }> {
-  const { data: profileData } = await supabase
-    .from("profiles")
-    .select("company_name, image, currency")
-    .eq("symbol", symbol)
-    .maybeSingle();
+  const profileCardForSymbol = activeCards?.find(
+    (c) => c.symbol === symbol && c.type === "profile"
+  ) as ProfileDBRowFromSupabase | undefined;
 
-  const baseCurrency = (profileData as ProfileDBRowFromSupabase | null)
-    ?.currency;
-  // Default to '$' if reported_currency is null or profile currency is not available
+  let fetchedProfileInfoRaw = {
+    company_name: profileCardForSymbol?.company_name ?? symbol,
+    image: profileCardForSymbol?.image ?? null,
+    website: profileCardForSymbol?.website ?? null,
+    currency: profileCardForSymbol?.currency ?? null,
+  };
+
+  if (!profileCardForSymbol) {
+    const { data: profileDataFromDB } = await supabase
+      .from("profiles")
+      .select("company_name, image, currency, website")
+      .eq("symbol", symbol)
+      .maybeSingle();
+    fetchedProfileInfoRaw = {
+      company_name:
+        (profileDataFromDB as ProfileDBRowFromSupabase | null)?.company_name ??
+        symbol,
+      image:
+        (profileDataFromDB as ProfileDBRowFromSupabase | null)?.image ?? null,
+      website:
+        (profileDataFromDB as ProfileDBRowFromSupabase | null)?.website ?? null,
+      currency:
+        (profileDataFromDB as ProfileDBRowFromSupabase | null)?.currency ??
+        null,
+    };
+  }
+
+  const baseCurrency = fetchedProfileInfoRaw.currency;
   const currencySymbol = baseCurrency === "USD" ? "$" : baseCurrency || "$";
 
   const profileInfo = {
-    companyName:
-      (profileData as ProfileDBRowFromSupabase | null)?.company_name ?? symbol,
-    logoUrl: (profileData as ProfileDBRowFromSupabase | null)?.image ?? null,
+    companyName: fetchedProfileInfoRaw.company_name,
+    logoUrl: fetchedProfileInfoRaw.image,
+    websiteUrl: fetchedProfileInfoRaw.website,
     currencySymbol: currencySymbol,
   };
 
@@ -75,7 +101,7 @@ async function fetchAndProcessRevenueBreakdown(
     .from("revenue_product_segmentation")
     .select("*")
     .eq("symbol", symbol)
-    .eq("period", "FY") // Assuming annual data is always 'FY'
+    .eq("period", "FY")
     .order("date", { ascending: false })
     .limit(2);
 
@@ -101,6 +127,7 @@ function constructRevenueBreakdownCardData(
   profileInfo: {
     companyName?: string | null;
     logoUrl?: string | null;
+    websiteUrl?: string | null;
     currencySymbol: string;
   },
   latestRow: RevenueSegmentationDBRow | null,
@@ -108,7 +135,6 @@ function constructRevenueBreakdownCardData(
   idOverride?: string | null,
   existingCreatedAt?: number | null
 ): RevenueBreakdownCardData | null {
-  // Can return null if no latestRow
   if (!latestRow) {
     return null;
   }
@@ -130,7 +156,7 @@ function constructRevenueBreakdownCardData(
       if (previousRevenue !== null && previousRevenue !== 0) {
         yoyChange = (currentRevenue - previousRevenue) / previousRevenue;
       } else if (previousRevenue === null && currentRevenue > 0) {
-        yoyChange = null; // Indicate as new or unable to calculate
+        yoyChange = null;
       }
       return {
         segmentName,
@@ -139,7 +165,7 @@ function constructRevenueBreakdownCardData(
         yoyChange,
       };
     })
-    .sort((a, b) => b.currentRevenue - a.currentRevenue); // Sort by current revenue desc
+    .sort((a, b) => b.currentRevenue - a.currentRevenue);
 
   const staticData: RevenueBreakdownCardStaticData = {
     currencySymbol: latestRow.reported_currency || profileInfo.currencySymbol,
@@ -167,11 +193,11 @@ function constructRevenueBreakdownCardData(
     symbol,
     companyName: profileInfo.companyName ?? symbol,
     logoUrl: profileInfo.logoUrl ?? null,
+    websiteUrl: profileInfo.websiteUrl ?? null,
     createdAt: existingCreatedAt ?? Date.now(),
     staticData,
     liveData,
     backData: cardBackData,
-    websiteUrl: null,
   };
 }
 
@@ -179,10 +205,11 @@ async function initializeRevenueBreakdownCard({
   symbol,
   supabase,
   toast,
+  activeCards,
 }: CardInitializationContext): Promise<DisplayableCard | null> {
   try {
     const { profileInfo, latestRow, previousRow } =
-      await fetchAndProcessRevenueBreakdown(symbol, supabase);
+      await fetchAndProcessRevenueBreakdown(symbol, supabase, activeCards);
 
     if (!latestRow) {
       if (toast) {
@@ -201,7 +228,7 @@ async function initializeRevenueBreakdownCard({
       previousRow
     );
 
-    if (!concreteCardData) return null; // Should be handled by !latestRow check already
+    if (!concreteCardData) return null;
 
     const cardState: Pick<DisplayableCardState, "isFlipped"> = {
       isFlipped: false,
@@ -226,100 +253,42 @@ async function initializeRevenueBreakdownCard({
 }
 registerCardInitializer("revenuebreakdown", initializeRevenueBreakdownCard);
 
-// Update handler for when revenue_product_segmentation table changes
-// This assumes the payload would be the new/updated segmentation row,
-// but for annual data, a full re-fetch like initialization is more robust.
-// const handleRevenueBreakdownDataUpdate: CardUpdateHandler<
-//   RevenueBreakdownCardData,
-//   RevenueSegmentationDBRow // Or a more abstract update payload
-// > = async (
-//   currentCardData,
-//   _updatedSegmentationRow, // May not be used if re-fetching
-//   _currentDisplayableCard,
-//   context
-// ): Promise<RevenueBreakdownCardData> => {
-//   const { supabase, toast } = context as CardInitializationContext;
-//   try {
-//     const { profileInfo, latestRow, previousRow } =
-//       await fetchAndProcessRevenueBreakdown(currentCardData.symbol, supabase);
-
-//     if (!latestRow) {
-//       if (toast) {
-//         toast({
-//           title: "Data Missing",
-//           description: `Revenue breakdown data no longer found for ${currentCardData.symbol}. Card may be stale.`,
-//           variant: "destructive",
-//         });
-//       }
-//       return currentCardData; // Or handle as an error/removal
-//     }
-
-//     if (toast) {
-//       toast({
-//         title: "Revenue Breakdown Synced",
-//         description: `Data for ${currentCardData.symbol} refreshed.`,
-//       });
-//     }
-
-//     const updatedCardData = constructRevenueBreakdownCardData(
-//       currentCardData.symbol,
-//       profileInfo,
-//       latestRow,
-//       previousRow,
-//       currentCardData.id,
-//       currentCardData.createdAt
-//     );
-//     return updatedCardData || currentCardData; // Fallback to current data if construction fails
-//   } catch {
-//     if (toast) {
-//       toast({
-//         title: "Update Error",
-//         description: `Failed to refresh revenue breakdown for ${currentCardData.symbol}.`,
-//         variant: "destructive",
-//       });
-//     }
-//     return currentCardData;
-//   }
-// };
-// This registration is more conceptual for annual data.
-// You'd need an event like "ANNUAL_DATA_REFRESH_REVENUE_BREAKDOWN"
-// or trigger it based on the 'updated_at' field if you poll.
-// For now, using a placeholder event. If this table updates via Supabase CDC,
-// the payload type for `handleRevenueBreakdownDataUpdate` should match that.
-/*
-registerCardUpdateHandler(
-  "revenuebreakdown",
-  "REVENUE_SEGMENTATION_TABLE_UPDATE", // Placeholder for a specific event
-  handleRevenueBreakdownDataUpdate as CardUpdateHandler<RevenueBreakdownCardData, unknown>
-);
-*/
-
 const handleRevenueBreakdownProfileUpdate: CardUpdateHandler<
   RevenueBreakdownCardData,
   ProfileDBRow
 > = (currentCardData, profilePayload): RevenueBreakdownCardData => {
-  const newCompanyName = profilePayload.company_name ?? currentCardData.symbol;
-  const newLogoUrl = profilePayload.image ?? null;
-  const newCurrencySymbol =
-    (profilePayload.currency === "USD" ? "$" : profilePayload.currency) ||
-    currentCardData.staticData.currencySymbol;
+  const { updatedCardData, coreDataChanged } = applyProfileCoreUpdates(
+    currentCardData,
+    profilePayload
+  );
 
-  if (
-    currentCardData.companyName !== newCompanyName ||
-    currentCardData.logoUrl !== newLogoUrl ||
-    currentCardData.staticData.currencySymbol !== newCurrencySymbol
-  ) {
-    const newBackData: BaseCardBackData = {
-      description: `Revenue breakdown by product/segment for ${newCompanyName} for ${currentCardData.staticData.latestPeriodLabel}, showing year-over-year changes.`,
-    };
-    return {
-      ...currentCardData,
-      companyName: newCompanyName,
-      logoUrl: newLogoUrl,
+  // RevenueBreakdown specific: currencySymbol might change based on profile's currency
+  const newBaseCurrency = profilePayload.currency;
+  const newCurrencySymbol =
+    newBaseCurrency === "USD"
+      ? "$"
+      : newBaseCurrency || updatedCardData.staticData.currencySymbol;
+  const currencySymbolChanged =
+    updatedCardData.staticData.currencySymbol !== newCurrencySymbol;
+
+  if (coreDataChanged || currencySymbolChanged) {
+    const finalCardData = {
+      ...updatedCardData,
       staticData: {
-        ...currentCardData.staticData,
+        ...updatedCardData.staticData,
         currencySymbol: newCurrencySymbol,
       },
+    };
+
+    const newBackData: BaseCardBackData = {
+      description: `Revenue breakdown by product/segment for ${
+        finalCardData.companyName // Use the potentially updated company name
+      } for ${
+        finalCardData.staticData.latestPeriodLabel
+      }, showing year-over-year changes.`,
+    };
+    return {
+      ...finalCardData,
       backData: newBackData,
     };
   }

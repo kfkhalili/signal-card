@@ -3,18 +3,15 @@ import React from "react";
 import type { Meta, StoryObj } from "@storybook/react";
 import { action } from "@storybook/addon-actions";
 import Header from "./Header";
-import { AuthContext, type AuthContextType } from "@/contexts/AuthContext"; // Correctly import context and its type
+import { AuthContext, type AuthContextType } from "@/contexts/AuthContext";
 import type {
   Session,
   User,
   AuthChangeEvent,
   AuthError,
-} from "@supabase/supabase-js"; // Import necessary Supabase types
+} from "@supabase/supabase-js";
 import { SupabaseClient } from "@supabase/supabase-js";
 
-// A more typed (though still partial) mock for SupabaseClient focusing on auth methods used by AuthContext
-// We cast to SupabaseClient because fully mocking it is extensive.
-// The key is that the methods *actually called* by AuthContext are present and correctly typed.
 const mockSupabaseClient = {
   auth: {
     signOut: async (): Promise<{ error: AuthError | null }> => {
@@ -26,7 +23,6 @@ const mockSupabaseClient = {
       error: AuthError | null;
     }> => {
       action("mock: supabase.auth.getSession")();
-      // Simulate no active session by default for stories, can be overridden in specific story args
       return { data: { session: null }, error: null };
     },
     onAuthStateChange: (
@@ -35,9 +31,6 @@ const mockSupabaseClient = {
       action("mock: supabase.auth.onAuthStateChange callback registered")(
         callback
       );
-      // In a real scenario, this callback would be invoked by Supabase.
-      // For stories, we typically don't need to simulate these events unless testing specific reactions.
-      // Example: callback("INITIAL_SESSION", null); // Simulate initial state
       return {
         data: {
           subscription: {
@@ -49,19 +42,17 @@ const mockSupabaseClient = {
       };
     },
   },
-  // If AuthContext uses other parts of SupabaseClient (e.g., from()), mock them as needed.
 } as unknown as SupabaseClient;
 
-// Default mock values for AuthContext, using the imported AuthContextType.
+// Default mock values for AuthContext, including clientInitError
 const defaultAuthContextMock: AuthContextType = {
   supabase: mockSupabaseClient,
   session: null,
   user: null,
   isLoading: false,
+  clientInitError: null, // <<< Added clientInitError
   signOut: async () => {
     action("AuthContext.signOut called")();
-    // This mock should also ideally update the 'user' and 'session' in a story if a story needs to react to signout.
-    // For now, primarily logging the action.
   },
 };
 
@@ -69,31 +60,21 @@ const meta: Meta<typeof Header> = {
   title: "Layout/Header",
   component: Header,
   tags: ["autodocs"],
-  parameters: {
-    // nextjs: { // If using storybook-nextjs-router for Next.js Link components
-    //   appDirectory: true,
-    // },
-  },
+  parameters: {},
 };
 
 export default meta;
 
-// Define the structure of custom arguments our stories will use to control the AuthContext
 interface HeaderStoryCustomArgs {
   authContextValue?: AuthContextType;
-  // HeaderComponent takes no direct props, so this interface mainly holds authContextValue.
 }
 
-// Define the Story type, making Storybook aware of our custom args structure.
-// This combines the inferred props of HeaderComponent (none in this case) with our custom args.
 type Story = StoryObj<
   React.ComponentProps<typeof Header> & HeaderStoryCustomArgs
 >;
 
-// Template story that provides the AuthContext
 const Template: Story = {
   render: (args: HeaderStoryCustomArgs) => {
-    // args is now HeaderStoryCustomArgs
     const authContextValueToProvide =
       args.authContextValue || defaultAuthContextMock;
 
@@ -113,6 +94,7 @@ export const LoggedOut: Story = {
       user: null,
       session: null,
       isLoading: false,
+      clientInitError: null, // <<< Added clientInitError
     },
   },
 };
@@ -123,15 +105,15 @@ export const Loading: Story = {
     authContextValue: {
       ...defaultAuthContextMock,
       isLoading: true,
+      clientInitError: null, // <<< Added clientInitError
     },
   },
 };
 
-// Mock user and session data for logged-in states
 const mockUser: User = {
   id: "user-storybook-mock-id",
   app_metadata: { provider: "email", providers: ["email"] },
-  user_metadata: { name: "Storybook User" }, // Example user metadata
+  user_metadata: { name: "Storybook User" },
   aud: "authenticated",
   created_at: new Date().toISOString(),
   email: "user@storybook.example",
@@ -153,8 +135,8 @@ export const LoggedIn: Story = {
       user: mockUser,
       session: mockSession,
       isLoading: false,
+      clientInitError: null, // <<< Added clientInitError
       signOut: async () => {
-        // Override default signOut for more specific action logging if desired
         action("AuthContext.signOut called (LoggedIn state)")();
       },
     },
@@ -172,7 +154,6 @@ export const LoggedInLongEmail: Story = {
           "a.very.long.email.address.for.testing.truncation.feature.in.ui@example.com",
       },
       session: {
-        // Also update session.user if your context/component reads email from there
         ...mockSession,
         user: {
           ...mockUser,
@@ -181,9 +162,26 @@ export const LoggedInLongEmail: Story = {
         },
       },
       isLoading: false,
+      clientInitError: null, // <<< Added clientInitError
       signOut: async () => {
         action("AuthContext.signOut called (LoggedInLongEmail state)")();
       },
+    },
+  },
+};
+
+// Story to demonstrate the clientInitError state
+export const AuthClientInitializationError: Story = {
+  ...Template,
+  args: {
+    authContextValue: {
+      ...defaultAuthContextMock,
+      user: null,
+      session: null,
+      isLoading: false,
+      clientInitError:
+        "Supabase client failed to initialize due to missing configuration.", // Example error message
+      supabase: null, // Reflect that supabase client is null in this state
     },
   },
 };

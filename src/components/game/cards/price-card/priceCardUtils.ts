@@ -20,6 +20,7 @@ import {
   type CardUpdateHandler,
 } from "@/components/game/cardUpdateHandler.types";
 import type { ProfileCardData as ProfileCardDataType } from "../profile-card/profile-card.types";
+import { applyProfileCoreUpdates } from "../cardUtils";
 
 function createPriceCardLiveData(
   leanQuote: LiveQuoteIndicatorDBRow,
@@ -55,7 +56,10 @@ function createPriceCardStaticData(
 function createDisplayablePriceCard(
   leanQuote: LiveQuoteIndicatorDBRow,
   apiTimestampMillis: number | null,
-  profileContext?: Pick<ProfileDBRow, "company_name" | "image" | "exchange">,
+  profileContext?: Pick<
+    ProfileDBRow,
+    "company_name" | "image" | "exchange" | "website"
+  >,
   isShell = false
 ): PriceCardData & DisplayableCardState {
   let liveData = createPriceCardLiveData(
@@ -77,8 +81,10 @@ function createDisplayablePriceCard(
     isFlipped: false,
   };
 
+  // Use companyName from profileContext if available, otherwise leanQuote.symbol
+  const companyNameForDesc = profileContext?.company_name ?? leanQuote.symbol;
   const backDataDescription: BaseCardBackData = {
-    description: `Market price information for ${leanQuote.symbol}. Includes daily and historical price points, volume, and key moving averages.`,
+    description: `Market price information for ${companyNameForDesc}. Includes daily and historical price points, volume, and key moving averages.`,
   };
 
   const concreteCardData: PriceCardData = {
@@ -88,10 +94,10 @@ function createDisplayablePriceCard(
     createdAt: Date.now(),
     companyName: profileContext?.company_name ?? leanQuote.symbol,
     logoUrl: profileContext?.image ?? null,
+    websiteUrl: profileContext?.website ?? null,
     staticData,
     liveData,
     backData: backDataDescription,
-    // websiteUrl can be added if relevant for PriceCard, though typically for Profile
   };
 
   return {
@@ -127,7 +133,8 @@ async function initializePriceCard({
       ? {
           company_name: profileCardForSymbol.companyName ?? null,
           image: profileCardForSymbol.logoUrl ?? null,
-          exchange: profileCardForSymbol.staticData.exchange_full_name ?? null, // Assuming exchange_full_name is desired
+          exchange: profileCardForSymbol.staticData.exchange ?? null,
+          website: profileCardForSymbol.websiteUrl ?? null,
         }
       : undefined;
 
@@ -143,11 +150,10 @@ async function initializePriceCard({
       const now = Date.now();
       const nowSeconds = Math.floor(now / 1000);
 
-      // Create a shell quote. Some fields might be unavailable or should be explicitly null.
       const shellLeanQuote: LiveQuoteIndicatorDBRow = {
-        id: `shell-indicator-${now}`, // Placeholder ID
+        id: `shell-indicator-${now}`,
         symbol: symbol,
-        current_price: 0, // Placeholder, will be nulled out by isShell in createDisplayablePriceCard
+        current_price: 0,
         api_timestamp: nowSeconds,
         fetched_at: new Date(now).toISOString(),
         exchange: profileContext?.exchange || null,
@@ -167,9 +173,9 @@ async function initializePriceCard({
 
       const shellDisplayableCard = createDisplayablePriceCard(
         shellLeanQuote,
-        now, // Pass current time for shell's timestamp
+        now,
         profileContext,
-        true // isShell = true
+        true
       );
 
       if (toast) {
@@ -213,16 +219,16 @@ const handlePriceCardLiveQuoteUpdate: CardUpdateHandler<
   if (
     currentPriceCardData.liveData.timestamp &&
     apiTimestampMillis < currentPriceCardData.liveData.timestamp &&
-    currentPriceCardData.liveData.price !== null // Ensure we don't block update if current price is null (shell card)
+    currentPriceCardData.liveData.price !== null
   ) {
-    return currentPriceCardData; // Incoming data is older than current, and we have a price
+    return currentPriceCardData;
   }
 
   const newLiveData = createPriceCardLiveData(
     leanQuotePayload,
     apiTimestampMillis
   );
-  const newStaticData = createPriceCardStaticData(leanQuotePayload); // Exchange might come from quote
+  const newStaticData = createPriceCardStaticData(leanQuotePayload);
 
   let hasSignificantChange = false;
   if (
@@ -245,7 +251,6 @@ const handlePriceCardLiveQuoteUpdate: CardUpdateHandler<
     ...currentPriceCardData,
     liveData: newLiveData,
     staticData: {
-      // Keep existing static data and only update exchange_code if it changed
       ...currentPriceCardData.staticData,
       exchange_code: newStaticData.exchange_code,
     },
@@ -259,29 +264,23 @@ registerCardUpdateHandler(
 
 const handlePriceCardProfileUpdate: CardUpdateHandler<
   PriceCardData,
-  ProfileDBRow // Assuming ProfileDBRow contains company_name, image, exchange
+  ProfileDBRow
 > = (currentPriceCardData, profilePayload): PriceCardData => {
-  let needsUpdate = false;
+  const { updatedCardData, coreDataChanged } = applyProfileCoreUpdates(
+    currentPriceCardData,
+    profilePayload
+  );
 
-  const newCompanyName =
-    profilePayload.company_name ?? currentPriceCardData.companyName;
-  const newLogoUrl = profilePayload.image ?? currentPriceCardData.logoUrl;
-  // Exchange code update from profile might be less frequent or contingent
-  // For now, let's assume live_quote_indicators is the primary source for exchange for PriceCard
-  // const newExchangeCode = profilePayload.exchange ?? currentPriceCardData.staticData.exchange_code;
-
-  if (newCompanyName !== currentPriceCardData.companyName) {
-    needsUpdate = true;
-  }
-  if (newLogoUrl !== currentPriceCardData.logoUrl) {
-    needsUpdate = true;
-  }
-
-  if (needsUpdate) {
+  if (coreDataChanged) {
+    // If companyName changed, update the backData description
+    const companyNameForDesc =
+      updatedCardData.companyName ?? updatedCardData.symbol;
+    const newBackData: BaseCardBackData = {
+      description: `Market price information for ${companyNameForDesc}. Includes daily and historical price points, volume, and key moving averages.`,
+    };
     return {
-      ...currentPriceCardData,
-      companyName: newCompanyName,
-      logoUrl: newLogoUrl,
+      ...updatedCardData,
+      backData: newBackData,
     };
   }
 

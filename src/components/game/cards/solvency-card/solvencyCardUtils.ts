@@ -22,15 +22,19 @@ import {
 import type { Database } from "@/lib/supabase/database.types";
 import type { FinancialStatementDBRow as FinancialStatementDBRowFromRealtime } from "@/lib/supabase/realtime-service";
 import type { ProfileDBRow } from "@/hooks/useStockData";
+import { applyProfileCoreUpdates } from "../cardUtils";
 
 type FinancialStatementDBRowFromSupabase =
   Database["public"]["Tables"]["financial_statements"]["Row"];
 type ProfileDBRowFromSupabase = Database["public"]["Tables"]["profiles"]["Row"];
 
-// Helper function to construct SolvencyCardData from a DB row and profile details
 function constructSolvencyCardData(
   dbRow: FinancialStatementDBRowFromSupabase,
-  profileInfo: { companyName?: string | null; logoUrl?: string | null },
+  profileInfo: {
+    companyName?: string | null;
+    logoUrl?: string | null;
+    websiteUrl?: string | null;
+  },
   idOverride?: string | null,
   existingCreatedAt?: number | null
 ): SolvencyCardData {
@@ -99,6 +103,7 @@ function constructSolvencyCardData(
     symbol: dbRow.symbol,
     companyName: profileInfo.companyName ?? dbRow.symbol,
     logoUrl: profileInfo.logoUrl ?? null,
+    websiteUrl: profileInfo.websiteUrl ?? null,
     createdAt: existingCreatedAt ?? Date.now(),
     staticData,
     liveData,
@@ -110,26 +115,39 @@ async function initializeSolvencyCard({
   symbol,
   supabase,
   toast,
+  activeCards,
 }: CardInitializationContext): Promise<DisplayableCard | null> {
   try {
-    const { data: profileData, error: profileError } = await supabase
-      .from("profiles")
-      .select("company_name, image")
-      .eq("symbol", symbol)
-      .maybeSingle();
+    const profileCardForSymbol = activeCards?.find(
+      (c) => c.symbol === symbol && c.type === "profile"
+    ) as ProfileDBRowFromSupabase | undefined;
 
-    if (profileError) {
-      console.warn(
-        `[initializeSolvencyCard] Error fetching profile for ${symbol}:`,
-        profileError.message
-      );
-    }
     const fetchedProfileInfo = {
-      companyName:
-        (profileData as ProfileDBRowFromSupabase | null)?.company_name ??
-        symbol,
-      logoUrl: (profileData as ProfileDBRowFromSupabase | null)?.image ?? null,
+      companyName: profileCardForSymbol?.company_name ?? symbol,
+      logoUrl: profileCardForSymbol?.image ?? null,
+      websiteUrl: profileCardForSymbol?.website ?? null,
     };
+    if (!profileCardForSymbol) {
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("company_name, image, website")
+        .eq("symbol", symbol)
+        .maybeSingle();
+
+      if (profileError) {
+        console.warn(
+          `[initializeSolvencyCard] Error fetching profile for ${symbol}:`,
+          profileError.message
+        );
+      }
+      fetchedProfileInfo.companyName =
+        (profileData as ProfileDBRowFromSupabase | null)?.company_name ??
+        symbol;
+      fetchedProfileInfo.logoUrl =
+        (profileData as ProfileDBRowFromSupabase | null)?.image ?? null;
+      fetchedProfileInfo.websiteUrl =
+        (profileData as ProfileDBRowFromSupabase | null)?.website ?? null;
+    }
 
     const { data: statementData, error: statementError } = await supabase
       .from("financial_statements")
@@ -282,6 +300,7 @@ const handleSolvencyCardStatementUpdate: CardUpdateHandler<
       {
         companyName: currentSolvencyCardData.companyName,
         logoUrl: currentSolvencyCardData.logoUrl,
+        websiteUrl: currentSolvencyCardData.websiteUrl,
       },
       currentSolvencyCardData.id,
       Date.now()
@@ -299,30 +318,21 @@ const handleSolvencyCardProfileUpdate: CardUpdateHandler<
   SolvencyCardData,
   ProfileDBRow
 > = (currentSolvencyCardData, profilePayload): SolvencyCardData => {
-  let needsDisplayUpdate = false;
-  const newCompanyName =
-    profilePayload.company_name ?? currentSolvencyCardData.symbol;
-  const newLogoUrl = profilePayload.image ?? null;
+  const { updatedCardData, coreDataChanged } = applyProfileCoreUpdates(
+    currentSolvencyCardData,
+    profilePayload
+  );
 
-  if (currentSolvencyCardData.companyName !== newCompanyName) {
-    needsDisplayUpdate = true;
-  }
-  if (currentSolvencyCardData.logoUrl !== newLogoUrl) {
-    needsDisplayUpdate = true;
-  }
-
-  if (needsDisplayUpdate) {
+  if (coreDataChanged) {
     const newBackDataDescription: BaseCardBackData = {
-      description: `Key solvency metrics for ${newCompanyName} (${
-        currentSolvencyCardData.staticData.periodLabel
-      }, ending ${
-        currentSolvencyCardData.staticData.statementDate || "N/A"
+      description: `Key solvency metrics for ${
+        updatedCardData.companyName // Use the new company name
+      } (${updatedCardData.staticData.periodLabel}, ending ${
+        updatedCardData.staticData.statementDate || "N/A"
       }). Includes assets, liabilities, debt, and cash flow.`,
     };
     return {
-      ...currentSolvencyCardData,
-      companyName: newCompanyName,
-      logoUrl: newLogoUrl,
+      ...updatedCardData,
       backData: newBackDataDescription,
     };
   }

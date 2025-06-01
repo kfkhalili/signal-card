@@ -25,12 +25,6 @@ export const geistMonoLocal = localFont({
       weight: "400",
       style: "normal",
     },
-    // Add GeistMono-Bold.woff2 if you decide you need it
-    // {
-    //   path: '../fonts/GeistMono-Bold.woff2',
-    //   weight: '700',
-    //   style: 'normal',
-    // },
   ],
   variable: "--font-geist-mono",
   display: "swap",
