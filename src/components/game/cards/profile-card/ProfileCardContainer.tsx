@@ -1,12 +1,12 @@
 // src/components/game/cards/profile-card/ProfileCardContainer.tsx
 import React from "react";
-import BaseCard from "../base-card/BaseCard"; //
+import BaseCard from "../base-card/BaseCard";
 import type { ProfileCardData } from "./profile-card.types";
 // ProfileCardInteractions is removed
 import { ProfileCardContent } from "./ProfileCardContent";
-import type { DisplayableCard } from "../../types"; //
-import type { RegisteredCardRendererProps } from "../../cardRenderers"; //
-import type { OnGenericInteraction } from "../base-card/base-card.types"; //
+import type { DisplayableCard } from "../../types";
+import type { RegisteredCardRendererProps } from "../../cardRenderers";
+import type { OnGenericInteraction } from "../base-card/base-card.types";
 
 interface ProfileCardContainerProps
   extends Omit<

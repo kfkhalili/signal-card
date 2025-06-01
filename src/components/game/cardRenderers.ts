@@ -3,9 +3,9 @@ import React from "react";
 import type {
   CardType,
   OnGenericInteraction,
-} from "@/components/game/cards/base-card/base-card.types"; //
+} from "@/components/game/cards/base-card/base-card.types";
 import type { CardActionContext } from "@/components/game/cards/base-card/base-card.types";
-import type { DisplayableCard } from "./types"; //
+import type { DisplayableCard } from "./types";
 
 /**
  * Common props expected by all registered card renderers (containers).
