@@ -22,15 +22,19 @@ import {
 import type { Database } from "@/lib/supabase/database.types";
 import type { FinancialStatementDBRow as FinancialStatementDBRowFromRealtime } from "@/lib/supabase/realtime-service";
 import type { ProfileDBRow } from "@/hooks/useStockData";
+import { applyProfileCoreUpdates } from "../cardUtils";
 
 type FinancialStatementDBRowFromSupabase =
   Database["public"]["Tables"]["financial_statements"]["Row"];
 type ProfileDBRowFromSupabase = Database["public"]["Tables"]["profiles"]["Row"];
 
-// Helper function to construct RevenueCardData from a DB row and profile details
 function constructRevenueCardData(
   dbRow: FinancialStatementDBRowFromSupabase,
-  profileInfo: { companyName?: string | null; logoUrl?: string | null },
+  profileInfo: {
+    companyName?: string | null;
+    logoUrl?: string | null;
+    websiteUrl?: string | null;
+  },
   idOverride?: string | null,
   existingCreatedAt?: number | null
 ): RevenueCardData {
@@ -96,6 +100,7 @@ function constructRevenueCardData(
     symbol: dbRow.symbol,
     companyName: profileInfo.companyName ?? dbRow.symbol,
     logoUrl: profileInfo.logoUrl ?? null,
+    websiteUrl: profileInfo.websiteUrl ?? null,
     createdAt: existingCreatedAt ?? Date.now(),
     staticData,
     liveData,
@@ -107,31 +112,41 @@ async function initializeRevenueCard({
   symbol,
   supabase,
   toast,
+  activeCards,
 }: CardInitializationContext): Promise<DisplayableCard | null> {
   try {
-    // Fetch profile data for companyName and logoUrl first
-    const { data: profileData, error: profileError } = await supabase
-      .from("profiles")
-      .select("company_name, image") // Select only needed fields
-      .eq("symbol", symbol)
-      .maybeSingle();
+    const profileCardForSymbol = activeCards?.find(
+      (c) => c.symbol === symbol && c.type === "profile"
+    ) as ProfileDBRowFromSupabase | undefined; // Assuming ProfileCardData is similar enough or use a specific type
 
-    if (profileError) {
-      // Log the error but don't necessarily fail the card creation,
-      // as financial data might still be available.
-      console.warn(
-        `[initializeRevenueCard] Error fetching profile for ${symbol} (for name/logo):`,
-        profileError.message
-      );
-    }
     const fetchedProfileInfo = {
-      companyName:
-        (profileData as ProfileDBRowFromSupabase | null)?.company_name ??
-        symbol,
-      logoUrl: (profileData as ProfileDBRowFromSupabase | null)?.image ?? null,
+      companyName: profileCardForSymbol?.company_name ?? symbol,
+      logoUrl: profileCardForSymbol?.image ?? null,
+      websiteUrl: profileCardForSymbol?.website ?? null,
     };
 
-    // Fetch the latest financial statement
+    if (!profileCardForSymbol) {
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("company_name, image, website")
+        .eq("symbol", symbol)
+        .maybeSingle();
+
+      if (profileError) {
+        console.warn(
+          `[initializeRevenueCard] Error fetching profile for ${symbol}:`,
+          profileError.message
+        );
+      }
+      fetchedProfileInfo.companyName =
+        (profileData as ProfileDBRowFromSupabase | null)?.company_name ??
+        symbol;
+      fetchedProfileInfo.logoUrl =
+        (profileData as ProfileDBRowFromSupabase | null)?.image ?? null;
+      fetchedProfileInfo.websiteUrl =
+        (profileData as ProfileDBRowFromSupabase | null)?.website ?? null;
+    }
+
     const { data: statementData, error: statementError } = await supabase
       .from("financial_statements")
       .select(
@@ -148,7 +163,7 @@ async function initializeRevenueCard({
         `[initializeRevenueCard] Supabase error fetching financial statement for ${symbol}:`,
         statementError
       );
-      throw statementError; // This is a more critical error
+      throw statementError;
     }
 
     if (statementData) {
@@ -156,7 +171,7 @@ async function initializeRevenueCard({
         statementData as FinancialStatementDBRowFromSupabase;
       const concreteCardData = constructRevenueCardData(
         financialStatement,
-        fetchedProfileInfo // Pass fetched profile info
+        fetchedProfileInfo
       );
 
       const cardState: Pick<DisplayableCardState, "isFlipped"> = {
@@ -206,7 +221,7 @@ const handleRevenueCardStatementUpdate: CardUpdateHandler<
 > = (
   currentRevenueCardData,
   newFinancialStatementRow,
-  _currentDisplayableCard, // Parameter is part of the generic signature, can be unused if prefixed
+  _currentDisplayableCard,
   context
 ): RevenueCardData => {
   const currentStatementDateStr =
@@ -253,9 +268,6 @@ const handleRevenueCardStatementUpdate: CardUpdateHandler<
       currentRevenueCardData.staticData.statementPeriod !==
       newFinancialStatementRow.period
     ) {
-      // If periods are different (and not handled by hierarchy) for the same date,
-      // and it's not an older accepted_date, consider it an update.
-      // This might need more specific rules if FMP can provide multiple non-hierarchical statements for the same date.
       if (
         newFinancialStatementRow.accepted_date &&
         currentRevenueCardData.staticData.acceptedDate
@@ -267,7 +279,7 @@ const handleRevenueCardStatementUpdate: CardUpdateHandler<
           shouldUpdate = true;
         }
       } else {
-        shouldUpdate = true; // If accepted_date isn't available for comparison, assume update.
+        shouldUpdate = true;
       }
     }
   }
@@ -284,12 +296,12 @@ const handleRevenueCardStatementUpdate: CardUpdateHandler<
     return constructRevenueCardData(
       newFinancialStatementRow,
       {
-        // Pass existing companyName and logoUrl
         companyName: currentRevenueCardData.companyName,
         logoUrl: currentRevenueCardData.logoUrl,
+        websiteUrl: currentRevenueCardData.websiteUrl,
       },
-      currentRevenueCardData.id, // Preserve ID
-      Date.now() // Update createdAt to signify data refresh
+      currentRevenueCardData.id,
+      Date.now()
     );
   }
   return currentRevenueCardData;
@@ -304,31 +316,21 @@ const handleRevenueCardProfileUpdate: CardUpdateHandler<
   RevenueCardData,
   ProfileDBRow
 > = (currentRevenueCardData, profilePayload): RevenueCardData => {
-  let needsDisplayUpdate = false;
-  const newCompanyName =
-    profilePayload.company_name ?? currentRevenueCardData.symbol;
-  const newLogoUrl = profilePayload.image ?? null;
+  const { updatedCardData, coreDataChanged } = applyProfileCoreUpdates(
+    currentRevenueCardData,
+    profilePayload
+  );
 
-  if (currentRevenueCardData.companyName !== newCompanyName) {
-    needsDisplayUpdate = true;
-  }
-  if (currentRevenueCardData.logoUrl !== newLogoUrl) {
-    needsDisplayUpdate = true;
-  }
-
-  if (needsDisplayUpdate) {
-    // Re-construct backData description if companyName changed
+  if (coreDataChanged) {
     const newBackDataDescription: BaseCardBackData = {
-      description: `Key financial metrics for ${newCompanyName} (${
-        currentRevenueCardData.staticData.periodLabel
+      description: `Key financial metrics for ${updatedCardData.companyName} (${
+        updatedCardData.staticData.periodLabel
       }, ending ${
-        currentRevenueCardData.staticData.statementDate || "N/A"
+        updatedCardData.staticData.statementDate || "N/A"
       }). Includes revenue, profits, and free cash flow.`,
     };
     return {
-      ...currentRevenueCardData,
-      companyName: newCompanyName,
-      logoUrl: newLogoUrl,
+      ...updatedCardData,
       backData: newBackDataDescription,
     };
   }

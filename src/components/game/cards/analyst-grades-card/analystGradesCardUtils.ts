@@ -21,6 +21,7 @@ import {
 } from "@/components/game/cardUpdateHandler.types";
 import type { Database } from "@/lib/supabase/database.types";
 import type { ProfileDBRow } from "@/hooks/useStockData";
+import { applyProfileCoreUpdates } from "../cardUtils";
 
 type GradesHistoricalDBRow =
   Database["public"]["Tables"]["grades_historical"]["Row"];
@@ -69,10 +70,9 @@ function mapDbRowToRatingCounts(
 function calculateTotalAnalysts(
   counts: Record<RatingCategory, number | null>
 ): number {
-  // Get an array of all rating count values, which can be number or null
   const ratingValues: (number | null)[] = Object.values(counts);
   return ratingValues.reduce((sum: number, current: number | null): number => {
-    const currentValueAsNumber = current ?? 0; // Ensures current is a number
+    const currentValueAsNumber = current ?? 0;
     return sum + currentValueAsNumber;
   }, 0);
 }
@@ -107,22 +107,48 @@ function deriveConsensusLabel(
 
 async function fetchAnalystGradesData(
   symbol: string,
-  supabase: CardInitializationContext["supabase"]
+  supabase: CardInitializationContext["supabase"],
+  activeCards?: DisplayableCard[]
 ): Promise<{
-  profileInfo: { companyName?: string | null; logoUrl?: string | null };
+  profileInfo: {
+    companyName?: string | null;
+    logoUrl?: string | null;
+    websiteUrl?: string | null;
+  };
   latestGrading: GradesHistoricalDBRow | null;
   previousGrading: GradesHistoricalDBRow | null;
 }> {
-  const { data: profileData } = await supabase
-    .from("profiles")
-    .select("company_name, image")
-    .eq("symbol", symbol)
-    .maybeSingle();
+  const profileCardForSymbol = activeCards?.find(
+    (c) => c.symbol === symbol && c.type === "profile"
+  ) as ProfileDBRowFromSupabase | undefined;
+
+  let fetchedProfileInfoRaw = {
+    company_name: profileCardForSymbol?.company_name ?? symbol,
+    image: profileCardForSymbol?.image ?? null,
+    website: profileCardForSymbol?.website ?? null,
+  };
+
+  if (!profileCardForSymbol) {
+    const { data: profileDataFromDB } = await supabase
+      .from("profiles")
+      .select("company_name, image, website")
+      .eq("symbol", symbol)
+      .maybeSingle();
+    fetchedProfileInfoRaw = {
+      company_name:
+        (profileDataFromDB as ProfileDBRowFromSupabase | null)?.company_name ??
+        symbol,
+      image:
+        (profileDataFromDB as ProfileDBRowFromSupabase | null)?.image ?? null,
+      website:
+        (profileDataFromDB as ProfileDBRowFromSupabase | null)?.website ?? null,
+    };
+  }
 
   const profileInfo = {
-    companyName:
-      (profileData as ProfileDBRowFromSupabase | null)?.company_name ?? symbol,
-    logoUrl: (profileData as ProfileDBRowFromSupabase | null)?.image ?? null,
+    companyName: fetchedProfileInfoRaw.company_name,
+    logoUrl: fetchedProfileInfoRaw.image,
+    websiteUrl: fetchedProfileInfoRaw.website,
   };
 
   const { data: gradesRows, error: gradesError } = await supabase
@@ -150,20 +176,25 @@ async function fetchAnalystGradesData(
 function formatPeriodDate(dateString: string | null): string {
   if (!dateString) return "N/A";
   try {
-    const date = new Date(dateString + "T00:00:00Z"); // Assume UTC date if no time
+    // Assuming dateString is YYYY-MM-DD from Supabase, ensure it's treated as UTC
+    const date = new Date(dateString + "T00:00:00Z");
     return date.toLocaleDateString(undefined, {
       month: "long",
       year: "numeric",
-      timeZone: "UTC",
+      timeZone: "UTC", // Specify UTC to avoid local timezone shifts
     });
   } catch {
-    return dateString; // Fallback
+    return dateString; // Fallback if date parsing fails
   }
 }
 
 function constructAnalystGradesCardData(
   symbol: string,
-  profileInfo: { companyName?: string | null; logoUrl?: string | null },
+  profileInfo: {
+    companyName?: string | null;
+    logoUrl?: string | null;
+    websiteUrl?: string | null;
+  },
   latestGrading: GradesHistoricalDBRow | null,
   previousGrading: GradesHistoricalDBRow | null,
   idOverride?: string | null,
@@ -177,7 +208,7 @@ function constructAnalystGradesCardData(
   const ratingsDistribution: AnalystRatingDetail[] =
     RATING_CATEGORIES_ORDERED.map(({ category, label, colorClass }) => {
       const currentValue = currentCounts[category] ?? 0;
-      const previousValue = previousCounts[category] ?? null; // Keep null if prev month no data for this category
+      const previousValue = previousCounts[category] ?? null;
       let change: number | null = null;
       if (previousValue !== null) {
         change = currentValue - previousValue;
@@ -230,11 +261,11 @@ function constructAnalystGradesCardData(
     symbol,
     companyName: profileInfo.companyName ?? symbol,
     logoUrl: profileInfo.logoUrl ?? null,
+    websiteUrl: profileInfo.websiteUrl ?? null,
     createdAt: existingCreatedAt ?? Date.now(),
     staticData,
     liveData,
     backData: cardBackData,
-    websiteUrl: null,
   };
 }
 
@@ -242,10 +273,11 @@ async function initializeAnalystGradesCard({
   symbol,
   supabase,
   toast,
+  activeCards,
 }: CardInitializationContext): Promise<DisplayableCard | null> {
   try {
     const { profileInfo, latestGrading, previousGrading } =
-      await fetchAnalystGradesData(symbol, supabase);
+      await fetchAnalystGradesData(symbol, supabase, activeCards);
 
     if (!latestGrading) {
       if (toast) {
@@ -289,20 +321,21 @@ const handleAnalystGradesProfileUpdate: CardUpdateHandler<
   AnalystGradesCardData,
   ProfileDBRow
 > = (currentCardData, profilePayload): AnalystGradesCardData => {
-  const newCompanyName = profilePayload.company_name ?? currentCardData.symbol;
-  const newLogoUrl = profilePayload.image ?? null;
+  const { updatedCardData, coreDataChanged } = applyProfileCoreUpdates(
+    currentCardData,
+    profilePayload
+  );
 
-  if (
-    currentCardData.companyName !== newCompanyName ||
-    currentCardData.logoUrl !== newLogoUrl
-  ) {
+  if (coreDataChanged) {
     const newBackData: BaseCardBackData = {
-      description: `Analyst rating distribution for ${newCompanyName} as of ${currentCardData.staticData.currentPeriodDate}, with changes from the previous period.`,
+      description: `Analyst rating distribution for ${
+        updatedCardData.companyName // Use the new company name
+      } as of ${
+        updatedCardData.staticData.currentPeriodDate
+      }, with changes from the previous period.`,
     };
     return {
-      ...currentCardData,
-      companyName: newCompanyName,
-      logoUrl: newLogoUrl,
+      ...updatedCardData,
       backData: newBackData,
     };
   }

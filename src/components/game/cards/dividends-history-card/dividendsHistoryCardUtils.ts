@@ -21,6 +21,7 @@ import {
 } from "@/components/game/cardUpdateHandler.types";
 import type { Database } from "@/lib/supabase/database.types";
 import type { ProfileDBRow } from "@/hooks/useStockData";
+import { applyProfileCoreUpdates } from "../cardUtils";
 
 type DividendHistoryDBRow =
   Database["public"]["Tables"]["dividend_history"]["Row"];
@@ -52,7 +53,7 @@ function getTypicalFrequency(
   return mostCommonFrequency;
 }
 
-function calculatePastAnnualTotals( // Renamed for clarity
+function calculatePastAnnualTotals(
   historicalRecords: readonly Pick<DividendHistoryDBRow, "date" | "dividend">[],
   currentYear: number
 ): {
@@ -72,12 +73,10 @@ function calculatePastAnnualTotals( // Renamed for clarity
     const targetYear = currentYear - 1 - i;
     pastTotals.push({
       year: targetYear,
-      totalDividend: yearlyData[targetYear] ?? 0, // Default to 0 if no data
+      totalDividend: yearlyData[targetYear] ?? 0,
       isEstimate: false,
     });
   }
-  // These are already effectively sorted with newest past year first if loop is as is,
-  // but we will sort the final combined array later.
 
   let growthYoY: number | null = null;
   const lastFullYear = currentYear - 1;
@@ -112,51 +111,67 @@ function calculateNextYearEstimate(
     case "quarterly":
       return amount * 4;
     case "annually":
-    case "annual": // FMP might use 'Annual'
+    case "annual":
       return amount * 1;
     case "semi-annually":
-    case "semi-annual": // FMP might use 'Semi-Annual'
+    case "semi-annual":
       return amount * 2;
     case "monthly":
       return amount * 12;
     default:
-      // If frequency is unknown or irregular, cannot reliably estimate annual from single payment.
-      // Could try to sum last 4 quarters if available, but that's more complex from just 'latestDividend'
       return null;
   }
 }
 
 async function fetchAndProcessDividendsData(
   symbol: string,
-  supabase: CardInitializationContext["supabase"]
+  supabase: CardInitializationContext["supabase"],
+  activeCards?: DisplayableCard[]
 ): Promise<{
   profileInfo: {
     companyName: string | null;
     logoUrl: string | null;
+    websiteUrl: string | null;
     reportedCurrency: string | null;
   };
   latestDividendRow: DividendHistoryDBRow | null;
   historicalRows: DividendHistoryDBRow[];
 }> {
-  const { data: profileData, error: profileError } = await supabase
-    .from("profiles")
-    .select("company_name, image, currency")
-    .eq("symbol", symbol)
-    .maybeSingle();
+  const profileCardForSymbol = activeCards?.find(
+    (c) => c.symbol === symbol && c.type === "profile"
+  ) as ProfileDBRowFromSupabase | undefined;
 
-  if (profileError) {
-    console.warn(
-      `[DividendsHistoryCard] Error fetching profile for ${symbol}:`,
-      profileError.message
-    );
-  }
-  const fetchedProfileInfo = {
-    companyName:
-      (profileData as ProfileDBRowFromSupabase | null)?.company_name ?? symbol,
-    logoUrl: (profileData as ProfileDBRowFromSupabase | null)?.image ?? null,
-    reportedCurrency:
-      (profileData as ProfileDBRowFromSupabase | null)?.currency ?? null,
+  let fetchedProfileInfo = {
+    companyName: profileCardForSymbol?.company_name ?? symbol,
+    logoUrl: profileCardForSymbol?.image ?? null,
+    websiteUrl: profileCardForSymbol?.website ?? null,
+    reportedCurrency: profileCardForSymbol?.currency ?? null,
   };
+
+  if (!profileCardForSymbol) {
+    const { data: profileData, error: profileError } = await supabase
+      .from("profiles")
+      .select("company_name, image, currency, website")
+      .eq("symbol", symbol)
+      .maybeSingle();
+
+    if (profileError) {
+      console.warn(
+        `[DividendsHistoryCard] Error fetching profile for ${symbol}:`,
+        profileError.message
+      );
+    }
+    fetchedProfileInfo = {
+      companyName:
+        (profileData as ProfileDBRowFromSupabase | null)?.company_name ??
+        symbol,
+      logoUrl: (profileData as ProfileDBRowFromSupabase | null)?.image ?? null,
+      websiteUrl:
+        (profileData as ProfileDBRowFromSupabase | null)?.website ?? null,
+      reportedCurrency:
+        (profileData as ProfileDBRowFromSupabase | null)?.currency ?? null,
+    };
+  }
 
   const { data: latestDividendData, error: latestDivError } = await supabase
     .from("dividend_history")
@@ -181,7 +196,7 @@ async function fetchAndProcessDividendsData(
     .from("dividend_history")
     .select("*")
     .eq("symbol", symbol)
-    .gte("date", startDate) // Fetch enough data for 3 past full years
+    .gte("date", startDate)
     .order("date", { ascending: false });
 
   if (histDivError) {
@@ -203,6 +218,7 @@ function constructDividendsHistoryCardData(
   profileInfo: {
     companyName: string | null;
     logoUrl: string | null;
+    websiteUrl: string | null;
     reportedCurrency: string | null;
   },
   latestDividendRow: DividendHistoryDBRow | null,
@@ -235,12 +251,11 @@ function constructDividendsHistoryCardData(
 
   if (nextYearEstimateValue !== null) {
     annualDividendFigures.push({
-      year: currentUtcYear + 1, // Estimate for the next calendar year
+      year: currentUtcYear + 1,
       totalDividend: nextYearEstimateValue,
       isEstimate: true,
     });
   }
-  // Sort by year ascending for consistent display order (oldest to newest)
   annualDividendFigures.sort((a, b) => a.year - b.year);
 
   const staticData: DividendsHistoryCardStaticData = {
@@ -271,11 +286,11 @@ function constructDividendsHistoryCardData(
     symbol,
     companyName: profileInfo.companyName ?? symbol,
     logoUrl: profileInfo.logoUrl ?? null,
+    websiteUrl: profileInfo.websiteUrl ?? null,
     createdAt: existingCreatedAt ?? Date.now(),
     staticData,
     liveData,
     backData: cardBackData,
-    websiteUrl: null,
   };
 }
 
@@ -283,10 +298,11 @@ async function initializeDividendsHistoryCard({
   symbol,
   supabase,
   toast,
+  activeCards,
 }: CardInitializationContext): Promise<DisplayableCard | null> {
   try {
     const { profileInfo, latestDividendRow, historicalRows } =
-      await fetchAndProcessDividendsData(symbol, supabase);
+      await fetchAndProcessDividendsData(symbol, supabase, activeCards);
 
     if (!latestDividendRow && historicalRows.length === 0) {
       if (toast) {
@@ -366,7 +382,6 @@ const handleSingleDividendRowUpdate: CardUpdateHandler<
       new Date().toISOString();
     hasChanged = true;
 
-    // Recalculate next year estimate based on the new latest dividend
     const nextYearEstimateValue = calculateNextYearEstimate(
       newLatestDividendInfo
     );
@@ -382,18 +397,15 @@ const handleSingleDividendRowUpdate: CardUpdateHandler<
         isEstimate: true,
       };
       if (estimateIndex !== -1) {
-        // Update existing estimate if year matches, or if only one estimate exists
         if (currentAnnualFigures[estimateIndex].year === currentUtcYear + 1) {
           currentAnnualFigures[estimateIndex] = estimateEntry;
         } else {
-          // year changed, replace
           currentAnnualFigures.splice(estimateIndex, 1, estimateEntry);
         }
       } else {
         currentAnnualFigures.push(estimateEntry);
       }
     } else if (estimateIndex !== -1) {
-      // Remove estimate if it can no longer be calculated
       currentAnnualFigures.splice(estimateIndex, 1);
     }
     currentAnnualFigures.sort((a, b) => a.year - b.year);
@@ -416,6 +428,9 @@ const handleSingleDividendRowUpdate: CardUpdateHandler<
         description: `Latest dividend for ${currentCardData.symbol} processed for ${newDividendRow.date}. Next year estimate may have updated.`,
       });
     }
+    // Re-construct backData if companyName might have changed implicitly (though not directly from this payload)
+    // For safety, or if profile updates are batched, consider if profileInfo should be re-fetched or passed.
+    // Here, assuming companyName doesn't change with a DIVIDEND_ROW_UPDATE.
     return {
       ...currentCardData,
       liveData: updatedLiveData,
@@ -426,11 +441,9 @@ const handleSingleDividendRowUpdate: CardUpdateHandler<
   return currentCardData;
 };
 
-// Register with a specific event type for dividend row updates
-// Ensure this event type is defined in CardUpdateEventType and dispatched correctly
 registerCardUpdateHandler(
   "dividendshistory",
-  "DIVIDEND_ROW_UPDATE", // Example: Replace with your actual specific event type
+  "DIVIDEND_ROW_UPDATE",
   handleSingleDividendRowUpdate
 );
 
@@ -438,29 +451,33 @@ const handleDividendsHistoryProfileUpdate: CardUpdateHandler<
   DividendsHistoryCardData,
   ProfileDBRow
 > = (currentCardData, profilePayload): DividendsHistoryCardData => {
-  const newCompanyName = profilePayload.company_name ?? currentCardData.symbol;
-  const newLogoUrl = profilePayload.image ?? null;
-  const newReportedCurrency = profilePayload.currency ?? null;
+  const { updatedCardData, coreDataChanged } = applyProfileCoreUpdates(
+    currentCardData,
+    profilePayload
+  );
 
-  let needsUpdate = false;
-  if (currentCardData.companyName !== newCompanyName) needsUpdate = true;
-  if (currentCardData.logoUrl !== newLogoUrl) needsUpdate = true;
+  let currencyChanged = false;
+  const newReportedCurrency = profilePayload.currency ?? null;
   if (currentCardData.staticData.reportedCurrency !== newReportedCurrency) {
-    needsUpdate = true;
+    currencyChanged = true;
   }
 
-  if (needsUpdate) {
-    return {
-      ...currentCardData,
-      companyName: newCompanyName,
-      logoUrl: newLogoUrl,
+  if (coreDataChanged || currencyChanged) {
+    const finalCardData = {
+      ...updatedCardData,
       staticData: {
-        ...currentCardData.staticData,
+        ...updatedCardData.staticData,
         reportedCurrency: newReportedCurrency,
       },
-      backData: {
-        description: `Historical dividend payments and trends for ${newCompanyName}, including recent payments and annual totals. Next year estimate based on latest payment.`,
-      },
+    };
+    const newBackDataDescription: BaseCardBackData = {
+      description: `Historical dividend payments and trends for ${
+        finalCardData.companyName // Use the new company name
+      }, including recent payments and annual totals. Next year estimate based on latest payment.`,
+    };
+    return {
+      ...finalCardData,
+      backData: newBackDataDescription,
     };
   }
   return currentCardData;
