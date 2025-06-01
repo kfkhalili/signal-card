@@ -4,8 +4,9 @@ import { CardContent as ShadCardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
 import type { ProfileCardData } from "./profile-card.types";
-import { getFlagEmoji, getCountryName, cn } from "@/lib/utils";
+import { getFlagEmoji, getCountryName } from "@/lib/utils";
 import { formatNumberWithAbbreviations } from "@/lib/formatters";
+import { DataRow } from "@/components/ui/DataRow"; // Import the shared DataRow
 import type {
   OnGenericInteraction,
   InteractionPayload,
@@ -58,49 +59,6 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
       onGenericInteraction(payload);
     };
 
-    // Helper to render a data item, now with optional unit
-    const renderDataItem = (
-      label: string,
-      value: string | number | null | undefined,
-      unit = "",
-      isInteractive = false,
-      onClickHandler?: () => void,
-      titleOverride?: string,
-      valuePrecision?: number,
-      originatingElement?: string
-    ) => {
-      let displayValue: string;
-      if (value === null || value === undefined) {
-        displayValue = "N/A";
-      } else if (typeof value === "number") {
-        displayValue = `${value.toFixed(valuePrecision ?? 2)}${unit}`;
-      } else {
-        displayValue = `${value}${unit}`;
-      }
-
-      return (
-        <ClickableDataItem
-          isInteractive={isInteractive && !!onClickHandler}
-          onClickHandler={onClickHandler}
-          title={titleOverride || `${label}: ${displayValue}`}
-          baseClassName={cn(
-            "flex items-baseline min-w-0 gap-1 text-foreground"
-          )}
-          interactiveClassName={
-            isInteractive && !!onClickHandler
-              ? "hover:text-primary cursor-pointer"
-              : ""
-          }
-          aria-label={titleOverride || `${label}: ${displayValue}`}
-          data-testid={`${
-            originatingElement || label.toLowerCase().replace(/\s+/g, "-")
-          }-profile-item`}>
-          <span className="text-xs font-medium shrink-0">{label}:</span>
-          <span className="truncate text-xs">{displayValue}</span>
-        </ClickableDataItem>
-      );
-    };
-
     if (!isBackFace) {
       const description = staticData?.description;
       const countryFlag = getFlagEmoji(staticData?.country);
@@ -141,18 +99,18 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
             )}
 
             <div className="space-y-0.5 mt-0.5">
-              {renderDataItem(
-                "Industry",
-                staticData?.industry
-                  ? `${truncateText(staticData.industry, 22)}${
-                      staticData.sector
-                        ? ` (${truncateText(staticData.sector, 15)})`
-                        : ""
-                    }`
-                  : "N/A",
-                "",
-                !!staticData?.industry,
-                () => {
+              <DataRow
+                label="Industry"
+                value={
+                  staticData?.industry
+                    ? `${truncateText(staticData.industry, 22)}${
+                        staticData.sector
+                          ? ` (${truncateText(staticData.sector, 15)})`
+                          : ""
+                      }`
+                    : "N/A"
+                }
+                onClick={() => {
                   if (staticData?.industry) {
                     handleInteraction("FILTER_WORKSPACE_DATA", {
                       filterField: "industry",
@@ -160,11 +118,12 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                       originatingElement: "industryLink",
                     } as Omit<FilterWorkspaceDataInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
                   }
-                },
-                `Industry: ${staticData?.industry || "N/A"}${
+                }}
+                title={`Industry: ${staticData?.industry || "N/A"}${
                   staticData?.sector ? ` (Sector: ${staticData.sector})` : ""
-                }`
-              )}
+                }`}
+                originatingElement="industry-profile-item"
+              />
 
               {staticData?.country && (
                 <ClickableDataItem
@@ -180,7 +139,8 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                   }}
                   title={`Country: ${fullCountryName}`}
                   baseClassName="flex items-baseline min-w-0 gap-1 text-foreground hover:text-primary cursor-pointer"
-                  aria-label={`Filter by country: ${fullCountryName}`}>
+                  aria-label={`Filter by country: ${fullCountryName}`}
+                  data-testid="country-profile-item">
                   <span className="text-xs font-medium shrink-0">Country:</span>
                   <span className="text-sm leading-none mr-0.5">
                     {countryFlag}
@@ -191,87 +151,96 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                 </ClickableDataItem>
               )}
 
-              {renderDataItem(
-                "Employees",
-                staticData?.formatted_full_time_employees,
-                "",
-                true,
-                () => {
+              <DataRow
+                label="Employees"
+                value={staticData?.formatted_full_time_employees}
+                onClick={() => {
                   handleInteraction("TRIGGER_CARD_ACTION", {
                     actionName: "viewEmployeeData",
                     actionData: {
                       employees: staticData?.formatted_full_time_employees,
                     },
                   } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
-                },
-                `${
+                }}
+                title={`${
                   staticData?.formatted_full_time_employees || "N/A"
-                } employees`
-              )}
+                } employees`}
+                originatingElement="employees-profile-item"
+              />
               {liveData?.revenue !== null &&
-                liveData?.revenue !== undefined &&
-                renderDataItem(
-                  "Revenue (TTM)",
-                  formatNumberWithAbbreviations(liveData.revenue),
-                  "",
-                  true,
-                  () =>
-                    handleInteraction("REQUEST_NEW_CARD", {
-                      targetCardType: "revenue",
-                      originatingElement: "revenueDisplayTriggerProfile",
-                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">),
-                  `Revenue (TTM): ${formatNumberWithAbbreviations(
-                    liveData.revenue
-                  )} ${staticData?.currency || ""}`
+                liveData?.revenue !== undefined && (
+                  <DataRow
+                    label="Revenue (TTM)"
+                    value={formatNumberWithAbbreviations(liveData.revenue)}
+                    currency={staticData?.currency} // Pass currency for potential symbol use
+                    isMonetary={false} // Value is already formatted, let DataRow just display it
+                    onClick={() =>
+                      handleInteraction("REQUEST_NEW_CARD", {
+                        targetCardType: "revenue",
+                        originatingElement: "revenueDisplayTriggerProfile",
+                      } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                    }
+                    title={`Revenue (TTM): ${formatNumberWithAbbreviations(
+                      liveData.revenue
+                    )} ${staticData?.currency || ""}`}
+                    originatingElement="revenue-ttm-profile-item"
+                  />
                 )}
-              {/* Displaying new TTM Ratios */}
-              {liveData?.eps !== null &&
-                liveData?.eps !== undefined &&
-                renderDataItem(
-                  `EPS (TTM)`,
-                  liveData.eps,
-                  staticData?.currency ? ` ${staticData.currency}` : "",
-                  true,
-                  () =>
+              {liveData?.eps !== null && liveData?.eps !== undefined && (
+                <DataRow
+                  label={`EPS (TTM)`}
+                  value={liveData.eps}
+                  unit={staticData?.currency ? ` ${staticData.currency}` : ""}
+                  precision={2}
+                  onClick={() =>
                     handleInteraction("REQUEST_NEW_CARD", {
                       targetCardType: "keyratios",
                       originatingElement: "epsTTMDisplayTriggerProfile",
-                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">),
-                  `EPS (TTM): ${liveData.eps.toFixed(2)} ${
+                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                  }
+                  title={`EPS (TTM): ${liveData.eps.toFixed(2)} ${
                     staticData?.currency || ""
-                  }`
-                )}
+                  }`}
+                  originatingElement="eps-ttm-profile-item"
+                />
+              )}
               {liveData?.priceToEarningsRatioTTM !== null &&
-                liveData?.priceToEarningsRatioTTM !== undefined &&
-                renderDataItem(
-                  "P/E (TTM)",
-                  liveData.priceToEarningsRatioTTM,
-                  "x",
-                  true,
-                  () =>
-                    handleInteraction("REQUEST_NEW_CARD", {
-                      targetCardType: "keyratios",
-                      originatingElement: "peTTMDisplayTriggerProfile",
-                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">),
-                  `Price/Earnings Ratio (TTM): ${liveData.priceToEarningsRatioTTM.toFixed(
-                    2
-                  )}x`
+                liveData?.priceToEarningsRatioTTM !== undefined && (
+                  <DataRow
+                    label="P/E (TTM)"
+                    value={liveData.priceToEarningsRatioTTM}
+                    unit="x"
+                    precision={2}
+                    onClick={() =>
+                      handleInteraction("REQUEST_NEW_CARD", {
+                        targetCardType: "keyratios",
+                        originatingElement: "peTTMDisplayTriggerProfile",
+                      } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                    }
+                    title={`Price/Earnings Ratio (TTM): ${liveData.priceToEarningsRatioTTM.toFixed(
+                      2
+                    )}x`}
+                    originatingElement="pe-ttm-profile-item"
+                  />
                 )}
               {liveData?.priceToBookRatioTTM !== null &&
-                liveData?.priceToBookRatioTTM !== undefined &&
-                renderDataItem(
-                  "P/B (TTM)",
-                  liveData.priceToBookRatioTTM,
-                  "x",
-                  true,
-                  () =>
-                    handleInteraction("REQUEST_NEW_CARD", {
-                      targetCardType: "keyratios",
-                      originatingElement: "pbTTMDisplayTriggerProfile",
-                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">),
-                  `Price/Book Ratio (TTM): ${liveData.priceToBookRatioTTM.toFixed(
-                    2
-                  )}x`
+                liveData?.priceToBookRatioTTM !== undefined && (
+                  <DataRow
+                    label="P/B (TTM)"
+                    value={liveData.priceToBookRatioTTM}
+                    unit="x"
+                    precision={2}
+                    onClick={() =>
+                      handleInteraction("REQUEST_NEW_CARD", {
+                        targetCardType: "keyratios",
+                        originatingElement: "pbTTMDisplayTriggerProfile",
+                      } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                    }
+                    title={`Price/Book Ratio (TTM): ${liveData.priceToBookRatioTTM.toFixed(
+                      2
+                    )}x`}
+                    originatingElement="pb-ttm-profile-item"
+                  />
                 )}
             </div>
           </ShadCardContent>
@@ -349,6 +318,7 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
         </div>
       );
     } else {
+      // Back Face
       return (
         <div
           data-testid={`profile-card-back-${symbol}`}
@@ -359,39 +329,40 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                 `Profile details for ${companyName || symbol}.`}
             </p>
             <div className="space-y-1.5">
-              {staticData?.ceo &&
-                renderDataItem(
-                  "CEO",
-                  staticData.ceo,
-                  "",
-                  true,
-                  () =>
+              {staticData?.ceo && (
+                <DataRow
+                  label="CEO"
+                  value={staticData.ceo}
+                  onClick={() =>
                     handleInteraction("REQUEST_NEW_CARD", {
+                      // Example interaction
                       targetCardType: "profile",
                       originatingElement: "ceoValueBack",
-                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">),
-                  `CEO: ${staticData.ceo}`
-                )}
-              {staticData?.formatted_ipo_date &&
-                renderDataItem(
-                  "IPO Date",
-                  staticData.formatted_ipo_date,
-                  "",
-                  true,
-                  () =>
+                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                  }
+                  title={`CEO: ${staticData.ceo}`}
+                  originatingElement="ceo-profile-item-back"
+                />
+              )}
+              {staticData?.formatted_ipo_date && (
+                <DataRow
+                  label="IPO Date"
+                  value={staticData.formatted_ipo_date}
+                  onClick={() =>
                     handleInteraction("REQUEST_NEW_CARD", {
-                      targetCardType: "profile",
+                      targetCardType: "profile", // Or another relevant card
                       originatingElement: "ipoDateValueBack",
-                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">),
-                  `IPO Date: ${staticData.formatted_ipo_date}`
-                )}
-              {staticData?.exchange_full_name &&
-                renderDataItem(
-                  "Exchange",
-                  staticData.exchange_full_name,
-                  "",
-                  !!staticData.exchange,
-                  () => {
+                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                  }
+                  title={`IPO Date: ${staticData.formatted_ipo_date}`}
+                  originatingElement="ipo-date-profile-item-back"
+                />
+              )}
+              {staticData?.exchange_full_name && (
+                <DataRow
+                  label="Exchange"
+                  value={staticData.exchange_full_name}
+                  onClick={() => {
                     if (staticData.exchange) {
                       handleInteraction("FILTER_WORKSPACE_DATA", {
                         filterField: "exchange",
@@ -399,63 +370,74 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                         originatingElement: "exchangeLinkBack",
                       } as Omit<FilterWorkspaceDataInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
                     }
-                  },
-                  `Exchange: ${staticData.exchange_full_name}`
-                )}
-              {staticData?.isin &&
-                renderDataItem(
-                  "ISIN",
-                  staticData.isin,
-                  "",
-                  false,
-                  undefined,
-                  `ISIN: ${staticData.isin}`
-                )}
+                  }}
+                  title={`Exchange: ${staticData.exchange_full_name}`}
+                  originatingElement="exchange-profile-item-back"
+                />
+              )}
+              {staticData?.isin && (
+                <DataRow
+                  label="ISIN"
+                  value={staticData.isin}
+                  title={`ISIN: ${staticData.isin}`}
+                  originatingElement="isin-profile-item-back"
+                />
+              )}
               {staticData?.last_dividend !== null &&
-                staticData?.last_dividend !== undefined &&
-                renderDataItem(
-                  "Last Div.",
-                  staticData.last_dividend,
-                  ` ${staticData.currency || ""}`,
-                  true,
-                  () =>
-                    handleInteraction("REQUEST_NEW_CARD", {
-                      targetCardType: "cashuse",
-                      originatingElement: "lastDividendDisplayTriggerBack",
-                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">),
-                  `Last Dividend: ${staticData.last_dividend.toFixed(2)} ${
-                    staticData.currency || ""
-                  }`
+                staticData?.last_dividend !== undefined && (
+                  <DataRow
+                    label="Last Div."
+                    value={staticData.last_dividend}
+                    unit={staticData.currency ? ` ${staticData.currency}` : ""}
+                    isMonetary={true}
+                    currency={staticData.currency}
+                    precision={2} // Assuming 2 decimal places for dividend amount
+                    onClick={() =>
+                      handleInteraction("REQUEST_NEW_CARD", {
+                        targetCardType: "dividendshistory", // Changed from "cashuse"
+                        originatingElement: "lastDividendDisplayTriggerBack",
+                      } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                    }
+                    title={`Last Dividend: ${staticData.last_dividend.toFixed(
+                      2
+                    )} ${staticData.currency || ""}`}
+                    originatingElement="last-dividend-profile-item-back"
+                  />
                 )}
-              {staticData?.beta !== null &&
-                staticData?.beta !== undefined &&
-                renderDataItem(
-                  "1Y Beta",
-                  staticData.beta,
-                  "",
-                  true,
-                  () =>
+              {staticData?.beta !== null && staticData?.beta !== undefined && (
+                <DataRow
+                  label="1Y Beta"
+                  value={staticData.beta}
+                  precision={2}
+                  onClick={() =>
                     handleInteraction("TRIGGER_CARD_ACTION", {
-                      actionName: "viewVolatilityAnalysis",
+                      actionName: "viewVolatilityAnalysis", // Or "REQUEST_NEW_CARD" if beta has its own card
                       actionData: { beta: staticData.beta },
-                    } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">),
-                  `1 Year Beta: ${staticData.beta.toFixed(2)}`
-                )}
+                    } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                  }
+                  title={`1 Year Beta: ${staticData.beta.toFixed(2)}`}
+                  originatingElement="beta-profile-item-back"
+                />
+              )}
               {staticData?.average_volume !== null &&
-                staticData?.average_volume !== undefined &&
-                renderDataItem(
-                  "Avg. Vol.",
-                  formatNumberWithAbbreviations(staticData.average_volume),
-                  "",
-                  true,
-                  () =>
-                    handleInteraction("REQUEST_NEW_CARD", {
-                      targetCardType: "price",
-                      originatingElement: "avgVolumeDisplayTriggerBack",
-                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">),
-                  `Average Volume: ${formatNumberWithAbbreviations(
-                    staticData.average_volume
-                  )}`
+                staticData?.average_volume !== undefined && (
+                  <DataRow
+                    label="Avg. Vol."
+                    value={formatNumberWithAbbreviations(
+                      staticData.average_volume
+                    )}
+                    isMonetary={false} // Avg. Volume is not monetary
+                    onClick={() =>
+                      handleInteraction("REQUEST_NEW_CARD", {
+                        targetCardType: "price",
+                        originatingElement: "avgVolumeDisplayTriggerBack",
+                      } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                    }
+                    title={`Average Volume: ${formatNumberWithAbbreviations(
+                      staticData.average_volume
+                    )}`}
+                    originatingElement="avg-volume-profile-item-back"
+                  />
                 )}
             </div>
           </ShadCardContent>

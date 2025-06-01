@@ -6,7 +6,6 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { KeyRatiosCardData } from "./key-ratios-card.types";
-import { cn } from "@/lib/utils";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
 import type {
   OnGenericInteraction,
@@ -14,93 +13,7 @@ import type {
   RequestNewCardInteraction,
 } from "../base-card/base-card.types";
 import type { CardType } from "../base-card/base-card.types";
-
-interface DataRowProps {
-  label: string;
-  value: string | number | null | undefined;
-  unit?: string;
-  className?: string;
-  labelClassName?: string;
-  valueClassName?: string;
-  "data-testid"?: string;
-  title?: string;
-  onClick?: () => void;
-  isInteractive?: boolean;
-  tooltip?: string;
-  precision?: number;
-  isMonetary?: boolean; // Added this line
-}
-
-const DataRow: React.FC<DataRowProps> = ({
-  label,
-  value,
-  unit = "",
-  className,
-  labelClassName,
-  valueClassName,
-  "data-testid": dataTestId,
-  title,
-  onClick,
-  isInteractive,
-  tooltip,
-  precision = 2,
-}) => {
-  const formattedValue =
-    value === null || value === undefined || Number.isNaN(value)
-      ? "N/A"
-      : typeof value === "number"
-      ? `${value.toFixed(precision)}${unit}`
-      : `${value}${unit}`;
-
-  const effectiveTitle = tooltip
-    ? `${label}: ${formattedValue} (${tooltip})`
-    : title || `${label}: ${formattedValue}`;
-
-  return (
-    <div
-      className={cn(
-        "flex justify-between items-baseline py-0.5 group/datarow text-xs sm:text-sm",
-        isInteractive && onClick ? "cursor-pointer rounded px-1 -mx-1" : "",
-        className
-      )}
-      data-testid={dataTestId}
-      title={effectiveTitle}
-      onClick={isInteractive && onClick ? onClick : undefined}
-      onKeyDown={
-        isInteractive && onClick
-          ? (e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onClick();
-              }
-            }
-          : undefined
-      }
-      role={isInteractive && onClick ? "button" : undefined}
-      tabIndex={isInteractive && onClick ? 0 : undefined}>
-      <span
-        className={cn(
-          "text-muted-foreground mr-2",
-          isInteractive && onClick
-            ? "group-hover/datarow:text-primary transition-colors"
-            : "",
-          labelClassName
-        )}>
-        {label}
-      </span>
-      <span
-        className={cn(
-          "font-semibold text-foreground text-right",
-          isInteractive && onClick
-            ? "group-hover/datarow:text-primary transition-colors"
-            : "",
-          valueClassName
-        )}>
-        {formattedValue}
-      </span>
-    </div>
-  );
-};
+import { DataRow } from "@/components/ui/DataRow";
 
 interface KeyRatiosCardContentProps {
   cardData: KeyRatiosCardData;

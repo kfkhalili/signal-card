@@ -6,101 +6,13 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { RevenueCardData } from "./revenue-card.types";
-import { cn } from "@/lib/utils";
-import { formatNumberWithAbbreviations } from "@/lib/formatters";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
 import type {
   OnGenericInteraction,
   InteractionPayload,
   RequestNewCardInteraction,
 } from "../base-card/base-card.types";
-
-interface DataRowProps {
-  label: string;
-  value: string | number | null | undefined;
-  currency?: string | null;
-  isMonetary?: boolean;
-  className?: string;
-  labelClassName?: string;
-  valueClassName?: string;
-  "data-testid"?: string;
-  title?: string;
-  onClick?: () => void;
-  isInteractive?: boolean;
-}
-
-const DataRow: React.FC<DataRowProps> = ({
-  label,
-  value,
-  currency,
-  isMonetary = true,
-  className,
-  labelClassName,
-  valueClassName,
-  "data-testid": dataTestId,
-  title,
-  onClick,
-  isInteractive,
-}) => {
-  const displayCurrencySymbol = currency === "USD" ? "$" : currency || "$";
-
-  const formattedValue =
-    value === null || value === undefined || Number.isNaN(value)
-      ? "N/A"
-      : isMonetary
-      ? `${displayCurrencySymbol}${formatNumberWithAbbreviations(
-          value as number,
-          2
-        )}`
-      : typeof value === "string"
-      ? value
-      : formatNumberWithAbbreviations(value as number, 2);
-
-  return (
-    <div
-      className={cn(
-        "flex justify-between items-baseline py-0.5 group/datarow",
-        isInteractive && onClick ? "cursor-pointer rounded px-1 -mx-1" : "", // Removed hover:bg-muted/50 dark:hover:bg-muted/20
-        className
-      )}
-      data-testid={dataTestId}
-      title={title || `${label}: ${value ?? "N/A"}`}
-      onClick={isInteractive && onClick ? onClick : undefined}
-      onKeyDown={
-        isInteractive && onClick
-          ? (e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onClick();
-              }
-            }
-          : undefined
-      }
-      role={isInteractive && onClick ? "button" : undefined}
-      tabIndex={isInteractive && onClick ? 0 : undefined}>
-      <span
-        className={cn(
-          "text-muted-foreground mr-2",
-          isInteractive && onClick
-            ? "group-hover/datarow:text-primary transition-colors"
-            : "",
-          labelClassName
-        )}>
-        {label}
-      </span>
-      <span
-        className={cn(
-          "font-semibold text-foreground text-right",
-          isInteractive && onClick
-            ? "group-hover/datarow:text-primary transition-colors"
-            : "",
-          valueClassName
-        )}>
-        {formattedValue}
-      </span>
-    </div>
-  );
-};
+import { DataRow } from "@/components/ui/DataRow";
 
 interface RevenueCardContentProps {
   cardData: RevenueCardData;
