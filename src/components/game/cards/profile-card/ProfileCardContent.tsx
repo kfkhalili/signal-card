@@ -6,7 +6,7 @@ import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
 import type { ProfileCardData } from "./profile-card.types";
 import { getFlagEmoji, getCountryName } from "@/lib/utils";
 import { formatNumberWithAbbreviations } from "@/lib/formatters";
-import { DataRow } from "@/components/ui/DataRow"; // Import the shared DataRow
+import { DataRow } from "@/components/ui/DataRow";
 import type {
   OnGenericInteraction,
   InteractionPayload,
@@ -32,15 +32,7 @@ interface ProfileCardContentProps {
 
 export const ProfileCardContent = React.memo<ProfileCardContentProps>(
   ({ cardData, isBackFace, onGenericInteraction }) => {
-    const {
-      staticData,
-      liveData,
-      symbol,
-      id,
-      type: cardType,
-      backData,
-      companyName,
-    } = cardData;
+    const { staticData, liveData, symbol, id, type: cardType } = cardData;
 
     const handleInteraction = (
       intent: InteractionPayload["intent"],
@@ -154,8 +146,8 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                   <DataRow
                     label="Revenue (TTM)"
                     value={formatNumberWithAbbreviations(liveData.revenue)}
-                    currency={staticData?.currency} // Pass currency for potential symbol use
-                    isMonetary={false} // Value is already formatted, let DataRow just display it
+                    currency={staticData?.currency}
+                    isMonetary={false}
                     onClick={() =>
                       handleInteraction("REQUEST_NEW_CARD", {
                         targetCardType: "revenue",
@@ -306,10 +298,7 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
           data-testid={`profile-card-back-${symbol}`}
           className="pointer-events-auto flex flex-col h-full text-xs">
           <ShadCardContent className="pt-1 pb-1 px-0 space-y-1.5 flex-grow">
-            <p className="text-muted-foreground/90 text-center mb-1.5 leading-relaxed text-xs px-1">
-              {backData.description ||
-                `Profile details for ${companyName || symbol}.`}
-            </p>
+            {/* Description removed, will be rendered by BaseCard */}
             <div className="space-y-1.5">
               {staticData?.ceo && (
                 <DataRow
@@ -317,7 +306,6 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                   value={staticData.ceo}
                   onClick={() =>
                     handleInteraction("REQUEST_NEW_CARD", {
-                      // Example interaction
                       targetCardType: "profile",
                       originatingElement: "ceoValueBack",
                     } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
@@ -332,7 +320,7 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                   value={staticData.formatted_ipo_date}
                   onClick={() =>
                     handleInteraction("REQUEST_NEW_CARD", {
-                      targetCardType: "profile", // Or another relevant card
+                      targetCardType: "profile",
                       originatingElement: "ipoDateValueBack",
                     } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
                   }
@@ -373,10 +361,10 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                     unit={staticData.currency ? ` ${staticData.currency}` : ""}
                     isMonetary={true}
                     currency={staticData.currency}
-                    precision={2} // Assuming 2 decimal places for dividend amount
+                    precision={2}
                     onClick={() =>
                       handleInteraction("REQUEST_NEW_CARD", {
-                        targetCardType: "dividendshistory", // Changed from "cashuse"
+                        targetCardType: "dividendshistory",
                         originatingElement: "lastDividendDisplayTriggerBack",
                       } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
                     }
@@ -393,7 +381,7 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                   precision={2}
                   onClick={() =>
                     handleInteraction("TRIGGER_CARD_ACTION", {
-                      actionName: "viewVolatilityAnalysis", // Or "REQUEST_NEW_CARD" if beta has its own card
+                      actionName: "viewVolatilityAnalysis",
                       actionData: { beta: staticData.beta },
                     } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
                   }
@@ -408,7 +396,7 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                     value={formatNumberWithAbbreviations(
                       staticData.average_volume
                     )}
-                    isMonetary={false} // Avg. Volume is not monetary
+                    isMonetary={false}
                     onClick={() =>
                       handleInteraction("REQUEST_NEW_CARD", {
                         targetCardType: "price",

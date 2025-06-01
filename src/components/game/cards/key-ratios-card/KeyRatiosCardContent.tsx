@@ -1,9 +1,6 @@
 // src/components/game/cards/key-ratios-card/KeyRatiosCardContent.tsx
 import React from "react";
-import {
-  CardDescription,
-  CardContent as ShadCardContent,
-} from "@/components/ui/card";
+import { CardContent as ShadCardContent } from "@/components/ui/card";
 import type { KeyRatiosCardData } from "./key-ratios-card.types";
 import type {
   OnGenericInteraction,
@@ -21,15 +18,7 @@ interface KeyRatiosCardContentProps {
 
 export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
   React.memo(({ cardData, isBackFace, onGenericInteraction }) => {
-    const {
-      staticData,
-      liveData,
-      symbol,
-      companyName,
-      backData,
-      id,
-      type: cardType,
-    } = cardData;
+    const { staticData, liveData, symbol, id, type: cardType } = cardData;
 
     const handleInteraction = (
       intent: InteractionPayload["intent"],
@@ -56,15 +45,17 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
       tooltip?: string,
       relatedCardType?: CardType,
       originatingElement?: string,
-      isMonetaryValue = false // Pass this for per-share values that might not be monetary ratios
+      isMonetaryValue = false
     ) => (
       <DataRow
         label={label}
-        value={value && unit === "%" ? value * 100 : value}
-        unit={unit}
+        value={value && unit === "%" ? value * 100 : value} // value is pre-multiplied by 100 if it's a percentage
+        unit={unit === "%" ? undefined : unit} // Pass undefined as unit if DataRow will handle '%'
+        isValueAsPercentage={unit === "%"} // DataRow gets true if original unit was '%'
         precision={precision}
         tooltip={tooltip}
-        isMonetary={isMonetaryValue} // Use the passed value
+        isMonetary={isMonetaryValue}
+        currency={isMonetaryValue ? staticData.reportedCurrency : undefined}
         isInteractive={!!relatedCardType}
         onClick={
           relatedCardType
@@ -84,12 +75,6 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
           data-testid={`keyratios-card-back-${symbol}`}
           className="pointer-events-auto flex flex-col h-full">
           <ShadCardContent className="pt-1 pb-2 px-0 space-y-1.5 flex-grow">
-            <CardDescription className="text-xs text-center text-muted-foreground/90 mb-2.5 px-1 leading-relaxed">
-              {backData.description ||
-                `Trailing Twelve Months (TTM) ratios for ${
-                  companyName || symbol
-                }.`}
-            </CardDescription>
             <div className="pt-1.5 space-y-0.5 text-[10px] sm:text-xs border-t mt-1.5">
               <DataRow
                 label="Data Last Updated:"
@@ -98,12 +83,12 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
                     ? new Date(staticData.lastUpdated).toLocaleString()
                     : "N/A"
                 }
-                isMonetary={false} // Explicitly false for date strings
+                isMonetary={false}
               />
               <DataRow
                 label="Reporting Currency:"
                 value={staticData.reportedCurrency || "N/A"}
-                isMonetary={false} // Explicitly false for currency codes
+                isMonetary={false}
               />
             </div>
             <div className="mt-2 text-xs space-y-0.5">
@@ -217,7 +202,7 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
               "",
               2,
               "Price to Free Cash Flow Ratio (TTM)",
-              "cashuse", // Or Price, depending on where FCF is shown
+              "cashuse",
               "pFcfRatioFront"
             )}
             {renderRatio(
@@ -253,18 +238,18 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
               "",
               2,
               "Enterprise Value Multiple (TTM)",
-              "price", // Assuming EV is most related to pricing/valuation cards
+              "price",
               "evMultipleFront"
             )}
             {renderRatio(
-              `EPS (${staticData.reportedCurrency || "$"})`, // Assuming $ if no currency
+              `EPS`,
               liveData.earningsPerShareTTM,
-              "", // Unit is part of label here
+              staticData.reportedCurrency || "",
               2,
               "Earnings Per Share (TTM)",
               "revenue",
               "epsFront",
-              true // This is a monetary value per share, not a ratio itself
+              true
             )}
           </ShadCardContent>
         </div>

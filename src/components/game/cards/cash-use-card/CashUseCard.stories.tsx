@@ -52,7 +52,7 @@ const mockLiveData: CashUseCardData["liveData"] = {
   currentFreeCashFlow: 15000000000,
   freeCashFlow_5y_min: 12000000000,
   freeCashFlow_5y_max: 16000000000,
-  currentNetDividendsPaid: 6000000000, // Store as positive, display as negative if needed
+  currentNetDividendsPaid: 6000000000,
   netDividendsPaid_5y_min: 5500000000,
   netDividendsPaid_5y_max: 6500000000,
 };
@@ -87,6 +87,7 @@ const mockCardContext: CardActionContext = {
   companyName: initialMockCashUseCardData.companyName,
   logoUrl: initialMockCashUseCardData.logoUrl,
   websiteUrl: initialMockCashUseCardData.websiteUrl,
+  backData: initialMockCashUseCardData.backData, // Ensure backData is included
 };
 
 const mockOnGenericInteraction: OnGenericInteraction = (
@@ -119,43 +120,46 @@ export const Flipped: Story = {
   },
 };
 
+const minimalMockBackData: BaseCardBackData = {
+  description:
+    "Minimal cash use data for Mini Corp. Shares outstanding as of 2024-01-15.",
+};
+const minimalInitialMockData = {
+  ...initialMockCashUseCardData,
+  id: "cashuse-minimal",
+  symbol: "MINI",
+  companyName: "Mini Corp",
+  logoUrl: null,
+  websiteUrl: null,
+  staticData: {
+    reportedCurrency: "USD",
+    debtRangePeriodLabel: "N/A",
+    fcfRangePeriodLabel: "N/A",
+    dividendsRangePeriodLabel: "N/A",
+    latestStatementDate: null,
+    latestStatementPeriod: null,
+    latestSharesFloatDate: "2024-01-15",
+  },
+  liveData: {
+    currentOutstandingShares: 1000000,
+    currentTotalDebt: null,
+    totalDebt_5y_min: null,
+    totalDebt_5y_max: null,
+    currentFreeCashFlow: 5000,
+    freeCashFlow_5y_min: 0,
+    freeCashFlow_5y_max: 10000,
+    currentNetDividendsPaid: null,
+    netDividendsPaid_5y_min: null,
+    netDividendsPaid_5y_max: null,
+  },
+  backData: minimalMockBackData,
+  isFlipped: false,
+};
+
 export const MinimalData: Story = {
   args: {
     ...Default.args,
-    initialCardData: {
-      ...initialMockCashUseCardData,
-      id: "cashuse-minimal",
-      symbol: "MINI",
-      companyName: "Mini Corp",
-      logoUrl: null,
-      websiteUrl: null,
-      staticData: {
-        reportedCurrency: "USD",
-        debtRangePeriodLabel: "N/A",
-        fcfRangePeriodLabel: "N/A",
-        dividendsRangePeriodLabel: "N/A",
-        latestStatementDate: null,
-        latestStatementPeriod: null,
-        latestSharesFloatDate: "2024-01-15",
-      },
-      liveData: {
-        currentOutstandingShares: 1000000,
-        currentTotalDebt: null,
-        totalDebt_5y_min: null,
-        totalDebt_5y_max: null,
-        currentFreeCashFlow: 5000,
-        freeCashFlow_5y_min: 0,
-        freeCashFlow_5y_max: 10000,
-        currentNetDividendsPaid: null,
-        netDividendsPaid_5y_min: null,
-        netDividendsPaid_5y_max: null,
-      },
-      backData: {
-        description:
-          "Minimal cash use data for Mini Corp. Shares outstanding as of 2024-01-15.",
-      },
-      isFlipped: false,
-    },
+    initialCardData: minimalInitialMockData,
     cardContext: {
       ...mockCardContext,
       id: "cashuse-minimal",
@@ -163,6 +167,7 @@ export const MinimalData: Story = {
       companyName: "Mini Corp",
       logoUrl: null,
       websiteUrl: null,
+      backData: minimalMockBackData, // Ensure backData is included for minimal story
     },
   },
 };

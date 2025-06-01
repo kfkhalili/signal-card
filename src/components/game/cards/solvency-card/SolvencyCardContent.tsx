@@ -1,9 +1,6 @@
 // src/components/game/cards/solvency-card/SolvencyCardContent.tsx
 import React from "react";
-import {
-  CardDescription,
-  CardContent as ShadCardContent,
-} from "@/components/ui/card";
+import { CardContent as ShadCardContent } from "@/components/ui/card";
 import type { SolvencyCardData } from "./solvency-card.types";
 import type {
   OnGenericInteraction,
@@ -12,7 +9,7 @@ import type {
   TriggerCardActionInteraction,
 } from "../base-card/base-card.types";
 import { DataRow } from "@/components/ui/DataRow";
-import { formatFinancialValue } from "@/lib/formatters"; // Updated import
+import { formatFinancialValue } from "@/lib/formatters";
 
 interface SolvencyCardContentProps {
   cardData: SolvencyCardData;
@@ -22,15 +19,7 @@ interface SolvencyCardContentProps {
 
 export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
   React.memo(({ cardData, isBackFace, onGenericInteraction }) => {
-    const {
-      staticData,
-      liveData,
-      symbol,
-      companyName,
-      backData,
-      id,
-      type: cardType,
-    } = cardData;
+    const { staticData, liveData, symbol, id, type: cardType } = cardData;
     const currencyCode = staticData.reportedCurrency;
 
     const handleInteraction = (
@@ -56,11 +45,7 @@ export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
           data-testid={`solvency-card-back-${symbol}`}
           className="pointer-events-auto flex flex-col h-full">
           <ShadCardContent className="pt-1 pb-2 px-0 space-y-1 sm:space-y-1.5 flex-grow">
-            <CardDescription className="text-xs text-center text-muted-foreground/90 mb-2.5 px-1 leading-relaxed">
-              {backData.description ||
-                `Financial statement details for ${companyName || symbol}.`}
-            </CardDescription>
-
+            {/* Description removed, will be rendered by BaseCard */}
             <div className="pt-1.5 space-y-0.5 text-[10px] sm:text-xs border-t mt-1.5">
               <DataRow
                 label="Period:"

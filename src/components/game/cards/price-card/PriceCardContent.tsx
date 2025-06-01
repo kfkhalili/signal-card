@@ -1,10 +1,6 @@
 // src/components/game/cards/price-card/PriceCardContent.tsx
 import React from "react";
-import {
-  CardHeader,
-  CardDescription,
-  CardContent as ShadCardContent,
-} from "@/components/ui/card";
+import { CardContent as ShadCardContent } from "@/components/ui/card";
 import type { PriceCardData } from "./price-card.types";
 import { cn } from "@/lib/utils";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
@@ -17,9 +13,6 @@ import type {
   TriggerCardActionInteraction,
 } from "../base-card/base-card.types";
 
-const STATIC_BACK_FACE_DESCRIPTION =
-  "Market Price: The value of a single unit of this asset.";
-
 interface PriceCardContentProps {
   cardData: PriceCardData;
   isBackFace: boolean;
@@ -28,7 +21,7 @@ interface PriceCardContentProps {
 
 export const PriceCardContent = React.memo<PriceCardContentProps>(
   ({ cardData, isBackFace, onGenericInteraction }) => {
-    const { liveData, symbol, id, type, backData } = cardData;
+    const { liveData, symbol, id, type } = cardData;
     const gridCellClass = "min-w-0";
 
     const handleInteraction = (
@@ -53,14 +46,10 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
         <div
           data-testid="price-card-back-content-data"
           className="pointer-events-auto">
-          <CardHeader className="pt-0 pb-2 px-0">
-            <CardDescription className="text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed">
-              {backData.description || STATIC_BACK_FACE_DESCRIPTION}
-            </CardDescription>
-          </CardHeader>
+          {/* Removed CardHeader and CardDescription that previously rendered backData.description */}
           <ShadCardContent
             className={cn(
-              "text-xs sm:text-sm md:text-base pb-0 px-0",
+              "text-xs sm:text-sm md:text-base pb-0 px-0", // Adjusted pt-0 if CardHeader was removed
               "text-muted-foreground"
             )}>
             <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-1 sm:gap-y-1.5">

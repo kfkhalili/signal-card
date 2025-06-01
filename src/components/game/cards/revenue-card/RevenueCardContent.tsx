@@ -1,9 +1,6 @@
 // src/components/game/cards/revenue-card/RevenueCardContent.tsx
 import React from "react";
-import {
-  CardDescription,
-  CardContent as ShadCardContent,
-} from "@/components/ui/card";
+import { CardContent as ShadCardContent } from "@/components/ui/card";
 import type { RevenueCardData } from "./revenue-card.types";
 import type {
   OnGenericInteraction,
@@ -21,15 +18,7 @@ interface RevenueCardContentProps {
 
 export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
   ({ cardData, isBackFace, onGenericInteraction }) => {
-    const {
-      staticData,
-      liveData,
-      symbol,
-      companyName,
-      backData,
-      id,
-      type: cardType,
-    } = cardData;
+    const { staticData, liveData, symbol, id, type: cardType } = cardData;
     const currencyCode = staticData.reportedCurrency;
 
     const handleInteraction = (
@@ -55,11 +44,7 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
           data-testid={`revenue-card-back-${symbol}`}
           className="pointer-events-auto flex flex-col h-full">
           <ShadCardContent className="pt-1 pb-2 px-0 space-y-1 sm:space-y-1.5 flex-grow">
-            <CardDescription className="text-xs text-center text-muted-foreground/90 mb-2.5 px-1 leading-relaxed">
-              {backData.description ||
-                `Financial highlights for ${companyName || symbol}.`}
-            </CardDescription>
-
+            {/* Description removed, will be rendered by BaseCard */}
             <div className="pt-1.5 space-y-0.5 text-[10px] sm:text-xs border-t mt-1.5">
               <DataRow
                 label="Period:"
@@ -155,7 +140,6 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
             <DataRow
               label="Revenue"
               value={formatFinancialValue(liveData.revenue, currencyCode)}
-              // currency prop is no longer needed if formatFinancialValue includes the symbol
               className="mb-1"
               labelClassName="text-base sm:text-lg md:text-xl"
               valueClassName="text-base sm:text-lg md:text-xl"

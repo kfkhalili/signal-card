@@ -10,6 +10,7 @@ import type {
   InteractionPayload,
   RequestNewCardInteraction,
   NavigateExternalInteraction,
+  BaseCardBackData,
 } from "./base-card.types";
 import { Button } from "@/components/ui/button";
 import { Heart } from "lucide-react";
@@ -77,7 +78,7 @@ const BaseCardStoryWrapper: React.FC<BaseCardStoryWrapperProps> = ({
 
   const handleFlip = useCallback(() => {
     setIsFlipped((prev) => !prev);
-    action("onFlip")(); // Log the onFlip action
+    action("onFlip")();
   }, []);
 
   if (!propCardContext || !onGenericInteraction) {
@@ -100,35 +101,36 @@ const BaseCardStoryWrapper: React.FC<BaseCardStoryWrapperProps> = ({
   );
 };
 
+const mockDefaultBackData: BaseCardBackData = {
+  description: "This is the back description from BaseCard's story context.",
+};
+
 const mockCardContextDefault: CardActionContext = {
   id: "base-story-1",
   symbol: "STCK",
-  type: "price", // Or any valid CardType
+  type: "price",
   companyName: "Storybook Inc.",
   logoUrl: "https://picsum.photos/seed/storylogo/40/40",
   websiteUrl: "https://storybook.js.org",
+  backData: mockDefaultBackData, // Ensure backData is included
 };
 
 const mockOnGenericInteraction: OnGenericInteraction = (
   payload: InteractionPayload
 ) => {
-  // Create a specific, easily identifiable log message for Playwright
   const playwrightLogMessage = `PLAYWRIGHT_TEST_ACTION: onGenericInteraction triggered - Intent: ${
     payload.intent
   }, Type: ${payload.sourceCardType}, Origin: ${
     payload.originatingElement || "N/A"
   }`;
-  console.log(playwrightLogMessage); // This is for Playwright to catch
-
-  action("onGenericInteraction")(payload); // This is for Storybook's UI and general logging
+  console.log(playwrightLogMessage);
+  action("onGenericInteraction")(payload);
 };
 
 const mockOnDeleteRequest = (context: CardActionContext) => {
-  // Create a specific, easily identifiable log message for Playwright
   const playwrightLogMessage = `PLAYWRIGHT_TEST_ACTION: onDeleteRequest triggered - Card ID: ${context.id}`;
-  console.log(playwrightLogMessage); // This is for Playwright to catch
-
-  action("onDeleteRequest")(context); // This is for Storybook's UI and general logging
+  console.log(playwrightLogMessage);
+  action("onDeleteRequest")(context);
 };
 
 const SimpleFaceContent: React.FC<{ title: string }> = ({ title }) => (
@@ -156,9 +158,11 @@ const SimpleBackContent: React.FC<{
   cardSymbol: string;
   cardType: CardType;
 }> = ({ onGenericInteraction, cardId, cardSymbol, cardType }) => (
+  // Note: The description is now rendered by BaseCard itself.
+  // This component now only renders content *below* the description.
   <div className="p-4 text-center">
-    <h3 className="text-lg font-semibold mb-2">Back Content</h3>
-    <p className="text-sm text-muted-foreground">Details on the back.</p>
+    <h3 className="text-lg font-semibold mb-2">Additional Back Details</h3>
+    <p className="text-sm text-muted-foreground">More specific details here.</p>
     <Button
       variant="secondary"
       size="sm"
@@ -171,7 +175,7 @@ const SimpleBackContent: React.FC<{
           sourceCardId: cardId,
           sourceCardSymbol: cardSymbol,
           sourceCardType: cardType,
-          targetCardType: "profile", // Example target
+          targetCardType: "profile",
           originatingElement: "backContentButton",
         };
         onGenericInteraction(payload);
@@ -221,7 +225,7 @@ export const Default: Story = {
     cardContext: mockCardContextDefault,
     onDeleteRequest: mockOnDeleteRequest,
     onGenericInteraction: mockOnGenericInteraction,
-    className: "w-[280px] h-[392px] sm:w-[300px] sm:h-[420px]", // Example dimensions
+    className: "w-[280px] h-[392px] sm:w-[300px] sm:h-[420px]",
   },
 };
 
@@ -233,6 +237,9 @@ export const Flipped: Story = {
   },
 };
 
+const noLogoNoWebsiteBackData: BaseCardBackData = {
+  description: "Back description for No Logo Corp.",
+};
 export const NoLogoNoWebsite: Story = {
   render: (args) => <BaseCardStoryWrapper {...args} />,
   args: {
@@ -242,10 +249,23 @@ export const NoLogoNoWebsite: Story = {
       companyName: "No Logo Corp",
       logoUrl: null,
       websiteUrl: null,
+      backData: noLogoNoWebsiteBackData, // Specific backData for this story
     },
+    // Update back content if needed
+    initialBackContent: (
+      <SimpleBackContent
+        onGenericInteraction={mockOnGenericInteraction}
+        cardId={mockCardContextDefault.id} // Assuming ID remains for context
+        cardSymbol={"STCK"} // Assuming symbol for context
+        cardType={mockCardContextDefault.type}
+      />
+    ),
   },
 };
 
+const longCompanyNameBackData: BaseCardBackData = {
+  description: "Back description for a very long company name.",
+};
 export const LongCompanyName: Story = {
   render: (args) => <BaseCardStoryWrapper {...args} />,
   args: {
@@ -255,6 +275,7 @@ export const LongCompanyName: Story = {
       companyName:
         "The Extremely Long Company Name That Might Cause Wrapping or Truncation Issues Incorporated Limited",
       symbol: "ELCNTWCOTIIL",
+      backData: longCompanyNameBackData, // Specific backData for this story
     },
     initialBackContent: (
       <SimpleBackContent
@@ -271,14 +292,21 @@ export const NoDeleteButton: Story = {
   render: (args) => <BaseCardStoryWrapper {...args} />,
   args: {
     ...Default.args,
-    onDeleteRequest: undefined, // Simulate no delete handler provided
+    onDeleteRequest: undefined,
   },
 };
 
+const customStylingBackData: BaseCardBackData = {
+  description: "This is a custom styled card's back description.",
+};
 export const CustomStyling: Story = {
   render: (args) => <BaseCardStoryWrapper {...args} />,
   args: {
     ...Default.args,
+    cardContext: {
+      ...mockCardContextDefault,
+      backData: customStylingBackData, // Specific backData for this story
+    },
     className:
       "w-[320px] h-[448px] border-4 border-blue-500 rounded-xl shadow-2xl",
     innerCardClassName: "bg-gradient-to-br from-purple-400 to-pink-500",
@@ -289,9 +317,10 @@ export const CustomStyling: Story = {
         <Heart className="mx-auto mt-4" size={48} />
       </div>
     ),
+    // This is now the content *below* the description
     initialBackContent: (
       <div className="p-4 text-white">
-        <h3 className="text-xl font-bold">Styled Back</h3>
+        <h3 className="text-xl font-bold">Styled Back Details</h3>
         <p>Also with custom style.</p>
       </div>
     ),

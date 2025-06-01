@@ -1,7 +1,7 @@
 // src/components/game/cards/dividends-history-card/DividendsHistoryCardContent.tsx
 import React from "react";
 import {
-  CardDescription,
+  // CardDescription, // No longer needed here
   CardContent as ShadCardContent,
 } from "@/components/ui/card";
 import type { DividendsHistoryCardData } from "./dividends-history-card.types";
@@ -66,12 +66,11 @@ interface DividendsHistoryCardContentProps {
 
 export const DividendsHistoryCardContent: React.FC<DividendsHistoryCardContentProps> =
   React.memo(({ cardData, isBackFace }) => {
-    const { staticData, liveData, symbol, companyName, backData } = cardData;
+    const { staticData, liveData, symbol } = cardData;
     const currency = staticData.reportedCurrency;
 
-    // Ensure liveData and its properties are correctly accessed with defaults
     const latestDividend = liveData?.latestDividend || null;
-    const annualDividendFigures = liveData?.annualDividendFigures || []; // Default to empty array
+    const annualDividendFigures = liveData?.annualDividendFigures || [];
     const lastFullYearDividendGrowthYoY =
       liveData?.lastFullYearDividendGrowthYoY || null;
 
@@ -81,11 +80,6 @@ export const DividendsHistoryCardContent: React.FC<DividendsHistoryCardContentPr
           data-testid={`dividendshistory-card-back-${symbol}`}
           className="pointer-events-auto flex flex-col h-full justify-between">
           <ShadCardContent className="pt-1 pb-1 px-0 space-y-1 sm:space-y-1.5 flex-grow">
-            <CardDescription className="text-xs text-center text-muted-foreground/90 mb-2 px-1 leading-relaxed">
-              {backData.description ||
-                `Dividend payment history for ${companyName || symbol}.`}
-            </CardDescription>
-
             <DataRow
               label="Last Dividend"
               value={latestDividend?.amount}
@@ -196,6 +190,8 @@ export const DividendsHistoryCardContent: React.FC<DividendsHistoryCardContentPr
               <DataRow
                 label="Growth (YoY)"
                 value={lastFullYearDividendGrowthYoY}
+                isValueAsPercentage={true} // Ensure this is treated as a percentage for display
+                precision={2}
                 labelClassName="text-xs sm:text-sm"
                 valueClassName="text-xs sm:text-sm font-semibold"
                 title={

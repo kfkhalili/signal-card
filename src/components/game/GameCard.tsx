@@ -1,4 +1,6 @@
 // src/components/game/GameCard.tsx
+"use client"; // Ensure "use client" is at the top
+
 import React from "react";
 import type { DisplayableCard } from "@/components/game/types";
 import type { ProfileCardData } from "./cards/profile-card/profile-card.types";
@@ -46,7 +48,8 @@ const GameCard: React.FC<GameCardProps> = ({
       type: card.type,
       companyName: card.companyName ?? null,
       logoUrl: card.logoUrl ?? null,
-      websiteUrl: websiteUrlForContext ?? card.websiteUrl ?? null, // Prioritize specific, then generic
+      websiteUrl: websiteUrlForContext ?? card.websiteUrl ?? null,
+      backData: card.backData, // <<< ADDED backData here
     };
   }, [card]);
 

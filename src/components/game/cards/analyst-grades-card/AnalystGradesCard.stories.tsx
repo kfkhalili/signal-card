@@ -11,6 +11,7 @@ import type {
   OnGenericInteraction,
   InteractionPayload,
   CardType,
+  BaseCardBackData,
 } from "../base-card/base-card.types";
 import type { DisplayableCardState } from "@/components/game/types";
 import {
@@ -77,6 +78,10 @@ const totalAnalysts = mockRatingsDistribution.reduce(
   0
 );
 
+const mockBackData: BaseCardBackData = {
+  description: "Analyst rating distribution for Apple Inc.",
+};
+
 const initialMockCardData: AnalystGradesCardData & DisplayableCardState = {
   id: `analystgrades-${defaultSymbol}-2025-05-01`,
   type: "analystgrades",
@@ -95,7 +100,7 @@ const initialMockCardData: AnalystGradesCardData & DisplayableCardState = {
     consensusLabelCurrent: "Buy Consensus",
     lastUpdated: new Date().toISOString(),
   },
-  backData: { description: "Analyst rating distribution for Apple Inc." },
+  backData: mockBackData,
   isFlipped: false,
   websiteUrl: null,
 };
@@ -107,6 +112,7 @@ const mockCardContext: CardActionContext = {
   companyName: initialMockCardData.companyName,
   logoUrl: initialMockCardData.logoUrl,
   websiteUrl: null,
+  backData: initialMockCardData.backData, // Ensure backData is included
 };
 
 const mockOnGenericInteraction: OnGenericInteraction = (

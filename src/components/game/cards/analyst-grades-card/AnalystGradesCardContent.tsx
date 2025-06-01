@@ -1,9 +1,6 @@
 // src/components/game/cards/analyst-grades-card/AnalystGradesCardContent.tsx
 import React from "react";
-import {
-  CardDescription,
-  CardContent as ShadCardContent,
-} from "@/components/ui/card";
+import { CardContent as ShadCardContent } from "@/components/ui/card";
 import type {
   AnalystGradesCardData,
   AnalystRatingDetail,
@@ -27,9 +24,7 @@ const RatingBarSegment: React.FC<RatingBarSegmentProps> = ({
       "h-full flex items-center justify-center overflow-hidden",
       colorClass
     )}
-    title={label}>
-    {/* Content inside segment if needed, e.g., for very large segments */}
-  </div>
+    title={label}></div>
 );
 
 interface RatingDetailRowProps {
@@ -98,7 +93,7 @@ interface AnalystGradesCardContentProps {
 
 export const AnalystGradesCardContent: React.FC<AnalystGradesCardContentProps> =
   React.memo(({ cardData, isBackFace }) => {
-    const { staticData, liveData, symbol, companyName, backData } = cardData;
+    const { staticData, liveData, symbol } = cardData;
 
     if (isBackFace) {
       return (
@@ -106,10 +101,6 @@ export const AnalystGradesCardContent: React.FC<AnalystGradesCardContentProps> =
           data-testid={`analystgrades-card-back-${symbol}`}
           className="pointer-events-auto flex flex-col h-full">
           <ShadCardContent className="pt-1 pb-2 px-0 space-y-1.5 flex-grow">
-            <CardDescription className="text-xs text-center text-muted-foreground/90 mb-2 px-1 leading-relaxed">
-              {backData.description ||
-                `Analyst grade details for ${companyName || symbol}.`}
-            </CardDescription>
             <div className="text-xs text-muted-foreground px-1 space-y-1">
               <p>
                 <strong>Current Period:</strong> {staticData.currentPeriodDate}
@@ -179,7 +170,6 @@ export const AnalystGradesCardContent: React.FC<AnalystGradesCardContentProps> =
             </p>
           </div>
 
-          {/* Segmented Bar */}
           {totalAnalystsCurrent > 0 && (
             <div
               className={cn(
@@ -204,7 +194,6 @@ export const AnalystGradesCardContent: React.FC<AnalystGradesCardContentProps> =
             </div>
           )}
 
-          {/* Details with changes */}
           <div className="space-y-0.5 px-1 mt-1 flex-grow overflow-y-auto text-xs">
             {ratingsDistribution.map((detail) => (
               <RatingDetailRow

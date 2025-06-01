@@ -1,9 +1,6 @@
 // src/components/game/cards/cash-use-card/CashUseCardContent.tsx
 import React from "react";
-import {
-  CardDescription,
-  CardContent as ShadCardContent,
-} from "@/components/ui/card";
+import { CardContent as ShadCardContent } from "@/components/ui/card";
 import type { CashUseCardData } from "./cash-use-card.types";
 import { cn } from "@/lib/utils";
 import { formatNumberWithAbbreviations } from "@/lib/formatters";
@@ -83,7 +80,7 @@ const MetricDisplayWithRange: React.FC<MetricDisplayWithRangeProps> = ({
         currentValue={currentValue}
         lowValue={minValue}
         highValue={maxValue}
-        lowLabel={rangeLabel.split(" - ")[0] || "Min"} // Basic split for label
+        lowLabel={rangeLabel.split(" - ")[0] || "Min"}
         highLabel={rangeLabel.split(" - ")[1] || "Max"}
         lowValueForTitle={minValue}
         highValueForTitle={maxValue}
@@ -103,7 +100,7 @@ interface SimpleMetricDisplayProps {
   isMonetary?: boolean;
   onMetricClick?: () => void;
   tooltip?: string;
-  currency?: string | null; // Added for consistency, though shares are not monetary
+  currency?: string | null;
 }
 
 const SimpleMetricDisplay: React.FC<SimpleMetricDisplayProps> = ({
@@ -111,10 +108,10 @@ const SimpleMetricDisplay: React.FC<SimpleMetricDisplayProps> = ({
   value,
   dateLabel,
   "data-testid": dataTestId,
-  isMonetary = false, // Default to false for shares
+  isMonetary = false,
   onMetricClick,
   tooltip,
-  currency, // Not typically used for shares but good for interface consistency
+  currency,
 }) => {
   const displayCurrencySymbol =
     currency === "USD" ? "$" : currency || (isMonetary ? "$" : "");
@@ -123,7 +120,7 @@ const SimpleMetricDisplay: React.FC<SimpleMetricDisplayProps> = ({
       ? "N/A"
       : `${
           isMonetary ? displayCurrencySymbol : ""
-        }${formatNumberWithAbbreviations(value, 0)}`; // Shares usually whole numbers
+        }${formatNumberWithAbbreviations(value, 0)}`;
 
   const title = tooltip
     ? `${label}: ${formattedValue} (${tooltip})`
@@ -169,15 +166,7 @@ interface CashUseCardContentProps {
 
 export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
   ({ cardData, isBackFace, onGenericInteraction }) => {
-    const {
-      staticData,
-      liveData,
-      symbol,
-      companyName,
-      backData,
-      id,
-      type: cardType,
-    } = cardData;
+    const { staticData, liveData, symbol, id, type: cardType } = cardData;
     const currency = staticData.reportedCurrency;
 
     const handleInteraction = (
@@ -203,10 +192,6 @@ export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
           data-testid={`cashuse-card-back-${symbol}`}
           className="pointer-events-auto flex flex-col h-full">
           <ShadCardContent className="pt-1 pb-2 px-0 space-y-1.5 flex-grow">
-            <CardDescription className="text-xs text-center text-muted-foreground/90 mb-2.5 px-1 leading-relaxed">
-              {backData.description ||
-                `Cash usage details for ${companyName || symbol}.`}
-            </CardDescription>
             <div className="pt-1.5 space-y-0.5 text-[10px] sm:text-xs border-t mt-1.5">
               <div className="flex justify-between items-baseline py-0.5">
                 <span className="text-muted-foreground/90 mr-2">

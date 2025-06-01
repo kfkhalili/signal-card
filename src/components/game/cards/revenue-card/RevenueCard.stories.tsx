@@ -66,6 +66,7 @@ const initialMockRevenueCardData: RevenueCardData & DisplayableCardState = {
   liveData: mockLiveData,
   backData: mockBaseBackData,
   isFlipped: false,
+  websiteUrl: null, // Added to satisfy BaseCardData
 };
 
 const mockCardContext: CardActionContext = {
@@ -74,7 +75,8 @@ const mockCardContext: CardActionContext = {
   type: "revenue" as CardType,
   companyName: initialMockRevenueCardData.companyName,
   logoUrl: initialMockRevenueCardData.logoUrl,
-  websiteUrl: null,
+  websiteUrl: initialMockRevenueCardData.websiteUrl,
+  backData: initialMockRevenueCardData.backData,
 };
 
 const mockOnGenericInteraction: OnGenericInteraction = (
@@ -107,43 +109,51 @@ export const Flipped: Story = {
   },
 };
 
+const minimalMockBackData: BaseCardBackData = {
+  description: "Financial highlights for Minimal Inc. (Q1 2024).",
+};
+
+// Explicitly type minimalInitialMockData and ensure type is "revenue"
+const minimalInitialMockData: RevenueCardData & { isFlipped: boolean } = {
+  id: "revenue-minimal-data",
+  type: "revenue", // Corrected to "revenue" and ensure it's the literal type
+  symbol: "MIN",
+  companyName: "Minimal Inc.",
+  logoUrl: null,
+  createdAt: Date.now(),
+  isFlipped: false,
+  websiteUrl: null, // Add missing optional BaseCardData property
+  staticData: {
+    periodLabel: "Q1 2024",
+    reportedCurrency: "CAD",
+    filingDate: null,
+    acceptedDate: null,
+    statementDate: "2024-03-31",
+    statementPeriod: "Q1",
+  },
+  liveData: {
+    revenue: 1000000,
+    grossProfit: null,
+    operatingIncome: -50000,
+    netIncome: null,
+    freeCashFlow: 200000,
+  },
+  backData: minimalMockBackData,
+};
+
 export const MinimalData: Story = {
   args: {
-    ...Default.args,
-    initialCardData: {
-      id: "revenue-minimal-data",
-      type: "revenue",
-      symbol: "MIN",
-      companyName: "Minimal Inc.",
-      logoUrl: null,
-      createdAt: Date.now(),
-      isFlipped: false,
-      staticData: {
-        periodLabel: "Q1 2024",
-        reportedCurrency: "CAD",
-        filingDate: null,
-        acceptedDate: null,
-        statementDate: "2024-03-31",
-        statementPeriod: "Q1",
-      },
-      liveData: {
-        revenue: 1000000,
-        grossProfit: null,
-        operatingIncome: -50000,
-        netIncome: null,
-        freeCashFlow: 200000,
-      },
-      backData: {
-        description: "Financial highlights for Minimal Inc. (Q1 2024).",
-      },
-    },
+    ...Default.args, // Spreads default args including expectedCardType: "revenue"
+    initialCardData: minimalInitialMockData, // Assign the correctly typed object
     cardContext: {
-      ...mockCardContext,
+      ...mockCardContext, // Base context
       id: "revenue-minimal-data",
       symbol: "MIN",
-      type: "revenue" as CardType,
+      type: "revenue" as CardType, // Type here is for CardActionContext which expects CardType
       companyName: "Minimal Inc.",
       logoUrl: null,
+      websiteUrl: null, // Ensure consistency
+      backData: minimalMockBackData,
     },
   },
 };

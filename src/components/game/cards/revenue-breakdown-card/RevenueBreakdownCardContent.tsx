@@ -1,9 +1,6 @@
 // src/components/game/cards/revenue-breakdown-card/RevenueBreakdownCardContent.tsx
 import React from "react";
-import {
-  CardDescription,
-  CardContent as ShadCardContent,
-} from "@/components/ui/card";
+import { CardContent as ShadCardContent } from "@/components/ui/card";
 import type {
   RevenueBreakdownCardData,
   SegmentRevenueDataItem,
@@ -46,9 +43,8 @@ const SegmentRow: React.FC<SegmentRowProps> = ({
       IconComponent = ArrowDown;
       yoyDisplay = `${yoyPercent.toFixed(1)}%`;
     } else {
-      // yoyChange === 0
       yoyColorClass = "text-muted-foreground";
-      IconComponent = Minus; // Or null if no icon for 0%
+      IconComponent = Minus;
       yoyDisplay = `0.0%`;
     }
   } else if (currentRevenue > 0) {
@@ -107,7 +103,7 @@ interface RevenueBreakdownCardContentProps {
 
 export const RevenueBreakdownCardContent: React.FC<RevenueBreakdownCardContentProps> =
   React.memo(({ cardData, isBackFace }) => {
-    const { staticData, liveData, symbol, companyName, backData } = cardData;
+    const { staticData, liveData, symbol } = cardData;
 
     if (isBackFace) {
       return (
@@ -115,10 +111,6 @@ export const RevenueBreakdownCardContent: React.FC<RevenueBreakdownCardContentPr
           data-testid={`revenuebreakdown-card-back-${symbol}`}
           className="pointer-events-auto flex flex-col h-full">
           <ShadCardContent className="pt-1 pb-2 px-0 space-y-1.5 flex-grow">
-            <CardDescription className="text-xs text-center text-muted-foreground/90 mb-2 px-1 leading-relaxed">
-              {backData.description ||
-                `Revenue breakdown details for ${companyName || symbol}.`}
-            </CardDescription>
             <div className="text-xs text-muted-foreground px-1 space-y-0.5">
               <p>
                 <strong>Latest Period:</strong> {staticData.latestPeriodLabel}
@@ -139,7 +131,6 @@ export const RevenueBreakdownCardContent: React.FC<RevenueBreakdownCardContentPr
                   : "N/A"}
               </p>
             </div>
-            {/* Optionally, list ALL segments here if desired for the back face */}
           </ShadCardContent>
         </div>
       );
@@ -160,7 +151,6 @@ export const RevenueBreakdownCardContent: React.FC<RevenueBreakdownCardContentPr
         (sum, seg) => sum + (seg.previousRevenue ?? 0),
         0
       );
-      // Check if there were any previous revenues at all for the "Others" category
       const anyPreviousRevenueExistsForOthers = otherSegments.some(
         (seg) => seg.previousRevenue !== null
       );
@@ -175,12 +165,12 @@ export const RevenueBreakdownCardContent: React.FC<RevenueBreakdownCardContentPr
         othersPreviousRevenueSum === 0 &&
         othersCurrentRevenue > 0
       ) {
-        yoyChangeForOthers = null; // Will be treated as "New" by SegmentRow if current is > 0
+        yoyChangeForOthers = null;
       } else if (
         !anyPreviousRevenueExistsForOthers &&
         othersCurrentRevenue > 0
       ) {
-        yoyChangeForOthers = null; // All underlying segments are new, so "Others" is new.
+        yoyChangeForOthers = null;
       }
 
       othersData = {
@@ -195,7 +185,6 @@ export const RevenueBreakdownCardContent: React.FC<RevenueBreakdownCardContentPr
 
     const displayItems = [...top5Segments];
     if (othersData && othersData.currentRevenue > 0) {
-      // Only add "Others" if it has revenue
       displayItems.push(othersData);
     }
 

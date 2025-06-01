@@ -1,8 +1,12 @@
 // src/components/game/cards/base-card/BaseCard.tsx
 "use client";
 
-import React, { useRef, useEffect } from "react";
-import { Card as ShadCard, CardTitle } from "@/components/ui/card";
+import React, { useRef } from "react"; // Removed useEffect as it's no longer used
+import {
+  Card as ShadCard,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { XIcon } from "lucide-react";
 import Image from "next/image";
@@ -68,7 +72,6 @@ const capitalize = (s: string): string => {
   return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 };
 
-// Internal component for the Card Type Badge
 const CardTypeHeaderBadge: React.FC<{
   cardContext: CardActionContext;
   onGenericInteraction: OnGenericInteraction;
@@ -96,7 +99,6 @@ const CardTypeHeaderBadge: React.FC<{
     CARD_TYPE_LABELS[sourceCardType] || capitalize(sourceCardType);
 
   return (
-    // Removed horizontal padding, adjusted vertical margin for integration within header
     <div className="text-center mt-2">
       <ClickableDataItem
         isInteractive={true}
@@ -133,6 +135,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
     companyName,
     logoUrl,
     websiteUrl,
+    backData,
   } = cardContext;
 
   const frontFaceRef = useRef<HTMLDivElement>(null);
@@ -280,7 +283,6 @@ const BaseCard: React.FC<BaseCardProps> = ({
     </>
   );
 
-  // MODIFIED: actualIdentityHeaderElement now includes the badge for the front face
   const actualIdentityHeaderElement = (
     <div className={cn(headerWrapperClassNames)}>
       <div className="flex justify-between items-start w-full">
@@ -293,20 +295,29 @@ const BaseCard: React.FC<BaseCardProps> = ({
     </div>
   );
 
-  const headerPlaceholderElementForBack = // This remains unchanged, for spacing on back
-    (
-      <div
-        className={cn("invisible", headerWrapperClassNames)}
-        aria-hidden="true">
-        <div className="flex justify-between items-start">
-          <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0 mr-2 sm:mr-3">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10" />
-          </div>
-          <div className="min-w-0 max-w-[calc(100%-3rem-12px)] sm:max-w-[calc(100%-3.5rem-12px)] md:max-w-[calc(100%-4rem-12px)]" />
+  const headerPlaceholderElementForBack = (
+    <div
+      className={cn("invisible", headerWrapperClassNames)}
+      aria-hidden="true">
+      <div className="flex justify-between items-start w-full">
+        <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0 mr-2 sm:mr-3 self-start">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10" />
         </div>
-        {/* No badge placeholder specifically needed if its height is managed by `headerWrapperClassNames` indirectly */}
+        <div
+          className={cn(
+            "text-right min-w-0 max-w-[calc(100%-3rem-12px)] sm:max-w-[calc(100%-3.5rem-12px)] md:max-w-[calc(100%-4rem-12px)]",
+            "flex flex-col justify-center"
+          )}>
+          {/* Approximate height of CardTitle + symbol paragraph */}
+          <div className="h-[calc(1.2em+1.1em)] sm:h-[calc(1.35em+1.2em)] md:h-[calc(1.5em+1.25em)]" />
+        </div>
       </div>
-    );
+      {/* Approximate structure for CardTypeHeaderBadge placeholder */}
+      <div className="text-center mt-2">
+        <div className="inline-block text-transparent text-xs sm:text-sm px-2 py-0.5 border border-transparent h-[1.5rem] sm:h-[1.75rem]" />
+      </div>
+    </div>
+  );
 
   const handleCardFlipInteraction = (
     e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>
@@ -347,16 +358,13 @@ const BaseCard: React.FC<BaseCardProps> = ({
     }
   };
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      // Focus logic can be added here if needed after flip
-    }, 0);
-
-    return () => clearTimeout(timer);
-  }, [isFlipped]);
+  // Removed the empty useEffect block
 
   const frontFaceInert = isFlipped;
   const backFaceInert = !isFlipped;
+
+  const frontAriaLabel = `Front of ${sourceCardSymbol} card. Action: Show back details.`;
+  const backAriaLabel = `Back of ${sourceCardSymbol} card. Action: Show front details.`;
 
   return (
     <div style={outerStyle} className={cn("group", className)}>
@@ -379,18 +387,13 @@ const BaseCard: React.FC<BaseCardProps> = ({
           onKeyDown={!isFlipped ? handleCardFlipInteraction : undefined}
           role="button"
           tabIndex={!isFlipped ? 0 : -1}
-          aria-label={
-            isFlipped
-              ? `Show ${sourceCardSymbol} front details`
-              : `Show ${sourceCardSymbol} back details`
-          }
+          aria-label={frontAriaLabel}
           aria-pressed={isFlipped}
           inert={frontFaceInert ? true : undefined}
           aria-hidden={isFlipped ? "true" : "false"}>
           {deleteButtonElement}
-          {actualIdentityHeaderElement} {/* This now includes the badge */}
+          {actualIdentityHeaderElement}
           <div className="flex-grow overflow-y-auto relative p-3 sm:p-4 md:px-5 md:pb-5 md:pt-2">
-            {/* pt-2 to give space below the header block which now contains the badge */}
             {faceContent}
           </div>
         </ShadCard>
@@ -409,17 +412,18 @@ const BaseCard: React.FC<BaseCardProps> = ({
           onKeyDown={isFlipped ? handleCardFlipInteraction : undefined}
           role="button"
           tabIndex={isFlipped ? 0 : -1}
-          aria-label={
-            isFlipped
-              ? `Show ${sourceCardSymbol} front details`
-              : `Show ${sourceCardSymbol} back details`
-          }
+          aria-label={backAriaLabel}
           aria-pressed={!isFlipped}
           inert={backFaceInert ? true : undefined}
           aria-hidden={!isFlipped ? "true" : "false"}>
           {deleteButtonElement}
           {headerPlaceholderElementForBack}
           <div className="flex-grow overflow-y-auto relative p-3 sm:p-4 md:px-5 md:pb-5 md:pt-2">
+            {backData?.description && (
+              <CardDescription className="text-xs text-center text-muted-foreground/90 mb-2.5 px-1 leading-relaxed">
+                {backData.description}
+              </CardDescription>
+            )}
             {backContent}
           </div>
         </ShadCard>
