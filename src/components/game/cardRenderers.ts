@@ -3,9 +3,9 @@ import React from "react";
 import type {
   CardType,
   OnGenericInteraction,
+  CardActionContext,
 } from "@/components/game/cards/base-card/base-card.types";
-import type { CardActionContext } from "@/components/game/cards/base-card/base-card.types";
-import type { DisplayableCard } from "./types";
+import type { DisplayableCard, ConcreteCardData } from "./types";
 
 /**
  * Common props expected by all registered card renderers (containers).
@@ -26,6 +26,29 @@ export interface RegisteredCardRendererProps {
   onGenericInteraction: OnGenericInteraction;
 }
 
+/**
+ * Props for the specific content component (e.g., PriceCardContent, ProfileCardContent).
+ * These components are responsible for rendering the unique face/back of a card.
+ */
+export interface SpecificCardContentComponentProps<
+  TCardDataType extends ConcreteCardData
+> {
+  cardData: TCardDataType; // The specific, concrete data for this card type
+  isBackFace: boolean;
+  onGenericInteraction: OnGenericInteraction;
+}
+
+/**
+ * Type definition for a specific card's content rendering component.
+ */
+export type SpecificCardContentComponent<
+  TCardDataType extends ConcreteCardData
+> = React.ComponentType<SpecificCardContentComponentProps<TCardDataType>>;
+
+/**
+ * Type definition for a registered card renderer.
+ * This is typically the GenericCardContainerRenderer configured for a specific card type.
+ */
 type RegisteredCardRenderer = React.ComponentType<RegisteredCardRendererProps>;
 
 const cardRendererRegistry = new Map<CardType, RegisteredCardRenderer>();
