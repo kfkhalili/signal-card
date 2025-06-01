@@ -3,33 +3,30 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type {
   RealtimeChannel,
   RealtimePostgresChangesPayload,
-  SupabaseClient,
+  SupabaseClient, // Ensure this is from '@supabase/supabase-js'
 } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 
-// Use the generated type for the shape of the row from database.types.ts
 export type LiveQuoteIndicatorDBRow =
   Database["public"]["Tables"]["live_quote_indicators"]["Row"];
 
-// LiveQuotePayload now uses the generated LiveQuoteIndicatorDBRow
 export type LiveQuotePayload =
   RealtimePostgresChangesPayload<LiveQuoteIndicatorDBRow>;
 
-// QuoteUpdateCallback expects a payload where 'new' (if present) is LiveQuoteIndicatorDBRow
 type QuoteUpdateCallback = (payload: LiveQuotePayload) => void;
 
 export type SubscriptionStatus =
   | "SUBSCRIBED"
   | "TIMED_OUT"
   | "CLOSED"
-  | "CHANNEL_ERROR";
+  | "CHANNEL_ERROR"
+  | "CLIENT_UNAVAILABLE"; // Added new status
 
 type SubscriptionStatusCallback = (
   status: SubscriptionStatus,
   err?: Error
 ) => void;
 
-// --- New types for Financial Statements ---
 export type FinancialStatementDBRow =
   Database["public"]["Tables"]["financial_statements"]["Row"];
 
@@ -39,19 +36,24 @@ export type FinancialStatementPayload =
 type FinancialStatementUpdateCallback = (
   payload: FinancialStatementPayload
 ) => void;
-// --- End new types ---
 
 const LIVE_QUOTE_TABLE_NAME = "live_quote_indicators";
 const FINANCIAL_STATEMENTS_TABLE_NAME = "financial_statements";
 
 let supabaseClientInstance: SupabaseClient<Database> | null = null;
+let clientInitialized = false; // Flag to ensure createSupabaseBrowserClient is called only once if needed initially
 
-function getSupabaseClient(): SupabaseClient<Database> {
-  if (!supabaseClientInstance) {
-    supabaseClientInstance = createSupabaseBrowserClient();
+function getSupabaseClient(): SupabaseClient<Database> | null {
+  if (!clientInitialized) {
+    supabaseClientInstance = createSupabaseBrowserClient(false); // Pass false
+    clientInitialized = true;
   }
   return supabaseClientInstance;
 }
+
+const noOpUnsubscribe = () => {
+  /* No operation */
+};
 
 export function subscribeToQuoteUpdates(
   symbol: string,
@@ -59,6 +61,20 @@ export function subscribeToQuoteUpdates(
   onStatusChange: SubscriptionStatusCallback
 ): () => void {
   const supabase = getSupabaseClient();
+  if (!supabase) {
+    console.warn(
+      `[realtime-service (${symbol})] Supabase client not available for live quote updates.`
+    );
+    // Immediately notify about unavailability
+    if (typeof onStatusChange === "function") {
+      onStatusChange(
+        "CLIENT_UNAVAILABLE",
+        new Error("Supabase client not initialized.")
+      );
+    }
+    return noOpUnsubscribe; // Return a no-op unsubscribe function
+  }
+
   const channelName = `live-quote-${symbol
     .toLowerCase()
     .replace(/[^a-z0-9_.-]/gi, "-")}-${Math.random()
@@ -86,32 +102,48 @@ export function subscribeToQuoteUpdates(
       }
     )
     .subscribe((status, err) => {
+      // Cast Supabase's RealtimeChannel['state'] to your SubscriptionStatus
+      // This might need more robust mapping if statuses don't align directly
       const castedStatus = status as SubscriptionStatus;
       if (typeof onStatusChange === "function") {
         onStatusChange(castedStatus, err);
       }
     });
 
-  const unsubscribe = () => {
-    supabase
-      .removeChannel(channel)
-      .catch((error) =>
-        console.error(
-          `[realtime-service] (${symbol}): Error removing live quote channel ${channel.topic}:`,
-          (error as Error).message
-        )
-      );
+  return () => {
+    // Ensure supabase client is available before trying to remove channel
+    if (supabase) {
+      supabase
+        .removeChannel(channel)
+        .catch((error) =>
+          console.error(
+            `[realtime-service] (${symbol}): Error removing live quote channel ${channel.topic}:`,
+            (error as Error).message
+          )
+        );
+    }
   };
-  return unsubscribe;
 }
 
-// New function for financial statement updates
 export function subscribeToFinancialStatementUpdates(
   symbol: string,
   onData: FinancialStatementUpdateCallback,
   onStatusChange: SubscriptionStatusCallback
 ): () => void {
   const supabase = getSupabaseClient();
+  if (!supabase) {
+    console.warn(
+      `[realtime-service (${symbol})] Supabase client not available for financial statement updates.`
+    );
+    if (typeof onStatusChange === "function") {
+      onStatusChange(
+        "CLIENT_UNAVAILABLE",
+        new Error("Supabase client not initialized.")
+      );
+    }
+    return noOpUnsubscribe;
+  }
+
   const channelName = `financial-statement-${symbol
     .toLowerCase()
     .replace(/[^a-z0-9_.-]/gi, "-")}-${Math.random()
@@ -127,15 +159,13 @@ export function subscribeToFinancialStatementUpdates(
     .on<FinancialStatementDBRow>(
       "postgres_changes",
       {
-        event: "*", // Listen to INSERT, UPDATE, DELETE. Handler will decide if relevant.
+        event: "*",
         schema: "public",
         table: FINANCIAL_STATEMENTS_TABLE_NAME,
         filter: topicFilter,
       },
       (payload) => {
         if (typeof onData === "function") {
-          // The payload from Supabase is already RealtimePostgresChangesPayload<FinancialStatementDBRow>
-          // which matches our FinancialStatementPayload type.
           onData(payload as FinancialStatementPayload);
         }
       }
@@ -147,15 +177,16 @@ export function subscribeToFinancialStatementUpdates(
       }
     });
 
-  const unsubscribe = () => {
-    supabase
-      .removeChannel(channel)
-      .catch((error) =>
-        console.error(
-          `[realtime-service] (${symbol}): Error removing Financial Statement channel ${channel.topic}:`,
-          (error as Error).message
-        )
-      );
+  return () => {
+    if (supabase) {
+      supabase
+        .removeChannel(channel)
+        .catch((error) =>
+          console.error(
+            `[realtime-service] (${symbol}): Error removing Financial Statement channel ${channel.topic}:`,
+            (error as Error).message
+          )
+        );
+    }
   };
-  return unsubscribe;
 }

@@ -9,14 +9,15 @@ import React, {
   type ReactNode,
 } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import type { Session, User } from "@supabase/supabase-js";
-import { SupabaseClient } from "@supabase/supabase-js";
+import type { Session, User, SupabaseClient } from "@supabase/supabase-js";
 
+// Ensure this interface includes clientInitError
 export interface AuthContextType {
-  supabase: SupabaseClient;
+  supabase: SupabaseClient | null;
   session: Session | null;
   user: User | null;
   isLoading: boolean;
+  clientInitError: string | null; // <<< Make sure this line is present
   signOut: () => Promise<void>;
 }
 
@@ -27,28 +28,42 @@ export const AuthContext = createContext<AuthContextType | undefined>(
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
-  const supabase = createSupabaseBrowserClient();
+  const supabase = createSupabaseBrowserClient(false);
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [clientInitError, setClientInitError] = useState<string | null>(null); // Initialized here
 
   useEffect(() => {
+    if (!supabase) {
+      setClientInitError(
+        "Authentication service is currently unavailable due to a configuration issue."
+      );
+      setIsLoading(false);
+      setSession(null);
+      setUser(null);
+      return;
+    }
+
+    setClientInitError(null);
     setIsLoading(true);
+
     const getSession = async () => {
       const { data, error } = await supabase.auth.getSession();
       if (error) {
-        console.error("Error getting session:", error);
+        console.error("[AuthContext] Error getting session:", error.message);
       }
       setSession(data.session);
       setUser(data.session?.user ?? null);
       setIsLoading(false);
     };
+
     getSession();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+      (_event, currentSession) => {
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
       }
     );
 
@@ -58,12 +73,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   }, [supabase]);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    if (supabase) {
+      await supabase.auth.signOut();
+    } else {
+      console.warn(
+        "[AuthContext] Sign out called, but Supabase client is not initialized."
+      );
+      setSession(null);
+      setUser(null);
+    }
   };
 
   return (
     <AuthContext.Provider
-      value={{ supabase, session, user, isLoading, signOut }}>
+      // Ensure clientInitError is part of the value provided by the context
+      value={{ supabase, session, user, isLoading, clientInitError, signOut }}>
       {children}
     </AuthContext.Provider>
   );

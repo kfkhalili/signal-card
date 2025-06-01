@@ -6,6 +6,7 @@ import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { AlertTriangle } from "lucide-react"; // For displaying an error
 
 type AuthViewType =
   | "sign_in"
@@ -15,85 +16,59 @@ type AuthViewType =
   | "magic_link";
 
 export default function AuthForm() {
-  const supabase = createSupabaseBrowserClient();
+  // supabase can now be SupabaseClient | null
+  const supabase = createSupabaseBrowserClient(false); // Pass false to prevent throwing
   const router = useRouter();
-  const pathname = usePathname(); // Reactive to path changes
-  const searchParams = useSearchParams(); // Reactive to query param changes
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const [authView, setAuthView] = useState<AuthViewType>("sign_in");
 
-  // This effect will run on mount and whenever pathname or searchParams change,
-  // which should be triggered by Next.js Link navigations, even for hash-only changes.
   useEffect(() => {
     const currentHash = window.location.hash;
-    if (process.env.NODE_ENV === "development") {
-      console.debug(
-        "[AuthForm] useEffect[pathname, searchParams] - Hash:",
-        currentHash,
-        "Pathname:",
-        pathname
-      );
-    }
+    // Development console.debug calls removed for brevity as per user preference
+    // but can be re-added if needed for debugging.
 
-    let newView: AuthViewType = "sign_in"; // Default view
+    let newView: AuthViewType = "sign_in";
     if (currentHash === "#auth-sign-up") {
       newView = "sign_up";
     } else if (currentHash === "#auth-sign-in") {
       newView = "sign_in";
     }
 
-    // Only update state if the determined view is different from the current state
-    // This prevents potential infinite loops if the effect runs multiple times with the same hash
     if (authView !== newView) {
-      if (process.env.NODE_ENV === "development") {
-        console.debug("[AuthForm] Setting authView from effect to:", newView);
-      }
       setAuthView(newView);
     }
-  }, [pathname, searchParams, authView]); // include authView to prevent loops if set to same value
+  }, [pathname, searchParams, authView]);
 
-  // Separate useEffect for the hashchange event listener for manual hash edits or browser back/forward
   useEffect(() => {
     const handleDirectHashChange = () => {
       const directHash = window.location.hash;
-      if (process.env.NODE_ENV === "development") {
-        console.debug(
-          "[AuthForm] 'hashchange' event. Direct Hash:",
-          directHash
-        );
-      }
       let freshNewView: AuthViewType = "sign_in";
       if (directHash === "#auth-sign-up") {
         freshNewView = "sign_up";
       } else if (directHash === "#auth-sign-in") {
         freshNewView = "sign_in";
       }
-
-      setAuthView((prev) => {
-        if (prev !== freshNewView) {
-          if (process.env.NODE_ENV === "development") {
-            console.debug(
-              "[AuthForm] Setting authView from hashchange listener to:",
-              freshNewView
-            );
-          }
-          return freshNewView;
-        }
-        return prev;
-      });
+      setAuthView((prev) => (prev !== freshNewView ? freshNewView : prev));
     };
     window.addEventListener("hashchange", handleDirectHashChange);
-
     return () => {
       window.removeEventListener("hashchange", handleDirectHashChange);
     };
-  }, []); // This effect runs once to set up/tear down the direct hash listener
+  }, []);
 
-  // useEffect for Supabase auth state changes and initial session check
   useEffect(() => {
+    // If supabase client is null, auth features are unavailable.
+    if (!supabase) {
+      console.warn(
+        "[AuthForm] Supabase client is not initialized. Auth listeners and session checks skipped."
+      );
+      return;
+    }
+
     const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN") {
-        // Use the hook's searchParams here, which are reactive
         const nextUrl = searchParams.get("next") || "/";
         router.push(nextUrl);
         router.refresh();
@@ -101,16 +76,19 @@ export default function AuthForm() {
     });
 
     const checkSession = async () => {
-      const { data: user } = await supabase.auth.getUser();
-      if (user) {
-        const nextUrl = searchParams.get("next") || "/";
-        router.push(nextUrl);
-        router.refresh();
+      // Ensure supabase is not null before calling getUser
+      if (supabase) {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser(); // Destructure user from data
+        if (user) {
+          const nextUrl = searchParams.get("next") || "/";
+          router.push(nextUrl);
+          router.refresh();
+        }
       }
     };
 
-    // Only check session if not on an auth path that implies user is already interacting with auth
-    // This check can remain based on window.location.hash as it's an initial check logic
     if (!window.location.hash.startsWith("#auth-")) {
       checkSession();
     }
@@ -118,52 +96,44 @@ export default function AuthForm() {
     return () => {
       authListener?.subscription.unsubscribe();
     };
-  }, [supabase, router, searchParams]); // searchParams is now a dependency here too
+  }, [supabase, router, searchParams]);
 
-  if (process.env.NODE_ENV === "development") {
-    console.debug(
-      "[AuthForm] Rendering with authView:",
-      authView,
-      "and key:",
-      authView
+  // If Supabase client failed to initialize (e.g., missing env vars client-side)
+  // display an error message instead of the Auth UI.
+  if (!supabase) {
+    return (
+      <div className="flex flex-col items-center justify-center text-center p-4">
+        <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
+        <h2 className="text-xl font-semibold text-destructive mb-2">
+          Authentication Unavailable
+        </h2>
+        <p className="text-muted-foreground">
+          The authentication service could not be initialized. Please ensure the
+          application is configured correctly or try again later.
+        </p>
+      </div>
     );
   }
 
+  // supabase is guaranteed to be non-null here, so we can pass it to Auth component
   return (
-    // The parent div in src/app/auth/page.tsx handles the styling like max-width, padding, bg-card etc.
-    // This component just returns the Auth UI.
     <Auth
-      key={authView} // This is crucial for forcing re-initialization
-      supabaseClient={supabase}
+      key={authView}
+      supabaseClient={supabase} // Now correctly expects and receives a non-null client
       appearance={{
-        theme: ThemeSupa, // Or your custom theme object
+        theme: ThemeSupa,
         variables: {
           default: {
             colors: {
               brand: "hsl(var(--primary))",
-              brandAccent: "hsl(var(--primary))", // Consider a hover shade
+              brandAccent: "hsl(var(--primary))",
               brandButtonText: "hsl(var(--primary-foreground))",
-              // Add other color overrides here if needed:
-              // defaultButtonBackground: 'hsl(var(--secondary))',
-              // defaultButtonText: 'hsl(var(--secondary-foreground))',
-              // inputBackground: 'hsl(var(--input))',
-              // inputBorder: 'hsl(var(--border))',
-              // inputText: 'hsl(var(--foreground))',
             },
-            // Add font and radii overrides if needed to match your UI components
-            // fonts: {
-            //   bodyFontFamily: 'var(--font-geist-sans), sans-serif',
-            //   buttonFontFamily: 'var(--font-geist-sans), sans-serif',
-            // },
-            // radii: {
-            //   borderRadiusButton: 'var(--radius)',
-            //   inputBorderRadius: 'var(--radius)',
-            // }
           },
         },
       }}
       view={authView}
-      providers={[]} // Or your configured list
+      providers={[]}
       redirectTo={`${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`}
       localization={{
         variables: {
@@ -171,15 +141,14 @@ export default function AuthForm() {
             email_label: "Email address",
             password_label: "Password",
             button_label: "Log in",
-            link_text: "New here? Create an account", // Text for link to sign_up
+            link_text: "New here? Create an account",
           },
           sign_up: {
             email_label: "Email address",
             password_label: "Create a Password",
-            button_label: "Sign up", // Text for sign_up button
-            link_text: "Already have an account? Log in", // Text for link to sign_in
+            button_label: "Sign up",
+            link_text: "Already have an account? Log in",
           },
-          // You can also customize other views like forgotten_password, etc.
         },
       }}
     />

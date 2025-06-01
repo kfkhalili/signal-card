@@ -13,7 +13,25 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Missing Supabase URL or Anonymous Key");
+    console.error(
+      "CRITICAL_ERROR: Missing Supabase environment variables (URL or Anon Key). Cannot initialize Supabase client in middleware."
+    );
+
+    const errorUrl = request.nextUrl.clone();
+    errorUrl.pathname = "/auth/auth-error";
+    errorUrl.searchParams.set(
+      "message",
+      "Server configuration error. Please contact support."
+    );
+    // This specific check for pathname !== "/auth/auth-error" becomes less critical
+    // if /auth/auth-error is excluded by the matcher, but kept for safety.
+    if (pathname !== "/auth/auth-error") {
+      return NextResponse.redirect(errorUrl);
+    }
+    return new NextResponse("Server configuration error. Unable to proceed.", {
+      status: 500,
+      headers: { "Content-Type": "text/plain" },
+    });
   }
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -38,8 +56,11 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           );
-        } catch {
-          // The `setAll` method was called from a Server Component.
+        } catch (error) {
+          console.warn(
+            "[Middleware] Supabase cookies.setAll call was caught. This is usually from a Server Component and can be ignored if sessions are refreshed by middleware. Error:",
+            error instanceof Error ? error.message : String(error)
+          );
         }
       },
     },
@@ -49,7 +70,6 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Redirect logic for protected routes
   if (!user && !(pathname.startsWith("/auth") || pathname === "/")) {
     const url = request.nextUrl.clone();
     url.pathname = "/auth";
@@ -61,7 +81,6 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   return supabaseResponse;
 }
 
-// Add this config to your middleware file
 export const config = {
   matcher: [
     /*
@@ -70,10 +89,13 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - Any other folders containing static assets (e.g., /images, /fonts)
+     * - fonts (fonts folder)
+     * - images (images folder)
+     * - auth/auth-error (our specific auth error page) <--- ADDED EXCLUSION
      *
-     * This ensures the middleware's auth logic only runs on page navigation.
+     * This ensures the middleware's auth logic only runs on page navigation
+     * and not on the error page itself when it's trying to report a config error.
      */
-    "/((?!api|_next/static|_next/image|favicon.ico|fonts|images).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|fonts|images|auth/auth-error).*)",
   ],
 };
