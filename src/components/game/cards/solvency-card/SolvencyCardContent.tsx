@@ -14,6 +14,7 @@ import type {
   TriggerCardActionInteraction,
 } from "../base-card/base-card.types";
 import { DataRow } from "@/components/ui/DataRow";
+import { formatFinancialValue } from "@/lib/formatters"; // Updated import
 
 interface SolvencyCardContentProps {
   cardData: SolvencyCardData;
@@ -32,7 +33,7 @@ export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
       id,
       type: cardType,
     } = cardData;
-    const currency = staticData.reportedCurrency;
+    const currencyCode = staticData.reportedCurrency;
 
     const handleInteraction = (
       intent: InteractionPayload["intent"],
@@ -66,12 +67,11 @@ export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
               <DataRow
                 label="Period:"
                 value={staticData.periodLabel}
-                isMonetary={false}
                 isInteractive={!!staticData.periodLabel}
                 onClick={() => {
                   if (staticData.periodLabel) {
                     handleInteraction("REQUEST_NEW_CARD", {
-                      targetCardType: "solvency", // Or "revenue" if more general
+                      targetCardType: "solvency",
                       originatingElement: "periodLabelBack",
                     } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
                   }
@@ -82,7 +82,6 @@ export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
               <DataRow
                 label="Currency:"
                 value={staticData.reportedCurrency || "N/A"}
-                isMonetary={false}
                 isInteractive={!!staticData.reportedCurrency}
                 onClick={() => {
                   if (staticData.reportedCurrency) {
@@ -99,11 +98,10 @@ export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
                 <DataRow
                   label="Statement Date:"
                   value={staticData.statementDate}
-                  isMonetary={false}
                   isInteractive={true}
                   onClick={() =>
                     handleInteraction("REQUEST_NEW_CARD", {
-                      targetCardType: "solvency", // Or "revenue"
+                      targetCardType: "solvency",
                       originatingElement: "statementDateBack",
                     } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
                   }
@@ -115,7 +113,6 @@ export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
                 <DataRow
                   label="Filing Date:"
                   value={staticData.filingDate}
-                  isMonetary={false}
                   isInteractive={true}
                   onClick={() =>
                     handleInteraction("TRIGGER_CARD_ACTION", {
@@ -130,8 +127,7 @@ export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
               {staticData.acceptedDate && (
                 <DataRow
                   label="Accepted Date:"
-                  value={staticData.acceptedDate.substring(0, 10)} // Show only date part
-                  isMonetary={false}
+                  value={staticData.acceptedDate.substring(0, 10)}
                   isInteractive={true}
                   onClick={() =>
                     handleInteraction("TRIGGER_CARD_ACTION", {
@@ -163,7 +159,7 @@ export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
                     originatingElement: "solvencyBadge",
                   } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
                 }
-                title={`View profile for ${companyName || symbol}`}
+                title={`View solvency details for ${companyName || symbol}`}
                 baseClassName="inline-block">
                 <Badge
                   variant="outline"
@@ -175,8 +171,7 @@ export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
 
             <DataRow
               label="Total Assets"
-              value={liveData.totalAssets}
-              currency={currency}
+              value={formatFinancialValue(liveData.totalAssets, currencyCode)}
               className="mb-0.5"
               labelClassName="text-sm sm:text-base"
               valueClassName="text-sm sm:text-base"
@@ -184,7 +179,7 @@ export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
               isInteractive={true}
               onClick={() =>
                 handleInteraction("TRIGGER_CARD_ACTION", {
-                  actionName: "viewAssetBreakdown", // Example action
+                  actionName: "viewAssetBreakdown",
                   actionData: {
                     metric: "totalAssets",
                     value: liveData.totalAssets,
@@ -194,12 +189,14 @@ export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
             />
             <DataRow
               label="Cash"
-              value={liveData.cashAndShortTermInvestments}
-              currency={currency}
+              value={formatFinancialValue(
+                liveData.cashAndShortTermInvestments,
+                currencyCode
+              )}
+              tooltip="includes short-term investments"
               labelClassName="text-xs sm:text-sm"
               valueClassName="text-xs sm:text-sm"
               data-testid="cash-value-front"
-              tooltip="includes short-term investments"
               isInteractive={true}
               onClick={() =>
                 handleInteraction("TRIGGER_CARD_ACTION", {
@@ -213,8 +210,10 @@ export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
             />
             <DataRow
               label="Liabilities"
-              value={liveData.totalCurrentLiabilities}
-              currency={currency}
+              value={formatFinancialValue(
+                liveData.totalCurrentLiabilities,
+                currencyCode
+              )}
               labelClassName="text-xs sm:text-sm"
               valueClassName="text-xs sm:text-sm"
               data-testid="current-liabilities-value-front"
@@ -231,8 +230,7 @@ export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
             />
             <DataRow
               label="Short-Term Debt"
-              value={liveData.shortTermDebt}
-              currency={currency}
+              value={formatFinancialValue(liveData.shortTermDebt, currencyCode)}
               labelClassName="text-xs sm:text-sm"
               valueClassName="text-xs sm:text-sm"
               data-testid="short-term-debt-value-front"
@@ -249,8 +247,7 @@ export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
             />
             <DataRow
               label="Long-Term Debt"
-              value={liveData.longTermDebt}
-              currency={currency}
+              value={formatFinancialValue(liveData.longTermDebt, currencyCode)}
               labelClassName="text-xs sm:text-sm"
               valueClassName="text-xs sm:text-sm"
               data-testid="long-term-debt-value-front"
@@ -267,16 +264,14 @@ export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
             />
             <DataRow
               label="Free Cash Flow"
-              value={liveData.freeCashFlow}
-              currency={currency}
+              value={formatFinancialValue(liveData.freeCashFlow, currencyCode)}
               labelClassName="text-xs sm:text-sm"
               valueClassName="text-xs sm:text-sm"
               data-testid="fcf-value-front"
               isInteractive={true}
               onClick={() =>
                 handleInteraction("REQUEST_NEW_CARD", {
-                  // Or trigger action for a chart
-                  targetCardType: "revenue", // Assuming FCF is also on revenue card or a general finance card
+                  targetCardType: "revenue",
                   originatingElement: "fcfMetricSolvency",
                 } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
               }

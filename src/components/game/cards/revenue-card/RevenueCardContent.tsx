@@ -13,7 +13,7 @@ import type {
   RequestNewCardInteraction,
 } from "../base-card/base-card.types";
 import { DataRow } from "@/components/ui/DataRow";
-import { formatFinancialValue } from "./revenueCardUtils";
+import { formatFinancialValue } from "@/lib/formatters";
 
 interface RevenueCardContentProps {
   cardData: RevenueCardData;

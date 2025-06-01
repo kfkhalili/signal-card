@@ -28,49 +28,6 @@ type FinancialStatementDBRowFromSupabase =
   Database["public"]["Tables"]["financial_statements"]["Row"];
 type ProfileDBRowFromSupabase = Database["public"]["Tables"]["profiles"]["Row"];
 
-const getCurrencySymbol = (currencyCode: string | null): string => {
-  if (!currencyCode) return "";
-  // Add more currency codes and symbols as needed
-  switch (currencyCode.toUpperCase()) {
-    case "USD":
-      return "$";
-    case "EUR":
-      return "€";
-    case "GBP":
-      return "£";
-    case "JPY":
-      return "¥";
-    default:
-      return `${currencyCode} `; // Fallback to currency code if symbol is unknown
-  }
-};
-
-export const formatFinancialValue = (
-  value: number | null | undefined,
-  currencyCode: string | null
-): string => {
-  if (value === null || typeof value === "undefined") {
-    return "N/A";
-  }
-
-  const symbol = getCurrencySymbol(currencyCode);
-  let displayValue: string;
-
-  if (Math.abs(value) >= 1_000_000_000_000) {
-    displayValue = `${(value / 1_000_000_000_000).toFixed(2)}T`;
-  } else if (Math.abs(value) >= 1_000_000_000) {
-    displayValue = `${(value / 1_000_000_000).toFixed(2)}B`;
-  } else if (Math.abs(value) >= 1_000_000) {
-    displayValue = `${(value / 1_000_000).toFixed(2)}M`;
-  } else if (Math.abs(value) >= 1_000) {
-    displayValue = `${(value / 1_000).toFixed(2)}K`;
-  } else {
-    displayValue = value.toFixed(2); // Keep 2 decimal places for smaller numbers
-  }
-
-  return `${symbol}${displayValue}`;
-};
-
 function constructRevenueCardData(
   dbRow: FinancialStatementDBRowFromSupabase,
   profileInfo: {
