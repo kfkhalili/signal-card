@@ -9,6 +9,7 @@ import type {
 } from "../base-card/base-card.types";
 import type { CardType } from "../base-card/base-card.types";
 import { DataRow } from "@/components/ui/DataRow";
+import { cn } from "@/lib/utils";
 
 interface KeyRatiosCardContentProps {
   cardData: KeyRatiosCardData;
@@ -45,13 +46,15 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
       tooltip?: string,
       relatedCardType?: CardType,
       originatingElement?: string,
-      isMonetaryValue = false
+      isMonetaryValue = false,
+      labelClassName = "text-sm font-medium text-muted-foreground",
+      valueClassName = "text-sm font-semibold text-foreground"
     ) => (
       <DataRow
         label={label}
-        value={value && unit === "%" ? value * 100 : value} // value is pre-multiplied by 100 if it's a percentage
-        unit={unit === "%" ? undefined : unit} // Pass undefined as unit if DataRow will handle '%'
-        isValueAsPercentage={unit === "%"} // DataRow gets true if original unit was '%'
+        value={value && unit === "%" ? value * 100 : value}
+        unit={unit === "%" ? undefined : unit}
+        isValueAsPercentage={unit === "%"}
         precision={precision}
         tooltip={tooltip}
         isMonetary={isMonetaryValue}
@@ -66,6 +69,8 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
                 } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
             : undefined
         }
+        labelClassName={labelClassName}
+        valueClassName={valueClassName}
       />
     );
 
@@ -74,8 +79,9 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
         <div
           data-testid={`keyratios-card-back-${symbol}`}
           className="pointer-events-auto flex flex-col h-full">
-          <ShadCardContent className="pt-1 pb-2 px-0 space-y-1.5 flex-grow">
-            <div className="pt-1.5 space-y-0.5 text-[10px] sm:text-xs border-t mt-1.5">
+          <ShadCardContent
+            className={cn("p-0 flex-grow flex flex-col text-xs")}>
+            <div className="space-y-1.5 pt-1.5 border-t">
               <DataRow
                 label="Data Last Updated:"
                 value={
@@ -84,15 +90,19 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
                     : "N/A"
                 }
                 isMonetary={false}
+                labelClassName="text-xs font-medium text-muted-foreground"
+                valueClassName="text-xs font-semibold text-foreground"
               />
               <DataRow
                 label="Reporting Currency:"
                 value={staticData.reportedCurrency || "N/A"}
                 isMonetary={false}
+                labelClassName="text-xs font-medium text-muted-foreground"
+                valueClassName="text-xs font-semibold text-foreground"
               />
             </div>
-            <div className="mt-2 text-xs space-y-0.5">
-              <h4 className="font-semibold text-muted-foreground">
+            <div className="mt-2 space-y-0.5">
+              <h4 className="text-xs font-semibold text-muted-foreground mb-1">
                 Additional Ratios:
               </h4>
               {renderRatio(
@@ -102,7 +112,10 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
                 2,
                 "Gross profit as a percentage of revenue",
                 "revenue",
-                "grossProfitMarginBack"
+                "grossProfitMarginBack",
+                false,
+                "text-xs font-medium text-muted-foreground",
+                "text-xs font-semibold text-foreground"
               )}
               {renderRatio(
                 "EBITDA Margin",
@@ -111,7 +124,10 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
                 2,
                 "EBITDA as a percentage of revenue",
                 "revenue",
-                "ebitdaMarginBack"
+                "ebitdaMarginBack",
+                false,
+                "text-xs font-medium text-muted-foreground",
+                "text-xs font-semibold text-foreground"
               )}
               {renderRatio(
                 "Asset Turnover",
@@ -120,7 +136,10 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
                 2,
                 "Efficiency in using assets to generate sales",
                 "solvency",
-                "assetTurnoverBack"
+                "assetTurnoverBack",
+                false,
+                "text-xs font-medium text-muted-foreground",
+                "text-xs font-semibold text-foreground"
               )}
               {renderRatio(
                 "Current Ratio",
@@ -129,7 +148,10 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
                 2,
                 "Ability to pay short-term obligations",
                 "solvency",
-                "currentRatioBack"
+                "currentRatioBack",
+                false,
+                "text-xs font-medium text-muted-foreground",
+                "text-xs font-semibold text-foreground"
               )}
               {renderRatio(
                 "Quick Ratio",
@@ -138,7 +160,10 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
                 2,
                 "Ability to pay short-term obligations without selling inventory",
                 "solvency",
-                "quickRatioBack"
+                "quickRatioBack",
+                false,
+                "text-xs font-medium text-muted-foreground",
+                "text-xs font-semibold text-foreground"
               )}
               {renderRatio(
                 "Effective Tax Rate",
@@ -147,7 +172,10 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
                 2,
                 "Average tax rate paid",
                 "revenue",
-                "effectiveTaxRateBack"
+                "effectiveTaxRateBack",
+                false,
+                "text-xs font-medium text-muted-foreground",
+                "text-xs font-semibold text-foreground"
               )}
               {renderRatio(
                 "Div. Payout Ratio",
@@ -156,7 +184,10 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
                 2,
                 "Percentage of earnings paid as dividends",
                 "cashuse",
-                "dividendPayoutRatioBack"
+                "dividendPayoutRatioBack",
+                false,
+                "text-xs font-medium text-muted-foreground",
+                "text-xs font-semibold text-foreground"
               )}
             </div>
           </ShadCardContent>
@@ -168,89 +199,91 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
         <div
           data-testid={`keyratios-card-front-${symbol}`}
           className="pointer-events-auto flex flex-col h-full justify-between">
-          <ShadCardContent className="pt-1 pb-2 px-0 space-y-0.5 flex-grow">
-            {renderRatio(
-              "P/E Ratio",
-              liveData.priceToEarningsRatioTTM,
-              "",
-              2,
-              "Price to Earnings Ratio (TTM)",
-              "price",
-              "peRatioFront"
-            )}
-            {renderRatio(
-              "P/S Ratio",
-              liveData.priceToSalesRatioTTM,
-              "",
-              2,
-              "Price to Sales Ratio (TTM)",
-              "price",
-              "psRatioFront"
-            )}
-            {renderRatio(
-              "P/B Ratio",
-              liveData.priceToBookRatioTTM,
-              "",
-              2,
-              "Price to Book Ratio (TTM)",
-              "price",
-              "pbRatioFront"
-            )}
-            {renderRatio(
-              "P/FCF Ratio",
-              liveData.priceToFreeCashFlowRatioTTM,
-              "",
-              2,
-              "Price to Free Cash Flow Ratio (TTM)",
-              "cashuse",
-              "pFcfRatioFront"
-            )}
-            {renderRatio(
-              "Div. Yield",
-              liveData.dividendYieldTTM,
-              "%",
-              2,
-              "Dividend Yield (TTM)",
-              "cashuse",
-              "dividendYieldFront"
-            )}
-            {renderRatio(
-              "Net Profit Margin",
-              liveData.netProfitMarginTTM,
-              "%",
-              2,
-              "Net Profit Margin (TTM)",
-              "revenue",
-              "netProfitMarginFront"
-            )}
-            {renderRatio(
-              "Debt/Equity",
-              liveData.debtToEquityRatioTTM,
-              "",
-              2,
-              "Debt to Equity Ratio (TTM)",
-              "solvency",
-              "debtToEquityFront"
-            )}
-            {renderRatio(
-              "EV Multiple",
-              liveData.enterpriseValueMultipleTTM,
-              "",
-              2,
-              "Enterprise Value Multiple (TTM)",
-              "price",
-              "evMultipleFront"
-            )}
-            {renderRatio(
-              `EPS`,
-              liveData.earningsPerShareTTM,
-              staticData.reportedCurrency || "",
-              2,
-              "Earnings Per Share (TTM)",
-              "revenue",
-              "epsFront",
-              true
-            )}
+          <ShadCardContent className={cn("p-0 flex-grow flex flex-col")}>
+            <div className="space-y-0.5">
+              {renderRatio(
+                "P/E Ratio",
+                liveData.priceToEarningsRatioTTM,
+                "",
+                2,
+                "Price to Earnings Ratio (TTM)",
+                "price",
+                "peRatioFront"
+              )}
+              {renderRatio(
+                "P/S Ratio",
+                liveData.priceToSalesRatioTTM,
+                "",
+                2,
+                "Price to Sales Ratio (TTM)",
+                "price",
+                "psRatioFront"
+              )}
+              {renderRatio(
+                "P/B Ratio",
+                liveData.priceToBookRatioTTM,
+                "",
+                2,
+                "Price to Book Ratio (TTM)",
+                "price",
+                "pbRatioFront"
+              )}
+              {renderRatio(
+                "P/FCF Ratio",
+                liveData.priceToFreeCashFlowRatioTTM,
+                "",
+                2,
+                "Price to Free Cash Flow Ratio (TTM)",
+                "cashuse",
+                "pFcfRatioFront"
+              )}
+              {renderRatio(
+                "Div. Yield",
+                liveData.dividendYieldTTM,
+                "%",
+                2,
+                "Dividend Yield (TTM)",
+                "cashuse",
+                "dividendYieldFront"
+              )}
+              {renderRatio(
+                "Net Profit Margin",
+                liveData.netProfitMarginTTM,
+                "%",
+                2,
+                "Net Profit Margin (TTM)",
+                "revenue",
+                "netProfitMarginFront"
+              )}
+              {renderRatio(
+                "Debt/Equity",
+                liveData.debtToEquityRatioTTM,
+                "",
+                2,
+                "Debt to Equity Ratio (TTM)",
+                "solvency",
+                "debtToEquityFront"
+              )}
+              {renderRatio(
+                "EV Multiple",
+                liveData.enterpriseValueMultipleTTM,
+                "",
+                2,
+                "Enterprise Value Multiple (TTM)",
+                "price",
+                "evMultipleFront"
+              )}
+              {renderRatio(
+                `EPS`,
+                liveData.earningsPerShareTTM,
+                staticData.reportedCurrency || "",
+                2,
+                "Earnings Per Share (TTM)",
+                "revenue",
+                "epsFront",
+                true
+              )}
+            </div>
           </ShadCardContent>
         </div>
       );

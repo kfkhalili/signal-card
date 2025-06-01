@@ -63,19 +63,19 @@ const RatingDetailRow: React.FC<RatingDetailRowProps> = ({
             detail.colorClass
           )}
         />
-        <span className="text-muted-foreground min-w-[60px]">
+        <span className="text-xs font-medium text-muted-foreground min-w-[70px] sm:min-w-[80px]">
           {detail.label}:
         </span>
-        <span className="font-semibold text-foreground mx-1">
+        <span className="text-xs font-semibold text-foreground mx-1">
           {detail.currentValue}
         </span>
-        <span className="text-muted-foreground text-[10px]">
+        <span className="text-xs text-muted-foreground">
           ({percentage.toFixed(0)}%)
         </span>
       </div>
       <div
         className={cn(
-          "flex items-center min-w-[40px] justify-end",
+          "flex items-center min-w-[45px] justify-end", // Adjusted min-width
           changeColorClass
         )}>
         <ChangeIcon className="w-3 h-3 mr-0.5 shrink-0" />
@@ -100,48 +100,73 @@ export const AnalystGradesCardContent: React.FC<AnalystGradesCardContentProps> =
         <div
           data-testid={`analystgrades-card-back-${symbol}`}
           className="pointer-events-auto flex flex-col h-full">
-          <ShadCardContent className="pt-1 pb-2 px-0 space-y-1.5 flex-grow">
-            <div className="text-xs text-muted-foreground px-1 space-y-1">
-              <p>
-                <strong>Current Period:</strong> {staticData.currentPeriodDate}
-              </p>
-              {staticData.previousPeriodDate && (
-                <p>
-                  <strong>Previous Period:</strong>{" "}
-                  {staticData.previousPeriodDate}
-                </p>
-              )}
-              <p>
-                <strong>Total Analysts (Current):</strong>{" "}
-                {liveData.totalAnalystsCurrent}
-              </p>
-              {liveData.totalAnalystsPrevious !== null && (
-                <p>
-                  <strong>Total Analysts (Previous):</strong>{" "}
-                  {liveData.totalAnalystsPrevious}
-                </p>
-              )}
-              <p className="mt-2 pt-1 border-t">
-                <strong>Ratings Breakdown (Current vs Previous):</strong>
-              </p>
-              {liveData.ratingsDistribution.map((detail) => (
-                <div
-                  key={detail.category}
-                  className="flex justify-between items-center text-[11px]">
-                  <span>{detail.label}:</span>
-                  <span>
-                    {detail.currentValue}
-                    {detail.previousValue !== null
-                      ? ` (Prev: ${detail.previousValue})`
-                      : " (Prev: N/A)"}
-                    {detail.change !== null
-                      ? `, Change: ${detail.change > 0 ? "+" : ""}${
-                          detail.change
-                        }`
-                      : ""}
+          <ShadCardContent className={cn("p-0 flex-grow text-xs")}>
+            <div className="space-y-1 pt-1.5 border-t">
+              <div className="space-y-0.5">
+                <div className="flex justify-between">
+                  <span className="font-medium text-muted-foreground">
+                    Current Period:
+                  </span>
+                  <span className="font-semibold text-foreground">
+                    {staticData.currentPeriodDate}
                   </span>
                 </div>
-              ))}
+                {staticData.previousPeriodDate && (
+                  <div className="flex justify-between">
+                    <span className="font-medium text-muted-foreground">
+                      Previous Period:
+                    </span>
+                    <span className="font-semibold text-foreground">
+                      {staticData.previousPeriodDate}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="font-medium text-muted-foreground">
+                    Total Analysts (Current):
+                  </span>
+                  <span className="font-semibold text-foreground">
+                    {liveData.totalAnalystsCurrent}
+                  </span>
+                </div>
+                {liveData.totalAnalystsPrevious !== null && (
+                  <div className="flex justify-between">
+                    <span className="font-medium text-muted-foreground">
+                      Total Analysts (Previous):
+                    </span>
+                    <span className="font-semibold text-foreground">
+                      {liveData.totalAnalystsPrevious}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div className="mt-2 pt-1.5 border-t">
+                <h4 className="text-xs font-semibold text-muted-foreground mb-1">
+                  Ratings Breakdown (Current vs Previous):
+                </h4>
+                <div className="space-y-0.5">
+                  {liveData.ratingsDistribution.map((detail) => (
+                    <div
+                      key={detail.category}
+                      className="flex justify-between items-center">
+                      <span className="font-medium text-muted-foreground">
+                        {detail.label}:
+                      </span>
+                      <span className="font-semibold text-foreground">
+                        {detail.currentValue}
+                        {detail.previousValue !== null
+                          ? ` (Prev: ${detail.previousValue})`
+                          : " (Prev: N/A)"}
+                        {detail.change !== null
+                          ? `, Change: ${detail.change > 0 ? "+" : ""}${
+                              detail.change
+                            }`
+                          : ""}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </ShadCardContent>
         </div>
@@ -151,57 +176,57 @@ export const AnalystGradesCardContent: React.FC<AnalystGradesCardContentProps> =
     // Front Face
     const { ratingsDistribution, totalAnalystsCurrent, consensusLabelCurrent } =
       liveData;
-    const barHeight = "h-5 sm:h-6"; // Height of the segmented bar
+    const barHeight = "h-5 sm:h-6";
 
     return (
       <div
         data-testid={`analystgrades-card-front-${symbol}`}
         className="pointer-events-auto flex flex-col h-full">
-        <ShadCardContent className="pt-1 pb-1 px-0 flex-grow flex flex-col">
-          <div className="px-1 mb-2 text-center">
-            <p className="text-xs text-muted-foreground">
-              {staticData.currentPeriodDate}
-            </p>
-            <p className="text-sm sm:text-base font-semibold text-primary">
-              {consensusLabelCurrent}
-            </p>
-            <p className="text-[10px] sm:text-xs text-muted-foreground">
-              Based on {totalAnalystsCurrent} Analysts
-            </p>
-          </div>
-
-          {totalAnalystsCurrent > 0 && (
-            <div
-              className={cn(
-                "flex w-full rounded-full overflow-hidden shadow my-2",
-                barHeight
-              )}>
-              {ratingsDistribution.toReversed().map((detail) => {
-                const percentage =
-                  (detail.currentValue / totalAnalystsCurrent) * 100;
-                if (percentage === 0) return null;
-                return (
-                  <RatingBarSegment
-                    key={detail.category}
-                    percentage={percentage}
-                    colorClass={detail.colorClass}
-                    label={`${detail.label}: ${
-                      detail.currentValue
-                    } (${percentage.toFixed(0)}%)`}
-                  />
-                );
-              })}
+        <ShadCardContent className={cn("p-0 flex-grow flex flex-col")}>
+          <div className="space-y-1">
+            <div className="text-center mt-0.5 mb-1.5">
+              <p className="text-xs text-muted-foreground">
+                {staticData.currentPeriodDate}
+              </p>
+              <p className="text-base font-semibold text-primary">
+                {consensusLabelCurrent}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Based on {totalAnalystsCurrent} Analysts
+              </p>
             </div>
-          )}
-
-          <div className="space-y-0.5 px-1 mt-1 flex-grow overflow-y-auto text-xs">
-            {ratingsDistribution.map((detail) => (
-              <RatingDetailRow
-                key={detail.category}
-                detail={detail}
-                totalAnalysts={totalAnalystsCurrent}
-              />
-            ))}
+            {totalAnalystsCurrent > 0 && (
+              <div
+                className={cn(
+                  "flex w-full rounded-full overflow-hidden shadow my-1.5",
+                  barHeight
+                )}>
+                {ratingsDistribution.toReversed().map((detail) => {
+                  const percentage =
+                    (detail.currentValue / totalAnalystsCurrent) * 100;
+                  if (percentage === 0) return null;
+                  return (
+                    <RatingBarSegment
+                      key={detail.category}
+                      percentage={percentage}
+                      colorClass={detail.colorClass}
+                      label={`${detail.label}: ${
+                        detail.currentValue
+                      } (${percentage.toFixed(0)}%)`}
+                    />
+                  );
+                })}
+              </div>
+            )}
+            <div className="space-y-0.5 flex-grow overflow-y-auto">
+              {ratingsDistribution.map((detail) => (
+                <RatingDetailRow
+                  key={detail.category}
+                  detail={detail}
+                  totalAnalysts={totalAnalystsCurrent}
+                />
+              ))}
+            </div>
           </div>
         </ShadCardContent>
       </div>

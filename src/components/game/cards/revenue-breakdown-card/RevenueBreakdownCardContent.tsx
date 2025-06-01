@@ -56,7 +56,7 @@ const SegmentRow: React.FC<SegmentRowProps> = ({
   return (
     <div
       className={cn(
-        "flex justify-between items-center py-1.5 border-b border-border/50 last:border-b-0",
+        "flex justify-between items-center py-1 border-b border-border/50 last:border-b-0", // Reduced py slightly
         isInteractive && onClick
           ? "cursor-pointer hover:bg-muted/50 dark:hover:bg-muted/20"
           : ""
@@ -77,16 +77,16 @@ const SegmentRow: React.FC<SegmentRowProps> = ({
       )} (YoY: ${
         yoyChange !== null ? (yoyChange * 100).toFixed(1) + "%" : "N/A"
       })`}>
-      <span className="text-xs sm:text-sm font-medium text-foreground truncate pr-2">
+      <span className="text-sm font-medium text-muted-foreground truncate pr-2">
         {segmentName}
       </span>
       <div className="flex items-baseline space-x-2 sm:space-x-3">
         <span
-          className={`text-xs sm:text-sm font-semibold ${yoyColorClass} flex items-center min-w-[50px] justify-end`}>
-          {IconComponent && <IconComponent className="h-3 w-3 mr-0.5" />}
+          className={`text-sm font-semibold ${yoyColorClass} flex items-center min-w-[60px] justify-end`}>
+          {IconComponent && <IconComponent className="h-3.5 w-3.5 mr-0.5" />}
           {yoyDisplay}
         </span>
-        <span className="text-xs sm:text-sm font-bold text-foreground min-w-[70px] text-right">
+        <span className="text-sm font-semibold text-foreground min-w-[80px] text-right">
           {currencySymbol}
           {formatNumberWithAbbreviations(currentRevenue, 2)}
         </span>
@@ -110,26 +110,44 @@ export const RevenueBreakdownCardContent: React.FC<RevenueBreakdownCardContentPr
         <div
           data-testid={`revenuebreakdown-card-back-${symbol}`}
           className="pointer-events-auto flex flex-col h-full">
-          <ShadCardContent className="pt-1 pb-2 px-0 space-y-1.5 flex-grow">
-            <div className="text-xs text-muted-foreground px-1 space-y-0.5">
-              <p>
-                <strong>Latest Period:</strong> {staticData.latestPeriodLabel}
-              </p>
+          <ShadCardContent className={cn("p-0 flex-grow text-xs")}>
+            <div className="space-y-1 pt-1.5 border-t">
+              <div className="flex justify-between">
+                <span className="font-medium text-muted-foreground">
+                  Latest Period:
+                </span>
+                <span className="font-semibold text-foreground">
+                  {staticData.latestPeriodLabel}
+                </span>
+              </div>
               {staticData.previousPeriodLabel && (
-                <p>
-                  <strong>Comparison Period:</strong>{" "}
-                  {staticData.previousPeriodLabel}
-                </p>
+                <div className="flex justify-between">
+                  <span className="font-medium text-muted-foreground">
+                    Comparison Period:
+                  </span>
+                  <span className="font-semibold text-foreground">
+                    {staticData.previousPeriodLabel}
+                  </span>
+                </div>
               )}
-              <p>
-                <strong>Currency:</strong> {staticData.currencySymbol}
-              </p>
-              <p>
-                <strong>Last Updated:</strong>{" "}
-                {liveData.lastUpdated
-                  ? new Date(liveData.lastUpdated).toLocaleDateString()
-                  : "N/A"}
-              </p>
+              <div className="flex justify-between">
+                <span className="font-medium text-muted-foreground">
+                  Currency:
+                </span>
+                <span className="font-semibold text-foreground">
+                  {staticData.currencySymbol}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-medium text-muted-foreground">
+                  Last Updated:
+                </span>
+                <span className="font-semibold text-foreground">
+                  {liveData.lastUpdated
+                    ? new Date(liveData.lastUpdated).toLocaleDateString()
+                    : "N/A"}
+                </span>
+              </div>
             </div>
           </ShadCardContent>
         </div>
@@ -192,43 +210,45 @@ export const RevenueBreakdownCardContent: React.FC<RevenueBreakdownCardContentPr
       <div
         data-testid={`revenuebreakdown-card-front-${symbol}`}
         className="pointer-events-auto flex flex-col h-full">
-        <ShadCardContent className="pt-1 pb-1 px-0 flex-grow flex flex-col">
-          <div className="flex justify-between items-baseline mb-2 px-0.5">
-            <span className="text-xs text-muted-foreground">
-              {staticData.latestPeriodLabel}
-            </span>
-            <div className="text-right">
-              <span className="text-xs text-muted-foreground block">
-                Total Revenue
+        <ShadCardContent className={cn("p-0 flex-grow flex flex-col")}>
+          <div className="space-y-1.5">
+            <div className="flex justify-between items-baseline mb-1.5">
+              <span className="text-xs text-muted-foreground">
+                {staticData.latestPeriodLabel}
               </span>
-              <span className="text-lg sm:text-xl font-bold text-foreground">
-                {staticData.currencySymbol}
-                {liveData.totalRevenueLatestPeriod !== null
-                  ? formatNumberWithAbbreviations(
-                      liveData.totalRevenueLatestPeriod,
-                      2
-                    )
-                  : "N/A"}
-              </span>
+              <div className="text-right">
+                <span className="text-sm font-medium text-muted-foreground block">
+                  Total Revenue
+                </span>
+                <span className="text-xl font-bold sm:text-2xl text-foreground">
+                  {staticData.currencySymbol}
+                  {liveData.totalRevenueLatestPeriod !== null
+                    ? formatNumberWithAbbreviations(
+                        liveData.totalRevenueLatestPeriod,
+                        2
+                      )
+                    : "N/A"}
+                </span>
+              </div>
             </div>
-          </div>
-          <div className="flex-grow space-y-0 overflow-y-auto pr-1">
-            {displayItems.length > 0 ? (
-              displayItems.map((item) => (
-                <SegmentRow
-                  key={item.segmentName}
-                  segmentName={item.segmentName}
-                  currentRevenue={item.currentRevenue}
-                  yoyChange={item.yoyChange}
-                  currencySymbol={staticData.currencySymbol}
-                  isInteractive={false}
-                />
-              ))
-            ) : (
-              <p className="text-xs text-muted-foreground text-center py-4">
-                No breakdown data available.
-              </p>
-            )}
+            <div className="flex-grow space-y-0.5 overflow-y-auto pr-0.5">
+              {displayItems.length > 0 ? (
+                displayItems.map((item) => (
+                  <SegmentRow
+                    key={item.segmentName}
+                    segmentName={item.segmentName}
+                    currentRevenue={item.currentRevenue}
+                    yoyChange={item.yoyChange}
+                    currencySymbol={staticData.currencySymbol}
+                    isInteractive={false} // Assuming not interactive for now
+                  />
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No breakdown data available.
+                </p>
+              )}
+            </div>
           </div>
         </ShadCardContent>
       </div>

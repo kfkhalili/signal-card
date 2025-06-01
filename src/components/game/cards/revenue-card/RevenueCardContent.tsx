@@ -9,6 +9,7 @@ import type {
 } from "../base-card/base-card.types";
 import { DataRow } from "@/components/ui/DataRow";
 import { formatFinancialValue } from "@/lib/formatters";
+import { cn } from "@/lib/utils";
 
 interface RevenueCardContentProps {
   cardData: RevenueCardData;
@@ -43,13 +44,11 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
         <div
           data-testid={`revenue-card-back-${symbol}`}
           className="pointer-events-auto flex flex-col h-full">
-          <ShadCardContent className="pt-1 pb-2 px-0 space-y-1 sm:space-y-1.5 flex-grow">
-            {/* Description removed, will be rendered by BaseCard */}
-            <div className="pt-1.5 space-y-0.5 text-[10px] sm:text-xs border-t mt-1.5">
+          <ShadCardContent className={cn("p-0 flex-grow text-xs")}>
+            <div className="pt-1.5 space-y-0.5 border-t ">
               <DataRow
                 label="Period:"
                 value={staticData.periodLabel}
-                isMonetary={false}
                 isInteractive={!!staticData.periodLabel}
                 onClick={() => {
                   if (staticData.periodLabel) {
@@ -59,13 +58,12 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
                     } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
                   }
                 }}
-                labelClassName="text-muted-foreground/90"
-                valueClassName="text-foreground font-medium"
+                labelClassName="text-xs font-medium text-muted-foreground"
+                valueClassName="text-xs font-semibold text-foreground"
               />
               <DataRow
                 label="Currency:"
                 value={staticData.reportedCurrency || "N/A"}
-                isMonetary={false}
                 isInteractive={!!staticData.reportedCurrency}
                 onClick={() => {
                   if (staticData.reportedCurrency) {
@@ -75,14 +73,13 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
                     } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
                   }
                 }}
-                labelClassName="text-muted-foreground/90"
-                valueClassName="text-foreground"
+                labelClassName="text-xs font-medium text-muted-foreground"
+                valueClassName="text-xs font-semibold text-foreground"
               />
               {staticData.statementDate && (
                 <DataRow
                   label="Statement Date:"
                   value={staticData.statementDate}
-                  isMonetary={false}
                   isInteractive={true}
                   onClick={() =>
                     handleInteraction("REQUEST_NEW_CARD", {
@@ -90,15 +87,14 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
                       originatingElement: "statementDateBack",
                     } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
                   }
-                  labelClassName="text-muted-foreground/90"
-                  valueClassName="text-foreground"
+                  labelClassName="text-xs font-medium text-muted-foreground"
+                  valueClassName="text-xs font-semibold text-foreground"
                 />
               )}
               {staticData.filingDate && (
                 <DataRow
                   label="Filing Date:"
                   value={staticData.filingDate}
-                  isMonetary={false}
                   isInteractive={true}
                   onClick={() =>
                     handleInteraction("REQUEST_NEW_CARD", {
@@ -106,15 +102,14 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
                       originatingElement: "filingDateBack",
                     } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
                   }
-                  labelClassName="text-muted-foreground/90"
-                  valueClassName="text-foreground"
+                  labelClassName="text-xs font-medium text-muted-foreground"
+                  valueClassName="text-xs font-semibold text-foreground"
                 />
               )}
               {staticData.acceptedDate && (
                 <DataRow
                   label="Accepted Date:"
                   value={staticData.acceptedDate.substring(0, 10)}
-                  isMonetary={false}
                   isInteractive={true}
                   onClick={() =>
                     handleInteraction("REQUEST_NEW_CARD", {
@@ -122,8 +117,8 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
                       originatingElement: "acceptedDateBack",
                     } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
                   }
-                  labelClassName="text-muted-foreground/90"
-                  valueClassName="text-foreground"
+                  labelClassName="text-xs font-medium text-muted-foreground"
+                  valueClassName="text-xs font-semibold text-foreground"
                 />
               )}
             </div>
@@ -136,81 +131,86 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
         <div
           data-testid={`revenue-card-front-${symbol}`}
           className="pointer-events-auto flex flex-col h-full justify-between">
-          <ShadCardContent className="pt-1 pb-2 px-0 space-y-1.5 flex-grow">
-            <DataRow
-              label="Revenue"
-              value={formatFinancialValue(liveData.revenue, currencyCode)}
-              className="mb-1"
-              labelClassName="text-base sm:text-lg md:text-xl"
-              valueClassName="text-base sm:text-lg md:text-xl"
-              data-testid="revenue-value-front"
-              isInteractive={true}
-              onClick={() =>
-                handleInteraction("REQUEST_NEW_CARD", {
-                  targetCardType: "price",
-                  originatingElement: "revenueMetric",
-                } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-              }
-            />
-            <DataRow
-              label="Gross Profit"
-              value={formatFinancialValue(liveData.grossProfit, currencyCode)}
-              labelClassName="text-xs sm:text-sm"
-              valueClassName="text-sm sm:text-base"
-              data-testid="gross-profit-value-front"
-              isInteractive={true}
-              onClick={() =>
-                handleInteraction("REQUEST_NEW_CARD", {
-                  targetCardType: "price",
-                  originatingElement: "grossProfitMetric",
-                } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-              }
-            />
-            <DataRow
-              label="Operating Income"
-              value={formatFinancialValue(
-                liveData.operatingIncome,
-                currencyCode
-              )}
-              labelClassName="text-xs sm:text-sm"
-              valueClassName="text-sm sm:text-base"
-              data-testid="operating-income-value-front"
-              isInteractive={true}
-              onClick={() =>
-                handleInteraction("REQUEST_NEW_CARD", {
-                  targetCardType: "price",
-                  originatingElement: "operatingIncomeMetric",
-                } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-              }
-            />
-            <DataRow
-              label="Net Income"
-              value={formatFinancialValue(liveData.netIncome, currencyCode)}
-              labelClassName="text-xs sm:text-sm"
-              valueClassName="text-sm sm:text-base"
-              data-testid="net-income-value-front"
-              isInteractive={true}
-              onClick={() =>
-                handleInteraction("REQUEST_NEW_CARD", {
-                  targetCardType: "price",
-                  originatingElement: "netIncomeMetric",
-                } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-              }
-            />
-            <DataRow
-              label="Free Cash Flow"
-              value={formatFinancialValue(liveData.freeCashFlow, currencyCode)}
-              labelClassName="text-xs sm:text-sm"
-              valueClassName="text-sm sm:text-base"
-              data-testid="fcf-value-front"
-              isInteractive={true}
-              onClick={() =>
-                handleInteraction("REQUEST_NEW_CARD", {
-                  targetCardType: "price",
-                  originatingElement: "fcfMetric",
-                } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-              }
-            />
+          <ShadCardContent className={cn("p-0 flex-grow flex flex-col")}>
+            <div className="space-y-1.5">
+              <DataRow
+                label="Revenue"
+                value={formatFinancialValue(liveData.revenue, currencyCode)}
+                className="mb-1"
+                labelClassName="text-sm font-medium text-muted-foreground"
+                valueClassName="text-xl font-bold sm:text-2xl text-foreground"
+                data-testid="revenue-value-front"
+                isInteractive={true}
+                onClick={() =>
+                  handleInteraction("REQUEST_NEW_CARD", {
+                    targetCardType: "price",
+                    originatingElement: "revenueMetric",
+                  } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                }
+              />
+              <DataRow
+                label="Gross Profit"
+                value={formatFinancialValue(liveData.grossProfit, currencyCode)}
+                labelClassName="text-sm font-medium text-muted-foreground"
+                valueClassName="text-sm font-semibold text-foreground"
+                data-testid="gross-profit-value-front"
+                isInteractive={true}
+                onClick={() =>
+                  handleInteraction("REQUEST_NEW_CARD", {
+                    targetCardType: "price",
+                    originatingElement: "grossProfitMetric",
+                  } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                }
+              />
+              <DataRow
+                label="Operating Income"
+                value={formatFinancialValue(
+                  liveData.operatingIncome,
+                  currencyCode
+                )}
+                labelClassName="text-sm font-medium text-muted-foreground"
+                valueClassName="text-sm font-semibold text-foreground"
+                data-testid="operating-income-value-front"
+                isInteractive={true}
+                onClick={() =>
+                  handleInteraction("REQUEST_NEW_CARD", {
+                    targetCardType: "price",
+                    originatingElement: "operatingIncomeMetric",
+                  } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                }
+              />
+              <DataRow
+                label="Net Income"
+                value={formatFinancialValue(liveData.netIncome, currencyCode)}
+                labelClassName="text-sm font-medium text-muted-foreground"
+                valueClassName="text-sm font-semibold text-foreground"
+                data-testid="net-income-value-front"
+                isInteractive={true}
+                onClick={() =>
+                  handleInteraction("REQUEST_NEW_CARD", {
+                    targetCardType: "price",
+                    originatingElement: "netIncomeMetric",
+                  } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                }
+              />
+              <DataRow
+                label="Free Cash Flow"
+                value={formatFinancialValue(
+                  liveData.freeCashFlow,
+                  currencyCode
+                )}
+                labelClassName="text-sm font-medium text-muted-foreground"
+                valueClassName="text-sm font-semibold text-foreground"
+                data-testid="fcf-value-front"
+                isInteractive={true}
+                onClick={() =>
+                  handleInteraction("REQUEST_NEW_CARD", {
+                    targetCardType: "price",
+                    originatingElement: "fcfMetric",
+                  } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                }
+              />
+            </div>
           </ShadCardContent>
         </div>
       );
