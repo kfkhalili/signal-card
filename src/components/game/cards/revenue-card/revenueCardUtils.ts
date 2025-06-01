@@ -28,6 +28,49 @@ type FinancialStatementDBRowFromSupabase =
   Database["public"]["Tables"]["financial_statements"]["Row"];
 type ProfileDBRowFromSupabase = Database["public"]["Tables"]["profiles"]["Row"];
 
+const getCurrencySymbol = (currencyCode: string | null): string => {
+  if (!currencyCode) return "";
+  // Add more currency codes and symbols as needed
+  switch (currencyCode.toUpperCase()) {
+    case "USD":
+      return "$";
+    case "EUR":
+      return "€";
+    case "GBP":
+      return "£";
+    case "JPY":
+      return "¥";
+    default:
+      return `${currencyCode} `; // Fallback to currency code if symbol is unknown
+  }
+};
+
+export const formatFinancialValue = (
+  value: number | null | undefined,
+  currencyCode: string | null
+): string => {
+  if (value === null || typeof value === "undefined") {
+    return "N/A";
+  }
+
+  const symbol = getCurrencySymbol(currencyCode);
+  let displayValue: string;
+
+  if (Math.abs(value) >= 1_000_000_000_000) {
+    displayValue = `${(value / 1_000_000_000_000).toFixed(2)}T`;
+  } else if (Math.abs(value) >= 1_000_000_000) {
+    displayValue = `${(value / 1_000_000_000).toFixed(2)}B`;
+  } else if (Math.abs(value) >= 1_000_000) {
+    displayValue = `${(value / 1_000_000).toFixed(2)}M`;
+  } else if (Math.abs(value) >= 1_000) {
+    displayValue = `${(value / 1_000).toFixed(2)}K`;
+  } else {
+    displayValue = value.toFixed(2); // Keep 2 decimal places for smaller numbers
+  }
+
+  return `${symbol}${displayValue}`;
+};
+
 function constructRevenueCardData(
   dbRow: FinancialStatementDBRowFromSupabase,
   profileInfo: {
@@ -117,7 +160,7 @@ async function initializeRevenueCard({
   try {
     const profileCardForSymbol = activeCards?.find(
       (c) => c.symbol === symbol && c.type === "profile"
-    ) as ProfileDBRowFromSupabase | undefined; // Assuming ProfileCardData is similar enough or use a specific type
+    ) as ProfileDBRowFromSupabase | undefined;
 
     const fetchedProfileInfo = {
       companyName: profileCardForSymbol?.company_name ?? symbol,
@@ -268,6 +311,9 @@ const handleRevenueCardStatementUpdate: CardUpdateHandler<
       currentRevenueCardData.staticData.statementPeriod !==
       newFinancialStatementRow.period
     ) {
+      // This condition is a bit broad; it implies any differing period (even lower in hierarchy)
+      // could trigger an update if accepted dates are also more recent or equal.
+      // This might be desired to catch corrections or restatements for the same date but different period label.
       if (
         newFinancialStatementRow.accepted_date &&
         currentRevenueCardData.staticData.acceptedDate
@@ -279,6 +325,7 @@ const handleRevenueCardStatementUpdate: CardUpdateHandler<
           shouldUpdate = true;
         }
       } else {
+        // If accepted dates are not available, a different period for the same statement date is considered an update
         shouldUpdate = true;
       }
     }
@@ -293,15 +340,21 @@ const handleRevenueCardStatementUpdate: CardUpdateHandler<
         } ${newFinancialStatementRow.fiscal_year || ""} available.`,
       });
     }
+    // Reconstruct the card data using the new financial statement row
+    // and existing profile information.
+    // Important: We pass Date.now() for createdAt to signify an update,
+    // unless you have specific logic to retain original creation time of the card instance itself.
+    // If id needs to remain exactly the same, ensure idOverride is currentRevenueCardData.id
+    // If createdAt needs to be the original creation time of this card *instance*, pass currentRevenueCardData.createdAt
     return constructRevenueCardData(
-      newFinancialStatementRow,
+      newFinancialStatementRow, // This is the new FinancialStatementDBRowFromRealtime
       {
         companyName: currentRevenueCardData.companyName,
         logoUrl: currentRevenueCardData.logoUrl,
         websiteUrl: currentRevenueCardData.websiteUrl,
       },
-      currentRevenueCardData.id,
-      Date.now()
+      currentRevenueCardData.id, // Preserve the original card ID
+      Date.now() // Update createdAt to reflect new data freshness on the card itself
     );
   }
   return currentRevenueCardData;
@@ -322,6 +375,7 @@ const handleRevenueCardProfileUpdate: CardUpdateHandler<
   );
 
   if (coreDataChanged) {
+    // If core data like companyName changed, update the description in backData
     const newBackDataDescription: BaseCardBackData = {
       description: `Key financial metrics for ${updatedCardData.companyName} (${
         updatedCardData.staticData.periodLabel
@@ -334,7 +388,7 @@ const handleRevenueCardProfileUpdate: CardUpdateHandler<
       backData: newBackDataDescription,
     };
   }
-  return currentRevenueCardData;
+  return currentRevenueCardData; // No change if core data didn't change
 };
 registerCardUpdateHandler(
   "revenue",
