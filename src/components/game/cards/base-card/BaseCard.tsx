@@ -11,8 +11,10 @@ import type {
   OnGenericInteraction,
   RequestNewCardInteraction,
   NavigateExternalInteraction,
+  CardType,
 } from "./base-card.types";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
+import { Badge } from "@/components/ui/badge";
 
 interface BaseCardProps {
   isFlipped: boolean;
@@ -47,6 +49,69 @@ const cardSurfaceBaseStyle: React.CSSProperties = {
 
 const backFaceTransformStyle: React.CSSProperties = {
   transform: "rotateY(180deg) translateZ(0px)",
+};
+
+const CARD_TYPE_LABELS: Record<CardType, string> = {
+  profile: "Profile",
+  price: "Price",
+  revenue: "Revenue",
+  solvency: "Solvency",
+  cashuse: "Cash Use",
+  keyratios: "Key Ratios",
+  dividendshistory: "Dividends History",
+  revenuebreakdown: "Revenue Breakdown",
+  analystgrades: "Analyst Grades",
+};
+
+const capitalize = (s: string): string => {
+  if (typeof s !== "string" || !s) return s;
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+};
+
+// Internal component for the Card Type Badge
+const CardTypeHeaderBadge: React.FC<{
+  cardContext: CardActionContext;
+  onGenericInteraction: OnGenericInteraction;
+}> = ({ cardContext, onGenericInteraction }) => {
+  const {
+    id: sourceCardId,
+    symbol: sourceCardSymbol,
+    type: sourceCardType,
+    companyName,
+  } = cardContext;
+
+  const handleBadgeClick = () => {
+    const payload: RequestNewCardInteraction = {
+      intent: "REQUEST_NEW_CARD",
+      sourceCardId,
+      sourceCardSymbol,
+      sourceCardType,
+      targetCardType: sourceCardType,
+      originatingElement: `header-badge-${sourceCardType}`,
+    };
+    onGenericInteraction(payload);
+  };
+
+  const cardLabel =
+    CARD_TYPE_LABELS[sourceCardType] || capitalize(sourceCardType);
+
+  return (
+    // Removed horizontal padding, adjusted vertical margin for integration within header
+    <div className="text-center mt-2">
+      <ClickableDataItem
+        isInteractive={true}
+        onClickHandler={handleBadgeClick}
+        title={`View ${cardLabel} card details for ${
+          companyName || sourceCardSymbol
+        }`}
+        baseClassName="inline-block"
+        data-interactive-child="true">
+        <Badge variant="outline" className="text-xs sm:text-sm px-2 py-0.5">
+          {cardLabel}
+        </Badge>
+      </ClickableDataItem>
+    </div>
+  );
 };
 
 const BaseCard: React.FC<BaseCardProps> = ({
@@ -192,7 +257,6 @@ const BaseCard: React.FC<BaseCardProps> = ({
           "text-right min-w-0 max-w-[calc(100%-3rem-12px)] sm:max-w-[calc(100%-3.5rem-12px)] md:max-w-[calc(100%-4rem-12px)]",
           "flex flex-col justify-center"
         )}
-        style={{ minHeight: "4.25rem" }}
         aria-label={`View profile for ${companyName || sourceCardSymbol}`}
         data-interactive-child="true"
         data-testid="header-text-clickable">
@@ -211,51 +275,38 @@ const BaseCard: React.FC<BaseCardProps> = ({
               ({sourceCardSymbol})
             </p>
           )}
-          {!companyName && sourceCardType === "price" && (
-            <p className="text-xs sm:text-sm text-muted-foreground leading-tight pt-[1px] sm:pt-[2px] capitalize">
-              {sourceCardType} Quote
-            </p>
-          )}
-          {!companyName && sourceCardType === "profile" && (
-            <p className="text-xs sm:text-sm text-muted-foreground leading-tight pt-[1px] sm:pt-[2px] capitalize">
-              {sourceCardSymbol} Profile
-            </p>
-          )}
-          {!companyName && sourceCardType === "revenue" && (
-            <p className="text-xs sm:text-sm text-muted-foreground leading-tight pt-[1px] sm:pt-[2px] capitalize">
-              {sourceCardSymbol} Financials
-            </p>
-          )}
         </div>
       </ClickableDataItem>
     </>
   );
 
+  // MODIFIED: actualIdentityHeaderElement now includes the badge for the front face
   const actualIdentityHeaderElement = (
-    <div
-      className={cn(
-        "flex justify-between items-start",
-        headerWrapperClassNames
-      )}>
-      {identityHeaderContent}
+    <div className={cn(headerWrapperClassNames)}>
+      <div className="flex justify-between items-start w-full">
+        {identityHeaderContent}
+      </div>
+      <CardTypeHeaderBadge
+        cardContext={cardContext}
+        onGenericInteraction={onGenericInteraction}
+      />
     </div>
   );
 
-  const headerPlaceholderElementForBack = (
-    <div
-      className={cn("invisible", headerWrapperClassNames)}
-      aria-hidden="true">
-      <div className="flex justify-between items-start">
-        <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0 mr-2 sm:mr-3">
-          <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10" />
+  const headerPlaceholderElementForBack = // This remains unchanged, for spacing on back
+    (
+      <div
+        className={cn("invisible", headerWrapperClassNames)}
+        aria-hidden="true">
+        <div className="flex justify-between items-start">
+          <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0 mr-2 sm:mr-3">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10" />
+          </div>
+          <div className="min-w-0 max-w-[calc(100%-3rem-12px)] sm:max-w-[calc(100%-3.5rem-12px)] md:max-w-[calc(100%-4rem-12px)]" />
         </div>
-        <div
-          className="min-w-0 max-w-[calc(100%-3rem-12px)] sm:max-w-[calc(100%-3.5rem-12px)] md:max-w-[calc(100%-4rem-12px)]"
-          style={{ minHeight: "4.25rem" }}
-        />
+        {/* No badge placeholder specifically needed if its height is managed by `headerWrapperClassNames` indirectly */}
       </div>
-    </div>
-  );
+    );
 
   const handleCardFlipInteraction = (
     e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>
@@ -337,8 +388,9 @@ const BaseCard: React.FC<BaseCardProps> = ({
           inert={frontFaceInert ? true : undefined}
           aria-hidden={isFlipped ? "true" : "false"}>
           {deleteButtonElement}
-          {actualIdentityHeaderElement}
+          {actualIdentityHeaderElement} {/* This now includes the badge */}
           <div className="flex-grow overflow-y-auto relative p-3 sm:p-4 md:px-5 md:pb-5 md:pt-2">
+            {/* pt-2 to give space below the header block which now contains the badge */}
             {faceContent}
           </div>
         </ShadCard>

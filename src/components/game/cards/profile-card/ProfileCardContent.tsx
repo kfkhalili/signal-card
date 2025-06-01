@@ -71,24 +71,6 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
           data-testid={`profile-card-front-${symbol}`}
           className="pointer-events-auto flex flex-col h-full justify-between text-xs">
           <ShadCardContent className="pt-1 pb-1 px-0 space-y-1 flex-grow">
-            <div className="text-center mb-1.5">
-              <ClickableDataItem
-                isInteractive={true}
-                onClickHandler={() =>
-                  handleInteraction("REQUEST_NEW_CARD", {
-                    targetCardType: "profile",
-                    originatingElement: "profileBadge",
-                  } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-                }
-                title={`View profile for ${companyName || symbol}`}
-                baseClassName="inline-block">
-                <Badge
-                  variant="outline"
-                  className="text-xs sm:text-sm px-2 py-0.5">
-                  Profile
-                </Badge>
-              </ClickableDataItem>
-            </div>
             {description && (
               <p
                 className="text-muted-foreground text-xs leading-snug line-clamp-3"
@@ -441,13 +423,6 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                 )}
             </div>
           </ShadCardContent>
-          <div className="px-0 pt-0.5 text-center mt-auto">
-            {staticData?.profile_last_updated && (
-              <p className="text-[9px] text-muted-foreground/80 leading-tight">
-                Profile as of: {staticData.profile_last_updated}
-              </p>
-            )}
-          </div>
         </div>
       );
     }

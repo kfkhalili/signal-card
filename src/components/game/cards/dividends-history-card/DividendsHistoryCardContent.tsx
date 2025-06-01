@@ -4,16 +4,10 @@ import {
   CardDescription,
   CardContent as ShadCardContent,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import type { DividendsHistoryCardData } from "./dividends-history-card.types";
 import { cn } from "@/lib/utils";
 import { formatNumberWithAbbreviations } from "@/lib/formatters";
-import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
-import type {
-  OnGenericInteraction,
-  InteractionPayload,
-  RequestNewCardInteraction,
-} from "../base-card/base-card.types";
+import type { OnGenericInteraction } from "../base-card/base-card.types";
 import { DataRow } from "@/components/ui/DataRow";
 
 interface HistogramBarProps {
@@ -71,34 +65,9 @@ interface DividendsHistoryCardContentProps {
 }
 
 export const DividendsHistoryCardContent: React.FC<DividendsHistoryCardContentProps> =
-  React.memo(({ cardData, isBackFace, onGenericInteraction }) => {
-    const {
-      staticData,
-      liveData,
-      symbol,
-      companyName,
-      backData,
-      id,
-      type: cardType,
-    } = cardData;
+  React.memo(({ cardData, isBackFace }) => {
+    const { staticData, liveData, symbol, companyName, backData } = cardData;
     const currency = staticData.reportedCurrency;
-
-    const handleInteraction = (
-      intent: InteractionPayload["intent"],
-      details: Omit<
-        InteractionPayload,
-        "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType"
-      >
-    ) => {
-      const payload: InteractionPayload = {
-        intent,
-        sourceCardId: id,
-        sourceCardSymbol: symbol,
-        sourceCardType: cardType,
-        ...details,
-      } as InteractionPayload;
-      onGenericInteraction(payload);
-    };
 
     // Ensure liveData and its properties are correctly accessed with defaults
     const latestDividend = liveData?.latestDividend || null;
@@ -183,14 +152,6 @@ export const DividendsHistoryCardContent: React.FC<DividendsHistoryCardContentPr
               valueClassName="text-xs sm:text-sm"
             />
           </ShadCardContent>
-          <div className="px-0 pt-1 text-[10px] text-center text-muted-foreground/80">
-            <p>
-              Last Div. Data:{" "}
-              {liveData.lastUpdated
-                ? new Date(liveData.lastUpdated).toLocaleDateString()
-                : "N/A"}
-            </p>
-          </div>
         </div>
       );
     } else {
@@ -208,25 +169,6 @@ export const DividendsHistoryCardContent: React.FC<DividendsHistoryCardContentPr
           data-testid={`dividendshistory-card-front-${symbol}`}
           className="pointer-events-auto flex flex-col h-full">
           <ShadCardContent className="pt-1 pb-1 px-0 space-y-1.5 flex-grow">
-            <div className="text-center mb-1.5">
-              <ClickableDataItem
-                isInteractive={true}
-                onClickHandler={() =>
-                  handleInteraction("REQUEST_NEW_CARD", {
-                    targetCardType: "dividendshistory",
-                    originatingElement: "dividendsHistoryBadge",
-                  } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-                }
-                title={`View details for ${companyName || symbol} Dividends`}
-                baseClassName="inline-block">
-                <Badge
-                  variant="outline"
-                  className="text-xs sm:text-sm px-2 py-0.5">
-                  Dividend History
-                </Badge>
-              </ClickableDataItem>
-            </div>
-
             {safeAnnualDividendFigures.length > 0 ? (
               <>
                 <h4 className="text-xs font-semibold text-center text-muted-foreground mb-1 mt-1">
@@ -266,14 +208,6 @@ export const DividendsHistoryCardContent: React.FC<DividendsHistoryCardContentPr
               />
             </div>
           </ShadCardContent>
-          <div className="px-0 pt-1 text-[10px] text-center text-muted-foreground/80 mt-auto">
-            <p>
-              Currency: {staticData.reportedCurrency || "N/A"}. Data as of:{" "}
-              {liveData.lastUpdated
-                ? new Date(liveData.lastUpdated).toLocaleDateString()
-                : "N/A"}
-            </p>
-          </div>
         </div>
       );
     }

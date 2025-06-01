@@ -4,16 +4,14 @@ import {
   CardDescription,
   CardContent as ShadCardContent,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import type { RevenueCardData } from "./revenue-card.types";
-import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
 import type {
   OnGenericInteraction,
   InteractionPayload,
   RequestNewCardInteraction,
 } from "../base-card/base-card.types";
 import { DataRow } from "@/components/ui/DataRow";
-import { formatFinancialValue } from "./revenueCardUtils";
+import { formatFinancialValue } from "@/lib/formatters";
 
 interface RevenueCardContentProps {
   cardData: RevenueCardData;
@@ -154,25 +152,6 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
           data-testid={`revenue-card-front-${symbol}`}
           className="pointer-events-auto flex flex-col h-full justify-between">
           <ShadCardContent className="pt-1 pb-2 px-0 space-y-1.5 flex-grow">
-            <div className="text-center mb-1.5">
-              <ClickableDataItem
-                isInteractive={true}
-                onClickHandler={() =>
-                  handleInteraction("REQUEST_NEW_CARD", {
-                    targetCardType: "revenue",
-                    originatingElement: "revenueBadge",
-                  } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-                }
-                title={"Revenue Card"}
-                baseClassName="inline-block">
-                <Badge
-                  variant="outline"
-                  className="text-xs sm:text-sm px-2 py-0.5">
-                  Revenue
-                </Badge>
-              </ClickableDataItem>
-            </div>
-
             <DataRow
               label="Revenue"
               value={formatFinancialValue(liveData.revenue, currencyCode)}
@@ -249,12 +228,6 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
               }
             />
           </ShadCardContent>
-          <div className="px-0 pt-1 text-[10px] text-center text-muted-foreground/80">
-            <p>
-              Currency: {staticData.reportedCurrency || "N/A"}. Statement:{" "}
-              {staticData.statementDate} ({staticData.statementPeriod})
-            </p>
-          </div>
         </div>
       );
     }

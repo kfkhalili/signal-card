@@ -4,7 +4,6 @@ import {
   CardDescription,
   CardContent as ShadCardContent,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import type {
   RevenueBreakdownCardData,
   SegmentRevenueDataItem,
@@ -205,11 +204,6 @@ export const RevenueBreakdownCardContent: React.FC<RevenueBreakdownCardContentPr
         data-testid={`revenuebreakdown-card-front-${symbol}`}
         className="pointer-events-auto flex flex-col h-full">
         <ShadCardContent className="pt-1 pb-1 px-0 flex-grow flex flex-col">
-          <div className="text-center mb-2">
-            <Badge variant="outline" className="text-xs sm:text-sm px-2 py-0.5">
-              Revenue Breakdown
-            </Badge>
-          </div>
           <div className="flex justify-between items-baseline mb-2 px-0.5">
             <span className="text-xs text-muted-foreground">
               {staticData.latestPeriodLabel}

@@ -29,17 +29,20 @@ export function formatNumberWithAbbreviations(
   if (Math.abs(num) >= 1e3) {
     return `${(num / 1e3).toFixed(fixedDecimals)}K`;
   }
-  // For numbers less than 1000, display with appropriate decimals if needed, or as integer
-  // Check if the number has decimals relevant up to 'fixedDecimals' places
+  // For numbers less than 1000
   const numAsString = num.toString();
   const decimalPointIndex = numAsString.indexOf(".");
   if (
     decimalPointIndex !== -1 &&
-    numAsString.length - decimalPointIndex - 1 > 0
+    numAsString.length - decimalPointIndex - 1 > 0 && // Has actual decimal digits
+    fixedDecimals > 0 // And we want to show decimals
   ) {
-    return num.toFixed(fixedDecimals); // Apply decimals if the original number has them
+    return num.toFixed(fixedDecimals);
   }
-  return num.toLocaleString(undefined, { maximumFractionDigits: 0 }); // Format as integer if no decimals
+  // For integers or numbers effectively integers after rounding for display (or if fixedDecimals is 0)
+  return num.toLocaleString(undefined, {
+    maximumFractionDigits: fixedDecimals,
+  });
 }
 
 /**
@@ -57,4 +60,77 @@ export function parseTimestampSafe(timestamp: unknown): number | null {
     return timestamp;
   }
   return null;
+}
+
+/**
+ * Gets the currency symbol for a given ISO 4217 currency code.
+ * @param currencyCode The ISO 4217 currency code (e.g., "USD", "EUR").
+ * @returns The currency symbol (e.g., "$", "€") or the code itself if no symbol is found. Returns an empty string if code is null/undefined.
+ */
+export function getCurrencySymbol(
+  currencyCode: string | null | undefined
+): string {
+  if (!currencyCode) return "";
+  const upperCode = currencyCode.toUpperCase();
+  switch (upperCode) {
+    case "USD":
+      return "$";
+    case "EUR":
+      return "€";
+    case "GBP":
+      return "£";
+    case "JPY":
+      return "¥";
+    case "CAD":
+      return "CA$";
+    case "AUD":
+      return "A$";
+    case "CHF":
+      return "CHF";
+    default:
+      try {
+        // Attempt to use Intl for less common symbols
+        const parts = new Intl.NumberFormat("en-US", {
+          // Locale choice here is less critical for just the symbol
+          style: "currency",
+          currency: upperCode,
+          currencyDisplay: "narrowSymbol", // 'symbol' or 'narrowSymbol'
+        }).formatToParts(0);
+        return (
+          parts.find((part) => part.type === "currency")?.value || upperCode
+        );
+      } catch {
+        // Fallback to the currency code itself if Intl API fails (e.g., unsupported code)
+        return upperCode;
+      }
+  }
+}
+
+/**
+ * Formats a financial value with appropriate currency symbol and abbreviations.
+ * @param value The numeric value to format.
+ * @param currencyCode The ISO 4217 currency code.
+ * @param decimals The number of decimal places for abbreviations. Default is 2.
+ * @returns Formatted financial string (e.g., "$1.23M", "€100K") or 'N/A'.
+ */
+export function formatFinancialValue(
+  value: number | null | undefined,
+  currencyCode: string | null | undefined,
+  decimals = 2
+): string {
+  if (value === null || typeof value === "undefined" || isNaN(value)) {
+    return "N/A";
+  }
+
+  const symbol = getCurrencySymbol(currencyCode);
+  const abbreviatedValue = formatNumberWithAbbreviations(value, decimals);
+
+  if (abbreviatedValue === "N/A") return "N/A";
+
+  // Prevent double symbols if formatNumberWithAbbreviations already added one (though it shouldn't for plain numbers)
+  if (symbol && abbreviatedValue.startsWith(symbol)) {
+    return abbreviatedValue;
+  }
+
+  return `${symbol}${abbreviatedValue}`;
 }
