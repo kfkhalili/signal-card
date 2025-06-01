@@ -39,14 +39,14 @@ import {
   getCardInitializer,
   type CardInitializationContext,
 } from "@/components/game/cardInitializer.types";
-import "@/components/game/cards/initializers"; // Side-effect import
+import "@/components/game/cards/initializers";
 
 import {
   getCardUpdateHandler,
   type CardUpdateContext,
   type CardUpdateEventType,
 } from "@/components/game/cardUpdateHandler.types";
-import "@/components/game/cards/updateHandlerInitializer"; // Side-effect import
+import "@/components/game/cards/updateHandlerInitializer";
 
 const INITIAL_ACTIVE_CARDS: DisplayableCard[] = [];
 const WORKSPACE_LOCAL_STORAGE_KEY = "finSignal-mainWorkspace-v1";
@@ -72,7 +72,7 @@ const getConcreteCardData = (card: DisplayableCard): ConcreteCardData => {
 export function useWorkspaceManager() {
   const { toast } = useToast();
   const supabase: SupabaseClient<Database> | null = useMemo(
-    () => createSupabaseBrowserClient(false), // Pass false to prevent throwing on init failure
+    () => createSupabaseBrowserClient(false),
     []
   );
 
@@ -128,11 +128,10 @@ export function useWorkspaceManager() {
       setIsAddingCardInProgress(true);
 
       if (!supabase) {
-        // Guard clause for null Supabase client
         toast({
           title: "Service Unavailable",
           description:
-            "Cannot add card: Data service is not properly initialized.",
+            "Cannot add card(s): Data service is not properly initialized.",
           variant: "destructive",
         });
         setIsAddingCardInProgress(false);
@@ -140,147 +139,150 @@ export function useWorkspaceManager() {
       }
 
       const determinedSymbol = values.symbol;
-      const cardTypeFromForm = values.cardType;
+      const cardTypesToAttempt = values.cardTypes;
       const requestingCardId = options?.requestingCardId;
 
-      const existingCardIndex = activeCards.findIndex(
-        (card) =>
-          card.symbol === determinedSymbol && card.type === cardTypeFromForm
-      );
+      let cardsAddedCount = 0;
+      let cardsReorderedCount = 0;
+      const duplicateMessages: string[] = [];
+      const errorMessages: string[] = [];
 
-      if (existingCardIndex !== -1) {
-        const existingCard = activeCards[existingCardIndex];
-        if (requestingCardId && existingCard.id !== requestingCardId) {
-          setActiveCards((prevCards) => {
-            const currentCards = [...prevCards];
-            const sourceCardActualIndex = currentCards.findIndex(
-              (c) => c.id === requestingCardId
-            );
-            const targetCardActualIndex = currentCards.findIndex(
-              (c) => c.id === existingCard.id
-            );
-            if (
-              sourceCardActualIndex !== -1 &&
-              targetCardActualIndex !== -1 &&
-              targetCardActualIndex !== sourceCardActualIndex + 1
-            ) {
-              const [cardToMove] = currentCards.splice(
-                targetCardActualIndex,
-                1
-              );
-              const insertAtIndex =
-                targetCardActualIndex < sourceCardActualIndex
-                  ? sourceCardActualIndex
-                  : sourceCardActualIndex + 1;
-              currentCards.splice(insertAtIndex, 0, cardToMove);
-              setTimeout(
-                () =>
-                  toast({
-                    title: "Card Reordered",
-                    description: `${
-                      existingCard.companyName || existingCard.symbol
-                    } ${existingCard.type} card moved.`,
-                  }),
-                0
-              );
-              return currentCards;
-            }
-            return prevCards;
-          });
-        } else {
-          setTimeout(
-            () =>
-              toast({
-                title: "Card Exists",
-                description: `A ${cardTypeFromForm} card for ${determinedSymbol} is already in your workspace.`,
-              }),
-            0
-          );
-        }
-        setIsAddingCardInProgress(false);
-        return;
-      }
+      toast({
+        title: `Processing ${cardTypesToAttempt.length} card request(s) for ${determinedSymbol}...`,
+      });
 
-      const initializer = getCardInitializer(cardTypeFromForm);
-      if (!initializer) {
-        toast({
-          title: "System Error",
-          description: `Unsupported card type requested: ${cardTypeFromForm}`,
-          variant: "destructive",
-        });
-        setIsAddingCardInProgress(false);
-        return;
-      }
+      for (const individualCardType of cardTypesToAttempt) {
+        const existingCardIndex = activeCards.findIndex(
+          (card) =>
+            card.symbol === determinedSymbol && card.type === individualCardType
+        );
 
-      setTimeout(
-        () =>
-          toast({
-            title: `Adding ${determinedSymbol} ${cardTypeFromForm} card...`,
-          }),
-        0
-      );
-
-      let newCardToAdd: DisplayableCard | null = null;
-      try {
-        // CardInitializationContext now accepts SupabaseClient | null
-        const initContext: CardInitializationContext = {
-          symbol: determinedSymbol,
-          supabase, // supabase is SupabaseClient | null here
-          toast,
-          activeCards,
-        };
-        newCardToAdd = await initializer(initContext);
-
-        if (newCardToAdd) {
-          setActiveCards((prev) => {
-            const updatedCards = [...prev];
-            if (requestingCardId) {
-              const sourceIndex = updatedCards.findIndex(
+        if (existingCardIndex !== -1) {
+          const existingCard = activeCards[existingCardIndex];
+          if (requestingCardId && existingCard.id !== requestingCardId) {
+            setActiveCards((prevCards) => {
+              const currentCards = [...prevCards];
+              const sourceCardActualIndex = currentCards.findIndex(
                 (c) => c.id === requestingCardId
               );
-              if (sourceIndex !== -1 && newCardToAdd !== null) {
-                updatedCards.splice(sourceIndex + 1, 0, newCardToAdd);
-              } else if (newCardToAdd !== null) {
-                updatedCards.push(newCardToAdd);
+              const targetCardActualIndex = currentCards.findIndex(
+                (c) => c.id === existingCard.id
+              );
+              if (
+                sourceCardActualIndex !== -1 &&
+                targetCardActualIndex !== -1 &&
+                targetCardActualIndex !== sourceCardActualIndex + 1
+              ) {
+                const [cardToMove] = currentCards.splice(
+                  targetCardActualIndex,
+                  1
+                );
+                const insertAtIndex =
+                  targetCardActualIndex < sourceCardActualIndex
+                    ? sourceCardActualIndex
+                    : sourceCardActualIndex + 1;
+                currentCards.splice(insertAtIndex, 0, cardToMove);
+                cardsReorderedCount++;
+                return currentCards;
               }
-            } else if (newCardToAdd !== null) {
-              updatedCards.push(newCardToAdd);
-            }
-            return updatedCards;
-          });
-
-          const newCardDataForShellCheck = newCardToAdd as DisplayableCard & {
-            liveData?: { price?: number | null };
-          };
-
-          const isShellPriceCard =
-            newCardToAdd.type === "price" &&
-            newCardDataForShellCheck.liveData?.price === null;
-
-          if (!isShellPriceCard) {
-            setTimeout(
-              () =>
-                toast({
-                  title: "Card Added!",
-                  description: `${determinedSymbol} ${cardTypeFromForm} card added to workspace.`,
-                }),
-              0
+              return prevCards;
+            });
+          } else {
+            duplicateMessages.push(
+              `${determinedSymbol} ${individualCardType} card already exists.`
             );
           }
+          continue;
         }
-      } catch (error: unknown) {
-        const errorMessage =
-          error instanceof Error
-            ? error.message
-            : `Could not add ${cardTypeFromForm} card.`;
+
+        const initializer = getCardInitializer(individualCardType);
+        if (!initializer) {
+          errorMessages.push(
+            `Unsupported card type: ${individualCardType} for ${determinedSymbol}.`
+          );
+          continue;
+        }
+
+        let newCardToAdd: DisplayableCard | null = null;
+        try {
+          const initContext: CardInitializationContext = {
+            symbol: determinedSymbol,
+            supabase,
+            toast,
+            activeCards,
+          };
+          newCardToAdd = await initializer(initContext);
+
+          if (newCardToAdd) {
+            setActiveCards((prev) => {
+              const updatedCards = [...prev];
+              if (requestingCardId) {
+                const sourceIndex = updatedCards.findIndex(
+                  (c) => c.id === requestingCardId
+                );
+                if (sourceIndex !== -1 && newCardToAdd) {
+                  // Check newCardToAdd
+                  updatedCards.splice(sourceIndex + 1, 0, newCardToAdd);
+                } else if (newCardToAdd) {
+                  // Check newCardToAdd
+                  updatedCards.push(newCardToAdd);
+                }
+              } else if (newCardToAdd) {
+                // Check newCardToAdd
+                updatedCards.push(newCardToAdd);
+              }
+              return updatedCards;
+            });
+            cardsAddedCount++;
+          }
+        } catch (error: unknown) {
+          const errorMessage =
+            error instanceof Error
+              ? error.message
+              : `Could not add ${individualCardType} card for ${determinedSymbol}.`;
+          errorMessages.push(errorMessage);
+        }
+      }
+
+      if (cardsAddedCount > 0) {
         toast({
-          title: "Error Adding Card",
-          description: errorMessage,
+          title: "Cards Added",
+          description: `${cardsAddedCount} new card(s) for ${determinedSymbol} added to workspace.`,
+        });
+      }
+      if (cardsReorderedCount > 0) {
+        toast({
+          title: "Cards Reordered",
+          description: `${cardsReorderedCount} existing card(s) moved.`,
+        });
+      }
+      if (duplicateMessages.length > 0) {
+        toast({
+          title: "Duplicates Found",
+          description: duplicateMessages.join(" "),
+          variant: "default",
+        });
+      }
+      if (errorMessages.length > 0) {
+        toast({
+          title: "Errors Adding Cards",
+          description: errorMessages.join(" "),
           variant: "destructive",
         });
-      } finally {
-        setIsAddingCardInProgress(false);
       }
+      if (
+        cardsAddedCount === 0 &&
+        cardsReorderedCount === 0 &&
+        duplicateMessages.length === 0 &&
+        errorMessages.length === 0
+      ) {
+        toast({
+          title: "No Action Taken",
+          description: "No new cards were added or reordered.",
+        });
+      }
+
+      setIsAddingCardInProgress(false);
     },
     [activeCards, supabase, toast, setActiveCards]
   );
@@ -292,7 +294,7 @@ export function useWorkspaceManager() {
           const requestPayload = payload as RequestNewCardInteraction;
           const values: AddCardFormValues = {
             symbol: requestPayload.sourceCardSymbol,
-            cardType: requestPayload.targetCardType,
+            cardTypes: [requestPayload.targetCardType],
           };
           await addCardToWorkspace(values, {
             requestingCardId: requestPayload.sourceCardId,
