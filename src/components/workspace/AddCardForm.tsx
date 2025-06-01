@@ -1,11 +1,24 @@
 // src/components/workspace/AddCardForm.tsx
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
@@ -24,17 +37,11 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, Check, ChevronsUpDown } from "lucide-react";
 import type { CardType } from "@/components/game/cards/base-card/base-card.types";
 import type { DisplayableCard } from "@/components/game/types";
 import { SymbolSearchComboBox } from "@/components/ui/SymbolSearchComboBox";
+import { cn } from "@/lib/utils";
 
 const AVAILABLE_CARD_TYPES: { value: CardType; label: string }[] = [
   { value: "profile", label: "Profile Card" },
@@ -55,10 +62,14 @@ const AddCardFormSchema = z.object({
     .max(10, { message: "Symbol is too long." })
     .regex(/^[A-Za-z0-9.-]+$/, { message: "Invalid characters in symbol." })
     .transform((val) => val.toUpperCase()),
-  cardType: z.custom<CardType>(
-    (val) => AVAILABLE_CARD_TYPES.some((ct) => ct.value === val),
-    { message: "Invalid card type selected." }
-  ),
+  cardTypes: z
+    .array(
+      z.custom<CardType>(
+        (val) => AVAILABLE_CARD_TYPES.some((ct) => ct.value === val),
+        { message: "Invalid card type selected." }
+      )
+    )
+    .nonempty({ message: "Please select at least one card type." }),
 });
 
 export type AddCardFormValues = z.infer<typeof AddCardFormSchema>;
@@ -72,21 +83,21 @@ interface AddCardFormProps {
 
 export const AddCardForm: React.FC<AddCardFormProps> = ({
   onAddCard,
-  existingCards,
   triggerButton,
   lockedSymbolForRegularUser,
 }) => {
   const [isOpen, setIsOpen] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isCardTypePopoverOpen, setIsCardTypePopoverOpen] = useState(false);
 
-  // Ref for the "Add Card" button
   const submitButtonRef = useRef<HTMLButtonElement>(null);
+  const cardTypeTriggerRef = useRef<HTMLButtonElement>(null);
 
   const form = useForm<AddCardFormValues>({
     resolver: zodResolver(AddCardFormSchema),
     defaultValues: {
       symbol: lockedSymbolForRegularUser || "",
-      cardType: "profile",
+      cardTypes: ["profile"],
     },
   });
 
@@ -95,39 +106,53 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
       const defaultSymbol = lockedSymbolForRegularUser || "";
       form.reset({
         symbol: defaultSymbol,
-        cardType: form.getValues("cardType") || "profile",
+        cardTypes: form.getValues("cardTypes") || ["profile"],
       });
 
-      // Initial focus logic when dialog opens
       if (lockedSymbolForRegularUser) {
-        // If symbol is locked, focus the submit button
         setTimeout(() => {
-          submitButtonRef.current?.focus();
-        }, 50); // Delay to ensure button is rendered
+          cardTypeTriggerRef.current?.focus();
+        }, 50);
       }
-      // If symbol is NOT locked, SymbolSearchComboBox will handle its own focus
-      // via the autoFocusOnMount prop passed to it.
     }
   }, [isOpen, lockedSymbolForRegularUser, form]);
 
   const handleSubmit = async (values: AddCardFormValues) => {
     setIsSubmitting(true);
     const finalSymbol = lockedSymbolForRegularUser || values.symbol;
-    const validatedSymbol = finalSymbol.toUpperCase();
-    const cardExists = existingCards.some(
-      (card) => card.symbol === validatedSymbol && card.type === values.cardType
-    );
-    if (cardExists) {
-      form.setError("symbol", {
-        type: "manual",
-        message: `A ${values.cardType} card for ${validatedSymbol} already exists.`,
-      });
-      setIsSubmitting(false);
-      return;
-    }
-    await onAddCard({ ...values, symbol: validatedSymbol });
+    const validatedValues: AddCardFormValues = {
+      ...values,
+      symbol: finalSymbol.toUpperCase(),
+    };
+
+    await onAddCard(validatedValues);
     setIsSubmitting(false);
     setIsOpen(false);
+  };
+
+  const getCardTypesDisplayText = (selectedTypes?: CardType[]): string => {
+    const numSelected = selectedTypes?.length ?? 0;
+
+    if (numSelected === 0) {
+      return "Select card type(s)...";
+    }
+    if (numSelected === 1 && selectedTypes) {
+      const typeValue = selectedTypes[0];
+      return (
+        AVAILABLE_CARD_TYPES.find((ct) => ct.value === typeValue)?.label ||
+        typeValue
+      );
+    }
+    if (numSelected === 2 && selectedTypes) {
+      return selectedTypes
+        .map(
+          (typeValue) =>
+            AVAILABLE_CARD_TYPES.find((ct) => ct.value === typeValue)?.label ||
+            typeValue
+        )
+        .join(", ");
+    }
+    return `${numSelected} types selected`;
   };
 
   return (
@@ -135,17 +160,17 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
       <DialogTrigger asChild>
         {triggerButton || (
           <Button variant="outline">
-            <PlusCircle className="mr-2 h-4 w-4" /> Add Card
+            <PlusCircle className="mr-2 h-4 w-4" /> Add Card(s)
           </Button>
         )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add New Card to Workspace</DialogTitle>
+          <DialogTitle>Add New Card(s) to Workspace</DialogTitle>
           <DialogDescription>
             {lockedSymbolForRegularUser
-              ? `Adding card for symbol: ${lockedSymbolForRegularUser}. Select card type.`
-              : "Enter a symbol and select the card type."}
+              ? `Adding card(s) for symbol: ${lockedSymbolForRegularUser}. Select card type(s).`
+              : "Enter a symbol and select card type(s)."}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -166,8 +191,8 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
                       onChange={field.onChange}
                       disabled={isSubmitting || !!lockedSymbolForRegularUser}
                       containerClassName="w-full"
-                      autoFocusOnMount={isOpen && !lockedSymbolForRegularUser} // Control autofocus
-                      focusAfterCloseRef={submitButtonRef} // Pass ref for focus after popover close
+                      autoFocusOnMount={isOpen && !lockedSymbolForRegularUser}
+                      focusAfterCloseRef={cardTypeTriggerRef}
                     />
                   </FormControl>
                   <FormMessage />
@@ -176,27 +201,74 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
             />
             <FormField
               control={form.control}
-              name="cardType"
+              name="cardTypes"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Card Type</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value || ""}
-                    disabled={isSubmitting}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a card type" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {AVAILABLE_CARD_TYPES.map((typeOpt) => (
-                        <SelectItem key={typeOpt.value} value={typeOpt.value}>
-                          {typeOpt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <FormItem className="flex flex-col">
+                  <FormLabel>Card Type(s)</FormLabel>
+                  <Popover
+                    open={isCardTypePopoverOpen}
+                    onOpenChange={setIsCardTypePopoverOpen}
+                    modal={true}>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          ref={cardTypeTriggerRef}
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={isCardTypePopoverOpen}
+                          className={cn(
+                            "w-full justify-between font-normal",
+                            !field.value?.length && "text-muted-foreground"
+                          )}
+                          disabled={isSubmitting}>
+                          <span className="truncate">
+                            {getCardTypesDisplayText(field.value)}
+                          </span>
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-[--radix-popover-trigger-width] p-0"
+                      onCloseAutoFocus={(e) => {
+                        e.preventDefault();
+                        submitButtonRef.current?.focus();
+                      }}>
+                      <Command>
+                        <CommandInput placeholder="Search card types..." />
+                        <CommandList>
+                          <CommandEmpty>No card type found.</CommandEmpty>
+                          <CommandGroup>
+                            {AVAILABLE_CARD_TYPES.map((typeOpt) => (
+                              <CommandItem
+                                key={typeOpt.value}
+                                value={typeOpt.label}
+                                onSelect={() => {
+                                  const currentSelection = field.value || [];
+                                  const newSelection =
+                                    currentSelection.includes(typeOpt.value)
+                                      ? currentSelection.filter(
+                                          (v) => v !== typeOpt.value
+                                        )
+                                      : [...currentSelection, typeOpt.value];
+                                  field.onChange(newSelection);
+                                }}>
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    (field.value || []).includes(typeOpt.value)
+                                      ? "opacity-100"
+                                      : "opacity-0"
+                                  )}
+                                />
+                                {typeOpt.label}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                   <FormMessage />
                 </FormItem>
               )}
@@ -208,13 +280,14 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
                 </Button>
               </DialogClose>
               <Button
-                ref={submitButtonRef} // Assign ref to the submit button
+                ref={submitButtonRef}
                 type="submit"
                 disabled={
                   isSubmitting ||
-                  (!form.getValues("symbol") && !lockedSymbolForRegularUser)
+                  (!form.getValues("symbol") && !lockedSymbolForRegularUser) ||
+                  (form.getValues("cardTypes") || []).length === 0
                 }>
-                {isSubmitting ? "Adding..." : "Add Card"}
+                {isSubmitting ? "Adding..." : "Add Card(s)"}
               </Button>
             </DialogFooter>
           </form>
