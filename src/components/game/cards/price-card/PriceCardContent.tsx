@@ -16,7 +16,6 @@ import type {
   RequestNewCardInteraction,
   TriggerCardActionInteraction,
 } from "../base-card/base-card.types";
-import { Badge } from "@/components/ui/badge";
 
 const STATIC_BACK_FACE_DESCRIPTION =
   "Market Price: The value of a single unit of this asset.";
@@ -255,24 +254,6 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
           data-testid="price-card-front-content-data"
           className="pointer-events-auto">
           <ShadCardContent className="px-0 pt-0 pb-0">
-            <div className="text-center mb-1.5">
-              <ClickableDataItem
-                isInteractive={true}
-                onClickHandler={() =>
-                  handleInteraction("REQUEST_NEW_CARD", {
-                    targetCardType: "price",
-                    originatingElement: "priceBadge",
-                  } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-                }
-                title={"Price Card"}
-                baseClassName="inline-block">
-                <Badge
-                  variant="outline"
-                  className="text-xs sm:text-sm px-2 py-0.5">
-                  Price
-                </Badge>
-              </ClickableDataItem>
-            </div>
             <div
               className="rounded-md p-2 -mx-2 -my-1 mb-2"
               data-testid="daily-performance-layout-area"

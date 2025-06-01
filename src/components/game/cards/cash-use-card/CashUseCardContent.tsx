@@ -15,7 +15,6 @@ import type {
   RequestNewCardInteraction,
   TriggerCardActionInteraction,
 } from "../base-card/base-card.types";
-import { Badge } from "@/components/ui/badge";
 
 // MetricDisplay is for items WITH a RangeIndicator (financials)
 interface MetricDisplayWithRangeProps {
@@ -270,24 +269,6 @@ export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
           data-testid={`cashuse-card-front-${symbol}`}
           className="pointer-events-auto flex flex-col h-full justify-between">
           <ShadCardContent className="pt-0 pb-1 px-0 space-y-1 sm:space-y-1.5 flex-grow">
-            <div className="text-center mb-1.5">
-              <ClickableDataItem
-                isInteractive={true}
-                onClickHandler={() =>
-                  handleInteraction("REQUEST_NEW_CARD", {
-                    targetCardType: "cashuse",
-                    originatingElement: "cashUseBadge",
-                  } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-                }
-                title={`View profile for ${companyName || symbol}`}
-                baseClassName="inline-block">
-                <Badge
-                  variant="outline"
-                  className="text-xs sm:text-sm px-2 py-0.5">
-                  Cash Use
-                </Badge>
-              </ClickableDataItem>
-            </div>
             <SimpleMetricDisplay
               label="Outstanding Shares"
               value={liveData.currentOutstandingShares}
@@ -348,15 +329,6 @@ export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
               tooltip="Total dividends paid to shareholders"
             />
           </ShadCardContent>
-          <div className="px-0 pt-1 text-[10px] text-center text-muted-foreground/80">
-            <p>
-              {staticData.reportedCurrency
-                ? `Currency: ${staticData.reportedCurrency}. `
-                : ""}
-              Stmt: {staticData.latestStatementDate || "N/A"}. Shares:{" "}
-              {staticData.latestSharesFloatDate || "N/A"}
-            </p>
-          </div>
         </div>
       );
     }

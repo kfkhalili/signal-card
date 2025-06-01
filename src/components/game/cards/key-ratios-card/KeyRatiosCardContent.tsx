@@ -4,9 +4,7 @@ import {
   CardDescription,
   CardContent as ShadCardContent,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import type { KeyRatiosCardData } from "./key-ratios-card.types";
-import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
 import type {
   OnGenericInteraction,
   InteractionPayload,
@@ -186,24 +184,6 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
           data-testid={`keyratios-card-front-${symbol}`}
           className="pointer-events-auto flex flex-col h-full justify-between">
           <ShadCardContent className="pt-1 pb-2 px-0 space-y-0.5 flex-grow">
-            <div className="text-center mb-1.5">
-              <ClickableDataItem
-                isInteractive={true}
-                onClickHandler={() =>
-                  handleInteraction("REQUEST_NEW_CARD", {
-                    targetCardType: "keyratios",
-                    originatingElement: "keyRatiosBadge",
-                  } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-                }
-                title={`View profile for ${companyName || symbol}`}
-                baseClassName="inline-block">
-                <Badge
-                  variant="outline"
-                  className="text-xs sm:text-sm px-2 py-0.5">
-                  Key Ratios (TTM)
-                </Badge>
-              </ClickableDataItem>
-            </div>
             {renderRatio(
               "P/E Ratio",
               liveData.priceToEarningsRatioTTM,
@@ -287,14 +267,6 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
               true // This is a monetary value per share, not a ratio itself
             )}
           </ShadCardContent>
-          <div className="px-0 pt-1 text-[10px] text-center text-muted-foreground/80">
-            <p>
-              Updated:{" "}
-              {staticData.lastUpdated
-                ? new Date(staticData.lastUpdated).toLocaleDateString()
-                : "N/A"}
-            </p>
-          </div>
         </div>
       );
     }

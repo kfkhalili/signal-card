@@ -4,7 +4,6 @@ import {
   CardDescription,
   CardContent as ShadCardContent,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import type {
   AnalystGradesCardData,
   AnalystRatingDetail,
@@ -152,12 +151,6 @@ export const AnalystGradesCardContent: React.FC<AnalystGradesCardContentProps> =
                   </span>
                 </div>
               ))}
-              <p className="mt-1">
-                <strong>Last Updated:</strong>{" "}
-                {liveData.lastUpdated
-                  ? new Date(liveData.lastUpdated).toLocaleString()
-                  : "N/A"}
-              </p>
             </div>
           </ShadCardContent>
         </div>
@@ -174,12 +167,6 @@ export const AnalystGradesCardContent: React.FC<AnalystGradesCardContentProps> =
         data-testid={`analystgrades-card-front-${symbol}`}
         className="pointer-events-auto flex flex-col h-full">
         <ShadCardContent className="pt-1 pb-1 px-0 flex-grow flex flex-col">
-          <div className="text-center mb-2">
-            <Badge variant="outline" className="text-xs sm:text-sm px-2 py-0.5">
-              Analyst Grades
-            </Badge>
-          </div>
-
           <div className="px-1 mb-2 text-center">
             <p className="text-xs text-muted-foreground">
               {staticData.currentPeriodDate}
