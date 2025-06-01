@@ -1,29 +1,19 @@
-// tests/components/BaseCard.spec.ts
+// src/components/game/cards/base-card/BaseCard.spec.ts
 import { test, expect, type Page } from "@playwright/test";
 
 const STORYBOOK_URL = process.env.STORYBOOK_URL || "http://localhost:6006";
 
-const getVisibleFrontFace = (page: Page) => {
+// Gets the DOM element representing the FRONT surface of the card
+const getFrontSurface = (page: Page) => {
   return page.locator(
-    '[data-testid="base-card-inner"] > div[role="button"][aria-label="Show STCK back details"][aria-pressed="false"][aria-hidden="false"]'
+    '[data-testid="base-card-inner"] > div[aria-label="Front of STCK card. Action: Show back details."]'
   );
 };
 
-const getVisibleBackFace = (page: Page) => {
+// Gets the DOM element representing the BACK surface of the card
+const getBackSurface = (page: Page) => {
   return page.locator(
-    '[data-testid="base-card-inner"] > div[role="button"][aria-label="Show STCK front details"][aria-pressed="false"][aria-hidden="false"]'
-  );
-};
-
-const getHiddenFrontFace = (page: Page) => {
-  return page.locator(
-    '[data-testid="base-card-inner"] > div[role="button"][aria-label="Show STCK front details"][aria-pressed="true"][aria-hidden="true"]'
-  );
-};
-
-const getHiddenBackFace = (page: Page) => {
-  return page.locator(
-    '[data-testid="base-card-inner"] > div[role="button"][aria-label="Show STCK back details"][aria-hidden="true"]'
+    '[data-testid="base-card-inner"] > div[aria-label="Back of STCK card. Action: Show front details."]'
   );
 };
 
@@ -32,30 +22,41 @@ test.describe("BaseCard Component", () => {
     await page.goto(
       `${STORYBOOK_URL}/iframe.html?id=game-cards-basecard--default&viewMode=story`
     );
-    // Increased timeout for visibility check for reliability in CI environments
     await expect(
       page.getByTestId("header-text-clickable").getByText("Storybook Inc.")
     ).toBeVisible({ timeout: 10000 });
   });
 
   test("should render front face content by default", async ({ page }) => {
-    const frontFace = getVisibleFrontFace(page);
-    await expect(frontFace).toBeVisible();
-    await expect(frontFace).toHaveAttribute("aria-pressed", "false");
+    const frontSurface = getFrontSurface(page);
+    const backSurface = getBackSurface(page);
 
+    // Check front surface is visible and correctly attributed
+    await expect(frontSurface).toBeVisible(); // Default: front is visible
+    await expect(frontSurface).toHaveAttribute("aria-pressed", "false");
+    await expect(frontSurface).toHaveAttribute("aria-hidden", "false");
+
+    // Check front content
     await expect(
-      frontFace.getByRole("heading", { name: "Card Front" })
+      frontSurface.getByRole("heading", { name: "Card Front" })
     ).toBeVisible();
     await expect(
-      frontFace.getByText("This is the card front of the card.")
+      frontSurface.getByText("This is the card front of the card.")
     ).toBeVisible();
     await expect(
-      frontFace.getByRole("button", { name: "Face Button" })
+      frontSurface.getByRole("button", { name: "Face Button" })
     ).toBeVisible();
 
-    const hiddenBackFace = getHiddenBackFace(page);
-    await expect(hiddenBackFace).toBeAttached();
-    await expect(hiddenBackFace).toContainText("Back Content");
+    // Check back surface is hidden and correctly attributed
+    // Instead of toBeHidden(), check aria-hidden attribute
+    await expect(backSurface).toHaveAttribute("aria-hidden", "true");
+    await expect(backSurface).toHaveAttribute("aria-pressed", "true");
+
+    // Check content of the (hidden) back surface
+    await expect(backSurface).toContainText(
+      "This is the back description from BaseCard's story context."
+    );
+    await expect(backSurface).toContainText("Additional Back Details");
   });
 
   test("should display company name and symbol in the header", async ({
@@ -74,58 +75,69 @@ test.describe("BaseCard Component", () => {
   test("should flip to back face on click and then back to front", async ({
     page,
   }) => {
-    const frontFaceInitially = getVisibleFrontFace(page);
-    await expect(frontFaceInitially).toBeVisible();
-    await expect(frontFaceInitially).toHaveAttribute("aria-pressed", "false");
+    const frontSurface = getFrontSurface(page);
+    const backSurface = getBackSurface(page);
 
-    await frontFaceInitially.click({ position: { x: 5, y: 5 } });
+    // Initial state: front visible
+    await expect(frontSurface).toHaveAttribute("aria-hidden", "false");
+    await expect(frontSurface).toHaveAttribute("aria-pressed", "false");
+    await expect(backSurface).toHaveAttribute("aria-hidden", "true");
+    await expect(backSurface).toHaveAttribute("aria-pressed", "true");
 
-    const nowHiddenFrontFace = getHiddenFrontFace(page);
-    await expect(nowHiddenFrontFace).toBeAttached({ timeout: 3000 });
-    await expect(nowHiddenFrontFace).toHaveAttribute("aria-hidden", "true");
-    await expect(nowHiddenFrontFace).toHaveAttribute("aria-pressed", "true");
+    // Click to flip to back
+    await frontSurface.click({ position: { x: 5, y: 5 } });
 
-    const backFaceAfterFlip = getVisibleBackFace(page);
-    await expect(backFaceAfterFlip).toBeVisible({ timeout: 2000 });
-    await expect(backFaceAfterFlip).toHaveAttribute("aria-pressed", "false");
-    await expect(backFaceAfterFlip.getByText("Back Content")).toBeVisible();
+    // After flip: back visible, front hidden
+    await expect(backSurface).toBeVisible({ timeout: 2000 }); // Back surface should be visible
+    await expect(backSurface).toHaveAttribute("aria-pressed", "false");
+    await expect(frontSurface).toHaveAttribute("aria-hidden", "true", {
+      timeout: 3000,
+    }); // Front surface should now be aria-hidden
+    await expect(frontSurface).toHaveAttribute("aria-pressed", "true");
 
-    await backFaceAfterFlip.click({ position: { x: 5, y: 5 } });
-
-    const nowHiddenBackFace = getHiddenBackFace(page);
-    await expect(nowHiddenBackFace).toBeAttached({ timeout: 3000 });
-    await expect(nowHiddenBackFace).toHaveAttribute("aria-hidden", "true");
-    await expect(nowHiddenBackFace).toHaveAttribute("aria-pressed", "true");
-
-    const frontFaceRestored = getVisibleFrontFace(page);
-    await expect(frontFaceRestored).toBeVisible({ timeout: 2000 });
-
+    // Check content of visible back face
     await expect(
-      frontFaceRestored.getByRole("heading", { name: "Card Front" })
+      backSurface.getByText(
+        "This is the back description from BaseCard's story context."
+      )
+    ).toBeVisible();
+    await expect(
+      backSurface.getByText("Additional Back Details")
     ).toBeVisible();
 
-    await expect(frontFaceRestored).toHaveAttribute("aria-pressed", "false");
+    // Click to flip back to front
+    await backSurface.click({ position: { x: 5, y: 5 } });
+
+    // After flipping back: front visible, back hidden
+    await expect(frontSurface).toBeVisible({ timeout: 2000 }); // Front surface should be visible again
+    await expect(frontSurface).toHaveAttribute("aria-pressed", "false");
+    await expect(backSurface).toHaveAttribute("aria-hidden", "true", {
+      timeout: 3000,
+    }); // Back surface should be aria-hidden again
+    await expect(backSurface).toHaveAttribute("aria-pressed", "true");
+
+    await expect(
+      frontSurface.getByRole("heading", { name: "Card Front" })
+    ).toBeVisible();
   });
 
   test("should call onDeleteRequest when delete button is clicked", async ({
     page,
   }) => {
-    const visibleFrontFace = getVisibleFrontFace(page);
-    await expect(visibleFrontFace).toBeVisible(); // Confirm the front face itself is visible
+    const frontSurface = getFrontSurface(page);
+    await expect(frontSurface).toBeVisible();
 
-    const deleteButton = visibleFrontFace.locator(
+    const deleteButton = frontSurface.locator(
       'button[aria-label="Delete STCK card"]'
     );
 
     await page.getByTestId("base-card-inner").hover();
-
     await expect(deleteButton).toBeVisible({ timeout: 500 });
 
     await Promise.all([
       page.waitForEvent("console", {
         predicate: (msg) => {
           const text = msg.text();
-          // MODIFIED: Update predicate to match the new explicit log message
           return (
             text.startsWith(
               "PLAYWRIGHT_TEST_ACTION: onDeleteRequest triggered"
@@ -148,7 +160,6 @@ test.describe("BaseCard Component", () => {
       page.waitForEvent("console", {
         predicate: (msg) => {
           const text = msg.text();
-          // MODIFIED: Update predicate to match the new explicit log message format
           return (
             text.startsWith(
               "PLAYWRIGHT_TEST_ACTION: onGenericInteraction triggered"
@@ -167,7 +178,6 @@ test.describe("BaseCard Component", () => {
     page,
   }) => {
     const logoLink = page.getByLabel("Visit Storybook Inc. website");
-
     await expect(logoLink).toBeVisible();
 
     await Promise.all([
@@ -198,7 +208,14 @@ test.describe("BaseCard Component", () => {
       page.getByTestId("header-text-clickable").getByText("Storybook Inc.")
     ).toBeVisible({ timeout: 10000 });
 
-    const deleteButton = page.locator('button[aria-label="Delete STCK card"]');
+    const frontSurfaceNoDelete = page.locator(
+      '[data-testid="base-card-inner"] > div[aria-label="Front of STCK card. Action: Show back details."]'
+    );
+
+    const deleteButton = frontSurfaceNoDelete.locator(
+      'button[aria-label="Delete STCK card"]'
+    );
+
     await page.getByTestId("base-card-inner").hover();
     await expect(deleteButton).not.toBeVisible();
   });

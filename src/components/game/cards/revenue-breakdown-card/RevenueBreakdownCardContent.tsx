@@ -1,9 +1,6 @@
 // src/components/game/cards/revenue-breakdown-card/RevenueBreakdownCardContent.tsx
 import React from "react";
-import {
-  CardDescription,
-  CardContent as ShadCardContent,
-} from "@/components/ui/card";
+import { CardContent as ShadCardContent } from "@/components/ui/card";
 import type {
   RevenueBreakdownCardData,
   SegmentRevenueDataItem,
@@ -46,9 +43,8 @@ const SegmentRow: React.FC<SegmentRowProps> = ({
       IconComponent = ArrowDown;
       yoyDisplay = `${yoyPercent.toFixed(1)}%`;
     } else {
-      // yoyChange === 0
       yoyColorClass = "text-muted-foreground";
-      IconComponent = Minus; // Or null if no icon for 0%
+      IconComponent = Minus;
       yoyDisplay = `0.0%`;
     }
   } else if (currentRevenue > 0) {
@@ -60,7 +56,7 @@ const SegmentRow: React.FC<SegmentRowProps> = ({
   return (
     <div
       className={cn(
-        "flex justify-between items-center py-1.5 border-b border-border/50 last:border-b-0",
+        "flex justify-between items-center py-1 border-b border-border/50 last:border-b-0", // Reduced py slightly
         isInteractive && onClick
           ? "cursor-pointer hover:bg-muted/50 dark:hover:bg-muted/20"
           : ""
@@ -81,16 +77,16 @@ const SegmentRow: React.FC<SegmentRowProps> = ({
       )} (YoY: ${
         yoyChange !== null ? (yoyChange * 100).toFixed(1) + "%" : "N/A"
       })`}>
-      <span className="text-xs sm:text-sm font-medium text-foreground truncate pr-2">
+      <span className="text-sm font-medium text-muted-foreground truncate pr-2">
         {segmentName}
       </span>
       <div className="flex items-baseline space-x-2 sm:space-x-3">
         <span
-          className={`text-xs sm:text-sm font-semibold ${yoyColorClass} flex items-center min-w-[50px] justify-end`}>
-          {IconComponent && <IconComponent className="h-3 w-3 mr-0.5" />}
+          className={`text-sm font-semibold ${yoyColorClass} flex items-center min-w-[60px] justify-end`}>
+          {IconComponent && <IconComponent className="h-3.5 w-3.5 mr-0.5" />}
           {yoyDisplay}
         </span>
-        <span className="text-xs sm:text-sm font-bold text-foreground min-w-[70px] text-right">
+        <span className="text-sm font-semibold text-foreground min-w-[80px] text-right">
           {currencySymbol}
           {formatNumberWithAbbreviations(currentRevenue, 2)}
         </span>
@@ -107,39 +103,52 @@ interface RevenueBreakdownCardContentProps {
 
 export const RevenueBreakdownCardContent: React.FC<RevenueBreakdownCardContentProps> =
   React.memo(({ cardData, isBackFace }) => {
-    const { staticData, liveData, symbol, companyName, backData } = cardData;
+    const { staticData, liveData, symbol } = cardData;
 
     if (isBackFace) {
       return (
         <div
           data-testid={`revenuebreakdown-card-back-${symbol}`}
           className="pointer-events-auto flex flex-col h-full">
-          <ShadCardContent className="pt-1 pb-2 px-0 space-y-1.5 flex-grow">
-            <CardDescription className="text-xs text-center text-muted-foreground/90 mb-2 px-1 leading-relaxed">
-              {backData.description ||
-                `Revenue breakdown details for ${companyName || symbol}.`}
-            </CardDescription>
-            <div className="text-xs text-muted-foreground px-1 space-y-0.5">
-              <p>
-                <strong>Latest Period:</strong> {staticData.latestPeriodLabel}
-              </p>
+          <ShadCardContent className={cn("p-0 flex-grow text-xs")}>
+            <div className="space-y-1 pt-1.5">
+              <div className="flex justify-between">
+                <span className="font-medium text-muted-foreground">
+                  Latest Period:
+                </span>
+                <span className="font-semibold text-foreground">
+                  {staticData.latestPeriodLabel}
+                </span>
+              </div>
               {staticData.previousPeriodLabel && (
-                <p>
-                  <strong>Comparison Period:</strong>{" "}
-                  {staticData.previousPeriodLabel}
-                </p>
+                <div className="flex justify-between">
+                  <span className="font-medium text-muted-foreground">
+                    Comparison Period:
+                  </span>
+                  <span className="font-semibold text-foreground">
+                    {staticData.previousPeriodLabel}
+                  </span>
+                </div>
               )}
-              <p>
-                <strong>Currency:</strong> {staticData.currencySymbol}
-              </p>
-              <p>
-                <strong>Last Updated:</strong>{" "}
-                {liveData.lastUpdated
-                  ? new Date(liveData.lastUpdated).toLocaleDateString()
-                  : "N/A"}
-              </p>
+              <div className="flex justify-between">
+                <span className="font-medium text-muted-foreground">
+                  Currency:
+                </span>
+                <span className="font-semibold text-foreground">
+                  {staticData.currencySymbol}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-medium text-muted-foreground">
+                  Last Updated:
+                </span>
+                <span className="font-semibold text-foreground">
+                  {liveData.lastUpdated
+                    ? new Date(liveData.lastUpdated).toLocaleDateString()
+                    : "N/A"}
+                </span>
+              </div>
             </div>
-            {/* Optionally, list ALL segments here if desired for the back face */}
           </ShadCardContent>
         </div>
       );
@@ -160,7 +169,6 @@ export const RevenueBreakdownCardContent: React.FC<RevenueBreakdownCardContentPr
         (sum, seg) => sum + (seg.previousRevenue ?? 0),
         0
       );
-      // Check if there were any previous revenues at all for the "Others" category
       const anyPreviousRevenueExistsForOthers = otherSegments.some(
         (seg) => seg.previousRevenue !== null
       );
@@ -175,12 +183,12 @@ export const RevenueBreakdownCardContent: React.FC<RevenueBreakdownCardContentPr
         othersPreviousRevenueSum === 0 &&
         othersCurrentRevenue > 0
       ) {
-        yoyChangeForOthers = null; // Will be treated as "New" by SegmentRow if current is > 0
+        yoyChangeForOthers = null;
       } else if (
         !anyPreviousRevenueExistsForOthers &&
         othersCurrentRevenue > 0
       ) {
-        yoyChangeForOthers = null; // All underlying segments are new, so "Others" is new.
+        yoyChangeForOthers = null;
       }
 
       othersData = {
@@ -195,7 +203,6 @@ export const RevenueBreakdownCardContent: React.FC<RevenueBreakdownCardContentPr
 
     const displayItems = [...top5Segments];
     if (othersData && othersData.currentRevenue > 0) {
-      // Only add "Others" if it has revenue
       displayItems.push(othersData);
     }
 
@@ -203,43 +210,42 @@ export const RevenueBreakdownCardContent: React.FC<RevenueBreakdownCardContentPr
       <div
         data-testid={`revenuebreakdown-card-front-${symbol}`}
         className="pointer-events-auto flex flex-col h-full">
-        <ShadCardContent className="pt-1 pb-1 px-0 flex-grow flex flex-col">
-          <div className="flex justify-between items-baseline mb-2 px-0.5">
-            <span className="text-xs text-muted-foreground">
-              {staticData.latestPeriodLabel}
-            </span>
-            <div className="text-right">
-              <span className="text-xs text-muted-foreground block">
+        <ShadCardContent className={cn("p-0 flex-grow flex flex-col")}>
+          <div className="space-y-1.5">
+            <div className="flex justify-between items-baseline mb-1.5">
+              <span className="text-sm font-medium text-muted-foreground block">
                 Total Revenue
               </span>
-              <span className="text-lg sm:text-xl font-bold text-foreground">
-                {staticData.currencySymbol}
-                {liveData.totalRevenueLatestPeriod !== null
-                  ? formatNumberWithAbbreviations(
-                      liveData.totalRevenueLatestPeriod,
-                      2
-                    )
-                  : "N/A"}
-              </span>
+              <div className="text-right">
+                <span className="text-xl font-bold sm:text-2xl text-foreground">
+                  {staticData.currencySymbol}
+                  {liveData.totalRevenueLatestPeriod !== null
+                    ? formatNumberWithAbbreviations(
+                        liveData.totalRevenueLatestPeriod,
+                        2
+                      )
+                    : "N/A"}
+                </span>
+              </div>
             </div>
-          </div>
-          <div className="flex-grow space-y-0 overflow-y-auto pr-1">
-            {displayItems.length > 0 ? (
-              displayItems.map((item) => (
-                <SegmentRow
-                  key={item.segmentName}
-                  segmentName={item.segmentName}
-                  currentRevenue={item.currentRevenue}
-                  yoyChange={item.yoyChange}
-                  currencySymbol={staticData.currencySymbol}
-                  isInteractive={false}
-                />
-              ))
-            ) : (
-              <p className="text-xs text-muted-foreground text-center py-4">
-                No breakdown data available.
-              </p>
-            )}
+            <div className="flex-grow space-y-0.5 overflow-y-auto pr-0.5">
+              {displayItems.length > 0 ? (
+                displayItems.map((item) => (
+                  <SegmentRow
+                    key={item.segmentName}
+                    segmentName={item.segmentName}
+                    currentRevenue={item.currentRevenue}
+                    yoyChange={item.yoyChange}
+                    currencySymbol={staticData.currencySymbol}
+                    isInteractive={false} // Assuming not interactive for now
+                  />
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No breakdown data available.
+                </p>
+              )}
+            </div>
           </div>
         </ShadCardContent>
       </div>

@@ -52,7 +52,7 @@ const mockAnnualTotals: AnnualDividendTotal[] = [
   { year: 2022, totalDividend: 2.24 },
   { year: 2023, totalDividend: 2.48 },
   { year: 2024, totalDividend: 2.79 },
-  { year: 2025, totalDividend: 3.0, isEstimate: true }, // Future projection
+  { year: 2025, totalDividend: 3.0, isEstimate: true },
 ];
 
 const mockStaticData: DividendsHistoryCardData["staticData"] = {
@@ -93,6 +93,7 @@ const mockCardContext: CardActionContext = {
   companyName: initialMockDividendsHistoryCardData.companyName,
   logoUrl: initialMockDividendsHistoryCardData.logoUrl,
   websiteUrl: null,
+  backData: initialMockDividendsHistoryCardData.backData, // Ensure backData is included
 };
 
 const mockOnGenericInteraction: OnGenericInteraction = (
@@ -131,40 +132,45 @@ export const Flipped: Story = {
   },
 };
 
+const minimalMockBackData: BaseCardBackData = {
+  description: "No dividend history found for No Dividend Corp.",
+};
+
+const minimalInitialMockData = {
+  ...initialMockDividendsHistoryCardData,
+  id: "dividendshistory-minimal",
+  symbol: "NODIV",
+  companyName: "No Dividend Corp",
+  logoUrl: null,
+  staticData: {
+    reportedCurrency: "USD",
+    typicalFrequency: null,
+  },
+  liveData: {
+    latestDividend: null,
+    annualDividendFigures: [
+      { year: 2021, totalDividend: 0 },
+      { year: 2022, totalDividend: 0 },
+      { year: 2023, totalDividend: 0 },
+    ],
+    lastFullYearDividendGrowthYoY: null,
+    lastUpdated: new Date().toISOString(),
+  },
+  backData: minimalMockBackData,
+  isFlipped: false,
+};
+
 export const MinimalData: Story = {
   args: {
     ...Default.args,
-    initialCardData: {
-      ...initialMockDividendsHistoryCardData,
-      id: "dividendshistory-minimal",
-      symbol: "NODIV",
-      companyName: "No Dividend Corp",
-      logoUrl: null,
-      staticData: {
-        reportedCurrency: "USD",
-        typicalFrequency: null,
-      },
-      liveData: {
-        latestDividend: null,
-        annualDividendFigures: [
-          { year: 2021, totalDividend: 0 },
-          { year: 2022, totalDividend: 0 },
-          { year: 2023, totalDividend: 0 },
-        ],
-        lastFullYearDividendGrowthYoY: null,
-        lastUpdated: new Date().toISOString(),
-      },
-      backData: {
-        description: "No dividend history found for No Dividend Corp.",
-      },
-      isFlipped: false,
-    },
+    initialCardData: minimalInitialMockData,
     cardContext: {
       ...mockCardContext,
       id: "dividendshistory-minimal",
       symbol: "NODIV",
       companyName: "No Dividend Corp",
       logoUrl: null,
+      backData: minimalMockBackData, // Ensure backData for minimal story
     },
   },
 };

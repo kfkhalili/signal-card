@@ -1,9 +1,6 @@
 // src/components/game/cards/cash-use-card/CashUseCardContent.tsx
 import React from "react";
-import {
-  CardDescription,
-  CardContent as ShadCardContent,
-} from "@/components/ui/card";
+import { CardContent as ShadCardContent } from "@/components/ui/card";
 import type { CashUseCardData } from "./cash-use-card.types";
 import { cn } from "@/lib/utils";
 import { formatNumberWithAbbreviations } from "@/lib/formatters";
@@ -58,7 +55,9 @@ const MetricDisplayWithRange: React.FC<MetricDisplayWithRangeProps> = ({
     : `${label}: ${formattedValue}`;
 
   return (
-    <div className="py-1.5 space-y-1" data-testid={dataTestId}>
+    <div className="py-1 space-y-1" data-testid={dataTestId}>
+      {" "}
+      {/* Adjusted py */}
       <ClickableDataItem
         isInteractive={!!onMetricClick}
         onClickHandler={onMetricClick}
@@ -68,7 +67,7 @@ const MetricDisplayWithRange: React.FC<MetricDisplayWithRangeProps> = ({
         aria-label={title}>
         <span
           className={cn(
-            "text-sm font-medium text-foreground mr-2 group-hover/metric:text-primary"
+            "text-sm font-medium text-muted-foreground mr-2 group-hover/metric:text-primary"
           )}>
           {label}
         </span>
@@ -83,12 +82,12 @@ const MetricDisplayWithRange: React.FC<MetricDisplayWithRangeProps> = ({
         currentValue={currentValue}
         lowValue={minValue}
         highValue={maxValue}
-        lowLabel={rangeLabel.split(" - ")[0] || "Min"} // Basic split for label
+        lowLabel={rangeLabel.split(" - ")[0] || "Min"}
         highLabel={rangeLabel.split(" - ")[1] || "Max"}
         lowValueForTitle={minValue}
         highValueForTitle={maxValue}
-        barHeightClassName="h-1"
-        labelClassName="text-[10px]"
+        barHeightClassName="h-1.5"
+        labelClassName="text-xs text-muted-foreground"
       />
     </div>
   );
@@ -103,7 +102,7 @@ interface SimpleMetricDisplayProps {
   isMonetary?: boolean;
   onMetricClick?: () => void;
   tooltip?: string;
-  currency?: string | null; // Added for consistency, though shares are not monetary
+  currency?: string | null;
 }
 
 const SimpleMetricDisplay: React.FC<SimpleMetricDisplayProps> = ({
@@ -111,10 +110,10 @@ const SimpleMetricDisplay: React.FC<SimpleMetricDisplayProps> = ({
   value,
   dateLabel,
   "data-testid": dataTestId,
-  isMonetary = false, // Default to false for shares
+  isMonetary = false,
   onMetricClick,
   tooltip,
-  currency, // Not typically used for shares but good for interface consistency
+  currency,
 }) => {
   const displayCurrencySymbol =
     currency === "USD" ? "$" : currency || (isMonetary ? "$" : "");
@@ -123,7 +122,7 @@ const SimpleMetricDisplay: React.FC<SimpleMetricDisplayProps> = ({
       ? "N/A"
       : `${
           isMonetary ? displayCurrencySymbol : ""
-        }${formatNumberWithAbbreviations(value, 0)}`; // Shares usually whole numbers
+        }${formatNumberWithAbbreviations(value, 0)}`;
 
   const title = tooltip
     ? `${label}: ${formattedValue} (${tooltip})`
@@ -131,7 +130,7 @@ const SimpleMetricDisplay: React.FC<SimpleMetricDisplayProps> = ({
   const ariaLabel = dateLabel ? `${title}, as of ${dateLabel}` : title;
 
   return (
-    <div className="py-1.5" data-testid={dataTestId}>
+    <div className="py-1" data-testid={dataTestId}>
       <ClickableDataItem
         isInteractive={!!onMetricClick}
         onClickHandler={onMetricClick}
@@ -141,7 +140,7 @@ const SimpleMetricDisplay: React.FC<SimpleMetricDisplayProps> = ({
         aria-label={ariaLabel}>
         <span
           className={cn(
-            "text-sm font-medium text-foreground mr-2 group-hover/metric:text-primary"
+            "text-sm font-medium text-muted-foreground mr-2 group-hover/metric:text-primary"
           )}>
           {label}
           {dateLabel && (
@@ -169,15 +168,7 @@ interface CashUseCardContentProps {
 
 export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
   ({ cardData, isBackFace, onGenericInteraction }) => {
-    const {
-      staticData,
-      liveData,
-      symbol,
-      companyName,
-      backData,
-      id,
-      type: cardType,
-    } = cardData;
+    const { staticData, liveData, symbol, id, type: cardType } = cardData;
     const currency = staticData.reportedCurrency;
 
     const handleInteraction = (
@@ -202,59 +193,54 @@ export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
         <div
           data-testid={`cashuse-card-back-${symbol}`}
           className="pointer-events-auto flex flex-col h-full">
-          <ShadCardContent className="pt-1 pb-2 px-0 space-y-1.5 flex-grow">
-            <CardDescription className="text-xs text-center text-muted-foreground/90 mb-2.5 px-1 leading-relaxed">
-              {backData.description ||
-                `Cash usage details for ${companyName || symbol}.`}
-            </CardDescription>
-            <div className="pt-1.5 space-y-0.5 text-[10px] sm:text-xs border-t mt-1.5">
+          <ShadCardContent className={cn("p-0 flex-grow text-xs")}>
+            <div className="space-y-0.5 pt-1.5">
               <div className="flex justify-between items-baseline py-0.5">
-                <span className="text-muted-foreground/90 mr-2">
+                <span className="text-xs font-medium text-muted-foreground mr-2">
                   Latest Statement:
                 </span>
-                <span className="font-medium text-foreground text-right">
+                <span className="text-xs font-semibold text-foreground text-right">
                   {staticData.latestStatementDate || "N/A"} (
                   {staticData.latestStatementPeriod || "N/A"})
                 </span>
               </div>
               <div className="flex justify-between items-baseline py-0.5">
-                <span className="text-muted-foreground/90 mr-2">
+                <span className="text-xs font-medium text-muted-foreground mr-2">
                   Latest Shares Data:
                 </span>
-                <span className="font-medium text-foreground text-right">
+                <span className="text-xs font-semibold text-foreground text-right">
                   {staticData.latestSharesFloatDate || "N/A"}
                 </span>
               </div>
               <div className="flex justify-between items-baseline py-0.5">
-                <span className="text-muted-foreground/90 mr-2">
+                <span className="text-xs font-medium text-muted-foreground mr-2">
                   Reporting Currency:
                 </span>
-                <span className="font-medium text-foreground text-right">
+                <span className="text-xs font-semibold text-foreground text-right">
                   {staticData.reportedCurrency || "N/A"}
                 </span>
               </div>
-              {/* Range labels for financial metrics */}
               <div className="flex justify-between items-baseline py-0.5">
-                <span className="text-muted-foreground/90 mr-2">
+                <span className="text-xs font-medium text-muted-foreground mr-2">
                   Debt Range:
                 </span>
-                <span className="font-medium text-foreground text-right">
+                <span className="text-xs font-semibold text-foreground text-right">
                   {staticData.debtRangePeriodLabel}
                 </span>
               </div>
               <div className="flex justify-between items-baseline py-0.5">
-                <span className="text-muted-foreground/90 mr-2">
+                <span className="text-xs font-medium text-muted-foreground mr-2">
                   FCF Range:
                 </span>
-                <span className="font-medium text-foreground text-right">
+                <span className="text-xs font-semibold text-foreground text-right">
                   {staticData.fcfRangePeriodLabel}
                 </span>
               </div>
               <div className="flex justify-between items-baseline py-0.5">
-                <span className="text-muted-foreground/90 mr-2">
+                <span className="text-xs font-medium text-muted-foreground mr-2">
                   Dividends Range:
                 </span>
-                <span className="font-medium text-foreground text-right">
+                <span className="text-xs font-semibold text-foreground text-right">
                   {staticData.dividendsRangePeriodLabel}
                 </span>
               </div>
@@ -268,66 +254,74 @@ export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
         <div
           data-testid={`cashuse-card-front-${symbol}`}
           className="pointer-events-auto flex flex-col h-full justify-between">
-          <ShadCardContent className="pt-0 pb-1 px-0 space-y-1 sm:space-y-1.5 flex-grow">
-            <SimpleMetricDisplay
-              label="Outstanding Shares"
-              value={liveData.currentOutstandingShares}
-              data-testid="outstanding-shares-metric"
-              onMetricClick={() =>
-                handleInteraction("TRIGGER_CARD_ACTION", {
-                  actionName: "viewSharesDetail",
-                } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-              }
-              tooltip="Total shares currently held by all shareholders"
-              isMonetary={false}
-            />
-            <MetricDisplayWithRange
-              label="Total Debt"
-              currentValue={liveData.currentTotalDebt}
-              minValue={liveData.totalDebt_5y_min}
-              maxValue={liveData.totalDebt_5y_max}
-              currency={currency}
-              rangeLabel={staticData.debtRangePeriodLabel}
-              data-testid="total-debt-metric"
-              onMetricClick={() =>
-                handleInteraction("REQUEST_NEW_CARD", {
-                  targetCardType: "solvency",
-                  originatingElement: "totalDebtMetric",
-                } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-              }
-              tooltip="Sum of all short-term and long-term debt"
-            />
-            <MetricDisplayWithRange
-              label="Free Cash Flow"
-              currentValue={liveData.currentFreeCashFlow}
-              minValue={liveData.freeCashFlow_5y_min}
-              maxValue={liveData.freeCashFlow_5y_max}
-              currency={currency}
-              rangeLabel={staticData.fcfRangePeriodLabel}
-              data-testid="fcf-metric"
-              onMetricClick={() =>
-                handleInteraction("REQUEST_NEW_CARD", {
-                  targetCardType: "revenue",
-                  originatingElement: "fcfMetric",
-                } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-              }
-              tooltip="Cash flow available after capital expenditures"
-            />
-            <MetricDisplayWithRange
-              label="Net Dividends Paid"
-              currentValue={liveData.currentNetDividendsPaid}
-              minValue={liveData.netDividendsPaid_5y_min}
-              maxValue={liveData.netDividendsPaid_5y_max}
-              currency={currency}
-              rangeLabel={staticData.dividendsRangePeriodLabel}
-              data-testid="net-dividends-metric"
-              onMetricClick={() =>
-                handleInteraction("TRIGGER_CARD_ACTION", {
-                  actionName: "viewDividendHistory",
-                } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-              }
-              tooltip="Total dividends paid to shareholders"
-            />
+          <ShadCardContent className={cn("p-0 flex-grow flex flex-col")}>
+            <div className="space-y-1 sm:space-y-1.5">
+              <SimpleMetricDisplay
+                label="Outstanding Shares"
+                value={liveData.currentOutstandingShares}
+                dateLabel={
+                  staticData.latestSharesFloatDate
+                    ? staticData.latestSharesFloatDate.substring(0, 4)
+                    : null
+                } // Display year part of date
+                data-testid="outstanding-shares-metric"
+                onMetricClick={() =>
+                  handleInteraction("TRIGGER_CARD_ACTION", {
+                    actionName: "viewSharesDetail",
+                  } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                }
+                tooltip="Total shares currently held by all shareholders"
+                isMonetary={false}
+              />
+              <MetricDisplayWithRange
+                label="Total Debt"
+                currentValue={liveData.currentTotalDebt}
+                minValue={liveData.totalDebt_5y_min}
+                maxValue={liveData.totalDebt_5y_max}
+                currency={currency}
+                rangeLabel={staticData.debtRangePeriodLabel}
+                data-testid="total-debt-metric"
+                onMetricClick={() =>
+                  handleInteraction("REQUEST_NEW_CARD", {
+                    targetCardType: "solvency",
+                    originatingElement: "totalDebtMetric",
+                  } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                }
+                tooltip="Sum of all short-term and long-term debt"
+              />
+              <MetricDisplayWithRange
+                label="Free Cash Flow"
+                currentValue={liveData.currentFreeCashFlow}
+                minValue={liveData.freeCashFlow_5y_min}
+                maxValue={liveData.freeCashFlow_5y_max}
+                currency={currency}
+                rangeLabel={staticData.fcfRangePeriodLabel}
+                data-testid="fcf-metric"
+                onMetricClick={() =>
+                  handleInteraction("REQUEST_NEW_CARD", {
+                    targetCardType: "revenue",
+                    originatingElement: "fcfMetric",
+                  } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                }
+                tooltip="Cash flow available after capital expenditures"
+              />
+              <MetricDisplayWithRange
+                label="Net Dividends Paid"
+                currentValue={liveData.currentNetDividendsPaid}
+                minValue={liveData.netDividendsPaid_5y_min}
+                maxValue={liveData.netDividendsPaid_5y_max}
+                currency={currency}
+                rangeLabel={staticData.dividendsRangePeriodLabel}
+                data-testid="net-dividends-metric"
+                onMetricClick={() =>
+                  handleInteraction("REQUEST_NEW_CARD", {
+                    targetCardType: "dividendshistory",
+                    originatingElement: "netDividendsMetric",
+                  } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                }
+                tooltip="Total dividends paid to shareholders"
+              />
+            </div>
           </ShadCardContent>
         </div>
       );

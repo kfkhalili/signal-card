@@ -95,6 +95,7 @@ const mockCardContext: CardActionContext = {
   companyName: initialMockProfileCardData.companyName,
   logoUrl: initialMockProfileCardData.logoUrl,
   websiteUrl: initialMockProfileCardData.websiteUrl,
+  backData: initialMockProfileCardData.backData, // Ensure backData is included
 };
 
 const mockOnGenericInteraction: OnGenericInteraction = (
@@ -127,41 +128,48 @@ export const Flipped: Story = {
   },
 };
 
+const minimalMockBackData: BaseCardBackData = {
+  description: "Minimal profile information.",
+};
+
+const minimalInitialMockData = {
+  ...initialMockProfileCardData,
+  id: "profile-min-live",
+  symbol: "MIN",
+  companyName: "Minimal Inc.",
+  logoUrl: null,
+  websiteUrl: null,
+  liveData: {
+    price: 100.0,
+    marketCap: 50000000,
+    revenue: 10000000,
+    eps: 0.5,
+    priceToEarningsRatioTTM: 200.0,
+    priceToBookRatioTTM: null,
+  },
+  staticData: {
+    ...initialMockProfileCardData.staticData,
+    db_id: "min-data-id",
+    description: "A company with minimal profile data available currently.",
+    industry: undefined,
+    sector: undefined,
+    ceo: undefined,
+    website: undefined,
+    last_dividend: 0.1,
+    beta: 0.5,
+    average_volume: 100000,
+    isin: "US12345MIN01",
+    currency: "USD",
+  },
+  backData: minimalMockBackData,
+  isFlipped: false,
+};
+
 export const MinimalLiveDataStory: Story = {
   name: "Minimal Live Data",
   args: {
     ...Default.args,
-    initialCardData: {
-      ...initialMockProfileCardData,
-      id: "profile-min-live",
-      symbol: "MIN",
-      companyName: "Minimal Inc.",
-      logoUrl: null,
-      websiteUrl: null,
-      liveData: {
-        price: 100.0,
-        marketCap: 50000000,
-        revenue: 10000000,
-        eps: 0.5,
-        priceToEarningsRatioTTM: 200.0,
-        priceToBookRatioTTM: null,
-      },
-      staticData: {
-        ...initialMockProfileCardData.staticData,
-        db_id: "min-data-id",
-        description: "A company with minimal profile data available currently.",
-        industry: undefined,
-        sector: undefined,
-        ceo: undefined,
-        website: undefined,
-        last_dividend: 0.1,
-        beta: 0.5,
-        average_volume: 100000,
-        isin: "US12345MIN01",
-        currency: "USD",
-      },
-      isFlipped: false,
-    },
+    initialCardData: minimalInitialMockData,
     cardContext: {
       id: "profile-min-live",
       symbol: "MIN",
@@ -169,6 +177,7 @@ export const MinimalLiveDataStory: Story = {
       companyName: "Minimal Inc.",
       logoUrl: null,
       websiteUrl: null,
+      backData: minimalMockBackData, // Ensure backData for minimal story
     },
   },
 };

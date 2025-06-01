@@ -33,6 +33,7 @@ export interface CardActionContext {
   readonly companyName?: string | null;
   readonly logoUrl?: string | null;
   readonly websiteUrl?: string | null;
+  readonly backData: BaseCardBackData;
 }
 
 // --- Generic Interaction System ---

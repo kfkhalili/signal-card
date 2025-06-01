@@ -1,10 +1,6 @@
 // src/components/game/cards/price-card/PriceCardContent.tsx
 import React from "react";
-import {
-  CardHeader,
-  CardDescription,
-  CardContent as ShadCardContent,
-} from "@/components/ui/card";
+import { CardContent as ShadCardContent } from "@/components/ui/card";
 import type { PriceCardData } from "./price-card.types";
 import { cn } from "@/lib/utils";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
@@ -17,9 +13,6 @@ import type {
   TriggerCardActionInteraction,
 } from "../base-card/base-card.types";
 
-const STATIC_BACK_FACE_DESCRIPTION =
-  "Market Price: The value of a single unit of this asset.";
-
 interface PriceCardContentProps {
   cardData: PriceCardData;
   isBackFace: boolean;
@@ -28,7 +21,7 @@ interface PriceCardContentProps {
 
 export const PriceCardContent = React.memo<PriceCardContentProps>(
   ({ cardData, isBackFace, onGenericInteraction }) => {
-    const { liveData, symbol, id, type, backData } = cardData;
+    const { liveData, symbol, id, type } = cardData;
     const gridCellClass = "min-w-0";
 
     const handleInteraction = (
@@ -53,16 +46,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
         <div
           data-testid="price-card-back-content-data"
           className="pointer-events-auto">
-          <CardHeader className="pt-0 pb-2 px-0">
-            <CardDescription className="text-xs sm:text-sm md:text-base text-muted-foreground leading-relaxed">
-              {backData.description || STATIC_BACK_FACE_DESCRIPTION}
-            </CardDescription>
-          </CardHeader>
-          <ShadCardContent
-            className={cn(
-              "text-xs sm:text-sm md:text-base pb-0 px-0",
-              "text-muted-foreground"
-            )}>
+          <ShadCardContent className={cn("p-0 text-xs")}>
             <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-1 sm:gap-y-1.5">
               <div className={cn(gridCellClass)}>
                 <ClickableDataItem
@@ -78,8 +62,12 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                   baseClassName="transition-colors w-full"
                   data-testid="open-price-interactive-area"
                   title={`Open: ${liveData.dayOpen?.toFixed(2)}`}>
-                  <span className="font-semibold block">Open</span>
-                  <span>${liveData.dayOpen?.toFixed(2) ?? "N/A"}</span>
+                  <span className="text-xs font-medium text-muted-foreground block">
+                    Open
+                  </span>
+                  <span className="text-xs font-semibold text-foreground">
+                    ${liveData.dayOpen?.toFixed(2) ?? "N/A"}
+                  </span>
                 </ClickableDataItem>
               </div>
 
@@ -99,8 +87,12 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                   title={`Previous Close: ${liveData.previousClose?.toFixed(
                     2
                   )}`}>
-                  <span className="font-semibold block">Prev Close</span>
-                  <span>${liveData.previousClose?.toFixed(2) ?? "N/A"}</span>
+                  <span className="text-xs font-medium text-muted-foreground block">
+                    Prev Close
+                  </span>
+                  <span className="text-xs font-semibold text-foreground">
+                    ${liveData.previousClose?.toFixed(2) ?? "N/A"}
+                  </span>
                 </ClickableDataItem>
               </div>
 
@@ -120,8 +112,12 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                   title={`Volume: ${formatNumberWithAbbreviations(
                     liveData.volume
                   )}`}>
-                  <span className="font-semibold block">Volume</span>
-                  <span>{formatNumberWithAbbreviations(liveData.volume)}</span>
+                  <span className="text-xs font-medium text-muted-foreground block">
+                    Volume
+                  </span>
+                  <span className="text-xs font-semibold text-foreground">
+                    {formatNumberWithAbbreviations(liveData.volume)}
+                  </span>
                 </ClickableDataItem>
               </div>
 
@@ -141,8 +137,10 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                   title={`Market Cap: $${formatNumberWithAbbreviations(
                     liveData.marketCap
                   )}`}>
-                  <span className="font-semibold block">Market Cap</span>
-                  <span>
+                  <span className="text-xs font-medium text-muted-foreground block">
+                    Market Cap
+                  </span>
+                  <span className="text-xs font-semibold text-foreground">
                     ${formatNumberWithAbbreviations(liveData.marketCap)}
                   </span>
                 </ClickableDataItem>
@@ -162,8 +160,12 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                   baseClassName="transition-colors w-full"
                   data-testid="sma-50d-interactive-area"
                   title={`50D SMA: ${liveData.sma50d?.toFixed(2)}`}>
-                  <span className="font-semibold block">50D SMA</span>
-                  <span>${liveData.sma50d?.toFixed(2) ?? "N/A"}</span>
+                  <span className="text-xs font-medium text-muted-foreground block">
+                    50D SMA
+                  </span>
+                  <span className="text-xs font-semibold text-foreground">
+                    ${liveData.sma50d?.toFixed(2) ?? "N/A"}
+                  </span>
                 </ClickableDataItem>
               </div>
               <div className={cn(gridCellClass)}>
@@ -180,8 +182,12 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                   baseClassName="transition-colors w-full"
                   data-testid="sma-200d-interactive-area"
                   title={`200D SMA: ${liveData.sma200d?.toFixed(2)}`}>
-                  <span className="font-semibold block">200D SMA</span>
-                  <span>${liveData.sma200d?.toFixed(2) ?? "N/A"}</span>
+                  <span className="text-xs font-medium text-muted-foreground block">
+                    200D SMA
+                  </span>
+                  <span className="text-xs font-semibold text-foreground">
+                    ${liveData.sma200d?.toFixed(2) ?? "N/A"}
+                  </span>
                 </ClickableDataItem>
               </div>
             </div>
@@ -189,7 +195,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
         </div>
       );
     } else {
-      // Front Face (remains unchanged)
+      // Front Face
       const currentPrice = liveData.price;
       const dayLow = liveData.dayLow;
       const dayHigh = liveData.dayHigh;
@@ -210,7 +216,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
           title={`Current Price: ${liveData.price?.toFixed(2)}`}>
           <p
             className={cn(
-              "text-2xl sm:text-3xl md:text-4xl font-bold",
+              "text-xl font-bold sm:text-2xl",
               "group-hover/textgroup:text-primary"
             )}>
             ${liveData.price != null ? liveData.price.toFixed(2) : "N/A"}
@@ -221,22 +227,18 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
               liveData.dayChange === 0 || liveData.dayChange == null
                 ? "text-muted-foreground"
                 : liveData.dayChange > 0
-                ? "text-green-600"
-                : "text-red-600",
+                ? "text-green-600 dark:text-green-500"
+                : "text-red-600 dark:text-red-500",
               "group-hover/textgroup:text-primary"
             )}>
-            <p
-              className="text-base sm:text-lg font-semibold"
-              title="Day Change">
+            <p className="text-base font-semibold" title="Day Change">
               {liveData.dayChange != null
                 ? `${
                     liveData.dayChange >= 0 ? "+" : ""
                   }${liveData.dayChange.toFixed(2)}`
                 : "N/A"}
             </p>
-            <p
-              className="text-base sm:text-lg font-semibold"
-              title="Percent Change">
+            <p className="text-base font-semibold" title="Percent Change">
               (
               {liveData.changePercentage != null
                 ? `${
@@ -253,9 +255,9 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
         <div
           data-testid="price-card-front-content-data"
           className="pointer-events-auto">
-          <ShadCardContent className="px-0 pt-0 pb-0">
+          <ShadCardContent className="p-0">
             <div
-              className="rounded-md p-2 -mx-2 -my-1 mb-2"
+              className="rounded-md p-1 mb-2"
               data-testid="daily-performance-layout-area"
               onClick={() =>
                 handleInteraction("TRIGGER_CARD_ACTION", {
@@ -301,6 +303,8 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
               }}
               lowValueForTitle={dayLow}
               highValueForTitle={dayHigh}
+              labelClassName="text-xs text-muted-foreground"
+              barHeightClassName="h-1.5"
             />
 
             <RangeIndicator
@@ -328,8 +332,8 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
               }}
               lowValueForTitle={yearLow}
               highValueForTitle={yearHigh}
-              barHeightClassName="h-1 sm:h-1.5"
-              labelClassName="text-[10px] sm:text-xs text-muted-foreground/90"
+              labelClassName="text-xs text-muted-foreground"
+              barHeightClassName="h-1.5"
             />
           </ShadCardContent>
         </div>

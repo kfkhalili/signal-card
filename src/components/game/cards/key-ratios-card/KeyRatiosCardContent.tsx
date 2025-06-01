@@ -1,9 +1,6 @@
 // src/components/game/cards/key-ratios-card/KeyRatiosCardContent.tsx
 import React from "react";
-import {
-  CardDescription,
-  CardContent as ShadCardContent,
-} from "@/components/ui/card";
+import { CardContent as ShadCardContent } from "@/components/ui/card";
 import type { KeyRatiosCardData } from "./key-ratios-card.types";
 import type {
   OnGenericInteraction,
@@ -12,6 +9,7 @@ import type {
 } from "../base-card/base-card.types";
 import type { CardType } from "../base-card/base-card.types";
 import { DataRow } from "@/components/ui/DataRow";
+import { cn } from "@/lib/utils";
 
 interface KeyRatiosCardContentProps {
   cardData: KeyRatiosCardData;
@@ -21,15 +19,7 @@ interface KeyRatiosCardContentProps {
 
 export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
   React.memo(({ cardData, isBackFace, onGenericInteraction }) => {
-    const {
-      staticData,
-      liveData,
-      symbol,
-      companyName,
-      backData,
-      id,
-      type: cardType,
-    } = cardData;
+    const { staticData, liveData, symbol, id, type: cardType } = cardData;
 
     const handleInteraction = (
       intent: InteractionPayload["intent"],
@@ -56,15 +46,19 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
       tooltip?: string,
       relatedCardType?: CardType,
       originatingElement?: string,
-      isMonetaryValue = false // Pass this for per-share values that might not be monetary ratios
+      isMonetaryValue = false,
+      labelClassName = "text-sm font-medium text-muted-foreground",
+      valueClassName = "text-sm font-semibold text-foreground"
     ) => (
       <DataRow
         label={label}
         value={value && unit === "%" ? value * 100 : value}
-        unit={unit}
+        unit={unit === "%" ? undefined : unit}
+        isValueAsPercentage={unit === "%"}
         precision={precision}
         tooltip={tooltip}
-        isMonetary={isMonetaryValue} // Use the passed value
+        isMonetary={isMonetaryValue}
+        currency={isMonetaryValue ? staticData.reportedCurrency : undefined}
         isInteractive={!!relatedCardType}
         onClick={
           relatedCardType
@@ -75,6 +69,8 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
                 } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
             : undefined
         }
+        labelClassName={labelClassName}
+        valueClassName={valueClassName}
       />
     );
 
@@ -83,14 +79,9 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
         <div
           data-testid={`keyratios-card-back-${symbol}`}
           className="pointer-events-auto flex flex-col h-full">
-          <ShadCardContent className="pt-1 pb-2 px-0 space-y-1.5 flex-grow">
-            <CardDescription className="text-xs text-center text-muted-foreground/90 mb-2.5 px-1 leading-relaxed">
-              {backData.description ||
-                `Trailing Twelve Months (TTM) ratios for ${
-                  companyName || symbol
-                }.`}
-            </CardDescription>
-            <div className="pt-1.5 space-y-0.5 text-[10px] sm:text-xs border-t mt-1.5">
+          <ShadCardContent
+            className={cn("p-0 flex-grow flex flex-col text-xs")}>
+            <div className="space-y-1.5 pt-1.5">
               <DataRow
                 label="Data Last Updated:"
                 value={
@@ -98,16 +89,20 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
                     ? new Date(staticData.lastUpdated).toLocaleString()
                     : "N/A"
                 }
-                isMonetary={false} // Explicitly false for date strings
+                isMonetary={false}
+                labelClassName="text-xs font-medium text-muted-foreground"
+                valueClassName="text-xs font-semibold text-foreground"
               />
               <DataRow
                 label="Reporting Currency:"
                 value={staticData.reportedCurrency || "N/A"}
-                isMonetary={false} // Explicitly false for currency codes
+                isMonetary={false}
+                labelClassName="text-xs font-medium text-muted-foreground"
+                valueClassName="text-xs font-semibold text-foreground"
               />
             </div>
-            <div className="mt-2 text-xs space-y-0.5">
-              <h4 className="font-semibold text-muted-foreground">
+            <div className="mt-2 space-y-0.5">
+              <h4 className="text-xs font-semibold text-muted-foreground mb-1">
                 Additional Ratios:
               </h4>
               {renderRatio(
@@ -117,7 +112,10 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
                 2,
                 "Gross profit as a percentage of revenue",
                 "revenue",
-                "grossProfitMarginBack"
+                "grossProfitMarginBack",
+                false,
+                "text-xs font-medium text-muted-foreground",
+                "text-xs font-semibold text-foreground"
               )}
               {renderRatio(
                 "EBITDA Margin",
@@ -126,7 +124,10 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
                 2,
                 "EBITDA as a percentage of revenue",
                 "revenue",
-                "ebitdaMarginBack"
+                "ebitdaMarginBack",
+                false,
+                "text-xs font-medium text-muted-foreground",
+                "text-xs font-semibold text-foreground"
               )}
               {renderRatio(
                 "Asset Turnover",
@@ -135,7 +136,10 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
                 2,
                 "Efficiency in using assets to generate sales",
                 "solvency",
-                "assetTurnoverBack"
+                "assetTurnoverBack",
+                false,
+                "text-xs font-medium text-muted-foreground",
+                "text-xs font-semibold text-foreground"
               )}
               {renderRatio(
                 "Current Ratio",
@@ -144,7 +148,10 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
                 2,
                 "Ability to pay short-term obligations",
                 "solvency",
-                "currentRatioBack"
+                "currentRatioBack",
+                false,
+                "text-xs font-medium text-muted-foreground",
+                "text-xs font-semibold text-foreground"
               )}
               {renderRatio(
                 "Quick Ratio",
@@ -153,7 +160,10 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
                 2,
                 "Ability to pay short-term obligations without selling inventory",
                 "solvency",
-                "quickRatioBack"
+                "quickRatioBack",
+                false,
+                "text-xs font-medium text-muted-foreground",
+                "text-xs font-semibold text-foreground"
               )}
               {renderRatio(
                 "Effective Tax Rate",
@@ -162,7 +172,10 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
                 2,
                 "Average tax rate paid",
                 "revenue",
-                "effectiveTaxRateBack"
+                "effectiveTaxRateBack",
+                false,
+                "text-xs font-medium text-muted-foreground",
+                "text-xs font-semibold text-foreground"
               )}
               {renderRatio(
                 "Div. Payout Ratio",
@@ -171,7 +184,10 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
                 2,
                 "Percentage of earnings paid as dividends",
                 "cashuse",
-                "dividendPayoutRatioBack"
+                "dividendPayoutRatioBack",
+                false,
+                "text-xs font-medium text-muted-foreground",
+                "text-xs font-semibold text-foreground"
               )}
             </div>
           </ShadCardContent>
@@ -183,89 +199,91 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
         <div
           data-testid={`keyratios-card-front-${symbol}`}
           className="pointer-events-auto flex flex-col h-full justify-between">
-          <ShadCardContent className="pt-1 pb-2 px-0 space-y-0.5 flex-grow">
-            {renderRatio(
-              "P/E Ratio",
-              liveData.priceToEarningsRatioTTM,
-              "",
-              2,
-              "Price to Earnings Ratio (TTM)",
-              "price",
-              "peRatioFront"
-            )}
-            {renderRatio(
-              "P/S Ratio",
-              liveData.priceToSalesRatioTTM,
-              "",
-              2,
-              "Price to Sales Ratio (TTM)",
-              "price",
-              "psRatioFront"
-            )}
-            {renderRatio(
-              "P/B Ratio",
-              liveData.priceToBookRatioTTM,
-              "",
-              2,
-              "Price to Book Ratio (TTM)",
-              "price",
-              "pbRatioFront"
-            )}
-            {renderRatio(
-              "P/FCF Ratio",
-              liveData.priceToFreeCashFlowRatioTTM,
-              "",
-              2,
-              "Price to Free Cash Flow Ratio (TTM)",
-              "cashuse", // Or Price, depending on where FCF is shown
-              "pFcfRatioFront"
-            )}
-            {renderRatio(
-              "Div. Yield",
-              liveData.dividendYieldTTM,
-              "%",
-              2,
-              "Dividend Yield (TTM)",
-              "cashuse",
-              "dividendYieldFront"
-            )}
-            {renderRatio(
-              "Net Profit Margin",
-              liveData.netProfitMarginTTM,
-              "%",
-              2,
-              "Net Profit Margin (TTM)",
-              "revenue",
-              "netProfitMarginFront"
-            )}
-            {renderRatio(
-              "Debt/Equity",
-              liveData.debtToEquityRatioTTM,
-              "",
-              2,
-              "Debt to Equity Ratio (TTM)",
-              "solvency",
-              "debtToEquityFront"
-            )}
-            {renderRatio(
-              "EV Multiple",
-              liveData.enterpriseValueMultipleTTM,
-              "",
-              2,
-              "Enterprise Value Multiple (TTM)",
-              "price", // Assuming EV is most related to pricing/valuation cards
-              "evMultipleFront"
-            )}
-            {renderRatio(
-              `EPS (${staticData.reportedCurrency || "$"})`, // Assuming $ if no currency
-              liveData.earningsPerShareTTM,
-              "", // Unit is part of label here
-              2,
-              "Earnings Per Share (TTM)",
-              "revenue",
-              "epsFront",
-              true // This is a monetary value per share, not a ratio itself
-            )}
+          <ShadCardContent className={cn("p-0 flex-grow flex flex-col")}>
+            <div className="space-y-0.5">
+              {renderRatio(
+                "P/E Ratio",
+                liveData.priceToEarningsRatioTTM,
+                "",
+                2,
+                "Price to Earnings Ratio (TTM)",
+                "price",
+                "peRatioFront"
+              )}
+              {renderRatio(
+                "P/S Ratio",
+                liveData.priceToSalesRatioTTM,
+                "",
+                2,
+                "Price to Sales Ratio (TTM)",
+                "price",
+                "psRatioFront"
+              )}
+              {renderRatio(
+                "P/B Ratio",
+                liveData.priceToBookRatioTTM,
+                "",
+                2,
+                "Price to Book Ratio (TTM)",
+                "price",
+                "pbRatioFront"
+              )}
+              {renderRatio(
+                "P/FCF Ratio",
+                liveData.priceToFreeCashFlowRatioTTM,
+                "",
+                2,
+                "Price to Free Cash Flow Ratio (TTM)",
+                "cashuse",
+                "pFcfRatioFront"
+              )}
+              {renderRatio(
+                "Div. Yield",
+                liveData.dividendYieldTTM,
+                "%",
+                2,
+                "Dividend Yield (TTM)",
+                "cashuse",
+                "dividendYieldFront"
+              )}
+              {renderRatio(
+                "Net Profit Margin",
+                liveData.netProfitMarginTTM,
+                "%",
+                2,
+                "Net Profit Margin (TTM)",
+                "revenue",
+                "netProfitMarginFront"
+              )}
+              {renderRatio(
+                "Debt/Equity",
+                liveData.debtToEquityRatioTTM,
+                "",
+                2,
+                "Debt to Equity Ratio (TTM)",
+                "solvency",
+                "debtToEquityFront"
+              )}
+              {renderRatio(
+                "EV Multiple",
+                liveData.enterpriseValueMultipleTTM,
+                "",
+                2,
+                "Enterprise Value Multiple (TTM)",
+                "price",
+                "evMultipleFront"
+              )}
+              {renderRatio(
+                `EPS`,
+                liveData.earningsPerShareTTM,
+                staticData.reportedCurrency || "",
+                2,
+                "Earnings Per Share (TTM)",
+                "revenue",
+                "epsFront",
+                true
+              )}
+            </div>
           </ShadCardContent>
         </div>
       );

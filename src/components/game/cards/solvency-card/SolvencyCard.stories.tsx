@@ -67,6 +67,7 @@ const initialMockSolvencyCardData: SolvencyCardData & DisplayableCardState = {
   liveData: mockLiveData,
   backData: mockBaseBackData,
   isFlipped: false,
+  websiteUrl: null, // Added to satisfy BaseCardData
 };
 
 const mockCardContext: CardActionContext = {
@@ -75,7 +76,8 @@ const mockCardContext: CardActionContext = {
   type: "solvency" as CardType,
   companyName: initialMockSolvencyCardData.companyName,
   logoUrl: initialMockSolvencyCardData.logoUrl,
-  websiteUrl: null,
+  websiteUrl: initialMockSolvencyCardData.websiteUrl,
+  backData: initialMockSolvencyCardData.backData,
 };
 
 const mockOnGenericInteraction: OnGenericInteraction = (
@@ -108,45 +110,52 @@ export const Flipped: Story = {
   },
 };
 
+const minimalMockBackData: BaseCardBackData = {
+  description: "Financial highlights for Minimal Solvency Inc. (Q1 2024).",
+};
+
+// Explicitly typed minimalInitialMockData
+const minimalInitialMockData: SolvencyCardData & { isFlipped: boolean } = {
+  id: "solvency-minimal-data",
+  type: "solvency", // Ensures the type is the literal "solvency"
+  symbol: "MINS",
+  companyName: "Minimal Solvency Inc.",
+  logoUrl: null,
+  createdAt: Date.now(),
+  isFlipped: false,
+  websiteUrl: null, // Added to satisfy BaseCardData
+  staticData: {
+    periodLabel: "Q1 2024",
+    reportedCurrency: "EUR",
+    filingDate: null,
+    acceptedDate: null,
+    statementDate: "2024-03-31",
+    statementPeriod: "Q1",
+  },
+  liveData: {
+    totalAssets: 1000000,
+    cashAndShortTermInvestments: 50000,
+    totalCurrentLiabilities: 200000,
+    shortTermDebt: null,
+    longTermDebt: 300000,
+    freeCashFlow: -10000,
+  },
+  backData: minimalMockBackData,
+};
+
 export const MinimalData: Story = {
   args: {
-    ...Default.args,
-    initialCardData: {
-      id: "solvency-minimal-data",
-      type: "solvency",
-      symbol: "MINS",
-      companyName: "Minimal Solvency Inc.",
-      logoUrl: null,
-      createdAt: Date.now(),
-      isFlipped: false,
-      staticData: {
-        periodLabel: "Q1 2024",
-        reportedCurrency: "EUR",
-        filingDate: null,
-        acceptedDate: null,
-        statementDate: "2024-03-31",
-        statementPeriod: "Q1",
-      },
-      liveData: {
-        totalAssets: 1000000,
-        cashAndShortTermInvestments: 50000,
-        totalCurrentLiabilities: 200000,
-        shortTermDebt: null,
-        longTermDebt: 300000,
-        freeCashFlow: -10000,
-      },
-      backData: {
-        description:
-          "Financial highlights for Minimal Solvency Inc. (Q1 2024).",
-      },
-    },
+    ...Default.args, // Spreads default args including expectedCardType: "solvency"
+    initialCardData: minimalInitialMockData, // Assign the correctly and explicitly typed object
     cardContext: {
-      ...mockCardContext,
+      ...mockCardContext, // Base context
       id: "solvency-minimal-data",
       symbol: "MINS",
       type: "solvency" as CardType,
       companyName: "Minimal Solvency Inc.",
       logoUrl: null,
+      websiteUrl: null, // Ensure consistency
+      backData: minimalMockBackData,
     },
   },
 };

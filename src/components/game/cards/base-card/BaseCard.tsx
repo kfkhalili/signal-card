@@ -1,8 +1,12 @@
 // src/components/game/cards/base-card/BaseCard.tsx
 "use client";
 
-import React, { useRef, useEffect } from "react";
-import { Card as ShadCard, CardTitle } from "@/components/ui/card";
+import React, { useRef } from "react";
+import {
+  Card as ShadCard,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { XIcon } from "lucide-react";
 import Image from "next/image";
@@ -68,7 +72,6 @@ const capitalize = (s: string): string => {
   return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 };
 
-// Internal component for the Card Type Badge
 const CardTypeHeaderBadge: React.FC<{
   cardContext: CardActionContext;
   onGenericInteraction: OnGenericInteraction;
@@ -96,7 +99,6 @@ const CardTypeHeaderBadge: React.FC<{
     CARD_TYPE_LABELS[sourceCardType] || capitalize(sourceCardType);
 
   return (
-    // Removed horizontal padding, adjusted vertical margin for integration within header
     <div className="text-center mt-2">
       <ClickableDataItem
         isInteractive={true}
@@ -133,6 +135,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
     companyName,
     logoUrl,
     websiteUrl,
+    backData,
   } = cardContext;
 
   const frontFaceRef = useRef<HTMLDivElement>(null);
@@ -280,7 +283,6 @@ const BaseCard: React.FC<BaseCardProps> = ({
     </>
   );
 
-  // MODIFIED: actualIdentityHeaderElement now includes the badge for the front face
   const actualIdentityHeaderElement = (
     <div className={cn(headerWrapperClassNames)}>
       <div className="flex justify-between items-start w-full">
@@ -292,21 +294,6 @@ const BaseCard: React.FC<BaseCardProps> = ({
       />
     </div>
   );
-
-  const headerPlaceholderElementForBack = // This remains unchanged, for spacing on back
-    (
-      <div
-        className={cn("invisible", headerWrapperClassNames)}
-        aria-hidden="true">
-        <div className="flex justify-between items-start">
-          <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0 mr-2 sm:mr-3">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10" />
-          </div>
-          <div className="min-w-0 max-w-[calc(100%-3rem-12px)] sm:max-w-[calc(100%-3.5rem-12px)] md:max-w-[calc(100%-4rem-12px)]" />
-        </div>
-        {/* No badge placeholder specifically needed if its height is managed by `headerWrapperClassNames` indirectly */}
-      </div>
-    );
 
   const handleCardFlipInteraction = (
     e: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>
@@ -347,16 +334,11 @@ const BaseCard: React.FC<BaseCardProps> = ({
     }
   };
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      // Focus logic can be added here if needed after flip
-    }, 0);
-
-    return () => clearTimeout(timer);
-  }, [isFlipped]);
-
   const frontFaceInert = isFlipped;
   const backFaceInert = !isFlipped;
+
+  const frontAriaLabel = `Front of ${sourceCardSymbol} card. Action: Show back details.`;
+  const backAriaLabel = `Back of ${sourceCardSymbol} card. Action: Show front details.`;
 
   return (
     <div style={outerStyle} className={cn("group", className)}>
@@ -379,18 +361,13 @@ const BaseCard: React.FC<BaseCardProps> = ({
           onKeyDown={!isFlipped ? handleCardFlipInteraction : undefined}
           role="button"
           tabIndex={!isFlipped ? 0 : -1}
-          aria-label={
-            isFlipped
-              ? `Show ${sourceCardSymbol} front details`
-              : `Show ${sourceCardSymbol} back details`
-          }
+          aria-label={frontAriaLabel}
           aria-pressed={isFlipped}
           inert={frontFaceInert ? true : undefined}
           aria-hidden={isFlipped ? "true" : "false"}>
           {deleteButtonElement}
-          {actualIdentityHeaderElement} {/* This now includes the badge */}
+          {actualIdentityHeaderElement}
           <div className="flex-grow overflow-y-auto relative p-3 sm:p-4 md:px-5 md:pb-5 md:pt-2">
-            {/* pt-2 to give space below the header block which now contains the badge */}
             {faceContent}
           </div>
         </ShadCard>
@@ -409,17 +386,36 @@ const BaseCard: React.FC<BaseCardProps> = ({
           onKeyDown={isFlipped ? handleCardFlipInteraction : undefined}
           role="button"
           tabIndex={isFlipped ? 0 : -1}
-          aria-label={
-            isFlipped
-              ? `Show ${sourceCardSymbol} front details`
-              : `Show ${sourceCardSymbol} back details`
-          }
+          aria-label={backAriaLabel}
           aria-pressed={!isFlipped}
           inert={backFaceInert ? true : undefined}
           aria-hidden={!isFlipped ? "true" : "false"}>
           {deleteButtonElement}
-          {headerPlaceholderElementForBack}
-          <div className="flex-grow overflow-y-auto relative p-3 sm:p-4 md:px-5 md:pb-5 md:pt-2">
+
+          {/* Description Area for Back Face (matches front header height) */}
+          {backData?.description ? (
+            <div
+              className={cn(
+                headerWrapperClassNames,
+                "flex items-center justify-center"
+              )}>
+              <CardDescription className="text-xs text-center text-muted-foreground/90 leading-relaxed line-clamp-3 px-1">
+                {backData.description}
+              </CardDescription>
+            </div>
+          ) : (
+            <div
+              className={cn(headerWrapperClassNames, "invisible")}
+              aria-hidden="true"
+            />
+          )}
+
+          {/* Main content area for the specific card's back content */}
+          <div
+            className={cn(
+              "flex-grow overflow-y-auto relative p-3 sm:p-4 md:px-5 md:pb-5 md:pt-2",
+              backData?.description ? "border-t" : "" // Add border-t only if description was present
+            )}>
             {backContent}
           </div>
         </ShadCard>

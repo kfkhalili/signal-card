@@ -11,6 +11,7 @@ import type {
   OnGenericInteraction,
   InteractionPayload,
   CardType,
+  BaseCardBackData,
 } from "../base-card/base-card.types";
 import type { DisplayableCardState } from "@/components/game/types";
 import {
@@ -79,6 +80,10 @@ const totalRevenue = mockBreakdown.reduce(
   0
 );
 
+const mockBackData: BaseCardBackData = {
+  description: `Revenue breakdown for ${defaultCompanyName} (FY2023).`,
+};
+
 const initialMockCardData: RevenueBreakdownCardData & DisplayableCardState = {
   id: `revenuebreakdown-${defaultSymbol}-FY2023`,
   type: "revenuebreakdown",
@@ -96,9 +101,7 @@ const initialMockCardData: RevenueBreakdownCardData & DisplayableCardState = {
     breakdown: mockBreakdown,
     lastUpdated: new Date().toISOString(),
   },
-  backData: {
-    description: `Revenue breakdown for ${defaultCompanyName} (FY2023).`,
-  },
+  backData: mockBackData,
   isFlipped: false,
   websiteUrl: "https://www.apple.com",
 };
@@ -110,6 +113,7 @@ const mockCardContext: CardActionContext = {
   companyName: defaultCompanyName,
   logoUrl: defaultLogoUrl,
   websiteUrl: initialMockCardData.websiteUrl,
+  backData: initialMockCardData.backData, // Ensure backData is included
 };
 
 const mockOnGenericInteraction: OnGenericInteraction = (
