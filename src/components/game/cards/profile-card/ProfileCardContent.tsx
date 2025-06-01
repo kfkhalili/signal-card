@@ -305,7 +305,7 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
           data-testid={`profile-card-back-${symbol}`}
           className="pointer-events-auto flex flex-col h-full">
           <ShadCardContent className={cn("p-0 flex-grow text-xs")}>
-            <div className="space-y-1.5 pt-1.5 border-t">
+            <div className="space-y-1.5 pt-1.5">
               {staticData?.ceo && (
                 <DataRow
                   label="CEO"

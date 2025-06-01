@@ -75,7 +75,7 @@ const RatingDetailRow: React.FC<RatingDetailRowProps> = ({
       </div>
       <div
         className={cn(
-          "flex items-center min-w-[45px] justify-end", // Adjusted min-width
+          "flex items-center min-w-[45px] justify-end",
           changeColorClass
         )}>
         <ChangeIcon className="w-3 h-3 mr-0.5 shrink-0" />
@@ -101,7 +101,7 @@ export const AnalystGradesCardContent: React.FC<AnalystGradesCardContentProps> =
           data-testid={`analystgrades-card-back-${symbol}`}
           className="pointer-events-auto flex flex-col h-full">
           <ShadCardContent className={cn("p-0 flex-grow text-xs")}>
-            <div className="space-y-1 pt-1.5 border-t">
+            <div className="space-y-1 pt-1.5">
               <div className="space-y-0.5">
                 <div className="flex justify-between">
                   <span className="font-medium text-muted-foreground">
@@ -140,33 +140,6 @@ export const AnalystGradesCardContent: React.FC<AnalystGradesCardContentProps> =
                   </div>
                 )}
               </div>
-              <div className="mt-2 pt-1.5 border-t">
-                <h4 className="text-xs font-semibold text-muted-foreground mb-1">
-                  Ratings Breakdown (Current vs Previous):
-                </h4>
-                <div className="space-y-0.5">
-                  {liveData.ratingsDistribution.map((detail) => (
-                    <div
-                      key={detail.category}
-                      className="flex justify-between items-center">
-                      <span className="font-medium text-muted-foreground">
-                        {detail.label}:
-                      </span>
-                      <span className="font-semibold text-foreground">
-                        {detail.currentValue}
-                        {detail.previousValue !== null
-                          ? ` (Prev: ${detail.previousValue})`
-                          : " (Prev: N/A)"}
-                        {detail.change !== null
-                          ? `, Change: ${detail.change > 0 ? "+" : ""}${
-                              detail.change
-                            }`
-                          : ""}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
           </ShadCardContent>
         </div>
@@ -188,9 +161,7 @@ export const AnalystGradesCardContent: React.FC<AnalystGradesCardContentProps> =
               <p className="text-xs text-muted-foreground">
                 {staticData.currentPeriodDate}
               </p>
-              <p className="text-base font-semibold text-primary">
-                {consensusLabelCurrent}
-              </p>
+              <p className="text-base font-semibold">{consensusLabelCurrent}</p>
               <p className="text-xs text-muted-foreground">
                 Based on {totalAnalystsCurrent} Analysts
               </p>

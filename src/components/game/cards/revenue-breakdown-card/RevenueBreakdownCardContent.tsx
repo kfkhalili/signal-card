@@ -111,7 +111,7 @@ export const RevenueBreakdownCardContent: React.FC<RevenueBreakdownCardContentPr
           data-testid={`revenuebreakdown-card-back-${symbol}`}
           className="pointer-events-auto flex flex-col h-full">
           <ShadCardContent className={cn("p-0 flex-grow text-xs")}>
-            <div className="space-y-1 pt-1.5 border-t">
+            <div className="space-y-1 pt-1.5">
               <div className="flex justify-between">
                 <span className="font-medium text-muted-foreground">
                   Latest Period:
@@ -213,13 +213,10 @@ export const RevenueBreakdownCardContent: React.FC<RevenueBreakdownCardContentPr
         <ShadCardContent className={cn("p-0 flex-grow flex flex-col")}>
           <div className="space-y-1.5">
             <div className="flex justify-between items-baseline mb-1.5">
-              <span className="text-xs text-muted-foreground">
-                {staticData.latestPeriodLabel}
+              <span className="text-sm font-medium text-muted-foreground block">
+                Total Revenue
               </span>
               <div className="text-right">
-                <span className="text-sm font-medium text-muted-foreground block">
-                  Total Revenue
-                </span>
                 <span className="text-xl font-bold sm:text-2xl text-foreground">
                   {staticData.currencySymbol}
                   {liveData.totalRevenueLatestPeriod !== null

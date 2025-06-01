@@ -194,7 +194,7 @@ export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
           data-testid={`cashuse-card-back-${symbol}`}
           className="pointer-events-auto flex flex-col h-full">
           <ShadCardContent className={cn("p-0 flex-grow text-xs")}>
-            <div className="space-y-0.5 pt-1.5 border-t">
+            <div className="space-y-0.5 pt-1.5">
               <div className="flex justify-between items-baseline py-0.5">
                 <span className="text-xs font-medium text-muted-foreground mr-2">
                   Latest Statement:

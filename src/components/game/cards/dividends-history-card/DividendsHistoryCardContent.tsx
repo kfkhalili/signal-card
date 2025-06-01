@@ -34,14 +34,12 @@ const HistogramBar: React.FC<HistogramBarProps> = ({
         isEstimate ? " (Est.)" : ""
       }\nTotal: ${displayCurrencySymbol}${totalDividend.toFixed(2)}`}>
       <span className="text-xs font-semibold text-foreground">
-        {" "}
-        {/* Standardized */}
         {displayCurrencySymbol}
         {formatNumberWithAbbreviations(totalDividend, 2)}
       </span>
       <div
         className={cn(
-          "w-full h-24 bg-muted rounded flex items-end", // Maintained h-24, consider if responsive height needed
+          "w-full h-24 bg-muted rounded flex items-end",
           isEstimate ? "border-2 border-primary/50 border-dashed" : ""
         )}>
         <div
@@ -50,15 +48,12 @@ const HistogramBar: React.FC<HistogramBarProps> = ({
         />
       </div>
       <span className="text-xs mt-1 text-muted-foreground">
-        {" "}
-        {/* Standardized */}
         {year}
         {isEstimate ? (
           <span className="text-[9px] text-muted-foreground"> (Est.)</span>
         ) : (
           ""
-        )}{" "}
-        {/* Standardized */}
+        )}
       </span>
     </div>
   );
@@ -86,9 +81,7 @@ export const DividendsHistoryCardContent: React.FC<DividendsHistoryCardContentPr
           data-testid={`dividendshistory-card-back-${symbol}`}
           className="pointer-events-auto flex flex-col h-full justify-between">
           <ShadCardContent className={cn("p-0 flex-grow text-xs")}>
-            <div className="space-y-1 pt-1.5 border-t">
-              {" "}
-              {/* Inner div for spacing */}
+            <div className="space-y-1 pt-1.5">
               <DataRow
                 label="Last Dividend"
                 value={latestDividend?.amount}
@@ -176,32 +169,21 @@ export const DividendsHistoryCardContent: React.FC<DividendsHistoryCardContentPr
           className="pointer-events-auto flex flex-col h-full">
           <ShadCardContent className={cn("p-0 flex-grow flex flex-col")}>
             <div className="space-y-1.5">
-              {" "}
-              {/* Inner div for spacing */}
               {safeAnnualDividendFigures.length > 0 ? (
-                <>
-                  <h4 className="text-sm font-semibold text-center text-muted-foreground mb-1 mt-1">
-                    {" "}
-                    {/* Standardized heading */}
-                    Annual Dividends Paid
-                  </h4>
-                  <div className="flex justify-around items-end h-32 sm:h-36 my-1 px-0.5">
-                    {safeAnnualDividendFigures.map((item) => (
-                      <HistogramBar
-                        key={item.year}
-                        year={item.year}
-                        totalDividend={item.totalDividend}
-                        maxValue={maxAnnualTotal}
-                        currency={currency}
-                        isEstimate={item.isEstimate}
-                      />
-                    ))}
-                  </div>
-                </>
+                <div className="flex justify-around items-end h-32 sm:h-36 my-1 px-0.5">
+                  {safeAnnualDividendFigures.map((item) => (
+                    <HistogramBar
+                      key={item.year}
+                      year={item.year}
+                      totalDividend={item.totalDividend}
+                      maxValue={maxAnnualTotal}
+                      currency={currency}
+                      isEstimate={item.isEstimate}
+                    />
+                  ))}
+                </div>
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-4">
-                  {" "}
-                  {/* Standardized message */}
                   No annual dividend data to display.
                 </p>
               )}

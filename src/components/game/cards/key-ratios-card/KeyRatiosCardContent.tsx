@@ -81,7 +81,7 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
           className="pointer-events-auto flex flex-col h-full">
           <ShadCardContent
             className={cn("p-0 flex-grow flex flex-col text-xs")}>
-            <div className="space-y-1.5 pt-1.5 border-t">
+            <div className="space-y-1.5 pt-1.5">
               <DataRow
                 label="Data Last Updated:"
                 value={

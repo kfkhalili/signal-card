@@ -46,7 +46,7 @@ export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
           data-testid={`solvency-card-back-${symbol}`}
           className="pointer-events-auto flex flex-col h-full">
           <ShadCardContent className={cn("p-0 flex-grow text-xs")}>
-            <div className="pt-1.5 space-y-0.5 border-t ">
+            <div className="pt-1.5 space-y-0.5">
               <DataRow
                 label="Period:"
                 value={staticData.periodLabel}
