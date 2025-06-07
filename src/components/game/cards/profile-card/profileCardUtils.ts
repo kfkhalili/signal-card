@@ -1,5 +1,6 @@
 // src/components/game/cards/profile-card/profileCardUtils.ts
 import { format, parseISO, isValid as isValidDate } from "date-fns";
+import { ok, err, fromPromise, Result } from "neverthrow";
 import type { ProfileDBRow } from "@/hooks/useStockData";
 import type {
   DisplayableCard,
@@ -28,6 +29,13 @@ import type { Database, Json } from "@/lib/supabase/database.types";
 import { applyProfileCoreUpdates } from "../cardUtils";
 
 type RatiosTtmDBRow = Database["public"]["Tables"]["ratios_ttm"]["Row"];
+
+class ProfileCardError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ProfileCardError";
+  }
+}
 
 interface ProfileCardFmpIncomeStatementPayload {
   revenue?: number | null;
@@ -175,7 +183,7 @@ function createDisplayableProfileCardFromDB(
   };
   return {
     ...concreteCardData,
-    isFlipped: false, // Default isFlipped, can be overridden if needed
+    isFlipped: false,
   };
 }
 
@@ -183,146 +191,145 @@ async function initializeProfileCard({
   symbol,
   supabase,
   toast,
-}: CardInitializationContext): Promise<DisplayableCard | null> {
-  try {
-    const { data: profileData, error: profileError } = await supabase
+}: CardInitializationContext): Promise<
+  Result<DisplayableCard, ProfileCardError>
+> {
+  const profileResult = await fromPromise(
+    supabase
       .from("profiles")
       .select("*, last_dividend, beta, average_volume, isin")
       .eq("symbol", symbol)
-      .maybeSingle();
+      .maybeSingle(),
+    (e) => new ProfileCardError((e as Error).message)
+  );
 
-    if (profileError) throw profileError;
-
-    if (profileData) {
-      const profile = profileData as ProfileDBRow;
-      let liveDataForCard: ProfileCardLiveData = {
-        price: profile.price ?? null,
-        marketCap: profile.market_cap ?? null,
-        revenue: null,
-        eps: null,
-        priceToEarningsRatioTTM: null,
-        priceToBookRatioTTM: null,
-      };
-
-      const { data: initialQuoteData, error: initialQuoteError } =
-        await supabase
-          .from("live_quote_indicators")
-          .select("current_price, market_cap")
-          .eq("symbol", symbol)
-          .order("api_timestamp", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-      if (initialQuoteError)
-        console.warn(
-          `Error fetching initial quote for ${symbol}: ${initialQuoteError.message}`
-        );
-      if (initialQuoteData) {
-        liveDataForCard = createProfileCardLiveData(
-          initialQuoteData,
-          null,
-          null,
-          liveDataForCard
-        );
-      }
-
-      const { data: financialStatementData, error: fsError } = await supabase
-        .from("financial_statements")
-        .select("income_statement_payload, period, date")
-        .eq("symbol", symbol)
-        .order("date", { ascending: false })
-        .order("period", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (fsError)
-        console.warn(
-          `Error fetching financial statement for ${symbol}: ${fsError.message}`
-        );
-      if (financialStatementData) {
-        liveDataForCard = createProfileCardLiveData(
-          null,
-          financialStatementData as ProfileFinancialStatementSource,
-          null,
-          liveDataForCard
-        );
-      }
-
-      const { data: ratiosData, error: ratiosError } = await supabase
-        .from("ratios_ttm")
-        .select(
-          "price_to_earnings_ratio_ttm, net_income_per_share_ttm, price_to_book_ratio_ttm"
-        )
-        .eq("symbol", symbol)
-        .maybeSingle();
-      if (ratiosError)
-        console.warn(
-          `Error fetching TTM ratios for ${symbol}: ${ratiosError.message}`
-        );
-      if (ratiosData) {
-        liveDataForCard = createProfileCardLiveData(
-          null,
-          null,
-          ratiosData as RatiosTtmDBRow,
-          liveDataForCard
-        );
-      }
-
-      const displayableCard = createDisplayableProfileCardFromDB(
-        profile,
-        liveDataForCard
-      );
-      return displayableCard as DisplayableCard;
-    } else {
-      if (toast)
-        toast({
-          title: "Profile Not Found",
-          description: `No profile data for ${symbol}.`,
-        });
-      return null;
-    }
-  } catch (error: unknown) {
-    const errorMessage =
-      error instanceof Error
-        ? error.message
-        : `Could not initialize profile for ${symbol}.`;
-    if (toast)
-      toast({
-        title: "Error Initializing Profile",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    return null;
+  if (profileResult.isErr()) {
+    return err(profileResult.error);
   }
+
+  const profileData = profileResult.value.data as ProfileDBRow | null;
+
+  if (!profileData) {
+    if (toast) {
+      toast({
+        title: "Profile Not Found",
+        description: `No profile data for ${symbol}.`,
+      });
+    }
+    return err(new ProfileCardError(`Profile not found for ${symbol}`));
+  }
+
+  // The rest of the data is supplemental, so we don't fail the whole operation if they're missing.
+  // We can fetch them and log warnings on failure without returning an `err`.
+  let liveDataForCard: ProfileCardLiveData = {
+    price: profileData.price ?? null,
+    marketCap: profileData.market_cap ?? null,
+    revenue: null,
+    eps: null,
+    priceToEarningsRatioTTM: null,
+    priceToBookRatioTTM: null,
+  };
+
+  const initialQuoteResult = await fromPromise(
+    supabase
+      .from("live_quote_indicators")
+      .select("current_price, market_cap")
+      .eq("symbol", symbol)
+      .order("api_timestamp", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    (e) => new ProfileCardError((e as Error).message)
+  );
+
+  if (initialQuoteResult.isOk() && initialQuoteResult.value.data) {
+    liveDataForCard = createProfileCardLiveData(
+      initialQuoteResult.value.data,
+      null,
+      null,
+      liveDataForCard
+    );
+  } else if (initialQuoteResult.isErr()) {
+    console.warn(
+      `[ProfileCard] Could not fetch initial quote: ${initialQuoteResult.error.message}`
+    );
+  }
+
+  const fsResult = await fromPromise(
+    supabase
+      .from("financial_statements")
+      .select("income_statement_payload, period, date")
+      .eq("symbol", symbol)
+      .order("date", { ascending: false })
+      .order("period", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    (e) => new ProfileCardError((e as Error).message)
+  );
+
+  if (fsResult.isOk() && fsResult.value.data) {
+    liveDataForCard = createProfileCardLiveData(
+      null,
+      fsResult.value.data as ProfileFinancialStatementSource,
+      null,
+      liveDataForCard
+    );
+  } else if (fsResult.isErr()) {
+    console.warn(
+      `[ProfileCard] Could not fetch financial statement: ${fsResult.error.message}`
+    );
+  }
+
+  const ratiosResult = await fromPromise(
+    supabase
+      .from("ratios_ttm")
+      .select(
+        "price_to_earnings_ratio_ttm, net_income_per_share_ttm, price_to_book_ratio_ttm"
+      )
+      .eq("symbol", symbol)
+      .maybeSingle(),
+    (e) => new ProfileCardError((e as Error).message)
+  );
+
+  if (ratiosResult.isOk() && ratiosResult.value.data) {
+    liveDataForCard = createProfileCardLiveData(
+      null,
+      null,
+      ratiosResult.value.data,
+      liveDataForCard
+    );
+  } else if (ratiosResult.isErr()) {
+    console.warn(
+      `[ProfileCard] Could not fetch TTM ratios: ${ratiosResult.error.message}`
+    );
+  }
+
+  const displayableCard = createDisplayableProfileCardFromDB(
+    profileData,
+    liveDataForCard
+  );
+  return ok(displayableCard);
 }
+
 registerCardInitializer("profile", initializeProfileCard);
 
-// Handler for when the underlying ProfileDBRow itself is updated
 const handleProfileCardStaticProfileUpdate: CardUpdateHandler<
   ProfileCardData,
   ProfileDBRow
 > = (currentProfileCardData, profilePayload): ProfileCardData => {
-  // Regenerate static data from the new profile payload
   const newStaticData = transformProfileDBRowToStaticData(profilePayload);
-
-  // Apply core updates (companyName, logoUrl, websiteUrl) to the root of the card data
   const { updatedCardData: cardWithCoreUpdates } = applyProfileCoreUpdates(
     currentProfileCardData,
     profilePayload
   );
 
-  // Recreate backData description with potentially new company name
   const newBackDataDescription = `Provides an overview of ${
     cardWithCoreUpdates.companyName || cardWithCoreUpdates.symbol
   }'s company profile, including sector, industry, and key operational highlights.`;
 
-  // Return a new card object with updated staticData, core properties, and backData
-  // LiveData is assumed to be updated by its own dedicated handlers (LIVE_QUOTE_UPDATE, etc.)
-  // but we preserve the existing liveData here.
   return {
-    ...cardWithCoreUpdates, // Contains updated root companyName, logoUrl, websiteUrl
-    staticData: newStaticData, // Overwrite with new static data
+    ...cardWithCoreUpdates,
+    staticData: newStaticData,
     backData: { description: newBackDataDescription },
-    // liveData: currentProfileCardData.liveData, // Retain existing live data
-    // createdAt should probably be updated if the profile itself changes substantially
     createdAt: Date.now(),
   };
 };

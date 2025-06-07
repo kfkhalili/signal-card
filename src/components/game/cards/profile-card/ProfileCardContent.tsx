@@ -54,10 +54,10 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
     if (!isBackFace) {
       const description = staticData?.description;
       const countryFlag = getFlagEmoji(staticData?.country);
-      const fullCountryName = staticData?.country
-        ? getCountryName(staticData.country)
-        : "N/A";
-
+      const countryNameResult = getCountryName("US");
+      const countryName = countryNameResult.isOk()
+        ? countryNameResult.value
+        : "Unknown Country";
       return (
         <div
           data-testid={`profile-card-front-${symbol}`}
@@ -105,8 +105,8 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                         <span className="text-sm leading-none mr-1.5">
                           {countryFlag}
                         </span>
-                        <span className="truncate" title={fullCountryName}>
-                          {fullCountryName}
+                        <span className="truncate" title={countryName}>
+                          {countryName}
                         </span>
                       </span>
                     }
@@ -119,7 +119,7 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                         } as Omit<FilterWorkspaceDataInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
                       }
                     }}
-                    title={`Country: ${fullCountryName}`}
+                    title={`Country: ${countryName}`}
                     labelClassName="text-sm font-medium text-muted-foreground"
                     valueClassName="text-sm font-semibold text-foreground"
                     isInteractive={true}

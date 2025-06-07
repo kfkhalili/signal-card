@@ -2,11 +2,13 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { Result } from "neverthrow";
+import { safeJsonParse } from "@/lib/utils";
 
 type SetValue<T> = (value: T | ((val: T) => T)) => void;
 
 function useLocalStorage<T>(key: string, initialValue: T): [T, SetValue<T>] {
-  const [storedValue, setStoredValue] = useState<T>(() => {
+  const readValueFromStorage = useCallback((): T => {
     if (typeof window === "undefined") {
       return initialValue;
     }
@@ -14,76 +16,73 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, SetValue<T>] {
     if (!item) {
       return initialValue;
     }
-    try {
-      // Parse WITHOUT the dateReviver for the main localStorage item
-      return JSON.parse(item) as T;
-    } catch (error) {
-      console.warn(
-        `[useLocalStorage] Error parsing localStorage item for key “${key}”. Error:`,
-        error
-      );
-      console.error(`[useLocalStorage] Item that failed to parse:`, item);
-      return initialValue;
-    }
-  });
+
+    return safeJsonParse<T>(item).match(
+      (parsedValue) => parsedValue,
+      (error) => {
+        console.warn(
+          `[useLocalStorage] Error parsing localStorage item for key “${key}”. Error:`,
+          error
+        );
+        console.error(`[useLocalStorage] Item that failed to parse:`, item);
+        return initialValue;
+      }
+    );
+  }, [initialValue, key]);
+
+  const [storedValue, setStoredValue] = useState<T>(readValueFromStorage);
 
   const setValue: SetValue<T> = useCallback(
     (valueOrFn) => {
-      if (typeof window === "undefined") {
-        console.warn(
-          `Tried setting localStorage key “${key}” even though environment is not a client`
-        );
-        return;
-      }
-      try {
-        setStoredValue((currentState) => {
-          const newValue =
-            typeof valueOrFn === "function"
-              ? (valueOrFn as (val: T) => T)(currentState)
-              : valueOrFn;
-          window.localStorage.setItem(key, JSON.stringify(newValue));
-          window.dispatchEvent(new Event("local-storage")); // For cross-tab sync if needed
-          return newValue;
-        });
-      } catch (error) {
-        console.warn(
-          `[useLocalStorage] Error setting localStorage key “${key}”:`,
-          error
-        );
-      }
+      // Use the updater function form of setState to avoid a dependency on `storedValue`,
+      // making this `setValue` function stable across re-renders.
+      setStoredValue((prevValue) => {
+        const valueToStore =
+          valueOrFn instanceof Function ? valueOrFn(prevValue) : valueOrFn;
+
+        if (typeof window !== "undefined") {
+          Result.fromThrowable(
+            () => {
+              window.localStorage.setItem(key, JSON.stringify(valueToStore));
+              // Dispatch event to sync with other useLocalStorage hooks on the same page.
+              window.dispatchEvent(new Event("local-storage"));
+            },
+            (e) => e as Error
+          )().mapErr((error) => {
+            console.warn(
+              `[useLocalStorage] Error setting localStorage key “${key}”:`,
+              error
+            );
+          });
+        }
+        return valueToStore;
+      });
     },
     [key]
   );
 
-  // Read value for effects, also without the top-level reviver
-  const readValueForEffects = useCallback((): T => {
-    if (typeof window === "undefined") return initialValue;
-    const item = window.localStorage.getItem(key);
-    if (!item) return initialValue;
-    try {
-      return JSON.parse(item) as T; // Parse WITHOUT reviver
-    } catch {
-      return initialValue;
-    }
-  }, [initialValue, key]);
+  // This effect is problematic if `initialValue` is not stable.
+  // It's the cause of the previous bug. We'll keep it but only with `key` as a dependency
+  // to handle the edge case of the key changing, which makes the hook more robust without causing loops.
+  useEffect(() => {
+    setStoredValue(readValueFromStorage());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
 
   useEffect(() => {
     const handleStorageChange = (event: Event): void => {
       if (typeof window === "undefined") return;
       let shouldReRead = false;
       if (event instanceof StorageEvent) {
-        // Standard 'storage' event from other tabs/windows
-        // event.key is null if localStorage.clear() was called
         if (event.key === null || event.key === key) {
           shouldReRead = true;
         }
       } else if (event.type === "local-storage") {
-        // Custom 'local-storage' event from setValue in the same tab or other instances of the hook
         shouldReRead = true;
       }
 
       if (shouldReRead) {
-        setStoredValue(readValueForEffects());
+        setStoredValue(readValueFromStorage());
       }
     };
 
@@ -94,7 +93,8 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, SetValue<T>] {
       window.removeEventListener("storage", handleStorageChange);
       window.removeEventListener("local-storage", handleStorageChange);
     };
-  }, [key, initialValue, readValueForEffects]); // readValueForEffects is stable if initialValue/key are
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
 
   return [storedValue, setValue];
 }

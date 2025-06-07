@@ -1,16 +1,10 @@
 // src/hooks/useStockData.ts
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { fromPromise, Result, ok } from "neverthrow";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import type { RealtimeChannel } from "@supabase/supabase-js";
-import {
-  subscribeToQuoteUpdates as subscribeToLiveQuoteIndicators,
-  type LiveQuotePayload,
-  type SubscriptionStatus as LiveQuoteSubscriptionStatus, // Renaming to avoid conflict
-  subscribeToFinancialStatementUpdates,
-  type FinancialStatementPayload,
-  type FinancialStatementDBRow,
-} from "@/lib/supabase/realtime-service";
+import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
+import type { FinancialStatementDBRow } from "@/lib/supabase/realtime-service";
 
 export type ProfileDBRow = Database["public"]["Tables"]["profiles"]["Row"];
 type LiveQuoteIndicatorDBRow =
@@ -45,6 +39,56 @@ interface UseStockDataReturn {
   marketStatusMessage: string | null;
 }
 
+async function fetchInitialProfile(
+  supabase: SupabaseClient<Database>,
+  symbol: string
+): Promise<Result<ProfileDBRow | null, Error>> {
+  const result = await fromPromise(
+    supabase.from("profiles").select("*").eq("symbol", symbol).maybeSingle(),
+    (e) => e as Error
+  );
+  return result.map((response) => response.data);
+}
+
+async function fetchInitialQuote(
+  supabase: SupabaseClient<Database>,
+  symbol: string
+): Promise<Result<LiveQuoteIndicatorDBRow | null, Error>> {
+  const result = await fromPromise(
+    supabase
+      .from("live_quote_indicators")
+      .select("*")
+      .eq("symbol", symbol)
+      .order("fetched_at", { ascending: false })
+      .limit(1)
+      .single(),
+    (e) => e as Error
+  );
+
+  if (result.isErr() && result.error.message.includes("PGRST116")) {
+    return ok(null);
+  }
+  return result.map((response) => response.data);
+}
+
+async function fetchExchangeStatus(
+  supabase: SupabaseClient<Database>,
+  exchangeCode: string
+): Promise<Result<ExchangeMarketStatusRecord | null, Error>> {
+  const result = await fromPromise(
+    supabase
+      .from("exchange_market_status")
+      .select("*")
+      .eq("exchange_code", exchangeCode)
+      .single(),
+    (e) => e as Error
+  );
+  if (result.isErr() && result.error.message.includes("PGRST116")) {
+    return ok(null);
+  }
+  return result.map((response) => response.data);
+}
+
 export function useStockData({
   symbol,
   onProfileUpdate,
@@ -53,13 +97,11 @@ export function useStockData({
   onFinancialStatementUpdate,
 }: UseStockDataProps): UseStockDataReturn {
   const instanceIdRef = useRef(Math.random().toString(36).substring(2, 7));
-
   const [profileData, setProfileData] = useState<ProfileDBRow | null>(null);
   const [latestQuote, setLatestQuote] =
     useState<LiveQuoteIndicatorDBRow | null>(null);
   const [exchangeStatus, setExchangeStatus] =
     useState<ExchangeMarketStatusRecord | null>(null);
-
   const [derivedMarketStatus, setDerivedMarketStatus] =
     useState<DerivedMarketStatus>("Fetching");
   const [marketStatusMessage, setMarketStatusMessage] = useState<string | null>(
@@ -69,11 +111,8 @@ export function useStockData({
   const supabaseClient = useMemo(() => createSupabaseBrowserClient(false), []);
   const isMountedRef = useRef<boolean>(false);
 
-  const profileChannelRef = useRef<RealtimeChannel | null>(null);
-  const liveQuoteUnsubscribeRef = useRef<(() => void) | null>(null);
+  const symbolChannelRef = useRef<RealtimeChannel | null>(null);
   const exchangeStatusChannelRef = useRef<RealtimeChannel | null>(null);
-  const financialStatementUnsubscribeRef = useRef<(() => void) | null>(null);
-
   const currentSubscribedExchangeCode = useRef<string | null>(null);
   const exchangeStatusRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -81,18 +120,17 @@ export function useStockData({
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
-      if (profileChannelRef.current && supabaseClient) {
+      if (symbolChannelRef.current && supabaseClient) {
         supabaseClient
-          .removeChannel(profileChannelRef.current)
+          .removeChannel(symbolChannelRef.current)
           .catch((err) =>
             console.error(
-              `[useStockData ${symbol}] Error removing profile channel:`,
+              `[useStockData ${symbol}] Error removing symbol channel:`,
               (err as Error).message
             )
           );
-        profileChannelRef.current = null;
+        symbolChannelRef.current = null;
       }
-      if (liveQuoteUnsubscribeRef.current) liveQuoteUnsubscribeRef.current();
       if (exchangeStatusChannelRef.current && supabaseClient) {
         supabaseClient
           .removeChannel(exchangeStatusChannelRef.current)
@@ -106,8 +144,6 @@ export function useStockData({
           );
         exchangeStatusChannelRef.current = null;
       }
-      if (financialStatementUnsubscribeRef.current)
-        financialStatementUnsubscribeRef.current();
       currentSubscribedExchangeCode.current = null;
       if (exchangeStatusRetryTimeoutRef.current)
         clearTimeout(exchangeStatusRetryTimeoutRef.current);
@@ -144,10 +180,6 @@ export function useStockData({
       }
       return;
     }
-    // ... (rest of derived market status logic from previous correct version) ...
-    // This complex logic should be carefully reviewed to ensure it correctly sets status
-    // without causing infinite loops if its own state setters are in dependencies.
-    // For brevity, assuming the core market status derivation logic is okay, focusing on client handling.
     const relevantExchangeCode = profileData?.exchange || latestQuote?.exchange;
     if (!relevantExchangeCode) {
       if (derivedMarketStatus !== "Unknown") {
@@ -171,12 +203,10 @@ export function useStockData({
       }
       return;
     }
-    // (Full market status logic as before)
     const isOpen = exchangeStatus.is_market_open ?? false;
     const isHoliday = exchangeStatus.current_day_is_holiday ?? false;
     let newStatus: DerivedMarketStatus = derivedMarketStatus;
     let newMessage: string | null = marketStatusMessage;
-
     if (isHoliday) {
       newStatus = "Holiday";
       newMessage =
@@ -233,7 +263,7 @@ export function useStockData({
             .catch((err) =>
               console.error(
                 "Error removing old exchange status channel",
-                err.message
+                (err as Error).message
               )
             );
           exchangeStatusChannelRef.current = null;
@@ -255,15 +285,15 @@ export function useStockData({
           `Subscribing to market status for ${exchangeCodeToSubscribe}...`
         );
       }
-      try {
-        const { data, error } = await supabaseClient
-          .from("exchange_market_status")
-          .select("*")
-          .eq("exchange_code", exchangeCodeToSubscribe)
-          .single();
-        if (!isMountedRef.current) return;
-        if (error && error.code !== "PGRST116") throw error;
-        if (isMountedRef.current) {
+
+      const result = await fetchExchangeStatus(
+        supabaseClient,
+        exchangeCodeToSubscribe
+      );
+      if (!isMountedRef.current) return;
+
+      result.match(
+        (data) => {
           setExchangeStatus(data);
           if (data && onExchangeStatusUpdate) onExchangeStatusUpdate(data);
           else if (!data) {
@@ -272,33 +302,32 @@ export function useStockData({
               `No market status data for ${exchangeCodeToSubscribe}.`
             );
           }
-        }
-      } catch (errCaught) {
-        if (isMountedRef.current) {
+        },
+        (error) => {
           setExchangeStatus(null);
           setDerivedMarketStatus("Error");
-          const errMsg =
-            errCaught instanceof Error ? errCaught.message : "unknown error";
           setMarketStatusMessage(
-            `Exception fetching market status for ${exchangeCodeToSubscribe}: ${errMsg}`
+            `Exception fetching market status for ${exchangeCodeToSubscribe}: ${error.message}`
           );
           console.error(
             `[useStockData] Exception fetching market status for ${exchangeCodeToSubscribe}:`,
-            errCaught
+            error
           );
         }
-      }
+      );
+
       if (exchangeStatusChannelRef.current) {
         await supabaseClient
           .removeChannel(exchangeStatusChannelRef.current)
           .catch((err) =>
             console.error(
               "Error removing stale exchange status channel",
-              err.message
+              (err as Error).message
             )
           );
         exchangeStatusChannelRef.current = null;
       }
+
       const channelName = `exchange-status-${exchangeCodeToSubscribe
         .toLowerCase()
         .replace(/[^a-z0-9_.-]/gi, "-")}-${instanceIdRef.current}`;
@@ -313,7 +342,6 @@ export function useStockData({
             filter: `exchange_code=eq.${exchangeCodeToSubscribe}`,
           },
           (payloadIncoming) => {
-            // payloadIncoming is used
             if (!isMountedRef.current) return;
             if (
               payloadIncoming.eventType === "DELETE" ||
@@ -330,7 +358,6 @@ export function useStockData({
           }
         )
         .subscribe((statusChange, errSubscribe) => {
-          // statusChange and errSubscribe are used
           if (!isMountedRef.current) return;
           const retry = () => {
             if (exchangeStatusRetryTimeoutRef.current)
@@ -363,7 +390,7 @@ export function useStockData({
               retry();
             }
           } else if (statusChange === "CLOSED") {
-            /* ... retry ... */ retry();
+            retry();
           } else if (statusChange === "SUBSCRIBED") {
             if (exchangeStatusRetryTimeoutRef.current)
               clearTimeout(exchangeStatusRetryTimeoutRef.current);
@@ -382,55 +409,67 @@ export function useStockData({
       derivedMarketStatus === "ClientUnavailable"
     ) {
       setProfileData(null);
+      setLatestQuote(null);
       if (supabaseClient) setupExchangeStatusSubscription(null);
       return;
     }
-    let profileSubActive = true;
-    const fetchInitialProfileAndSubscribe = async () => {
-      if (!supabaseClient) return;
-      try {
-        const { data, error } = await supabaseClient
-          .from("profiles")
-          .select("*")
-          .eq("symbol", symbol)
-          .maybeSingle();
-        if (!profileSubActive || !isMountedRef.current) return;
-        if (error) throw error;
-        if (isMountedRef.current) {
+
+    let isSubscribed = true;
+
+    const fetchAndSubscribe = async () => {
+      const profileRes = await fetchInitialProfile(supabaseClient, symbol);
+      if (!isSubscribed) return;
+
+      const fetchedProfile = profileRes.match(
+        (data) => {
           setProfileData(data);
           if (data && onProfileUpdate) onProfileUpdate(data);
-          const currentExchange = data?.exchange;
-          if (
-            currentExchange &&
-            currentSubscribedExchangeCode.current !== currentExchange
-          )
-            await setupExchangeStatusSubscription(currentExchange);
-          else if (!currentExchange && currentSubscribedExchangeCode.current)
-            await setupExchangeStatusSubscription(null);
-        }
-      } catch (errCaught) {
-        if (!profileSubActive || !isMountedRef.current) return;
-        console.error(
-          `[useStockData ${symbol}] Exception during initial profile fetch:`,
-          errCaught instanceof Error ? errCaught.message : String(errCaught)
-        );
-        if (isMountedRef.current) setProfileData(null);
-      }
-      if (profileChannelRef.current && supabaseClient) {
-        await supabaseClient
-          .removeChannel(profileChannelRef.current)
-          .catch((err) =>
-            console.error("Error removing stale profile channel", err.message)
+          return data;
+        },
+        (error) => {
+          console.error(
+            `[useStockData ${symbol}] Initial profile fetch error:`,
+            error.message
           );
-        profileChannelRef.current = null;
+          return null;
+        }
+      );
+
+      const quoteRes = await fetchInitialQuote(supabaseClient, symbol);
+      if (!isSubscribed) return;
+
+      const fetchedQuote = quoteRes.match(
+        (data) => {
+          setLatestQuote(data);
+          if (data && onLiveQuoteUpdate) onLiveQuoteUpdate(data, "fetch");
+          return data;
+        },
+        (error) => {
+          console.error(
+            `[useStockData ${symbol}] Initial quote fetch error:`,
+            error.message
+          );
+          return null;
+        }
+      );
+
+      const exchangeCode = fetchedProfile?.exchange || fetchedQuote?.exchange;
+      if (exchangeCode) {
+        setupExchangeStatusSubscription(exchangeCode);
+      }
+
+      if (symbolChannelRef.current) {
+        await supabaseClient.removeChannel(symbolChannelRef.current);
       }
       if (!supabaseClient) return;
-      const channelName = `profile-${symbol
+
+      const channelName = `symbol-updates-${symbol
         .toLowerCase()
         .replace(/[^a-z0-9_.-]/gi, "-")}-${instanceIdRef.current}`;
       const channel = supabaseClient.channel(channelName);
-      channel
-        .on<ProfileDBRow>(
+
+      if (onProfileUpdate) {
+        channel.on<ProfileDBRow>(
           "postgres_changes",
           {
             event: "UPDATE",
@@ -438,260 +477,93 @@ export function useStockData({
             table: "profiles",
             filter: `symbol=eq.${symbol}`,
           },
-          (payloadIncoming) => {
-            // payloadIncoming is used
-            if (
-              !isMountedRef.current ||
-              !profileSubActive ||
-              !payloadIncoming.new
-            )
-              return;
-            const updatedRecord = payloadIncoming.new as ProfileDBRow;
-            if (isMountedRef.current) {
+          (payload) => {
+            if (isSubscribed && payload.new) {
+              const updatedRecord = payload.new as ProfileDBRow;
               setProfileData(updatedRecord);
-              if (onProfileUpdate) onProfileUpdate(updatedRecord);
-              const newExchange = updatedRecord.exchange;
-              if (
-                newExchange &&
-                currentSubscribedExchangeCode.current !== newExchange
-              )
-                setupExchangeStatusSubscription(newExchange);
-              else if (!newExchange && currentSubscribedExchangeCode.current)
-                setupExchangeStatusSubscription(null);
+              onProfileUpdate(updatedRecord);
             }
           }
-        )
-        .subscribe((statusChange, errSubscribe) => {
-          // statusChange and errSubscribe are used
-          if (
-            statusChange === "CHANNEL_ERROR" &&
-            isMountedRef.current &&
-            profileSubActive
-          ) {
-            console.error(
-              `[useStockData ${symbol}] Profile channel error:`,
-              errSubscribe?.message || statusChange
-            );
-          }
-        });
-      profileChannelRef.current = channel;
-    };
-    fetchInitialProfileAndSubscribe();
-    return () => {
-      profileSubActive = false;
-      if (profileChannelRef.current && supabaseClient) {
-        supabaseClient
-          .removeChannel(profileChannelRef.current)
-          .catch((err) =>
-            console.error(
-              "Error removing profile channel on cleanup",
-              err.message
-            )
-          );
-        profileChannelRef.current = null;
+        );
       }
-    };
-  }, [
-    symbol,
-    onProfileUpdate,
-    setupExchangeStatusSubscription,
-    supabaseClient,
-    derivedMarketStatus,
-  ]);
 
-  useEffect(() => {
-    if (
-      !symbol ||
-      !isMountedRef.current ||
-      !supabaseClient ||
-      derivedMarketStatus === "ClientUnavailable"
-    ) {
-      setLatestQuote(null);
-      return;
-    }
-    let quoteSubActive = true;
-    const setupQuoteSub = async () => {
-      if (!supabaseClient) return;
-      if (liveQuoteUnsubscribeRef.current) liveQuoteUnsubscribeRef.current();
-      liveQuoteUnsubscribeRef.current = null;
-      try {
-        const { data, error } = await supabaseClient
-          .from("live_quote_indicators")
-          .select("*")
-          .eq("symbol", symbol)
-          .order("fetched_at", { ascending: false })
-          .limit(1)
-          .single();
-        if (!quoteSubActive || !isMountedRef.current) return;
-        if (error && error.code !== "PGRST116") throw error;
-        if (isMountedRef.current) {
-          setLatestQuote(data);
-          if (data && onLiveQuoteUpdate) onLiveQuoteUpdate(data, "fetch");
-          const currentExchange = data?.exchange;
-          if (
-            currentExchange &&
-            currentSubscribedExchangeCode.current !== currentExchange
-          )
-            await setupExchangeStatusSubscription(currentExchange);
-          else if (
-            !currentExchange &&
-            currentSubscribedExchangeCode.current &&
-            !profileData?.exchange
-          )
-            await setupExchangeStatusSubscription(null);
-        }
-      } catch (errCaught) {
-        if (isMountedRef.current && quoteSubActive) {
-          console.error(
-            `[useStockData ${symbol}] Exception fetching initial quote:`,
-            errCaught instanceof Error ? errCaught.message : String(errCaught)
-          );
-          if (isMountedRef.current) setLatestQuote(null);
-        }
-      }
-      liveQuoteUnsubscribeRef.current = subscribeToLiveQuoteIndicators(
-        symbol,
-        (payloadIncoming: LiveQuotePayload) => {
-          // payloadIncoming is used
-          if (
-            !isMountedRef.current ||
-            !quoteSubActive ||
-            payloadIncoming.eventType === "DELETE" ||
-            !payloadIncoming.new
-          )
-            return;
-          const newQuoteRecord = payloadIncoming.new as LiveQuoteIndicatorDBRow;
-          if (isMountedRef.current) {
-            setLatestQuote(newQuoteRecord);
-            if (onLiveQuoteUpdate)
-              onLiveQuoteUpdate(newQuoteRecord, "realtime");
-            const newExchange = newQuoteRecord.exchange;
-            if (
-              newExchange &&
-              currentSubscribedExchangeCode.current !== newExchange
-            )
-              setupExchangeStatusSubscription(newExchange);
-            else if (
-              !newExchange &&
-              currentSubscribedExchangeCode.current &&
-              !profileData?.exchange
-            )
-              setupExchangeStatusSubscription(null);
+      if (onLiveQuoteUpdate) {
+        channel.on<LiveQuoteIndicatorDBRow>(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "live_quote_indicators",
+            filter: `symbol=eq.${symbol}`,
+          },
+          (payload) => {
+            if (isSubscribed && payload.new) {
+              const newQuote = payload.new as LiveQuoteIndicatorDBRow;
+              setLatestQuote(newQuote);
+              onLiveQuoteUpdate(newQuote, "realtime");
+            }
           }
-        },
-        (statusChange: LiveQuoteSubscriptionStatus, errSubscribe?: Error) => {
-          // statusChange and errSubscribe are used
-          if (!isMountedRef.current || !quoteSubActive) return;
-          if (statusChange === "CLIENT_UNAVAILABLE") {
-            if (derivedMarketStatus !== "Error") {
-              setDerivedMarketStatus("Error");
-              setMarketStatusMessage(
-                `Live quote for ${symbol} unavailable: data service error.`
+        );
+      }
+
+      if (onFinancialStatementUpdate) {
+        channel.on<FinancialStatementDBRow>(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "financial_statements",
+            filter: `symbol=eq.${symbol}`,
+          },
+          (payload) => {
+            if (isSubscribed && payload.new) {
+              onFinancialStatementUpdate(
+                payload.new as FinancialStatementDBRow
               );
             }
-          } else if (
-            statusChange === "CHANNEL_ERROR" ||
-            statusChange === "TIMED_OUT"
-          ) {
-            if (derivedMarketStatus !== "Error")
-              setDerivedMarketStatus("Error");
-            setMarketStatusMessage(
-              `Live quote connection issue for ${symbol}: ${
-                errSubscribe?.message || statusChange
-              }. Retrying...`
-            );
-            console.error(
-              `[useStockData ${symbol}] Live quote channel error for ${symbol}:`,
-              errSubscribe || statusChange
-            );
-          } else if (statusChange === "CLOSED" && isMountedRef.current) {
-            if (derivedMarketStatus !== "Connecting")
-              setDerivedMarketStatus("Connecting");
-            setMarketStatusMessage(
-              `Live quote for ${symbol} interrupted. Reconnecting...`
-            );
           }
+        );
+      }
+
+      channel.subscribe((status, err) => {
+        if (!isSubscribed) return;
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          setDerivedMarketStatus("Error");
+          setMarketStatusMessage(
+            `Data connection issue for ${symbol}: ${
+              err?.message || status
+            }. Retrying...`
+          );
+          console.error(
+            `[useStockData ${symbol}] Symbol channel error:`,
+            err || status
+          );
         }
-      );
+      });
+
+      symbolChannelRef.current = channel;
     };
-    setupQuoteSub();
+
+    fetchAndSubscribe();
+
     return () => {
-      quoteSubActive = false;
-      if (liveQuoteUnsubscribeRef.current) {
-        liveQuoteUnsubscribeRef.current();
-        liveQuoteUnsubscribeRef.current = null;
+      isSubscribed = false;
+      if (symbolChannelRef.current && supabaseClient) {
+        supabaseClient
+          .removeChannel(symbolChannelRef.current)
+          .catch((err) => console.error(err));
+        symbolChannelRef.current = null;
       }
     };
   }, [
     symbol,
-    onLiveQuoteUpdate,
-    setupExchangeStatusSubscription,
-    profileData,
     supabaseClient,
+    onProfileUpdate,
+    onLiveQuoteUpdate,
+    onFinancialStatementUpdate,
+    setupExchangeStatusSubscription,
     derivedMarketStatus,
   ]);
-
-  useEffect(() => {
-    if (
-      !symbol ||
-      !onFinancialStatementUpdate ||
-      !isMountedRef.current ||
-      !supabaseClient ||
-      derivedMarketStatus === "ClientUnavailable"
-    ) {
-      if (financialStatementUnsubscribeRef.current)
-        financialStatementUnsubscribeRef.current();
-      financialStatementUnsubscribeRef.current = null;
-      return;
-    }
-    let subActive = true;
-    if (financialStatementUnsubscribeRef.current)
-      financialStatementUnsubscribeRef.current();
-    financialStatementUnsubscribeRef.current =
-      subscribeToFinancialStatementUpdates(
-        symbol,
-        (payloadIncoming: FinancialStatementPayload) => {
-          // payloadIncoming is used
-          if (!isMountedRef.current || !subActive) return;
-          if (
-            (payloadIncoming.eventType === "INSERT" ||
-              payloadIncoming.eventType === "UPDATE") &&
-            payloadIncoming.new
-          ) {
-            const newStatement = payloadIncoming.new as FinancialStatementDBRow;
-            onFinancialStatementUpdate(newStatement);
-          }
-        },
-        (statusChange: LiveQuoteSubscriptionStatus, errSubscribe?: Error) => {
-          // statusChange and errSubscribe are used
-          if (!isMountedRef.current || !subActive) return;
-          if (process.env.NODE_ENV === "development")
-            console.debug(
-              `[useStockData ${symbol}] Fin. statement sub status: ${statusChange}`,
-              errSubscribe || ""
-            );
-          if (statusChange === "CLIENT_UNAVAILABLE")
-            console.warn(
-              `[useStockData ${symbol}] Fin. statement sub unavailable: client error.`
-            );
-          else if (
-            statusChange === "CHANNEL_ERROR" ||
-            statusChange === "TIMED_OUT"
-          )
-            console.error(
-              `[useStockData ${symbol}] Fin. statement channel error:`,
-              errSubscribe || statusChange
-            );
-        }
-      );
-    return () => {
-      subActive = false;
-      if (financialStatementUnsubscribeRef.current) {
-        financialStatementUnsubscribeRef.current();
-        financialStatementUnsubscribeRef.current = null;
-      }
-    };
-  }, [symbol, onFinancialStatementUpdate, supabaseClient, derivedMarketStatus]);
 
   return { derivedMarketStatus, marketStatusMessage };
 }

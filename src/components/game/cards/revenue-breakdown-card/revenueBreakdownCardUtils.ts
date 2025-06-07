@@ -1,4 +1,5 @@
 // src/components/game/cards/revenue-breakdown-card/revenueBreakdownCardUtils.ts
+import { ok, err, fromPromise, Result } from "neverthrow";
 import type {
   RevenueBreakdownCardData,
   RevenueBreakdownCardStaticData,
@@ -26,6 +27,13 @@ type RevenueSegmentationDBRow =
   Database["public"]["Tables"]["revenue_product_segmentation"]["Row"];
 type ProfileDBRowFromSupabase = Database["public"]["Tables"]["profiles"]["Row"];
 
+class RevenueBreakdownCardError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RevenueBreakdownCardError";
+  }
+}
+
 function parseSegmentData(jsonData: unknown): Record<string, number> {
   if (typeof jsonData === "object" && jsonData !== null) {
     const result: Record<string, number> = {};
@@ -46,80 +54,70 @@ async function fetchAndProcessRevenueBreakdown(
   symbol: string,
   supabase: CardInitializationContext["supabase"],
   activeCards?: DisplayableCard[]
-): Promise<{
-  profileInfo: {
-    companyName?: string | null;
-    logoUrl?: string | null;
-    websiteUrl?: string | null;
-    currencySymbol: string;
-  };
-  latestRow: RevenueSegmentationDBRow | null;
-  previousRow: RevenueSegmentationDBRow | null;
-}> {
+) {
   const profileCardForSymbol = activeCards?.find(
     (c) => c.symbol === symbol && c.type === "profile"
   ) as ProfileDBRowFromSupabase | undefined;
-
-  let fetchedProfileInfoRaw = {
-    company_name: profileCardForSymbol?.company_name ?? symbol,
-    image: profileCardForSymbol?.image ?? null,
-    website: profileCardForSymbol?.website ?? null,
-    currency: profileCardForSymbol?.currency ?? null,
+  let profileInfo = {
+    companyName: profileCardForSymbol?.company_name ?? symbol,
+    logoUrl: profileCardForSymbol?.image ?? null,
+    websiteUrl: profileCardForSymbol?.website ?? null,
+    currencySymbol:
+      profileCardForSymbol?.currency === "USD"
+        ? "$"
+        : profileCardForSymbol?.currency || "$",
   };
 
   if (!profileCardForSymbol) {
-    const { data: profileDataFromDB } = await supabase
-      .from("profiles")
-      .select("company_name, image, currency, website")
-      .eq("symbol", symbol)
-      .maybeSingle();
-    fetchedProfileInfoRaw = {
-      company_name:
-        (profileDataFromDB as ProfileDBRowFromSupabase | null)?.company_name ??
-        symbol,
-      image:
-        (profileDataFromDB as ProfileDBRowFromSupabase | null)?.image ?? null,
-      website:
-        (profileDataFromDB as ProfileDBRowFromSupabase | null)?.website ?? null,
-      currency:
-        (profileDataFromDB as ProfileDBRowFromSupabase | null)?.currency ??
-        null,
-    };
-  }
-
-  const baseCurrency = fetchedProfileInfoRaw.currency;
-  const currencySymbol = baseCurrency === "USD" ? "$" : baseCurrency || "$";
-
-  const profileInfo = {
-    companyName: fetchedProfileInfoRaw.company_name,
-    logoUrl: fetchedProfileInfoRaw.image,
-    websiteUrl: fetchedProfileInfoRaw.website,
-    currencySymbol: currencySymbol,
-  };
-
-  const { data: segmentDataRows, error: segmentError } = await supabase
-    .from("revenue_product_segmentation")
-    .select("*")
-    .eq("symbol", symbol)
-    .eq("period", "FY")
-    .order("date", { ascending: false })
-    .limit(2);
-
-  if (segmentError) {
-    console.error(
-      `[RevenueBreakdownCard] Error fetching segmentation data for ${symbol}:`,
-      segmentError.message
+    const profileResult = await fromPromise(
+      supabase
+        .from("profiles")
+        .select("company_name, image, currency, website")
+        .eq("symbol", symbol)
+        .maybeSingle(),
+      (e) =>
+        new RevenueBreakdownCardError(
+          `Profile fetch failed: ${(e as Error).message}`
+        )
     );
-    throw segmentError;
+    if (profileResult.isOk() && profileResult.value.data) {
+      const profileData = profileResult.value.data;
+      profileInfo = {
+        companyName: profileData.company_name ?? symbol,
+        logoUrl: profileData.image ?? null,
+        websiteUrl: profileData.website ?? null,
+        currencySymbol:
+          profileData.currency === "USD" ? "$" : profileData.currency || "$",
+      };
+    } else if (profileResult.isErr()) {
+      console.warn(profileResult.error.message);
+    }
   }
 
-  return {
+  const segmentDataResult = await fromPromise(
+    supabase
+      .from("revenue_product_segmentation")
+      .select("*")
+      .eq("symbol", symbol)
+      .eq("period", "FY")
+      .order("date", { ascending: false })
+      .limit(2),
+    (e) =>
+      new RevenueBreakdownCardError(
+        `Segmentation data fetch failed: ${(e as Error).message}`
+      )
+  );
+
+  if (segmentDataResult.isErr()) {
+    return err(segmentDataResult.error);
+  }
+
+  const segmentDataRows = segmentDataResult.value.data || [];
+  return ok({
     profileInfo,
-    latestRow:
-      segmentDataRows && segmentDataRows.length > 0 ? segmentDataRows[0] : null,
-    previousRow:
-      segmentDataRows && segmentDataRows.length > 1 ? segmentDataRows[1] : null,
-  };
+    latestRow: segmentDataRows.length > 0 ? segmentDataRows[0] : null,
+    previousRow: segmentDataRows.length > 1 ? segmentDataRows[1] : null,
+  });
 }
 
 function constructRevenueBreakdownCardData(
@@ -135,15 +133,12 @@ function constructRevenueBreakdownCardData(
   idOverride?: string | null,
   existingCreatedAt?: number | null
 ): RevenueBreakdownCardData | null {
-  if (!latestRow) {
-    return null;
-  }
+  if (!latestRow) return null;
 
   const latestSegments = parseSegmentData(latestRow.data);
   const previousSegments = previousRow
     ? parseSegmentData(previousRow.data)
     : {};
-
   const totalRevenueLatestPeriod = Object.values(latestSegments).reduce(
     (sum, current) => sum + current,
     0
@@ -155,15 +150,8 @@ function constructRevenueBreakdownCardData(
       let yoyChange: number | null = null;
       if (previousRevenue !== null && previousRevenue !== 0) {
         yoyChange = (currentRevenue - previousRevenue) / previousRevenue;
-      } else if (previousRevenue === null && currentRevenue > 0) {
-        yoyChange = null;
       }
-      return {
-        segmentName,
-        currentRevenue,
-        previousRevenue,
-        yoyChange,
-      };
+      return { segmentName, currentRevenue, previousRevenue, yoyChange };
     })
     .sort((a, b) => b.currentRevenue - a.currentRevenue);
 
@@ -206,50 +194,59 @@ async function initializeRevenueBreakdownCard({
   supabase,
   toast,
   activeCards,
-}: CardInitializationContext): Promise<DisplayableCard | null> {
-  try {
-    const { profileInfo, latestRow, previousRow } =
-      await fetchAndProcessRevenueBreakdown(symbol, supabase, activeCards);
+}: CardInitializationContext): Promise<
+  Result<DisplayableCard, RevenueBreakdownCardError>
+> {
+  const fetchDataResult = await fetchAndProcessRevenueBreakdown(
+    symbol,
+    supabase,
+    activeCards
+  );
 
-    if (!latestRow) {
-      if (toast) {
-        toast({
-          title: "No Revenue Breakdown Data",
-          description: `No revenue segmentation data found for ${symbol}.`,
-        });
-      }
-      return null;
-    }
-
-    const concreteCardData = constructRevenueBreakdownCardData(
-      symbol,
-      profileInfo,
-      latestRow,
-      previousRow
-    );
-
-    if (!concreteCardData) return null;
-
-    const cardState: Pick<DisplayableCardState, "isFlipped"> = {
-      isFlipped: false,
-    };
-    return { ...concreteCardData, ...cardState };
-  } catch (error: unknown) {
-    const errorMessage =
-      error instanceof Error ? error.message : "An unknown error occurred.";
-    console.error(
-      `[initializeRevenueBreakdownCard] Error for ${symbol}:`,
-      errorMessage
-    );
-    if (toast) {
+  if (fetchDataResult.isErr()) {
+    if (toast)
       toast({
         title: "Error Initializing Revenue Breakdown",
-        description: `Could not fetch data for ${symbol}. ${errorMessage}`,
+        description: fetchDataResult.error.message,
         variant: "destructive",
       });
-    }
-    return null;
+    return err(fetchDataResult.error);
   }
+
+  const { profileInfo, latestRow, previousRow } = fetchDataResult.value;
+
+  if (!latestRow) {
+    if (toast)
+      toast({
+        title: "No Revenue Breakdown Data",
+        description: `No revenue segmentation data found for ${symbol}.`,
+      });
+    return err(
+      new RevenueBreakdownCardError(
+        `No revenue segmentation data found for ${symbol}.`
+      )
+    );
+  }
+
+  const concreteCardData = constructRevenueBreakdownCardData(
+    symbol,
+    profileInfo,
+    latestRow,
+    previousRow
+  );
+  if (!concreteCardData) {
+    // This case should be rare if latestRow is guaranteed, but it's a safe check.
+    return err(
+      new RevenueBreakdownCardError(
+        "Failed to construct card data from fetched rows."
+      )
+    );
+  }
+
+  const cardState: Pick<DisplayableCardState, "isFlipped"> = {
+    isFlipped: false,
+  };
+  return ok({ ...concreteCardData, ...cardState });
 }
 registerCardInitializer("revenuebreakdown", initializeRevenueBreakdownCard);
 
@@ -262,7 +259,6 @@ const handleRevenueBreakdownProfileUpdate: CardUpdateHandler<
     profilePayload
   );
 
-  // RevenueBreakdown specific: currencySymbol might change based on profile's currency
   const newBaseCurrency = profilePayload.currency;
   const newCurrencySymbol =
     newBaseCurrency === "USD"
@@ -281,11 +277,7 @@ const handleRevenueBreakdownProfileUpdate: CardUpdateHandler<
     };
 
     const newBackData: BaseCardBackData = {
-      description: `Revenue breakdown by product/segment for ${
-        finalCardData.companyName // Use the potentially updated company name
-      } for ${
-        finalCardData.staticData.latestPeriodLabel
-      }, showing year-over-year changes.`,
+      description: `Revenue breakdown by product/segment for ${finalCardData.companyName} for ${finalCardData.staticData.latestPeriodLabel}, showing year-over-year changes.`,
     };
     return {
       ...finalCardData,

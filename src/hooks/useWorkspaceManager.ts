@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import useLocalStorage from "@/hooks/use-local-storage";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Result } from "neverthrow";
 
 import type {
   DisplayableCard,
@@ -63,6 +64,8 @@ interface BaseStoredCard {
 }
 type StoredCardRawArray = BaseStoredCard[];
 
+const INITIAL_RAW_CARDS: StoredCardRawArray = [];
+
 const getConcreteCardData = (card: DisplayableCard): ConcreteCardData => {
   const cardClone = { ...card };
   delete (cardClone as Partial<DisplayableCardState>).isFlipped;
@@ -77,7 +80,10 @@ export function useWorkspaceManager() {
   );
 
   const [rawCardsFromStorage, setCardsInLocalStorage] =
-    useLocalStorage<StoredCardRawArray>(WORKSPACE_LOCAL_STORAGE_KEY, []);
+    useLocalStorage<StoredCardRawArray>(
+      WORKSPACE_LOCAL_STORAGE_KEY,
+      INITIAL_RAW_CARDS
+    );
 
   const [activeCards, setActiveCards] = useState<DisplayableCard[]>(() => {
     if (Array.isArray(rawCardsFromStorage)) {
@@ -203,45 +209,42 @@ export function useWorkspaceManager() {
           continue;
         }
 
-        let newCardToAdd: DisplayableCard | null = null;
-        try {
-          const initContext: CardInitializationContext = {
-            symbol: determinedSymbol,
-            supabase,
-            toast,
-            activeCards,
-          };
-          newCardToAdd = await initializer(initContext);
+        const initContext: CardInitializationContext = {
+          symbol: determinedSymbol,
+          supabase,
+          toast,
+          activeCards,
+        };
 
-          if (newCardToAdd) {
+        const result: Result<DisplayableCard, Error> = await initializer(
+          initContext
+        );
+
+        result.match(
+          (newCardToAdd) => {
             setActiveCards((prev) => {
               const updatedCards = [...prev];
               if (requestingCardId) {
                 const sourceIndex = updatedCards.findIndex(
                   (c) => c.id === requestingCardId
                 );
-                if (sourceIndex !== -1 && newCardToAdd) {
-                  // Check newCardToAdd
+                if (sourceIndex !== -1) {
                   updatedCards.splice(sourceIndex + 1, 0, newCardToAdd);
-                } else if (newCardToAdd) {
-                  // Check newCardToAdd
+                } else {
                   updatedCards.push(newCardToAdd);
                 }
-              } else if (newCardToAdd) {
-                // Check newCardToAdd
+              } else {
                 updatedCards.push(newCardToAdd);
               }
               return updatedCards;
             });
             cardsAddedCount++;
+          },
+          (error) => {
+            const errorMessage = `Could not add ${individualCardType} card for ${determinedSymbol}: ${error.message}`;
+            errorMessages.push(errorMessage);
           }
-        } catch (error: unknown) {
-          const errorMessage =
-            error instanceof Error
-              ? error.message
-              : `Could not add ${individualCardType} card for ${determinedSymbol}.`;
-          errorMessages.push(errorMessage);
-        }
+        );
       }
 
       if (cardsAddedCount > 0) {

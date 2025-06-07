@@ -1,4 +1,5 @@
 // src/components/game/cards/analyst-grades-card/analystGradesCardUtils.ts
+import { ok, err, fromPromise, Result } from "neverthrow";
 import type {
   AnalystGradesCardData,
   AnalystGradesCardStaticData,
@@ -26,6 +27,13 @@ import { applyProfileCoreUpdates } from "../cardUtils";
 type GradesHistoricalDBRow =
   Database["public"]["Tables"]["grades_historical"]["Row"];
 type ProfileDBRowFromSupabase = Database["public"]["Tables"]["profiles"]["Row"];
+
+class AnalystGradesCardError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AnalystGradesCardError";
+  }
+}
 
 const RATING_CATEGORIES_ORDERED: readonly {
   category: RatingCategory;
@@ -70,11 +78,10 @@ function mapDbRowToRatingCounts(
 function calculateTotalAnalysts(
   counts: Record<RatingCategory, number | null>
 ): number {
-  const ratingValues: (number | null)[] = Object.values(counts);
-  return ratingValues.reduce((sum: number, current: number | null): number => {
-    const currentValueAsNumber = current ?? 0;
-    return sum + currentValueAsNumber;
-  }, 0);
+  return Object.values(counts).reduce(
+    (sum: number, current: number | null): number => sum + (current ?? 0),
+    0
+  );
 }
 
 function deriveConsensusLabel(
@@ -83,7 +90,6 @@ function deriveConsensusLabel(
 ): string {
   if (totalAnalysts === 0) return "N/A";
 
-  let weightedSum = 0;
   const weights: Record<RatingCategory, number> = {
     strongBuy: 5,
     buy: 4,
@@ -91,11 +97,10 @@ function deriveConsensusLabel(
     sell: 2,
     strongSell: 1,
   };
-
-  distribution.forEach((item) => {
-    weightedSum += (item.currentValue ?? 0) * weights[item.category];
-  });
-
+  const weightedSum = distribution.reduce(
+    (sum, item) => sum + (item.currentValue ?? 0) * weights[item.category],
+    0
+  );
   const averageScore = totalAnalysts > 0 ? weightedSum / totalAnalysts : 0;
 
   if (averageScore >= 4.5) return "Strong Buy Consensus";
@@ -105,86 +110,17 @@ function deriveConsensusLabel(
   return "Strong Sell Consensus";
 }
 
-async function fetchAnalystGradesData(
-  symbol: string,
-  supabase: CardInitializationContext["supabase"],
-  activeCards?: DisplayableCard[]
-): Promise<{
-  profileInfo: {
-    companyName?: string | null;
-    logoUrl?: string | null;
-    websiteUrl?: string | null;
-  };
-  latestGrading: GradesHistoricalDBRow | null;
-  previousGrading: GradesHistoricalDBRow | null;
-}> {
-  const profileCardForSymbol = activeCards?.find(
-    (c) => c.symbol === symbol && c.type === "profile"
-  ) as ProfileDBRowFromSupabase | undefined;
-
-  let fetchedProfileInfoRaw = {
-    company_name: profileCardForSymbol?.company_name ?? symbol,
-    image: profileCardForSymbol?.image ?? null,
-    website: profileCardForSymbol?.website ?? null,
-  };
-
-  if (!profileCardForSymbol) {
-    const { data: profileDataFromDB } = await supabase
-      .from("profiles")
-      .select("company_name, image, website")
-      .eq("symbol", symbol)
-      .maybeSingle();
-    fetchedProfileInfoRaw = {
-      company_name:
-        (profileDataFromDB as ProfileDBRowFromSupabase | null)?.company_name ??
-        symbol,
-      image:
-        (profileDataFromDB as ProfileDBRowFromSupabase | null)?.image ?? null,
-      website:
-        (profileDataFromDB as ProfileDBRowFromSupabase | null)?.website ?? null,
-    };
-  }
-
-  const profileInfo = {
-    companyName: fetchedProfileInfoRaw.company_name,
-    logoUrl: fetchedProfileInfoRaw.image,
-    websiteUrl: fetchedProfileInfoRaw.website,
-  };
-
-  const { data: gradesRows, error: gradesError } = await supabase
-    .from("grades_historical")
-    .select("*")
-    .eq("symbol", symbol)
-    .order("date", { ascending: false })
-    .limit(2);
-
-  if (gradesError) {
-    console.error(
-      `[AnalystGradesCard] Error fetching grades for ${symbol}:`,
-      gradesError.message
-    );
-    throw gradesError;
-  }
-
-  return {
-    profileInfo,
-    latestGrading: gradesRows && gradesRows.length > 0 ? gradesRows[0] : null,
-    previousGrading: gradesRows && gradesRows.length > 1 ? gradesRows[1] : null,
-  };
-}
-
 function formatPeriodDate(dateString: string | null): string {
   if (!dateString) return "N/A";
   try {
-    // Assuming dateString is YYYY-MM-DD from Supabase, ensure it's treated as UTC
     const date = new Date(dateString + "T00:00:00Z");
     return date.toLocaleDateString(undefined, {
       month: "long",
       year: "numeric",
-      timeZone: "UTC", // Specify UTC to avoid local timezone shifts
+      timeZone: "UTC",
     });
   } catch {
-    return dateString; // Fallback if date parsing fails
+    return dateString;
   }
 }
 
@@ -195,13 +131,11 @@ function constructAnalystGradesCardData(
     logoUrl?: string | null;
     websiteUrl?: string | null;
   },
-  latestGrading: GradesHistoricalDBRow | null,
+  latestGrading: GradesHistoricalDBRow,
   previousGrading: GradesHistoricalDBRow | null,
   idOverride?: string | null,
   existingCreatedAt?: number | null
-): AnalystGradesCardData | null {
-  if (!latestGrading) return null;
-
+): AnalystGradesCardData {
   const currentCounts = mapDbRowToRatingCounts(latestGrading);
   const previousCounts = mapDbRowToRatingCounts(previousGrading);
 
@@ -209,10 +143,8 @@ function constructAnalystGradesCardData(
     RATING_CATEGORIES_ORDERED.map(({ category, label, colorClass }) => {
       const currentValue = currentCounts[category] ?? 0;
       const previousValue = previousCounts[category] ?? null;
-      let change: number | null = null;
-      if (previousValue !== null) {
-        change = currentValue - previousValue;
-      }
+      const change =
+        previousValue !== null ? currentValue - previousValue : null;
       return {
         category,
         label,
@@ -269,51 +201,113 @@ function constructAnalystGradesCardData(
   };
 }
 
+async function fetchAnalystGradesData(
+  symbol: string,
+  supabase: CardInitializationContext["supabase"],
+  activeCards?: DisplayableCard[]
+) {
+  const profileCardForSymbol = activeCards?.find(
+    (c) => c.symbol === symbol && c.type === "profile"
+  ) as ProfileDBRowFromSupabase | undefined;
+  let profileInfo = {
+    companyName: profileCardForSymbol?.company_name ?? symbol,
+    logoUrl: profileCardForSymbol?.image ?? null,
+    websiteUrl: profileCardForSymbol?.website ?? null,
+  };
+
+  if (!profileCardForSymbol) {
+    const profileResult = await fromPromise(
+      supabase
+        .from("profiles")
+        .select("company_name, image, website")
+        .eq("symbol", symbol)
+        .maybeSingle(),
+      (e) =>
+        new AnalystGradesCardError(
+          `Profile fetch failed: ${(e as Error).message}`
+        )
+    );
+    if (profileResult.isOk() && profileResult.value.data) {
+      profileInfo = {
+        companyName: profileResult.value.data.company_name ?? symbol,
+        logoUrl: profileResult.value.data.image ?? null,
+        websiteUrl: profileResult.value.data.website ?? null,
+      };
+    } else if (profileResult.isErr()) {
+      console.warn(profileResult.error.message);
+    }
+  }
+
+  const gradesResult = await fromPromise(
+    supabase
+      .from("grades_historical")
+      .select("*")
+      .eq("symbol", symbol)
+      .order("date", { ascending: false })
+      .limit(2),
+    (e) =>
+      new AnalystGradesCardError(`Grades fetch failed: ${(e as Error).message}`)
+  );
+
+  if (gradesResult.isErr()) {
+    return err(gradesResult.error);
+  }
+
+  const gradesRows = gradesResult.value.data || [];
+  return ok({
+    profileInfo,
+    latestGrading: gradesRows.length > 0 ? gradesRows[0] : null,
+    previousGrading: gradesRows.length > 1 ? gradesRows[1] : null,
+  });
+}
+
 async function initializeAnalystGradesCard({
   symbol,
   supabase,
   toast,
   activeCards,
-}: CardInitializationContext): Promise<DisplayableCard | null> {
-  try {
-    const { profileInfo, latestGrading, previousGrading } =
-      await fetchAnalystGradesData(symbol, supabase, activeCards);
+}: CardInitializationContext): Promise<
+  Result<DisplayableCard, AnalystGradesCardError>
+> {
+  const fetchDataResult = await fetchAnalystGradesData(
+    symbol,
+    supabase,
+    activeCards
+  );
 
-    if (!latestGrading) {
-      if (toast) {
-        toast({
-          title: "No Analyst Grades Data",
-          description: `No analyst grades found for ${symbol}.`,
-        });
-      }
-      return null;
-    }
-
-    const concreteCardData = constructAnalystGradesCardData(
-      symbol,
-      profileInfo,
-      latestGrading,
-      previousGrading
-    );
-
-    if (!concreteCardData) return null;
-
-    const cardState: Pick<DisplayableCardState, "isFlipped"> = {
-      isFlipped: false,
-    };
-    return { ...concreteCardData, ...cardState };
-  } catch (error: unknown) {
-    const errorMessage =
-      error instanceof Error ? error.message : "An unknown error occurred.";
-    if (toast) {
+  if (fetchDataResult.isErr()) {
+    if (toast)
       toast({
         title: "Error Initializing Analyst Grades",
-        description: `Could not fetch data for ${symbol}: ${errorMessage}`,
+        description: fetchDataResult.error.message,
         variant: "destructive",
       });
-    }
-    return null;
+    return err(fetchDataResult.error);
   }
+
+  const { profileInfo, latestGrading, previousGrading } = fetchDataResult.value;
+
+  if (!latestGrading) {
+    if (toast)
+      toast({
+        title: "No Analyst Grades Data",
+        description: `No analyst grades found for ${symbol}.`,
+      });
+    return err(
+      new AnalystGradesCardError(`No analyst grades found for ${symbol}.`)
+    );
+  }
+
+  const concreteCardData = constructAnalystGradesCardData(
+    symbol,
+    profileInfo,
+    latestGrading,
+    previousGrading
+  );
+  const cardState: Pick<DisplayableCardState, "isFlipped"> = {
+    isFlipped: false,
+  };
+  return ok({ ...concreteCardData, ...cardState });
 }
 registerCardInitializer("analystgrades", initializeAnalystGradesCard);
 
@@ -328,11 +322,7 @@ const handleAnalystGradesProfileUpdate: CardUpdateHandler<
 
   if (coreDataChanged) {
     const newBackData: BaseCardBackData = {
-      description: `Analyst rating distribution for ${
-        updatedCardData.companyName // Use the new company name
-      } as of ${
-        updatedCardData.staticData.currentPeriodDate
-      }, with changes from the previous period.`,
+      description: `Analyst rating distribution for ${updatedCardData.companyName} as of ${updatedCardData.staticData.currentPeriodDate}, with changes from the previous period.`,
     };
     return {
       ...updatedCardData,

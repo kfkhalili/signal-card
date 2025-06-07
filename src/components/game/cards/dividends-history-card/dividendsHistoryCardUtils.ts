@@ -1,4 +1,5 @@
 // src/components/game/cards/dividends-history-card/dividendsHistoryCardUtils.ts
+import { ok, err, fromPromise, Result } from "neverthrow";
 import type {
   DividendsHistoryCardData,
   DividendsHistoryCardStaticData,
@@ -26,6 +27,13 @@ import { applyProfileCoreUpdates } from "../cardUtils";
 type DividendHistoryDBRow =
   Database["public"]["Tables"]["dividend_history"]["Row"];
 type ProfileDBRowFromSupabase = Database["public"]["Tables"]["profiles"]["Row"];
+
+class DividendsHistoryError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DividendsHistoryError";
+  }
+}
 
 function getTypicalFrequency(
   latestFrequency: string | null,
@@ -127,90 +135,77 @@ async function fetchAndProcessDividendsData(
   symbol: string,
   supabase: CardInitializationContext["supabase"],
   activeCards?: DisplayableCard[]
-): Promise<{
-  profileInfo: {
-    companyName: string | null;
-    logoUrl: string | null;
-    websiteUrl: string | null;
-    reportedCurrency: string | null;
-  };
-  latestDividendRow: DividendHistoryDBRow | null;
-  historicalRows: DividendHistoryDBRow[];
-}> {
+) {
   const profileCardForSymbol = activeCards?.find(
     (c) => c.symbol === symbol && c.type === "profile"
   ) as ProfileDBRowFromSupabase | undefined;
-
-  let fetchedProfileInfo = {
+  let profileInfo = {
     companyName: profileCardForSymbol?.company_name ?? symbol,
     logoUrl: profileCardForSymbol?.image ?? null,
     websiteUrl: profileCardForSymbol?.website ?? null,
     reportedCurrency: profileCardForSymbol?.currency ?? null,
   };
-
   if (!profileCardForSymbol) {
-    const { data: profileData, error: profileError } = await supabase
-      .from("profiles")
-      .select("company_name, image, currency, website")
-      .eq("symbol", symbol)
-      .maybeSingle();
-
-    if (profileError) {
-      console.warn(
-        `[DividendsHistoryCard] Error fetching profile for ${symbol}:`,
-        profileError.message
-      );
-    }
-    fetchedProfileInfo = {
-      companyName:
-        (profileData as ProfileDBRowFromSupabase | null)?.company_name ??
-        symbol,
-      logoUrl: (profileData as ProfileDBRowFromSupabase | null)?.image ?? null,
-      websiteUrl:
-        (profileData as ProfileDBRowFromSupabase | null)?.website ?? null,
-      reportedCurrency:
-        (profileData as ProfileDBRowFromSupabase | null)?.currency ?? null,
-    };
-  }
-
-  const { data: latestDividendData, error: latestDivError } = await supabase
-    .from("dividend_history")
-    .select("*")
-    .eq("symbol", symbol)
-    .order("date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (latestDivError) {
-    console.error(
-      `[DividendsHistoryCard] Error fetching latest dividend for ${symbol}:`,
-      latestDivError
+    const profileResult = await fromPromise(
+      supabase
+        .from("profiles")
+        .select("company_name, image, currency, website")
+        .eq("symbol", symbol)
+        .maybeSingle(),
+      (e) =>
+        new DividendsHistoryError(
+          `Profile fetch failed: ${(e as Error).message}`
+        )
     );
+    if (profileResult.isOk() && profileResult.value.data) {
+      const profileData = profileResult.value.data;
+      profileInfo = {
+        companyName: profileData.company_name ?? symbol,
+        logoUrl: profileData.image ?? null,
+        websiteUrl: profileData.website ?? null,
+        reportedCurrency: profileData.currency ?? null,
+      };
+    } else if (profileResult.isErr()) {
+      console.warn(profileResult.error.message);
+    }
   }
+
+  const latestDividendResult = await fromPromise(
+    supabase
+      .from("dividend_history")
+      .select("*")
+      .eq("symbol", symbol)
+      .order("date", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    (e) =>
+      new DividendsHistoryError(
+        `Latest dividend fetch failed: ${(e as Error).message}`
+      )
+  );
+  if (latestDividendResult.isErr()) return err(latestDividendResult.error);
 
   const fourYearsAgo = new Date();
   fourYearsAgo.setUTCFullYear(fourYearsAgo.getUTCFullYear() - 4);
-  const startDate = fourYearsAgo.toISOString().split("T")[0];
+  const historicalResult = await fromPromise(
+    supabase
+      .from("dividend_history")
+      .select("*")
+      .eq("symbol", symbol)
+      .gte("date", fourYearsAgo.toISOString().split("T")[0])
+      .order("date", { ascending: false }),
+    (e) =>
+      new DividendsHistoryError(
+        `Historical dividends fetch failed: ${(e as Error).message}`
+      )
+  );
+  if (historicalResult.isErr()) return err(historicalResult.error);
 
-  const { data: historicalDivData, error: histDivError } = await supabase
-    .from("dividend_history")
-    .select("*")
-    .eq("symbol", symbol)
-    .gte("date", startDate)
-    .order("date", { ascending: false });
-
-  if (histDivError) {
-    console.error(
-      `[DividendsHistoryCard] Error fetching historical dividends for ${symbol}:`,
-      histDivError
-    );
-  }
-
-  return {
-    profileInfo: fetchedProfileInfo,
-    latestDividendRow: latestDividendData as DividendHistoryDBRow | null,
-    historicalRows: (historicalDivData as DividendHistoryDBRow[]) || [],
-  };
+  return ok({
+    profileInfo,
+    latestDividendRow: latestDividendResult.value.data,
+    historicalRows: historicalResult.value.data || [],
+  });
 }
 
 function constructDividendsHistoryCardData(
@@ -299,48 +294,50 @@ async function initializeDividendsHistoryCard({
   supabase,
   toast,
   activeCards,
-}: CardInitializationContext): Promise<DisplayableCard | null> {
-  try {
-    const { profileInfo, latestDividendRow, historicalRows } =
-      await fetchAndProcessDividendsData(symbol, supabase, activeCards);
-
-    if (!latestDividendRow && historicalRows.length === 0) {
-      if (toast) {
-        toast({
-          title: "No Dividend Data",
-          description: `No dividend history found for ${symbol}.`,
-          variant: "default",
-        });
-      }
-      return null;
-    }
-
-    const concreteCardData = constructDividendsHistoryCardData(
-      symbol,
-      profileInfo,
-      latestDividendRow,
-      historicalRows
-    );
-    const cardState: Pick<DisplayableCardState, "isFlipped"> = {
-      isFlipped: false,
-    };
-    return { ...concreteCardData, ...cardState };
-  } catch (error: unknown) {
-    const errorMessage =
-      error instanceof Error ? error.message : "An unknown error occurred.";
-    console.error(
-      `[initializeDividendsHistoryCard] Error for ${symbol}:`,
-      errorMessage
-    );
-    if (toast) {
+}: CardInitializationContext): Promise<
+  Result<DisplayableCard, DividendsHistoryError>
+> {
+  const fetchDataResult = await fetchAndProcessDividendsData(
+    symbol,
+    supabase,
+    activeCards
+  );
+  if (fetchDataResult.isErr()) {
+    if (toast)
       toast({
         title: "Error Initializing Dividends History",
-        description: `Could not fetch dividend data for ${symbol}. ${errorMessage}`,
+        description: fetchDataResult.error.message,
         variant: "destructive",
       });
-    }
-    return null;
+    return err(fetchDataResult.error);
   }
+
+  const { profileInfo, latestDividendRow, historicalRows } =
+    fetchDataResult.value;
+
+  if (!latestDividendRow && historicalRows.length === 0) {
+    if (toast)
+      toast({
+        title: "No Dividend Data",
+        description: `No dividend history found for ${symbol}.`,
+        variant: "default",
+      });
+    return err(
+      new DividendsHistoryError(`No dividend data found for ${symbol}.`)
+    );
+  }
+
+  const cardData = constructDividendsHistoryCardData(
+    symbol,
+    profileInfo,
+    latestDividendRow,
+    historicalRows
+  );
+  const cardState: Pick<DisplayableCardState, "isFlipped"> = {
+    isFlipped: false,
+  };
+
+  return ok({ ...cardData, ...cardState });
 }
 registerCardInitializer("dividendshistory", initializeDividendsHistoryCard);
 
@@ -428,9 +425,6 @@ const handleSingleDividendRowUpdate: CardUpdateHandler<
         description: `Latest dividend for ${currentCardData.symbol} processed for ${newDividendRow.date}. Next year estimate may have updated.`,
       });
     }
-    // Re-construct backData if companyName might have changed implicitly (though not directly from this payload)
-    // For safety, or if profile updates are batched, consider if profileInfo should be re-fetched or passed.
-    // Here, assuming companyName doesn't change with a DIVIDEND_ROW_UPDATE.
     return {
       ...currentCardData,
       liveData: updatedLiveData,
@@ -471,9 +465,7 @@ const handleDividendsHistoryProfileUpdate: CardUpdateHandler<
       },
     };
     const newBackDataDescription: BaseCardBackData = {
-      description: `Historical dividend payments and trends for ${
-        finalCardData.companyName // Use the new company name
-      }, including recent payments and annual totals. Next year estimate based on latest payment.`,
+      description: `Historical dividend payments and trends for ${finalCardData.companyName}, including recent payments and annual totals. Next year estimate based on latest payment.`,
     };
     return {
       ...finalCardData,

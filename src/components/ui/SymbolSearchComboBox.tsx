@@ -3,7 +3,7 @@
 
 import * as React from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
-
+import { fromPromise } from "neverthrow";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -71,35 +71,42 @@ export const SymbolSearchComboBox: React.FC<SymbolSearchComboBoxProps> = ({
           "Supabase client is not available for fetching suggestions."
         );
         setSuggestions([]);
-        setIsLoading(false);
         return;
       }
       if (!query.trim() || disabled) {
         setSuggestions([]);
-        setIsLoading(false);
         return;
       }
       setIsLoading(true);
-      try {
-        const { data, error } = await supabase
+
+      const fetchResult = await fromPromise(
+        supabase
           .from("supported_symbols")
           .select("symbol")
           .eq("is_active", true)
           .ilike("symbol", `%${query.toUpperCase()}%`)
-          .limit(7);
-        if (error) {
-          console.error("Error fetching symbol suggestions:", error);
-          throw error;
+          .limit(7),
+        (error) => error as Error
+      );
+
+      fetchResult.match(
+        (result) => {
+          if (result.error) {
+            console.error("Error fetching symbol suggestions:", result.error);
+            setSuggestions([]);
+          } else {
+            setSuggestions(
+              result.data?.map((s) => ({ value: s.symbol, label: s.symbol })) ||
+                []
+            );
+          }
+        },
+        (error) => {
+          console.error("Catch block in fetchSuggestions:", error);
+          setSuggestions([]);
         }
-        setSuggestions(
-          data?.map((s) => ({ value: s.symbol, label: s.symbol })) || []
-        );
-      } catch (err) {
-        console.error("Catch block in fetchSuggestions:", err);
-        setSuggestions([]);
-      } finally {
-        setIsLoading(false);
-      }
+      );
+      setIsLoading(false);
     },
     [supabase, disabled]
   );
@@ -155,7 +162,6 @@ export const SymbolSearchComboBox: React.FC<SymbolSearchComboBoxProps> = ({
 
   const displayLabel = controlledFormValue || placeholder;
 
-  // Determine if the CommandList should be visible
   const showCommandList = open && (isLoading || inputValue.trim().length > 0);
 
   return (
