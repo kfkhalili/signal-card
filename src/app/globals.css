@@ -6,6 +6,12 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
+code,
+pre,
+.font-mono {
+  font-family: var(--font-geist-mono), monospace;
+}
+
 @layer base {
   :root {
     --background: 210 40% 98%; /* Light Gray */

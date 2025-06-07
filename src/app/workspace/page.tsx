@@ -166,7 +166,7 @@ export default function WorkspacePage() {
               className="mx-auto text-muted-foreground mb-4"
               strokeWidth={1.5}
             />
-            <p className="text-lg text-muted-foreground mb-6">
+            <p className="text-lg font-bold text-muted-foreground mb-6">
               Your workspace is currently empty.
             </p>
             <AddCardForm
