@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import useLocalStorage from "@/hooks/use-local-storage";
-import { useAuth } from "@/contexts/AuthContext"; // Import useAuth
+import { useAuth } from "@/contexts/AuthContext";
 import { fromPromise, Result } from "neverthrow";
 import type {
   DisplayableCard,
@@ -39,6 +39,7 @@ import {
   type CardUpdateEventType,
 } from "@/components/game/cardUpdateHandler.types";
 import "@/components/game/cards/updateHandlerInitializer";
+import type { CustomCardData } from "@/components/game/cards/custom-card/custom-card.types";
 
 type ExchangeMarketStatusRecord =
   Database["public"]["Tables"]["exchange_market_status"]["Row"];
@@ -65,6 +66,18 @@ interface SymbolSuggestion {
   label: string;
 }
 
+export interface SelectedDataItem {
+  id: string;
+  sourceCardId: string;
+  sourceCardSymbol: string;
+  label: string;
+  value: string | number | React.ReactNode;
+  unit?: string;
+  isMonetary?: boolean;
+  currency?: string | null;
+  isValueAsPercentage?: boolean;
+}
+
 const getConcreteCardData = (card: DisplayableCard): ConcreteCardData => {
   const cardClone = { ...card };
   delete (cardClone as Partial<DisplayableCardState>).isFlipped;
@@ -73,7 +86,7 @@ const getConcreteCardData = (card: DisplayableCard): ConcreteCardData => {
 
 export function useWorkspaceManager() {
   const { toast } = useToast();
-  const { supabase } = useAuth(); // Get supabase client from AuthContext
+  const { supabase } = useAuth();
 
   const [rawCardsFromStorage, setCardsInLocalStorage] =
     useLocalStorage<StoredCardRawArray>(
@@ -105,6 +118,11 @@ export function useWorkspaceManager() {
   const [supportedSymbols, setSupportedSymbols] = useState<SymbolSuggestion[]>(
     []
   );
+
+  const [isSelectionMode, setIsSelectionMode] = useState<boolean>(false);
+  const [selectedDataItems, setSelectedDataItems] = useState<
+    SelectedDataItem[]
+  >([]);
 
   useEffect(() => {
     const fetchAllSymbols = async () => {
@@ -151,9 +169,84 @@ export function useWorkspaceManager() {
 
   const uniqueSymbolsInWorkspace = useMemo(() => {
     const symbols = new Set<string>();
-    activeCards.forEach((card) => symbols.add(card.symbol));
+    activeCards.forEach((card) => {
+      if (card.type !== "custom") {
+        // Exclude custom cards from this logic
+        symbols.add(card.symbol);
+      }
+    });
     return Array.from(symbols);
   }, [activeCards]);
+
+  const handleToggleItemSelection = useCallback(
+    (item: SelectedDataItem) => {
+      setSelectedDataItems((prev) => {
+        const isSelected = prev.some((p) => p.id === item.id);
+        if (isSelected) {
+          return prev.filter((p) => p.id !== item.id);
+        } else {
+          if (prev.length >= 20) {
+            toast({
+              title: "Selection Limit Reached",
+              description: "A custom card can hold up to 20 items.",
+              variant: "default",
+            });
+            return prev;
+          }
+          return [...prev, item];
+        }
+      });
+    },
+    [toast]
+  );
+
+  const createCustomStaticCard = useCallback(
+    (narrative: string, description: string) => {
+      if (selectedDataItems.length === 0) {
+        toast({
+          title: "No Items Selected",
+          description:
+            "Please select one or more data points to create a card.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const firstItem = selectedDataItems[0];
+      const sourceCard = activeCards.find(
+        (c) => c.id === firstItem.sourceCardId
+      );
+
+      const newCustomCard: CustomCardData & DisplayableCardState = {
+        id: `custom-${Date.now()}`,
+        type: "custom",
+        symbol: sourceCard?.symbol ?? "CUSTOM",
+        companyName: sourceCard?.companyName ?? narrative,
+        logoUrl: sourceCard?.logoUrl ?? null,
+        createdAt: Date.now(),
+        isFlipped: false,
+        websiteUrl: null,
+        backData: {
+          description:
+            description ||
+            `A custom card for ${sourceCard?.companyName ?? "a company"}.`,
+        },
+        narrative: narrative,
+        items: selectedDataItems,
+      };
+
+      setActiveCards((prev) => [newCustomCard, ...prev]);
+
+      toast({
+        title: "Custom Card Created",
+        description: `Successfully created "${narrative}".`,
+      });
+
+      setSelectedDataItems([]);
+      setIsSelectionMode(false);
+    },
+    [activeCards, selectedDataItems, toast]
+  );
 
   const addCardToWorkspace = useCallback(
     async (
@@ -316,7 +409,7 @@ export function useWorkspaceManager() {
 
       setIsAddingCardInProgress(false);
     },
-    [activeCards, supabase, toast, setActiveCards]
+    [activeCards, supabase, toast]
   );
 
   const onGenericInteraction: OnGenericInteraction = useCallback(
@@ -424,7 +517,7 @@ export function useWorkspaceManager() {
         return overallChanged ? updatedCards : prevActiveCards;
       });
     },
-    [toast, setActiveCards]
+    [toast]
   );
 
   const handleStaticProfileUpdate = useCallback(
@@ -469,7 +562,7 @@ export function useWorkspaceManager() {
         return overallChanged ? updatedCards : prevActiveCards;
       });
     },
-    [toast, setActiveCards]
+    [toast]
   );
 
   const handleFinancialStatementUpdate = useCallback(
@@ -504,7 +597,7 @@ export function useWorkspaceManager() {
         return overallChanged ? updatedCards : prevActiveCards;
       });
     },
-    [toast, setActiveCards]
+    [toast]
   );
 
   const handleExchangeStatusUpdate = useCallback(
@@ -528,7 +621,7 @@ export function useWorkspaceManager() {
         }),
       0
     );
-  }, [toast, setActiveCards, setWorkspaceSymbolForRegularUser]);
+  }, [toast]);
 
   const stockDataCallbacks = useMemo(
     () => ({
@@ -557,5 +650,10 @@ export function useWorkspaceManager() {
     exchangeStatuses,
     onGenericInteraction,
     supportedSymbols,
+    isSelectionMode,
+    setIsSelectionMode,
+    selectedDataItems,
+    handleToggleItemSelection,
+    createCustomStaticCard,
   };
 }

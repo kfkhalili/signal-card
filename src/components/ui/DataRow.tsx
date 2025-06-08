@@ -3,6 +3,7 @@ import React from "react";
 import { cn } from "@/lib/utils";
 import { formatNumberWithAbbreviations } from "@/lib/formatters";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
+import { CheckboxCheckedIcon, CheckboxUncheckedIcon } from "./CheckboxIcons";
 
 interface DataRowProps {
   label: string;
@@ -25,6 +26,10 @@ interface DataRowProps {
   isInteractive?: boolean;
   "data-testid"?: string;
   originatingElement?: string;
+  // NEW PROPS FOR SELECTION
+  isSelectionMode?: boolean;
+  isSelected?: boolean;
+  onSelect?: () => void;
 }
 
 export const DataRow: React.FC<DataRowProps> = ({
@@ -44,12 +49,16 @@ export const DataRow: React.FC<DataRowProps> = ({
   isInteractive: isInteractiveProp,
   "data-testid": dataTestId,
   originatingElement,
+  // NEW PROPS
+  isSelectionMode = false,
+  isSelected = false,
+  onSelect,
 }) => {
   const displayCurrencySymbol =
     currency === "USD" ? "$" : currency || (isMonetary ? "$" : "");
 
   let valueContent: React.ReactNode;
-  let titleDisplayValue: string; // This will be a string representation for the title
+  let titleDisplayValue: string;
 
   if (value === null || value === undefined) {
     valueContent = "N/A";
@@ -58,19 +67,18 @@ export const DataRow: React.FC<DataRowProps> = ({
     valueContent = `${value}${unit}`;
     titleDisplayValue = value;
   } else if (typeof value === "number" && !Number.isNaN(value)) {
-    titleDisplayValue = value.toFixed(precision); // For title, use precise number before abbreviation
+    titleDisplayValue = value.toFixed(precision);
     if (isMonetary) {
       valueContent = `${displayCurrencySymbol}${formatNumberWithAbbreviations(
         value,
         precision
       )}`;
-      // titleDisplayValue already set, or could be prefixed with currency symbol if desired for title
     } else if (isValueAsPercentage) {
       valueContent = `${value.toFixed(precision)}%`;
-      titleDisplayValue = `${value.toFixed(precision)}%`; // Add % for title too
+      titleDisplayValue = `${value.toFixed(precision)}%`;
     } else {
       valueContent = `${value.toFixed(precision)}${unit}`;
-      titleDisplayValue = `${value.toFixed(precision)}${unit}`; // Add unit for title
+      titleDisplayValue = `${value.toFixed(precision)}${unit}`;
     }
   } else if (typeof value === "bigint") {
     valueContent = `${value.toString()}${unit}`;
@@ -79,15 +87,11 @@ export const DataRow: React.FC<DataRowProps> = ({
     valueContent = value.toString();
     titleDisplayValue = value.toString();
   } else {
-    // Value is a React element (or fragment, etc.)
     valueContent = value;
-    // For complex ReactNode values, a generic placeholder for auto-title.
-    // The `titleOverride` or `tooltip` prop becomes more important here.
     titleDisplayValue = "[View Content]";
   }
 
   const autoTitle = `${label}: ${titleDisplayValue}`;
-
   let finalTitle = titleOverride ?? autoTitle;
   if (
     typeof value === "object" &&
@@ -95,7 +99,6 @@ export const DataRow: React.FC<DataRowProps> = ({
     !titleOverride &&
     tooltip
   ) {
-    // If value is ReactNode and no specific title override, use tooltip if available
     finalTitle = tooltip;
   } else if (
     typeof value === "object" &&
@@ -103,18 +106,20 @@ export const DataRow: React.FC<DataRowProps> = ({
     !titleOverride &&
     !tooltip
   ) {
-    // If ReactNode and no override or tooltip, just use the label for title
     finalTitle = label;
   }
 
   const augmentedTitle =
     tooltip && titleOverride
       ? `${titleOverride} (${tooltip})`
-      : tooltip && finalTitle !== tooltip // only add tooltip if it's different from finalTitle already
+      : tooltip && finalTitle !== tooltip
       ? `${finalTitle} (${tooltip})`
       : finalTitle;
 
-  const isClickable = isInteractiveProp ?? !!onClick;
+  // In selection mode, the primary action is selecting. Otherwise, it's the default onClick.
+  const effectiveOnClick = isSelectionMode ? onSelect : onClick;
+  const isClickable = isSelectionMode || isInteractiveProp || !!onClick;
+
   const testId =
     dataTestId ||
     (originatingElement
@@ -124,17 +129,32 @@ export const DataRow: React.FC<DataRowProps> = ({
   return (
     <ClickableDataItem
       isInteractive={isClickable}
-      onClickHandler={onClick}
-      title={augmentedTitle} // augmentedTitle is now a string
+      onClickHandler={effectiveOnClick}
+      title={augmentedTitle}
       baseClassName={cn(
-        "flex justify-between items-baseline py-0.5",
-        className
+        "flex justify-between items-center py-0.5 px-1 rounded-md transition-colors",
+        className,
+        isSelected && "bg-primary/20",
+        isSelectionMode &&
+          "hover:bg-primary/10 data-[interactive-child=true]:hover:bg-primary/10"
       )}
       data-testid={testId}
       aria-label={augmentedTitle}>
-      <span className={cn("text-muted-foreground mr-2", labelClassName)}>
-        {label}
-      </span>
+      <div className="flex items-center min-w-0">
+        {isSelectionMode && (
+          <div className="mr-2 shrink-0">
+            {isSelected ? (
+              <CheckboxCheckedIcon className="text-primary" />
+            ) : (
+              <CheckboxUncheckedIcon className="text-muted-foreground" />
+            )}
+          </div>
+        )}
+        <span
+          className={cn("text-muted-foreground mr-2 truncate", labelClassName)}>
+          {label}
+        </span>
+      </div>
       <span
         className={cn(
           "font-semibold text-foreground text-right",

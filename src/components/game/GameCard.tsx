@@ -1,5 +1,5 @@
 // src/components/game/GameCard.tsx
-"use client"; // Ensure "use client" is at the top
+"use client";
 
 import React from "react";
 import type { DisplayableCard } from "@/components/game/types";
@@ -14,6 +14,7 @@ import {
   type RegisteredCardRendererProps,
 } from "@/components/game/cardRenderers";
 import "@/components/game/cards/rendererRegistryInitializer";
+import type { SelectedDataItem } from "@/hooks/useWorkspaceManager"; // NEW IMPORT
 
 interface GameCardProps {
   readonly card: DisplayableCard;
@@ -22,6 +23,10 @@ interface GameCardProps {
   readonly onGenericInteraction: OnGenericInteraction;
   readonly className?: string;
   readonly innerCardClassName?: string;
+  // NEW PROPS
+  readonly isSelectionMode: boolean;
+  readonly selectedDataItems: SelectedDataItem[];
+  readonly onToggleItemSelection: (item: SelectedDataItem) => void;
 }
 
 const GameCard: React.FC<GameCardProps> = ({
@@ -31,6 +36,10 @@ const GameCard: React.FC<GameCardProps> = ({
   onGenericInteraction,
   className,
   innerCardClassName,
+  // NEW PROPS
+  isSelectionMode,
+  selectedDataItems,
+  onToggleItemSelection,
 }) => {
   const handleFlip = React.useCallback(() => {
     onToggleFlip(card.id);
@@ -49,7 +58,7 @@ const GameCard: React.FC<GameCardProps> = ({
       companyName: card.companyName ?? null,
       logoUrl: card.logoUrl ?? null,
       websiteUrl: websiteUrlForContext ?? card.websiteUrl ?? null,
-      backData: card.backData, // <<< ADDED backData here
+      backData: card.backData,
     };
   }, [card]);
 
@@ -97,6 +106,10 @@ const GameCard: React.FC<GameCardProps> = ({
     className: cardWrapperClassName,
     innerCardClassName: innerCardClassName,
     onGenericInteraction: onGenericInteraction,
+    // NEW PROPS PASSED TO RENDERER
+    isSelectionMode,
+    selectedDataItems,
+    onToggleItemSelection,
   };
 
   return <CardRenderer {...rendererProps} />;

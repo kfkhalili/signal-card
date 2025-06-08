@@ -7,8 +7,9 @@ import { useRouter } from "next/navigation";
 import { AddCardForm } from "@/components/workspace/AddCardForm";
 import { StockDataHandler } from "@/components/workspace/StockDataHandler";
 import MarketDataStatusBanner from "@/components/workspace/MarketStatusBanner";
+import { CustomCardCreatorPanel } from "@/components/workspace/CustomCardCreatorPanel";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, RefreshCw, Loader2 } from "lucide-react";
+import { PlusCircle, RefreshCw, Loader2, Edit, X } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,12 +52,18 @@ export default function WorkspacePage() {
     stockDataCallbacks,
     uniqueSymbolsInWorkspace,
     onGenericInteraction,
-    supportedSymbols, // Get symbols from the hook
+    supportedSymbols,
+    isSelectionMode,
+    setIsSelectionMode,
+    selectedDataItems,
+    handleToggleItemSelection,
+    createCustomStaticCard,
   } = useWorkspaceManager();
 
   const [marketStatuses, setMarketStatuses] = useState<MarketStatus>({});
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState<boolean>(false);
   const [hasMounted, setHasMounted] = useState<boolean>(false);
+  const [isCreatorPanelOpen, setIsCreatorPanelOpen] = useState<boolean>(false);
 
   useEffect(() => {
     setHasMounted(true);
@@ -67,6 +74,32 @@ export default function WorkspacePage() {
       router.push("/");
     }
   }, [user, isAuthLoading, router, hasMounted]);
+
+  useEffect(() => {
+    if (!isSelectionMode) {
+      setIsCreatorPanelOpen(false);
+    }
+  }, [isSelectionMode]);
+
+  const handleCreateCustomCard = (narrative: string, description: string) => {
+    createCustomStaticCard(narrative, description);
+    setIsSelectionMode(false);
+  };
+
+  const handleToggleSelectionMode = () => {
+    setIsSelectionMode((prev) => !prev);
+  };
+
+  const handleOpenCreatorPanel = () => {
+    setIsCreatorPanelOpen(true);
+  };
+
+  const handleDeselectItem = (itemId: string) => {
+    const itemToDeselect = selectedDataItems.find((item) => item.id === itemId);
+    if (itemToDeselect) {
+      handleToggleItemSelection(itemToDeselect);
+    }
+  };
 
   const handleMarketStatusChange = useCallback(
     (symbol: string, status: DerivedMarketStatus, message: string | null) => {
@@ -114,10 +147,32 @@ export default function WorkspacePage() {
             className="flex gap-2 items-center"
             style={{ minHeight: "32px" }}>
             <Button
+              variant={isSelectionMode ? "destructive" : "outline"}
+              size="sm"
+              onClick={handleToggleSelectionMode}
+              disabled={isAddingCardInProgress}>
+              {isSelectionMode ? (
+                <X className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+              ) : (
+                <Edit className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+              )}
+              {isSelectionMode ? "Cancel" : "Create Custom"}
+            </Button>
+            {isSelectionMode && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleOpenCreatorPanel}
+                disabled={selectedDataItems.length === 0}>
+                Review ({selectedDataItems.length})
+              </Button>
+            )}
+
+            <Button
               variant="outline"
               size="sm"
               onClick={() => setIsClearConfirmOpen(true)}
-              disabled={isAddingCardInProgress}>
+              disabled={isAddingCardInProgress || isSelectionMode}>
               <RefreshCw className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Clear All
             </Button>
             <AddCardForm
@@ -187,6 +242,9 @@ export default function WorkspacePage() {
             activeCards={activeCards}
             setActiveCards={setActiveCards}
             onGenericInteraction={onGenericInteraction}
+            isSelectionMode={isSelectionMode}
+            selectedDataItems={selectedDataItems}
+            onToggleItemSelection={handleToggleItemSelection}
           />
         )}
       </div>
@@ -214,6 +272,14 @@ export default function WorkspacePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <CustomCardCreatorPanel
+        isOpen={isCreatorPanelOpen}
+        onClose={() => setIsCreatorPanelOpen(false)}
+        selectedItems={selectedDataItems}
+        onDeselectItem={handleDeselectItem}
+        onCreateCard={handleCreateCustomCard}
+      />
     </div>
   );
 }

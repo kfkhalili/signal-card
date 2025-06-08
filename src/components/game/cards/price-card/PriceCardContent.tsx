@@ -12,15 +12,32 @@ import type {
   RequestNewCardInteraction,
   TriggerCardActionInteraction,
 } from "../base-card/base-card.types";
+import type { SelectedDataItem } from "@/hooks/useWorkspaceManager";
+import {
+  CheckboxCheckedIcon,
+  CheckboxUncheckedIcon,
+} from "@/components/ui/CheckboxIcons";
 
 interface PriceCardContentProps {
   cardData: PriceCardData;
   isBackFace: boolean;
   onGenericInteraction: OnGenericInteraction;
+  // NEW PROPS
+  isSelectionMode: boolean;
+  selectedDataItems: SelectedDataItem[];
+  onToggleItemSelection: (item: SelectedDataItem) => void;
 }
 
 export const PriceCardContent = React.memo<PriceCardContentProps>(
-  ({ cardData, isBackFace, onGenericInteraction }) => {
+  ({
+    cardData,
+    isBackFace,
+    onGenericInteraction,
+    // NEW PROPS
+    isSelectionMode,
+    selectedDataItems,
+    onToggleItemSelection,
+  }) => {
     const { liveData, symbol, id, type } = cardData;
     const gridCellClass = "min-w-0";
 
@@ -41,6 +58,17 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
       onGenericInteraction(payload);
     };
 
+    const isSelected = (itemId: string) =>
+      selectedDataItems.some((item) => item.id === itemId);
+
+    const onSelect = (item: Omit<SelectedDataItem, "id">) => {
+      const fullItem: SelectedDataItem = {
+        id: `${id}-${item.label.toLowerCase().replace(/\s/g, "-")}`,
+        ...item,
+      };
+      onToggleItemSelection(fullItem);
+    };
+
     if (isBackFace) {
       return (
         <div
@@ -50,16 +78,32 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
             <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-1 sm:gap-y-1.5">
               <div className={cn(gridCellClass)}>
                 <ClickableDataItem
-                  isInteractive={liveData.dayOpen != null}
-                  onClickHandler={() => {
-                    if (liveData.dayOpen != null) {
-                      handleInteraction("TRIGGER_CARD_ACTION", {
-                        actionName: "openPriceClick",
-                        actionData: { value: liveData.dayOpen },
-                      } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
-                    }
-                  }}
-                  baseClassName="transition-colors w-full"
+                  isInteractive={isSelectionMode || liveData.dayOpen != null}
+                  onClickHandler={
+                    isSelectionMode
+                      ? () =>
+                          onSelect({
+                            sourceCardId: id,
+                            sourceCardSymbol: symbol,
+                            label: "Open",
+                            value: liveData.dayOpen,
+                            isMonetary: true,
+                            currency: "USD",
+                          })
+                      : () => {
+                          if (liveData.dayOpen != null) {
+                            handleInteraction("TRIGGER_CARD_ACTION", {
+                              actionName: "openPriceClick",
+                              actionData: { value: liveData.dayOpen },
+                            } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                          }
+                        }
+                  }
+                  baseClassName={cn(
+                    "transition-colors w-full p-1 rounded-md",
+                    isSelectionMode && "hover:bg-primary/10",
+                    isSelected(`${id}-open`) && "bg-primary/20"
+                  )}
                   data-testid="open-price-interactive-area"
                   title={`Open: ${liveData.dayOpen?.toFixed(2)}`}>
                   <span className="text-xs font-medium text-muted-foreground block">
@@ -73,16 +117,34 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
 
               <div className={cn(gridCellClass)}>
                 <ClickableDataItem
-                  isInteractive={liveData.previousClose != null}
-                  onClickHandler={() => {
-                    if (liveData.previousClose != null) {
-                      handleInteraction("REQUEST_NEW_CARD", {
-                        targetCardType: "price",
-                        originatingElement: "previousCloseValue",
-                      } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
-                    }
-                  }}
-                  baseClassName="transition-colors w-full"
+                  isInteractive={
+                    isSelectionMode || liveData.previousClose != null
+                  }
+                  onClickHandler={
+                    isSelectionMode
+                      ? () =>
+                          onSelect({
+                            sourceCardId: id,
+                            sourceCardSymbol: symbol,
+                            label: "Prev. Close",
+                            value: liveData.previousClose,
+                            isMonetary: true,
+                            currency: "USD",
+                          })
+                      : () => {
+                          if (liveData.previousClose != null) {
+                            handleInteraction("REQUEST_NEW_CARD", {
+                              targetCardType: "price",
+                              originatingElement: "previousCloseValue",
+                            } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                          }
+                        }
+                  }
+                  baseClassName={cn(
+                    "transition-colors w-full p-1 rounded-md",
+                    isSelectionMode && "hover:bg-primary/10",
+                    isSelected(`${id}-prev.-close`) && "bg-primary/20"
+                  )}
                   data-testid="previous-close-interactive-area"
                   title={`Previous Close: ${liveData.previousClose?.toFixed(
                     2
@@ -98,16 +160,31 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
 
               <div className={cn(gridCellClass)}>
                 <ClickableDataItem
-                  isInteractive={liveData.volume != null}
-                  onClickHandler={() => {
-                    if (liveData.volume != null) {
-                      handleInteraction("REQUEST_NEW_CARD", {
-                        targetCardType: "price",
-                        originatingElement: "volumeValue",
-                      } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
-                    }
-                  }}
-                  baseClassName="transition-colors w-full"
+                  isInteractive={isSelectionMode || liveData.volume != null}
+                  onClickHandler={
+                    isSelectionMode
+                      ? () =>
+                          onSelect({
+                            sourceCardId: id,
+                            sourceCardSymbol: symbol,
+                            label: "Volume",
+                            value: liveData.volume,
+                            isMonetary: false,
+                          })
+                      : () => {
+                          if (liveData.volume != null) {
+                            handleInteraction("REQUEST_NEW_CARD", {
+                              targetCardType: "price",
+                              originatingElement: "volumeValue",
+                            } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                          }
+                        }
+                  }
+                  baseClassName={cn(
+                    "transition-colors w-full p-1 rounded-md",
+                    isSelectionMode && "hover:bg-primary/10",
+                    isSelected(`${id}-volume`) && "bg-primary/20"
+                  )}
                   data-testid="volume-interactive-area"
                   title={`Volume: ${formatNumberWithAbbreviations(
                     liveData.volume
@@ -123,16 +200,32 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
 
               <div className={cn(gridCellClass)}>
                 <ClickableDataItem
-                  isInteractive={liveData.marketCap != null}
-                  onClickHandler={() => {
-                    if (liveData.marketCap != null) {
-                      handleInteraction("REQUEST_NEW_CARD", {
-                        targetCardType: "revenue",
-                        originatingElement: "marketCapValue",
-                      } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
-                    }
-                  }}
-                  baseClassName="transition-colors w-full"
+                  isInteractive={isSelectionMode || liveData.marketCap != null}
+                  onClickHandler={
+                    isSelectionMode
+                      ? () =>
+                          onSelect({
+                            sourceCardId: id,
+                            sourceCardSymbol: symbol,
+                            label: "Market Cap",
+                            value: liveData.marketCap,
+                            isMonetary: true,
+                            currency: "USD",
+                          })
+                      : () => {
+                          if (liveData.marketCap != null) {
+                            handleInteraction("REQUEST_NEW_CARD", {
+                              targetCardType: "revenue",
+                              originatingElement: "marketCapValue",
+                            } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                          }
+                        }
+                  }
+                  baseClassName={cn(
+                    "transition-colors w-full p-1 rounded-md",
+                    isSelectionMode && "hover:bg-primary/10",
+                    isSelected(`${id}-market-cap`) && "bg-primary/20"
+                  )}
                   data-testid="market-cap-interactive-area"
                   title={`Market Cap: $${formatNumberWithAbbreviations(
                     liveData.marketCap
@@ -148,16 +241,35 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
 
               <div className={cn(gridCellClass)}>
                 <ClickableDataItem
-                  isInteractive={liveData.sma50d != null}
-                  onClickHandler={() => {
-                    if (liveData.sma50d != null) {
-                      handleInteraction("TRIGGER_CARD_ACTION", {
-                        actionName: "smaClick",
-                        actionData: { period: 50, value: liveData.sma50d },
-                      } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
-                    }
-                  }}
-                  baseClassName="transition-colors w-full"
+                  isInteractive={isSelectionMode || liveData.sma50d != null}
+                  onClickHandler={
+                    isSelectionMode
+                      ? () =>
+                          onSelect({
+                            sourceCardId: id,
+                            sourceCardSymbol: symbol,
+                            label: "50D SMA",
+                            value: liveData.sma50d,
+                            isMonetary: true,
+                            currency: "USD",
+                          })
+                      : () => {
+                          if (liveData.sma50d != null) {
+                            handleInteraction("TRIGGER_CARD_ACTION", {
+                              actionName: "smaClick",
+                              actionData: {
+                                period: 50,
+                                value: liveData.sma50d,
+                              },
+                            } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                          }
+                        }
+                  }
+                  baseClassName={cn(
+                    "transition-colors w-full p-1 rounded-md",
+                    isSelectionMode && "hover:bg-primary/10",
+                    isSelected(`${id}-50d-sma`) && "bg-primary/20"
+                  )}
                   data-testid="sma-50d-interactive-area"
                   title={`50D SMA: ${liveData.sma50d?.toFixed(2)}`}>
                   <span className="text-xs font-medium text-muted-foreground block">
@@ -170,16 +282,35 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
               </div>
               <div className={cn(gridCellClass)}>
                 <ClickableDataItem
-                  isInteractive={liveData.sma200d != null}
-                  onClickHandler={() => {
-                    if (liveData.sma200d != null) {
-                      handleInteraction("TRIGGER_CARD_ACTION", {
-                        actionName: "smaClick",
-                        actionData: { period: 200, value: liveData.sma200d },
-                      } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
-                    }
-                  }}
-                  baseClassName="transition-colors w-full"
+                  isInteractive={isSelectionMode || liveData.sma200d != null}
+                  onClickHandler={
+                    isSelectionMode
+                      ? () =>
+                          onSelect({
+                            sourceCardId: id,
+                            sourceCardSymbol: symbol,
+                            label: "200D SMA",
+                            value: liveData.sma200d,
+                            isMonetary: true,
+                            currency: "USD",
+                          })
+                      : () => {
+                          if (liveData.sma200d != null) {
+                            handleInteraction("TRIGGER_CARD_ACTION", {
+                              actionName: "smaClick",
+                              actionData: {
+                                period: 200,
+                                value: liveData.sma200d,
+                              },
+                            } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                          }
+                        }
+                  }
+                  baseClassName={cn(
+                    "transition-colors w-full p-1 rounded-md",
+                    isSelectionMode && "hover:bg-primary/10",
+                    isSelected(`${id}-200d-sma`) && "bg-primary/20"
+                  )}
                   data-testid="sma-200d-interactive-area"
                   title={`200D SMA: ${liveData.sma200d?.toFixed(2)}`}>
                   <span className="text-xs font-medium text-muted-foreground block">
@@ -256,27 +387,40 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
           data-testid="price-card-front-content-data"
           className="pointer-events-auto">
           <ShadCardContent className="p-0">
-            <div
-              className="rounded-md p-1 mb-2"
-              data-testid="daily-performance-layout-area"
-              onClick={() =>
-                handleInteraction("TRIGGER_CARD_ACTION", {
-                  actionName: "generateDailyPerformanceSignal",
-                } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+            <ClickableDataItem
+              isInteractive={isSelectionMode}
+              onClickHandler={
+                isSelectionMode
+                  ? () =>
+                      onSelect({
+                        sourceCardId: id,
+                        sourceCardSymbol: symbol,
+                        label: "Price",
+                        value: liveData.price,
+                        isMonetary: true,
+                        currency: "USD",
+                      })
+                  : undefined
               }
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  handleInteraction("TRIGGER_CARD_ACTION", {
-                    actionName: "generateDailyPerformanceSignal",
-                  } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
-                }
-              }}
-              style={{ cursor: "pointer" }}>
-              {PriceDisplayBlock}
-            </div>
+              baseClassName={cn(
+                "rounded-md p-1 mb-2",
+                isSelectionMode && "hover:bg-primary/10",
+                isSelected(`${id}-price`) && "bg-primary/20"
+              )}
+              data-testid="daily-performance-layout-area">
+              <div className="flex items-start justify-between">
+                {PriceDisplayBlock}
+                {isSelectionMode && (
+                  <div className="p-1">
+                    {isSelected(`${id}-price`) ? (
+                      <CheckboxCheckedIcon className="text-primary" />
+                    ) : (
+                      <CheckboxUncheckedIcon className="text-muted-foreground" />
+                    )}
+                  </div>
+                )}
+              </div>
+            </ClickableDataItem>
 
             <RangeIndicator
               containerClassName="mt-2 sm:mt-3"

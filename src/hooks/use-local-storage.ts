@@ -34,8 +34,6 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, SetValue<T>] {
 
   const setValue: SetValue<T> = useCallback(
     (valueOrFn) => {
-      // Use the updater function form of setState to avoid a dependency on `storedValue`,
-      // making this `setValue` function stable across re-renders.
       setStoredValue((prevValue) => {
         const valueToStore =
           valueOrFn instanceof Function ? valueOrFn(prevValue) : valueOrFn;
@@ -44,7 +42,6 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, SetValue<T>] {
           Result.fromThrowable(
             () => {
               window.localStorage.setItem(key, JSON.stringify(valueToStore));
-              // Dispatch event to sync with other useLocalStorage hooks on the same page.
               window.dispatchEvent(new Event("local-storage"));
             },
             (e) => e as Error
@@ -61,13 +58,9 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, SetValue<T>] {
     [key]
   );
 
-  // This effect is problematic if `initialValue` is not stable.
-  // It's the cause of the previous bug. We'll keep it but only with `key` as a dependency
-  // to handle the edge case of the key changing, which makes the hook more robust without causing loops.
   useEffect(() => {
     setStoredValue(readValueFromStorage());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, [key, readValueFromStorage]);
 
   useEffect(() => {
     const handleStorageChange = (event: Event): void => {
@@ -82,7 +75,11 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, SetValue<T>] {
       }
 
       if (shouldReRead) {
-        setStoredValue(readValueFromStorage());
+        // By wrapping the update in a setTimeout, we yield to the main thread,
+        // preventing the synchronous parsing from blocking the UI.
+        setTimeout(() => {
+          setStoredValue(readValueFromStorage());
+        }, 0);
       }
     };
 
@@ -93,8 +90,7 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, SetValue<T>] {
       window.removeEventListener("storage", handleStorageChange);
       window.removeEventListener("local-storage", handleStorageChange);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, [key, readValueFromStorage]);
 
   return [storedValue, setValue];
 }

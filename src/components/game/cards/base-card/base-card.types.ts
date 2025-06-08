@@ -9,7 +9,8 @@ export type CardType =
   | "keyratios"
   | "dividendshistory"
   | "revenuebreakdown"
-  | "analystgrades"; // Add new card types here
+  | "analystgrades"
+  | "custom"; // Add new card types here
 
 export interface BaseCardBackData {
   readonly description?: string;

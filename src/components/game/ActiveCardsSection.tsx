@@ -5,22 +5,27 @@ import React, { useCallback, useState } from "react";
 import type { DisplayableCard } from "./types";
 import { ActiveCards as ActiveCardsPresentational } from "./ActiveCards";
 import { useToast as useAppToast } from "@/hooks/use-toast";
-import type {
-  CardActionContext,
-  OnGenericInteraction,
-} from "./cards/base-card/base-card.types";
+import type { OnGenericInteraction } from "./cards/base-card/base-card.types";
+import type { SelectedDataItem } from "@/hooks/useWorkspaceManager";
 
 interface ActiveCardsSectionProps {
   activeCards: DisplayableCard[];
   setActiveCards: React.Dispatch<React.SetStateAction<DisplayableCard[]>>;
-  onHeaderIdentityClick?: (context: CardActionContext) => void;
   onGenericInteraction: OnGenericInteraction;
+  // NEW PROPS
+  isSelectionMode: boolean;
+  selectedDataItems: SelectedDataItem[];
+  onToggleItemSelection: (item: SelectedDataItem) => void;
 }
 
 const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
   activeCards,
   setActiveCards,
   onGenericInteraction,
+  // NEW PROPS
+  isSelectionMode,
+  selectedDataItems,
+  onToggleItemSelection,
 }) => {
   const { toast } = useAppToast();
 
@@ -62,6 +67,10 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
         onGenericInteraction={onGenericInteraction}
         onConfirmDeletion={confirmDeletion}
         onCancelDeletion={cancelDeletion}
+        // NEW PROPS PASSED DOWN
+        isSelectionMode={isSelectionMode}
+        selectedDataItems={selectedDataItems}
+        onToggleItemSelection={onToggleItemSelection}
       />
     </>
   );
