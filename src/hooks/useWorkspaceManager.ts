@@ -4,17 +4,14 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import useLocalStorage from "@/hooks/use-local-storage";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Result } from "neverthrow";
-
+import { useAuth } from "@/contexts/AuthContext"; // Import useAuth
+import { fromPromise, Result } from "neverthrow";
 import type {
   DisplayableCard,
   ConcreteCardData,
   DisplayableCardState,
 } from "@/components/game/types";
 import type { AddCardFormValues } from "@/components/workspace/AddCardForm";
-
 import type {
   OnGenericInteraction,
   InteractionPayload,
@@ -24,30 +21,27 @@ import type {
   TriggerCardActionInteraction,
   CardType,
 } from "@/components/game/cards/base-card/base-card.types";
-
 import { rehydrateCardFromStorage } from "@/components/game/cardRehydration";
 import type { ProfileDBRow } from "@/hooks/useStockData";
 import type {
   LiveQuoteIndicatorDBRow,
   FinancialStatementDBRow,
 } from "@/lib/supabase/realtime-service";
-
 import type { Database } from "@/lib/supabase/database.types";
-type ExchangeMarketStatusRecord =
-  Database["public"]["Tables"]["exchange_market_status"]["Row"];
-
 import {
   getCardInitializer,
   type CardInitializationContext,
 } from "@/components/game/cardInitializer.types";
 import "@/components/game/cards/initializers";
-
 import {
   getCardUpdateHandler,
   type CardUpdateContext,
   type CardUpdateEventType,
 } from "@/components/game/cardUpdateHandler.types";
 import "@/components/game/cards/updateHandlerInitializer";
+
+type ExchangeMarketStatusRecord =
+  Database["public"]["Tables"]["exchange_market_status"]["Row"];
 
 const INITIAL_ACTIVE_CARDS: DisplayableCard[] = [];
 const WORKSPACE_LOCAL_STORAGE_KEY = "finSignal-mainWorkspace-v1";
@@ -66,6 +60,11 @@ type StoredCardRawArray = BaseStoredCard[];
 
 const INITIAL_RAW_CARDS: StoredCardRawArray = [];
 
+interface SymbolSuggestion {
+  value: string;
+  label: string;
+}
+
 const getConcreteCardData = (card: DisplayableCard): ConcreteCardData => {
   const cardClone = { ...card };
   delete (cardClone as Partial<DisplayableCardState>).isFlipped;
@@ -74,10 +73,7 @@ const getConcreteCardData = (card: DisplayableCard): ConcreteCardData => {
 
 export function useWorkspaceManager() {
   const { toast } = useToast();
-  const supabase: SupabaseClient<Database> | null = useMemo(
-    () => createSupabaseBrowserClient(false),
-    []
-  );
+  const { supabase } = useAuth(); // Get supabase client from AuthContext
 
   const [rawCardsFromStorage, setCardsInLocalStorage] =
     useLocalStorage<StoredCardRawArray>(
@@ -87,14 +83,14 @@ export function useWorkspaceManager() {
 
   const [activeCards, setActiveCards] = useState<DisplayableCard[]>(() => {
     if (Array.isArray(rawCardsFromStorage)) {
-      const rehydrated: DisplayableCard[] = rawCardsFromStorage
-        .map((cardObject): DisplayableCard | null => {
-          return rehydrateCardFromStorage(
-            cardObject as Record<string, unknown>
-          );
-        })
-        .filter((card): card is DisplayableCard => card !== null);
-      return rehydrated;
+      return (
+        rawCardsFromStorage
+          .map((cardObject) =>
+            rehydrateCardFromStorage(cardObject as Record<string, unknown>)
+          )
+          .filter((card): card is DisplayableCard => card !== null) ||
+        INITIAL_ACTIVE_CARDS
+      );
     }
     return INITIAL_ACTIVE_CARDS;
   });
@@ -103,10 +99,43 @@ export function useWorkspaceManager() {
     useState<string | null>(null);
   const [isAddingCardInProgress, setIsAddingCardInProgress] =
     useState<boolean>(false);
-
   const [exchangeStatuses, setExchangeStatuses] = useState<
     Record<string, ExchangeMarketStatusRecord>
   >({});
+  const [supportedSymbols, setSupportedSymbols] = useState<SymbolSuggestion[]>(
+    []
+  );
+
+  useEffect(() => {
+    const fetchAllSymbols = async () => {
+      if (!supabase) return;
+      const result = await fromPromise(
+        supabase
+          .from("supported_symbols")
+          .select("symbol")
+          .eq("is_active", true)
+          .order("symbol", { ascending: true }),
+        (e) => e as Error
+      );
+
+      result.match(
+        (response) => {
+          if (response.data) {
+            const symbols = response.data.map((s) => ({
+              value: s.symbol,
+              label: s.symbol,
+            }));
+            setSupportedSymbols(symbols);
+          }
+        },
+        (error) => {
+          console.error("Failed to fetch supported symbols:", error);
+        }
+      );
+    };
+
+    fetchAllSymbols();
+  }, [supabase]);
 
   useEffect(() => {
     if (activeCards.length > 0) {
@@ -527,5 +556,6 @@ export function useWorkspaceManager() {
     uniqueSymbolsInWorkspace,
     exchangeStatuses,
     onGenericInteraction,
+    supportedSymbols,
   };
 }

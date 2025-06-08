@@ -1,26 +1,11 @@
 // src/components/workspace/AddCardForm.tsx
 "use client";
 
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { fromPromise } from "neverthrow";
 import { Button } from "@/components/ui/button";
-import {
-  Command,
-  CommandDialog,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +17,15 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import {
+  Command,
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
   Form,
   FormControl,
   FormField,
@@ -39,10 +33,13 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { PlusCircle, Check, ChevronsUpDown, Search } from "lucide-react";
 import type { CardType } from "@/components/game/cards/base-card/base-card.types";
-import type { DisplayableCard } from "@/components/game/types";
-import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 
 const AVAILABLE_CARD_TYPES: { value: CardType; label: string }[] = [
@@ -76,20 +73,21 @@ const AddCardFormSchema = z.object({
 
 export type AddCardFormValues = z.infer<typeof AddCardFormSchema>;
 
-interface AddCardFormProps {
-  onAddCard: (values: AddCardFormValues) => Promise<void>;
-  existingCards: DisplayableCard[];
-  triggerButton?: React.ReactNode;
-  lockedSymbolForRegularUser?: string | null;
-}
-
 interface SymbolSuggestion {
   value: string;
   label: string;
 }
 
+interface AddCardFormProps {
+  onAddCard: (values: AddCardFormValues) => Promise<void>;
+  supportedSymbols: SymbolSuggestion[];
+  triggerButton?: React.ReactNode;
+  lockedSymbolForRegularUser?: string | null;
+}
+
 export const AddCardForm: React.FC<AddCardFormProps> = ({
   onAddCard,
+  supportedSymbols,
   triggerButton,
   lockedSymbolForRegularUser,
 }) => {
@@ -97,12 +95,6 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
   const [isSymbolDialogOpen, setIsSymbolDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCardTypePopoverOpen, setIsCardTypePopoverOpen] = useState(false);
-  const [symbolSuggestions, setSymbolSuggestions] = useState<
-    SymbolSuggestion[]
-  >([]);
-  const { supabase } = useAuth();
-
-  const submitButtonRef = useRef<HTMLButtonElement>(null);
   const cardTypeTriggerRef = useRef<HTMLButtonElement>(null);
 
   const form = useForm<AddCardFormValues>({
@@ -120,61 +112,24 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
         symbol: defaultSymbol,
         cardTypes: form.getValues("cardTypes") || ["profile"],
       });
-
       if (lockedSymbolForRegularUser) {
-        setTimeout(() => {
-          cardTypeTriggerRef.current?.focus();
-        }, 50);
+        setTimeout(() => cardTypeTriggerRef.current?.focus(), 50);
+      } else {
+        setTimeout(() => setIsSymbolDialogOpen(true), 50);
       }
     }
   }, [isOpen, lockedSymbolForRegularUser, form]);
 
-  const runSymbolQuery = useCallback(
-    async (query: string) => {
-      if (!supabase || !query) {
-        setSymbolSuggestions([]);
-        return;
-      }
-      const fetchResult = await fromPromise(
-        supabase
-          .from("supported_symbols")
-          .select("symbol")
-          .eq("is_active", true)
-          .ilike("symbol", `%${query.toUpperCase()}%`)
-          .limit(7),
-        (e) => e as Error
-      );
-      fetchResult.match(
-        (result) =>
-          setSymbolSuggestions(
-            result.data?.map((s) => ({ value: s.symbol, label: s.symbol })) ||
-              []
-          ),
-        (err) => {
-          console.error(err);
-          setSymbolSuggestions([]);
-        }
-      );
-    },
-    [supabase]
-  );
-
   const handleSubmit = async (values: AddCardFormValues) => {
     setIsSubmitting(true);
     const finalSymbol = lockedSymbolForRegularUser || values.symbol;
-    const validatedValues: AddCardFormValues = {
-      ...values,
-      symbol: finalSymbol.toUpperCase(),
-    };
-
-    await onAddCard(validatedValues);
+    await onAddCard({ ...values, symbol: finalSymbol.toUpperCase() });
     setIsSubmitting(false);
     setIsOpen(false);
   };
 
   const getCardTypesDisplayText = (selectedTypes?: CardType[]): string => {
     const numSelected = selectedTypes?.length ?? 0;
-
     if (numSelected === 0) return "Select card type(s)...";
     if (numSelected === 1 && selectedTypes) {
       const typeValue = selectedTypes[0];
@@ -274,12 +229,13 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
                                     const currentSelection = field.value || [];
                                     const isSelected =
                                       currentSelection.includes(typeOpt.value);
-                                    const newSelection = isSelected
-                                      ? currentSelection.filter(
-                                          (v) => v !== typeOpt.value
-                                        )
-                                      : [...currentSelection, typeOpt.value];
-                                    field.onChange(newSelection);
+                                    field.onChange(
+                                      isSelected
+                                        ? currentSelection.filter(
+                                            (v) => v !== typeOpt.value
+                                          )
+                                        : [...currentSelection, typeOpt.value]
+                                    );
                                   }}>
                                   <Check
                                     className={cn(
@@ -313,7 +269,6 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
                   </Button>
                 </DialogClose>
                 <Button
-                  ref={submitButtonRef}
                   type="submit"
                   disabled={
                     isSubmitting ||
@@ -330,28 +285,31 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
       </Dialog>
       <CommandDialog
         open={isSymbolDialogOpen}
-        onOpenChange={setIsSymbolDialogOpen}>
-        <DialogTitle className="sr-only">Select a Symbol</DialogTitle>
-        <DialogDescription className="sr-only">
-          Search for a stock symbol and select one to add to the form.
-        </DialogDescription>
-        <CommandInput
-          placeholder="Type a symbol to search..."
-          onValueChange={runSymbolQuery}
-        />
+        onOpenChange={setIsSymbolDialogOpen}
+        title="Select a Symbol"
+        description="Search for a stock symbol and select one to add to the form.">
+        <CommandInput placeholder="Type a symbol to search..." />
         <CommandList>
           <CommandEmpty>No results found.</CommandEmpty>
           <CommandGroup>
-            {symbolSuggestions.map((suggestion) => (
+            {supportedSymbols.map((suggestion) => (
               <CommandItem
                 key={suggestion.value}
                 value={suggestion.value}
                 onSelect={(currentValue) => {
-                  form.setValue("symbol", currentValue, {
+                  form.setValue("symbol", currentValue.toUpperCase(), {
                     shouldValidate: true,
                   });
                   setIsSymbolDialogOpen(false);
                 }}>
+                <Check
+                  className={cn(
+                    "mr-2 h-4 w-4",
+                    form.getValues("symbol") === suggestion.value
+                      ? "opacity-100"
+                      : "opacity-0"
+                  )}
+                />
                 {suggestion.label}
               </CommandItem>
             ))}

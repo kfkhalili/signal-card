@@ -4,7 +4,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
-
 import { AddCardForm } from "@/components/workspace/AddCardForm";
 import { StockDataHandler } from "@/components/workspace/StockDataHandler";
 import MarketDataStatusBanner from "@/components/workspace/MarketStatusBanner";
@@ -26,7 +25,6 @@ import "@/components/game/cards/initializers";
 import "@/components/game/cards/updateHandlerInitializer";
 
 import { useWorkspaceManager } from "@/hooks/useWorkspaceManager";
-
 import ActiveCardsSection from "@/components/game/ActiveCardsSection";
 import type { DerivedMarketStatus } from "@/hooks/useStockData";
 import type { FinancialStatementDBRow } from "@/lib/supabase/realtime-service";
@@ -43,17 +41,6 @@ export default function WorkspacePage() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const router = useRouter();
 
-  const [hasMounted, setHasMounted] = useState<boolean>(false);
-  useEffect(() => {
-    setHasMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (hasMounted && !isAuthLoading && !user) {
-      router.push("/");
-    }
-  }, [user, isAuthLoading, router, hasMounted]);
-
   const {
     activeCards,
     setActiveCards,
@@ -64,10 +51,22 @@ export default function WorkspacePage() {
     stockDataCallbacks,
     uniqueSymbolsInWorkspace,
     onGenericInteraction,
+    supportedSymbols, // Get symbols from the hook
   } = useWorkspaceManager();
 
   const [marketStatuses, setMarketStatuses] = useState<MarketStatus>({});
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState<boolean>(false);
+  const [hasMounted, setHasMounted] = useState<boolean>(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (hasMounted && !isAuthLoading && !user) {
+      router.push("/");
+    }
+  }, [user, isAuthLoading, router, hasMounted]);
 
   const handleMarketStatusChange = useCallback(
     (symbol: string, status: DerivedMarketStatus, message: string | null) => {
@@ -123,7 +122,7 @@ export default function WorkspacePage() {
             </Button>
             <AddCardForm
               onAddCard={addCardToWorkspace}
-              existingCards={activeCards}
+              supportedSymbols={supportedSymbols}
               lockedSymbolForRegularUser={workspaceSymbolForRegularUser}
             />
           </div>
@@ -171,7 +170,7 @@ export default function WorkspacePage() {
             </p>
             <AddCardForm
               onAddCard={addCardToWorkspace}
-              existingCards={activeCards}
+              supportedSymbols={supportedSymbols}
               lockedSymbolForRegularUser={workspaceSymbolForRegularUser}
               triggerButton={
                 <Button size="lg">
