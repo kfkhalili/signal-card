@@ -31,7 +31,6 @@ interface SymbolSearchComboBoxProps {
   onChange?: (value: string) => void;
   disabled?: boolean;
   placeholder?: string;
-  id?: string;
   name?: string;
   containerClassName?: string;
   triggerClassName?: string;
@@ -46,7 +45,6 @@ export const SymbolSearchComboBox: React.FC<SymbolSearchComboBoxProps> = ({
   onChange: onFormChange,
   disabled = false,
   placeholder = "Select symbol...",
-  id,
   name,
   containerClassName,
   triggerClassName,
@@ -144,35 +142,28 @@ export const SymbolSearchComboBox: React.FC<SymbolSearchComboBoxProps> = ({
     }
   }, [autoFocusOnMount, disabled]);
 
-  const handleItemSelect = React.useCallback(
-    (selectedValue: string) => {
-      if (!selectedValue && selectedValue !== "") {
-        setOpen(false);
-        return;
-      }
-      if (onFormChange) {
-        onFormChange(selectedValue);
-      } else {
-        console.error("onFormChange is undefined in handleItemSelect!");
-      }
-      setOpen(false);
-    },
-    [onFormChange]
-  );
+  const handleItemSelect = (selectedValue: string) => {
+    if (!selectedValue) {
+      return;
+    }
+    if (onFormChange) {
+      onFormChange(selectedValue);
+    }
+    setOpen(false);
+  };
 
   const displayLabel = controlledFormValue || placeholder;
-
   const showCommandList = open && (isLoading || inputValue.trim().length > 0);
 
   return (
     <div className={cn("w-full", containerClassName)}>
       <Popover
-        modal={true}
+        modal={false}
         open={open}
         onOpenChange={(newOpenState) => {
           setOpen(newOpenState);
         }}>
-        <PopoverTrigger asChild ref={triggerRef} id={id} name={name}>
+        <PopoverTrigger asChild ref={triggerRef} name={name}>
           <Button
             variant="outline"
             role="combobox"
@@ -215,7 +206,11 @@ export const SymbolSearchComboBox: React.FC<SymbolSearchComboBoxProps> = ({
                   inputValue.trim() && (
                     <CommandEmpty>No symbol found.</CommandEmpty>
                   )}
-                <CommandGroup>
+                <CommandGroup
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}>
                   {suggestions.map((suggestion) => (
                     <CommandItem
                       key={suggestion.value}
