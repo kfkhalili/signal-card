@@ -195,6 +195,7 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
                   <FormItem className="flex flex-col">
                     <FormLabel>Card Type(s)</FormLabel>
                     <Popover
+                      modal={true}
                       open={isCardTypePopoverOpen}
                       onOpenChange={setIsCardTypePopoverOpen}>
                       <PopoverTrigger asChild>
