@@ -8,6 +8,11 @@ import type {
 import { cn } from "@/lib/utils";
 import { formatNumberWithAbbreviations } from "@/lib/formatters";
 import { ArrowDown, ArrowUp, Minus } from "lucide-react";
+import type { SelectedDataItem } from "@/hooks/useWorkspaceManager";
+import {
+  CheckboxCheckedIcon,
+  CheckboxUncheckedIcon,
+} from "@/components/ui/CheckboxIcons";
 
 interface SegmentRowProps {
   segmentName: string;
@@ -16,6 +21,10 @@ interface SegmentRowProps {
   currencySymbol: string;
   onClick?: () => void;
   isInteractive?: boolean;
+  // NEW PROPS
+  isSelectionMode?: boolean;
+  isSelected?: boolean;
+  onSelect?: () => void;
 }
 
 const SegmentRow: React.FC<SegmentRowProps> = ({
@@ -25,6 +34,10 @@ const SegmentRow: React.FC<SegmentRowProps> = ({
   currencySymbol,
   onClick,
   isInteractive,
+  // NEW PROPS
+  isSelectionMode = false,
+  isSelected = false,
+  onSelect,
 }) => {
   let yoyDisplay: React.ReactNode = (
     <span className="text-muted-foreground">N/A</span>
@@ -53,33 +66,50 @@ const SegmentRow: React.FC<SegmentRowProps> = ({
     yoyColorClass = "text-blue-600 dark:text-blue-500";
   }
 
+  const effectiveClickHandler = isSelectionMode ? onSelect : onClick;
+  const effectiveIsInteractive = isSelectionMode || isInteractive;
+
   return (
     <div
       className={cn(
-        "flex justify-between items-center py-1 border-b border-border/50 last:border-b-0", // Reduced py slightly
-        isInteractive && onClick
-          ? "cursor-pointer hover:bg-muted/50 dark:hover:bg-muted/20"
-          : ""
+        "flex justify-between items-center py-1 border-b border-border/50 last:border-b-0 px-1 rounded-md transition-colors",
+        effectiveIsInteractive &&
+          "hover:bg-primary/10 data-[interactive-child=true]:hover:bg-primary/10",
+        isSelected && "bg-primary/20"
       )}
-      onClick={isInteractive ? onClick : undefined}
+      onClick={effectiveIsInteractive ? effectiveClickHandler : undefined}
       onKeyDown={
-        isInteractive && onClick
+        effectiveIsInteractive
           ? (e) => {
-              if (e.key === "Enter" || e.key === " ") e.currentTarget.click();
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                e.currentTarget.click();
+              }
             }
           : undefined
       }
-      role={isInteractive ? "button" : undefined}
-      tabIndex={isInteractive ? 0 : undefined}
+      role={effectiveIsInteractive ? "button" : undefined}
+      tabIndex={effectiveIsInteractive ? 0 : undefined}
       title={`${segmentName}: ${currencySymbol}${formatNumberWithAbbreviations(
         currentRevenue,
         2
       )} (YoY: ${
         yoyChange !== null ? (yoyChange * 100).toFixed(1) + "%" : "N/A"
       })`}>
-      <span className="text-sm font-medium text-muted-foreground truncate pr-2">
-        {segmentName}
-      </span>
+      <div className="flex items-center min-w-0">
+        {isSelectionMode && (
+          <div className="mr-2 shrink-0">
+            {isSelected ? (
+              <CheckboxCheckedIcon className="text-primary" />
+            ) : (
+              <CheckboxUncheckedIcon className="text-muted-foreground" />
+            )}
+          </div>
+        )}
+        <span className="text-sm font-medium text-muted-foreground truncate pr-2">
+          {segmentName}
+        </span>
+      </div>
       <div className="flex items-baseline space-x-2 sm:space-x-3">
         <span
           className={`text-sm font-semibold ${yoyColorClass} flex items-center min-w-[60px] justify-end`}>
@@ -98,158 +128,200 @@ const SegmentRow: React.FC<SegmentRowProps> = ({
 interface RevenueBreakdownCardContentProps {
   cardData: RevenueBreakdownCardData;
   isBackFace: boolean;
-  // onGenericInteraction: OnGenericInteraction;
+  // onGenericInteraction: OnGenericInteraction; // Keep for future use
+  // NEW PROPS
+  isSelectionMode: boolean;
+  selectedDataItems: SelectedDataItem[];
+  onToggleItemSelection: (item: SelectedDataItem) => void;
 }
 
 export const RevenueBreakdownCardContent: React.FC<RevenueBreakdownCardContentProps> =
-  React.memo(({ cardData, isBackFace }) => {
-    const { staticData, liveData, symbol } = cardData;
+  React.memo(
+    ({
+      cardData,
+      isBackFace,
+      isSelectionMode,
+      selectedDataItems,
+      onToggleItemSelection,
+    }) => {
+      const { staticData, liveData, symbol, id } = cardData;
 
-    if (isBackFace) {
-      return (
-        <div
-          data-testid={`revenuebreakdown-card-back-${symbol}`}
-          className="pointer-events-auto flex flex-col h-full">
-          <ShadCardContent className={cn("p-0 flex-grow text-xs")}>
-            <div className="space-y-1 pt-1.5">
-              <div className="flex justify-between">
-                <span className="font-medium text-muted-foreground">
-                  Latest Period:
-                </span>
-                <span className="font-semibold text-foreground">
-                  {staticData.latestPeriodLabel}
-                </span>
-              </div>
-              {staticData.previousPeriodLabel && (
+      const isSelected = (itemId: string) =>
+        selectedDataItems.some((item) => item.id === itemId);
+
+      const onSelect = (item: Omit<SelectedDataItem, "id">) => {
+        const fullItem: SelectedDataItem = {
+          id: `${id}-${item.label.toLowerCase().replace(/\s|\//g, "-")}`,
+          ...item,
+        };
+        onToggleItemSelection(fullItem);
+      };
+
+      if (isBackFace) {
+        return (
+          <div
+            data-testid={`revenuebreakdown-card-back-${symbol}`}
+            className="pointer-events-auto flex flex-col h-full">
+            <ShadCardContent className={cn("p-0 flex-grow text-xs")}>
+              <div className="space-y-1 pt-1.5">
                 <div className="flex justify-between">
                   <span className="font-medium text-muted-foreground">
-                    Comparison Period:
+                    Latest Period:
                   </span>
                   <span className="font-semibold text-foreground">
-                    {staticData.previousPeriodLabel}
+                    {staticData.latestPeriodLabel}
                   </span>
                 </div>
-              )}
-              <div className="flex justify-between">
-                <span className="font-medium text-muted-foreground">
-                  Currency:
-                </span>
-                <span className="font-semibold text-foreground">
-                  {staticData.currencySymbol}
-                </span>
+                {staticData.previousPeriodLabel && (
+                  <div className="flex justify-between">
+                    <span className="font-medium text-muted-foreground">
+                      Comparison Period:
+                    </span>
+                    <span className="font-semibold text-foreground">
+                      {staticData.previousPeriodLabel}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="font-medium text-muted-foreground">
+                    Currency:
+                  </span>
+                  <span className="font-semibold text-foreground">
+                    {staticData.currencySymbol}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium text-muted-foreground">
+                    Last Updated:
+                  </span>
+                  <span className="font-semibold text-foreground">
+                    {liveData.lastUpdated
+                      ? new Date(liveData.lastUpdated).toLocaleDateString()
+                      : "N/A"}
+                  </span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="font-medium text-muted-foreground">
-                  Last Updated:
+            </ShadCardContent>
+          </div>
+        );
+      }
+
+      // Front Face
+      const allSegments = liveData.breakdown || [];
+      const top5Segments = allSegments.slice(0, 5);
+      const otherSegments = allSegments.slice(5);
+
+      let othersData: SegmentRevenueDataItem | null = null;
+      if (otherSegments.length > 0) {
+        const othersCurrentRevenue = otherSegments.reduce(
+          (sum, seg) => sum + seg.currentRevenue,
+          0
+        );
+        const othersPreviousRevenueSum = otherSegments.reduce(
+          (sum, seg) => sum + (seg.previousRevenue ?? 0),
+          0
+        );
+        const anyPreviousRevenueExistsForOthers = otherSegments.some(
+          (seg) => seg.previousRevenue !== null
+        );
+
+        let yoyChangeForOthers: number | null = null;
+        if (anyPreviousRevenueExistsForOthers && othersPreviousRevenueSum > 0) {
+          yoyChangeForOthers =
+            (othersCurrentRevenue - othersPreviousRevenueSum) /
+            othersPreviousRevenueSum;
+        }
+
+        othersData = {
+          segmentName: "Others",
+          currentRevenue: othersCurrentRevenue,
+          previousRevenue: anyPreviousRevenueExistsForOthers
+            ? othersPreviousRevenueSum
+            : null,
+          yoyChange: yoyChangeForOthers,
+        };
+      }
+
+      const displayItems = [...top5Segments];
+      if (othersData && othersData.currentRevenue > 0) {
+        displayItems.push(othersData);
+      }
+
+      return (
+        <div
+          data-testid={`revenuebreakdown-card-front-${symbol}`}
+          className="pointer-events-auto flex flex-col h-full">
+          <ShadCardContent className={cn("p-0 flex-grow flex flex-col")}>
+            <div className="space-y-1.5">
+              <div
+                className={cn(
+                  "flex justify-between items-baseline mb-1.5 p-1 rounded-md transition-colors",
+                  isSelectionMode && "hover:bg-primary/10 cursor-pointer",
+                  isSelected(`${id}-total-revenue`) && "bg-primary/20"
+                )}
+                onClick={
+                  isSelectionMode
+                    ? () =>
+                        onSelect({
+                          sourceCardId: id,
+                          sourceCardSymbol: symbol,
+                          label: `Total Revenue (${staticData.latestPeriodLabel})`,
+                          value: liveData.totalRevenueLatestPeriod,
+                          isMonetary: true,
+                          currency: staticData.currencySymbol,
+                        })
+                    : undefined
+                }>
+                <span className="text-sm font-medium text-muted-foreground block">
+                  Total Revenue
                 </span>
-                <span className="font-semibold text-foreground">
-                  {liveData.lastUpdated
-                    ? new Date(liveData.lastUpdated).toLocaleDateString()
-                    : "N/A"}
-                </span>
+                <div className="text-right">
+                  <span className="text-xl font-bold sm:text-2xl text-foreground">
+                    {staticData.currencySymbol}
+                    {liveData.totalRevenueLatestPeriod !== null
+                      ? formatNumberWithAbbreviations(
+                          liveData.totalRevenueLatestPeriod,
+                          2
+                        )
+                      : "N/A"}
+                  </span>
+                </div>
+              </div>
+              <div className="flex-grow space-y-0.5 overflow-y-auto pr-0.5">
+                {displayItems.length > 0 ? (
+                  displayItems.map((item) => (
+                    <SegmentRow
+                      key={item.segmentName}
+                      segmentName={item.segmentName}
+                      currentRevenue={item.currentRevenue}
+                      yoyChange={item.yoyChange}
+                      currencySymbol={staticData.currencySymbol}
+                      isInteractive={isSelectionMode} // A segment row is only interactive in selection mode
+                      isSelectionMode={isSelectionMode}
+                      isSelected={isSelected(`${id}-${item.segmentName}`)}
+                      onSelect={() =>
+                        onSelect({
+                          sourceCardId: id,
+                          sourceCardSymbol: symbol,
+                          label: `${item.segmentName} Revenue`,
+                          value: item.currentRevenue,
+                          isMonetary: true,
+                          currency: staticData.currencySymbol,
+                        })
+                      }
+                    />
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No breakdown data available.
+                  </p>
+                )}
               </div>
             </div>
           </ShadCardContent>
         </div>
       );
     }
-
-    // Front Face
-    const allSegments = liveData.breakdown || [];
-    const top5Segments = allSegments.slice(0, 5);
-    const otherSegments = allSegments.slice(5);
-
-    let othersData: SegmentRevenueDataItem | null = null;
-    if (otherSegments.length > 0) {
-      const othersCurrentRevenue = otherSegments.reduce(
-        (sum, seg) => sum + seg.currentRevenue,
-        0
-      );
-      const othersPreviousRevenueSum = otherSegments.reduce(
-        (sum, seg) => sum + (seg.previousRevenue ?? 0),
-        0
-      );
-      const anyPreviousRevenueExistsForOthers = otherSegments.some(
-        (seg) => seg.previousRevenue !== null
-      );
-
-      let yoyChangeForOthers: number | null = null;
-      if (anyPreviousRevenueExistsForOthers && othersPreviousRevenueSum > 0) {
-        yoyChangeForOthers =
-          (othersCurrentRevenue - othersPreviousRevenueSum) /
-          othersPreviousRevenueSum;
-      } else if (
-        anyPreviousRevenueExistsForOthers &&
-        othersPreviousRevenueSum === 0 &&
-        othersCurrentRevenue > 0
-      ) {
-        yoyChangeForOthers = null;
-      } else if (
-        !anyPreviousRevenueExistsForOthers &&
-        othersCurrentRevenue > 0
-      ) {
-        yoyChangeForOthers = null;
-      }
-
-      othersData = {
-        segmentName: "Others",
-        currentRevenue: othersCurrentRevenue,
-        previousRevenue: anyPreviousRevenueExistsForOthers
-          ? othersPreviousRevenueSum
-          : null,
-        yoyChange: yoyChangeForOthers,
-      };
-    }
-
-    const displayItems = [...top5Segments];
-    if (othersData && othersData.currentRevenue > 0) {
-      displayItems.push(othersData);
-    }
-
-    return (
-      <div
-        data-testid={`revenuebreakdown-card-front-${symbol}`}
-        className="pointer-events-auto flex flex-col h-full">
-        <ShadCardContent className={cn("p-0 flex-grow flex flex-col")}>
-          <div className="space-y-1.5">
-            <div className="flex justify-between items-baseline mb-1.5">
-              <span className="text-sm font-medium text-muted-foreground block">
-                Total Revenue
-              </span>
-              <div className="text-right">
-                <span className="text-xl font-bold sm:text-2xl text-foreground">
-                  {staticData.currencySymbol}
-                  {liveData.totalRevenueLatestPeriod !== null
-                    ? formatNumberWithAbbreviations(
-                        liveData.totalRevenueLatestPeriod,
-                        2
-                      )
-                    : "N/A"}
-                </span>
-              </div>
-            </div>
-            <div className="flex-grow space-y-0.5 overflow-y-auto pr-0.5">
-              {displayItems.length > 0 ? (
-                displayItems.map((item) => (
-                  <SegmentRow
-                    key={item.segmentName}
-                    segmentName={item.segmentName}
-                    currentRevenue={item.currentRevenue}
-                    yoyChange={item.yoyChange}
-                    currencySymbol={staticData.currencySymbol}
-                    isInteractive={false} // Assuming not interactive for now
-                  />
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No breakdown data available.
-                </p>
-              )}
-            </div>
-          </div>
-        </ShadCardContent>
-      </div>
-    );
-  });
+  );
 
 RevenueBreakdownCardContent.displayName = "RevenueBreakdownCardContent";

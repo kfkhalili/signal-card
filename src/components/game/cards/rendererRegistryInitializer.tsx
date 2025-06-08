@@ -2,6 +2,7 @@
 import {
   registerCardRenderer,
   type RegisteredCardRendererProps,
+  type SpecificCardContentComponent,
 } from "@/components/game/cardRenderers";
 import { GenericCardContainerRenderer } from "./GenericCardContainerRenderer";
 
@@ -33,35 +34,28 @@ import type { RevenueBreakdownCardData } from "./revenue-breakdown-card/revenue-
 import { AnalystGradesCardContent } from "./analyst-grades-card/AnalystGradesCardContent";
 import type { AnalystGradesCardData } from "./analyst-grades-card/analyst-grades-card.types";
 
+import { CustomCardContent } from "./custom-card/CustomCardContent";
+import type { CustomCardData } from "./custom-card/custom-card.types";
+
 import type { ConcreteCardData } from "@/components/game/types";
-import type { OnGenericInteraction } from "./base-card/base-card.types";
 
 // Helper to correctly type the props for the generic renderer within the registration
 const createTypedGenericRenderer = <TCardData extends ConcreteCardData>(
-  ContentComponent: React.ComponentType<{
-    cardData: TCardData;
-    isBackFace: boolean;
-    onGenericInteraction: OnGenericInteraction;
-  }>,
-  // This parameter directly receives the string literal like "price", "profile", etc.
+  ContentComponent: SpecificCardContentComponent<TCardData>,
   expectedCardTypeForThisRenderer: TCardData["type"]
 ): React.ComponentType<RegisteredCardRendererProps> => {
-  // This inner component is what gets registered. Its props are RegisteredCardRendererProps.
   const SpecificRendererComponent = (props: RegisteredCardRendererProps) => {
-    // When GenericCardContainerRenderer is used here, its TCardDataType generic parameter
-    // will be inferred as TCardData from the ContentComponent and expectedCardTypeForThisRenderer props.
     return (
-      <GenericCardContainerRenderer // NO <TCardData> or any other generic type argument here
-        {...props} // props.cardData here is DisplayableCard
+      <GenericCardContainerRenderer<TCardData>
+        {...props}
         ContentComponent={ContentComponent}
-        expectedCardType={expectedCardTypeForThisRenderer} // Pass the string literal
+        expectedCardType={expectedCardTypeForThisRenderer}
       />
     );
   };
   return SpecificRendererComponent;
 };
 
-// Ensure the second argument here is the exact string literal for the card type
 registerCardRenderer(
   "price",
   createTypedGenericRenderer<PriceCardData>(PriceCardContent, "price")
@@ -109,4 +103,8 @@ registerCardRenderer(
     AnalystGradesCardContent,
     "analystgrades"
   )
+);
+registerCardRenderer(
+  "custom",
+  createTypedGenericRenderer<CustomCardData>(CustomCardContent, "custom")
 );

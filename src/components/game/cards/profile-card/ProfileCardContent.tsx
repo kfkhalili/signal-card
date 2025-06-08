@@ -14,6 +14,7 @@ import type {
   TriggerCardActionInteraction,
 } from "../base-card/base-card.types";
 import { cn } from "@/lib/utils";
+import type { SelectedDataItem } from "@/hooks/useWorkspaceManager";
 
 const truncateText = (
   text: string | null | undefined,
@@ -28,10 +29,22 @@ interface ProfileCardContentProps {
   cardData: ProfileCardData;
   isBackFace: boolean;
   onGenericInteraction: OnGenericInteraction;
+  // NEW PROPS
+  isSelectionMode: boolean;
+  selectedDataItems: SelectedDataItem[];
+  onToggleItemSelection: (item: SelectedDataItem) => void;
 }
 
 export const ProfileCardContent = React.memo<ProfileCardContentProps>(
-  ({ cardData, isBackFace, onGenericInteraction }) => {
+  ({
+    cardData,
+    isBackFace,
+    onGenericInteraction,
+    // NEW PROPS
+    isSelectionMode,
+    selectedDataItems,
+    onToggleItemSelection,
+  }) => {
     const { staticData, liveData, symbol, id, type: cardType } = cardData;
 
     const handleInteraction = (
@@ -54,9 +67,10 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
     if (!isBackFace) {
       const description = staticData?.description;
       const countryFlag = getFlagEmoji(staticData?.country);
-      const fullCountryName = staticData?.country
-        ? getCountryName(staticData.country)
-        : "N/A";
+      const countryNameResult = getCountryName(staticData?.country || "");
+      const countryName = countryNameResult.isOk()
+        ? countryNameResult.value
+        : staticData?.country || "Unknown";
 
       return (
         <div
@@ -74,27 +88,40 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
               )}
               <div className="space-y-0.5">
                 <DataRow
-                  label="Sector" // Changed label from "Industry" to "Sector"
+                  label="Sector"
                   value={
                     staticData?.sector
-                      ? truncateText(staticData.sector, 30) // Display only sector, truncated
+                      ? truncateText(staticData.sector, 30)
                       : "N/A"
                   }
                   onClick={() => {
                     if (staticData?.sector) {
-                      // Filter by sector
                       handleInteraction("FILTER_WORKSPACE_DATA", {
-                        filterField: "sector", // Changed to filter by sector
+                        filterField: "sector",
                         filterValue: staticData.sector,
-                        originatingElement: "sectorLink", // Updated originating element
+                        originatingElement: "sectorLink",
                       } as Omit<FilterWorkspaceDataInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
                     }
                   }}
-                  title={`Sector: ${staticData?.sector || "N/A"}`} // Updated title
+                  title={`Sector: ${staticData?.sector || "N/A"}`}
                   labelClassName="text-sm font-medium text-muted-foreground"
                   valueClassName="text-sm font-semibold text-foreground"
-                  originatingElement="sector-profile-item" // Updated originating element
-                  data-testid="sector-profile-item" // Updated data-testid
+                  originatingElement="sector-profile-item"
+                  data-testid="sector-profile-item"
+                  // SELECTION PROPS
+                  isSelectionMode={isSelectionMode}
+                  isSelected={selectedDataItems.some(
+                    (item) => item.id === `${id}-sector`
+                  )}
+                  onSelect={() =>
+                    onToggleItemSelection({
+                      id: `${id}-sector`,
+                      sourceCardId: id,
+                      sourceCardSymbol: symbol,
+                      label: "Sector",
+                      value: staticData?.sector || "N/A",
+                    })
+                  }
                 />
 
                 {staticData?.country && (
@@ -105,8 +132,8 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                         <span className="text-sm leading-none mr-1.5">
                           {countryFlag}
                         </span>
-                        <span className="truncate" title={fullCountryName}>
-                          {fullCountryName}
+                        <span className="truncate" title={countryName}>
+                          {countryName}
                         </span>
                       </span>
                     }
@@ -119,11 +146,25 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                         } as Omit<FilterWorkspaceDataInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
                       }
                     }}
-                    title={`Country: ${fullCountryName}`}
+                    title={`Country: ${countryName}`}
                     labelClassName="text-sm font-medium text-muted-foreground"
                     valueClassName="text-sm font-semibold text-foreground"
                     isInteractive={true}
                     data-testid="country-profile-item"
+                    // SELECTION PROPS
+                    isSelectionMode={isSelectionMode}
+                    isSelected={selectedDataItems.some(
+                      (item) => item.id === `${id}-country`
+                    )}
+                    onSelect={() =>
+                      onToggleItemSelection({
+                        id: `${id}-country`,
+                        sourceCardId: id,
+                        sourceCardSymbol: symbol,
+                        label: "Country",
+                        value: countryName,
+                      })
+                    }
                   />
                 )}
 
@@ -144,6 +185,20 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                   labelClassName="text-sm font-medium text-muted-foreground"
                   valueClassName="text-sm font-semibold text-foreground"
                   originatingElement="employees-profile-item"
+                  // SELECTION PROPS
+                  isSelectionMode={isSelectionMode}
+                  isSelected={selectedDataItems.some(
+                    (item) => item.id === `${id}-employees`
+                  )}
+                  onSelect={() =>
+                    onToggleItemSelection({
+                      id: `${id}-employees`,
+                      sourceCardId: id,
+                      sourceCardSymbol: symbol,
+                      label: "Employees",
+                      value: staticData?.formatted_full_time_employees || "N/A",
+                    })
+                  }
                 />
                 {liveData?.revenue !== null &&
                   liveData?.revenue !== undefined && (
@@ -151,7 +206,7 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                       label="Revenue (TTM)"
                       value={formatNumberWithAbbreviations(liveData.revenue)}
                       currency={staticData?.currency}
-                      isMonetary={false}
+                      isMonetary={true}
                       onClick={() =>
                         handleInteraction("REQUEST_NEW_CARD", {
                           targetCardType: "revenue",
@@ -164,13 +219,30 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                       labelClassName="text-sm font-medium text-muted-foreground"
                       valueClassName="text-sm font-semibold text-foreground"
                       originatingElement="revenue-ttm-profile-item"
+                      // SELECTION PROPS
+                      isSelectionMode={isSelectionMode}
+                      isSelected={selectedDataItems.some(
+                        (item) => item.id === `${id}-revenue`
+                      )}
+                      onSelect={() =>
+                        onToggleItemSelection({
+                          id: `${id}-revenue`,
+                          sourceCardId: id,
+                          sourceCardSymbol: symbol,
+                          label: "Revenue (TTM)",
+                          value: liveData.revenue,
+                          isMonetary: true,
+                          currency: staticData?.currency,
+                        })
+                      }
                     />
                   )}
                 {liveData?.eps !== null && liveData?.eps !== undefined && (
                   <DataRow
                     label={`EPS (TTM)`}
                     value={liveData.eps}
-                    unit={staticData?.currency ? ` ${staticData.currency}` : ""}
+                    currency={staticData?.currency}
+                    isMonetary={true}
                     precision={2}
                     onClick={() =>
                       handleInteraction("REQUEST_NEW_CARD", {
@@ -184,6 +256,22 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                     labelClassName="text-sm font-medium text-muted-foreground"
                     valueClassName="text-sm font-semibold text-foreground"
                     originatingElement="eps-ttm-profile-item"
+                    // SELECTION PROPS
+                    isSelectionMode={isSelectionMode}
+                    isSelected={selectedDataItems.some(
+                      (item) => item.id === `${id}-eps`
+                    )}
+                    onSelect={() =>
+                      onToggleItemSelection({
+                        id: `${id}-eps`,
+                        sourceCardId: id,
+                        sourceCardSymbol: symbol,
+                        label: "EPS (TTM)",
+                        value: liveData.eps,
+                        isMonetary: true,
+                        currency: staticData?.currency,
+                      })
+                    }
                   />
                 )}
                 {liveData?.priceToEarningsRatioTTM !== null &&
@@ -205,6 +293,21 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                       labelClassName="text-sm font-medium text-muted-foreground"
                       valueClassName="text-sm font-semibold text-foreground"
                       originatingElement="pe-ttm-profile-item"
+                      // SELECTION PROPS
+                      isSelectionMode={isSelectionMode}
+                      isSelected={selectedDataItems.some(
+                        (item) => item.id === `${id}-pe`
+                      )}
+                      onSelect={() =>
+                        onToggleItemSelection({
+                          id: `${id}-pe`,
+                          sourceCardId: id,
+                          sourceCardSymbol: symbol,
+                          label: "P/E (TTM)",
+                          value: liveData.priceToEarningsRatioTTM,
+                          unit: "x",
+                        })
+                      }
                     />
                   )}
                 {liveData?.priceToBookRatioTTM !== null &&
@@ -226,6 +329,21 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                       labelClassName="text-sm font-medium text-muted-foreground"
                       valueClassName="text-sm font-semibold text-foreground"
                       originatingElement="pb-ttm-profile-item"
+                      // SELECTION PROPS
+                      isSelectionMode={isSelectionMode}
+                      isSelected={selectedDataItems.some(
+                        (item) => item.id === `${id}-pb`
+                      )}
+                      onSelect={() =>
+                        onToggleItemSelection({
+                          id: `${id}-pb`,
+                          sourceCardId: id,
+                          sourceCardSymbol: symbol,
+                          label: "P/B (TTM)",
+                          value: liveData.priceToBookRatioTTM,
+                          unit: "x",
+                        })
+                      }
                     />
                   )}
               </div>
@@ -251,6 +369,22 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                 isInteractive={true}
                 labelClassName="text-sm font-medium text-muted-foreground"
                 valueClassName="text-sm font-semibold text-foreground"
+                // SELECTION PROPS
+                isSelectionMode={isSelectionMode}
+                isSelected={selectedDataItems.some(
+                  (item) => item.id === `${id}-price`
+                )}
+                onSelect={() =>
+                  onToggleItemSelection({
+                    id: `${id}-price`,
+                    sourceCardId: id,
+                    sourceCardSymbol: symbol,
+                    label: "Price",
+                    value: liveData.price,
+                    isMonetary: true,
+                    currency: staticData?.currency,
+                  })
+                }
               />
               {liveData?.marketCap !== null &&
                 liveData?.marketCap !== undefined && (
@@ -269,6 +403,22 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                     )}`}
                     labelClassName="text-sm font-medium text-muted-foreground"
                     valueClassName="text-sm font-semibold text-foreground"
+                    // SELECTION PROPS
+                    isSelectionMode={isSelectionMode}
+                    isSelected={selectedDataItems.some(
+                      (item) => item.id === `${id}-marketcap`
+                    )}
+                    onSelect={() =>
+                      onToggleItemSelection({
+                        id: `${id}-marketcap`,
+                        sourceCardId: id,
+                        sourceCardSymbol: symbol,
+                        label: "Market Cap",
+                        value: liveData.marketCap,
+                        isMonetary: true,
+                        currency: staticData?.currency,
+                      })
+                    }
                   />
                 )}
             </div>
@@ -320,6 +470,20 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                   labelClassName="text-xs font-medium text-muted-foreground"
                   valueClassName="text-xs font-semibold text-foreground"
                   originatingElement="ceo-profile-item-back"
+                  // SELECTION PROPS
+                  isSelectionMode={isSelectionMode}
+                  isSelected={selectedDataItems.some(
+                    (item) => item.id === `${id}-ceo`
+                  )}
+                  onSelect={() =>
+                    onToggleItemSelection({
+                      id: `${id}-ceo`,
+                      sourceCardId: id,
+                      sourceCardSymbol: symbol,
+                      label: "CEO",
+                      value: staticData.ceo || "N/A",
+                    })
+                  }
                 />
               )}
               {staticData?.formatted_ipo_date && (
@@ -336,6 +500,20 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                   labelClassName="text-xs font-medium text-muted-foreground"
                   valueClassName="text-xs font-semibold text-foreground"
                   originatingElement="ipo-date-profile-item-back"
+                  // SELECTION PROPS
+                  isSelectionMode={isSelectionMode}
+                  isSelected={selectedDataItems.some(
+                    (item) => item.id === `${id}-ipo`
+                  )}
+                  onSelect={() =>
+                    onToggleItemSelection({
+                      id: `${id}-ipo`,
+                      sourceCardId: id,
+                      sourceCardSymbol: symbol,
+                      label: "IPO Date",
+                      value: staticData.formatted_ipo_date || "N/A",
+                    })
+                  }
                 />
               )}
               {staticData?.exchange_full_name && (
@@ -355,6 +533,20 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                   labelClassName="text-xs font-medium text-muted-foreground"
                   valueClassName="text-xs font-semibold text-foreground"
                   originatingElement="exchange-profile-item-back"
+                  // SELECTION PROPS
+                  isSelectionMode={isSelectionMode}
+                  isSelected={selectedDataItems.some(
+                    (item) => item.id === `${id}-exchange`
+                  )}
+                  onSelect={() =>
+                    onToggleItemSelection({
+                      id: `${id}-exchange`,
+                      sourceCardId: id,
+                      sourceCardSymbol: symbol,
+                      label: "Exchange",
+                      value: staticData.exchange_full_name || "N/A",
+                    })
+                  }
                 />
               )}
               {staticData?.isin && (
@@ -365,6 +557,20 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                   labelClassName="text-xs font-medium text-muted-foreground"
                   valueClassName="text-xs font-semibold text-foreground"
                   originatingElement="isin-profile-item-back"
+                  // SELECTION PROPS
+                  isSelectionMode={isSelectionMode}
+                  isSelected={selectedDataItems.some(
+                    (item) => item.id === `${id}-isin`
+                  )}
+                  onSelect={() =>
+                    onToggleItemSelection({
+                      id: `${id}-isin`,
+                      sourceCardId: id,
+                      sourceCardSymbol: symbol,
+                      label: "ISIN",
+                      value: staticData.isin || "N/A",
+                    })
+                  }
                 />
               )}
               {staticData?.last_dividend !== null &&
@@ -372,9 +578,8 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                   <DataRow
                     label="Last Div."
                     value={staticData.last_dividend}
-                    unit={staticData.currency ? ` ${staticData.currency}` : ""}
-                    isMonetary={true}
                     currency={staticData.currency}
+                    isMonetary={true}
                     precision={2}
                     onClick={() =>
                       handleInteraction("REQUEST_NEW_CARD", {
@@ -388,6 +593,22 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                     labelClassName="text-xs font-medium text-muted-foreground"
                     valueClassName="text-xs font-semibold text-foreground"
                     originatingElement="last-dividend-profile-item-back"
+                    // SELECTION PROPS
+                    isSelectionMode={isSelectionMode}
+                    isSelected={selectedDataItems.some(
+                      (item) => item.id === `${id}-lastdiv`
+                    )}
+                    onSelect={() =>
+                      onToggleItemSelection({
+                        id: `${id}-lastdiv`,
+                        sourceCardId: id,
+                        sourceCardSymbol: symbol,
+                        label: "Last Dividend",
+                        value: staticData.last_dividend,
+                        isMonetary: true,
+                        currency: staticData.currency,
+                      })
+                    }
                   />
                 )}
               {staticData?.beta !== null && staticData?.beta !== undefined && (
@@ -405,6 +626,20 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                   labelClassName="text-xs font-medium text-muted-foreground"
                   valueClassName="text-xs font-semibold text-foreground"
                   originatingElement="beta-profile-item-back"
+                  // SELECTION PROPS
+                  isSelectionMode={isSelectionMode}
+                  isSelected={selectedDataItems.some(
+                    (item) => item.id === `${id}-beta`
+                  )}
+                  onSelect={() =>
+                    onToggleItemSelection({
+                      id: `${id}-beta`,
+                      sourceCardId: id,
+                      sourceCardSymbol: symbol,
+                      label: "1Y Beta",
+                      value: staticData.beta,
+                    })
+                  }
                 />
               )}
               {staticData?.average_volume !== null &&
@@ -427,6 +662,20 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                     labelClassName="text-xs font-medium text-muted-foreground"
                     valueClassName="text-xs font-semibold text-foreground"
                     originatingElement="avg-volume-profile-item-back"
+                    // SELECTION PROPS
+                    isSelectionMode={isSelectionMode}
+                    isSelected={selectedDataItems.some(
+                      (item) => item.id === `${id}-avgvol`
+                    )}
+                    onSelect={() =>
+                      onToggleItemSelection({
+                        id: `${id}-avgvol`,
+                        sourceCardId: id,
+                        sourceCardSymbol: symbol,
+                        label: "Avg. Volume",
+                        value: staticData.average_volume,
+                      })
+                    }
                   />
                 )}
             </div>

@@ -12,6 +12,11 @@ import type {
   RequestNewCardInteraction,
   TriggerCardActionInteraction,
 } from "../base-card/base-card.types";
+import type { SelectedDataItem } from "@/hooks/useWorkspaceManager";
+import {
+  CheckboxCheckedIcon,
+  CheckboxUncheckedIcon,
+} from "@/components/ui/CheckboxIcons";
 
 // MetricDisplay is for items WITH a RangeIndicator (financials)
 interface MetricDisplayWithRangeProps {
@@ -25,6 +30,10 @@ interface MetricDisplayWithRangeProps {
   isMonetary?: boolean;
   onMetricClick?: () => void;
   tooltip?: string;
+  // NEW PROPS
+  isSelectionMode?: boolean;
+  isSelected?: boolean;
+  onSelect?: () => void;
 }
 
 const MetricDisplayWithRange: React.FC<MetricDisplayWithRangeProps> = ({
@@ -38,6 +47,10 @@ const MetricDisplayWithRange: React.FC<MetricDisplayWithRangeProps> = ({
   isMonetary = true,
   onMetricClick,
   tooltip,
+  // NEW PROPS
+  isSelectionMode,
+  isSelected,
+  onSelect,
 }) => {
   const displayCurrencySymbol =
     currency === "USD" ? "$" : currency || (isMonetary ? "$" : "");
@@ -54,23 +67,39 @@ const MetricDisplayWithRange: React.FC<MetricDisplayWithRangeProps> = ({
     ? `${label}: ${formattedValue} (${tooltip})`
     : `${label}: ${formattedValue}`;
 
+  const effectiveClickHandler = isSelectionMode ? onSelect : onMetricClick;
+  const isClickable = isSelectionMode || !!onMetricClick;
+
   return (
     <div className="py-1 space-y-1" data-testid={dataTestId}>
-      {" "}
-      {/* Adjusted py */}
       <ClickableDataItem
-        isInteractive={!!onMetricClick}
-        onClickHandler={onMetricClick}
+        isInteractive={isClickable}
+        onClickHandler={effectiveClickHandler}
         title={title}
-        baseClassName="flex justify-between items-baseline group/metric"
+        baseClassName={cn(
+          "flex justify-between items-baseline group/metric p-1 rounded-md transition-colors",
+          isSelectionMode && "hover:bg-primary/10",
+          isSelected && "bg-primary/20"
+        )}
         interactiveClassName="cursor-pointer"
         aria-label={title}>
-        <span
-          className={cn(
-            "text-sm font-medium text-muted-foreground mr-2 group-hover/metric:text-primary"
-          )}>
-          {label}
-        </span>
+        <div className="flex items-center">
+          {isSelectionMode && (
+            <div className="mr-2 shrink-0">
+              {isSelected ? (
+                <CheckboxCheckedIcon className="text-primary" />
+              ) : (
+                <CheckboxUncheckedIcon className="text-muted-foreground" />
+              )}
+            </div>
+          )}
+          <span
+            className={cn(
+              "text-sm font-medium text-muted-foreground mr-2 group-hover/metric:text-primary"
+            )}>
+            {label}
+          </span>
+        </div>
         <span
           className={cn(
             "text-sm font-semibold text-foreground group-hover/metric:text-primary"
@@ -103,6 +132,10 @@ interface SimpleMetricDisplayProps {
   onMetricClick?: () => void;
   tooltip?: string;
   currency?: string | null;
+  // NEW PROPS
+  isSelectionMode?: boolean;
+  isSelected?: boolean;
+  onSelect?: () => void;
 }
 
 const SimpleMetricDisplay: React.FC<SimpleMetricDisplayProps> = ({
@@ -114,6 +147,10 @@ const SimpleMetricDisplay: React.FC<SimpleMetricDisplayProps> = ({
   onMetricClick,
   tooltip,
   currency,
+  // NEW PROPS
+  isSelectionMode,
+  isSelected,
+  onSelect,
 }) => {
   const displayCurrencySymbol =
     currency === "USD" ? "$" : currency || (isMonetary ? "$" : "");
@@ -129,26 +166,44 @@ const SimpleMetricDisplay: React.FC<SimpleMetricDisplayProps> = ({
     : `${label}: ${formattedValue}`;
   const ariaLabel = dateLabel ? `${title}, as of ${dateLabel}` : title;
 
+  const effectiveClickHandler = isSelectionMode ? onSelect : onMetricClick;
+  const isClickable = isSelectionMode || !!onMetricClick;
+
   return (
     <div className="py-1" data-testid={dataTestId}>
       <ClickableDataItem
-        isInteractive={!!onMetricClick}
-        onClickHandler={onMetricClick}
+        isInteractive={isClickable}
+        onClickHandler={effectiveClickHandler}
         title={title}
-        baseClassName="flex justify-between items-baseline group/metric"
+        baseClassName={cn(
+          "flex justify-between items-baseline group/metric p-1 rounded-md transition-colors",
+          isSelectionMode && "hover:bg-primary/10",
+          isSelected && "bg-primary/20"
+        )}
         interactiveClassName="cursor-pointer"
         aria-label={ariaLabel}>
-        <span
-          className={cn(
-            "text-sm font-medium text-muted-foreground mr-2 group-hover/metric:text-primary"
-          )}>
-          {label}
-          {dateLabel && (
-            <span className="text-xs text-muted-foreground ml-1">
-              ({dateLabel})
-            </span>
+        <div className="flex items-center">
+          {isSelectionMode && (
+            <div className="mr-2 shrink-0">
+              {isSelected ? (
+                <CheckboxCheckedIcon className="text-primary" />
+              ) : (
+                <CheckboxUncheckedIcon className="text-muted-foreground" />
+              )}
+            </div>
           )}
-        </span>
+          <span
+            className={cn(
+              "text-sm font-medium text-muted-foreground mr-2 group-hover/metric:text-primary"
+            )}>
+            {label}
+            {dateLabel && (
+              <span className="text-xs text-muted-foreground ml-1">
+                ({dateLabel})
+              </span>
+            )}
+          </span>
+        </div>
         <span
           className={cn(
             "text-sm font-semibold text-foreground group-hover/metric:text-primary"
@@ -164,10 +219,20 @@ interface CashUseCardContentProps {
   cardData: CashUseCardData;
   isBackFace: boolean;
   onGenericInteraction: OnGenericInteraction;
+  isSelectionMode: boolean;
+  selectedDataItems: SelectedDataItem[];
+  onToggleItemSelection: (item: SelectedDataItem) => void;
 }
 
 export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
-  ({ cardData, isBackFace, onGenericInteraction }) => {
+  ({
+    cardData,
+    isBackFace,
+    onGenericInteraction,
+    isSelectionMode,
+    selectedDataItems,
+    onToggleItemSelection,
+  }) => {
     const { staticData, liveData, symbol, id, type: cardType } = cardData;
     const currency = staticData.reportedCurrency;
 
@@ -178,6 +243,7 @@ export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
         "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType"
       >
     ) => {
+      if (isSelectionMode) return;
       const payload: InteractionPayload = {
         intent,
         sourceCardId: id,
@@ -188,12 +254,24 @@ export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
       onGenericInteraction(payload);
     };
 
+    const isSelected = (itemId: string) =>
+      selectedDataItems.some((item) => item.id === itemId);
+
+    const onSelect = (item: Omit<SelectedDataItem, "id">) => {
+      const fullItem: SelectedDataItem = {
+        id: `${id}-${item.label.toLowerCase().replace(/\s/g, "-")}`,
+        ...item,
+      };
+      onToggleItemSelection(fullItem);
+    };
+
     if (isBackFace) {
       return (
         <div
           data-testid={`cashuse-card-back-${symbol}`}
           className="pointer-events-auto flex flex-col h-full">
           <ShadCardContent className={cn("p-0 flex-grow text-xs")}>
+            {/* Back face content can be made selectable too if needed */}
             <div className="space-y-0.5 pt-1.5">
               <div className="flex justify-between items-baseline py-0.5">
                 <span className="text-xs font-medium text-muted-foreground mr-2">
@@ -220,30 +298,6 @@ export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
                   {staticData.reportedCurrency || "N/A"}
                 </span>
               </div>
-              <div className="flex justify-between items-baseline py-0.5">
-                <span className="text-xs font-medium text-muted-foreground mr-2">
-                  Debt Range:
-                </span>
-                <span className="text-xs font-semibold text-foreground text-right">
-                  {staticData.debtRangePeriodLabel}
-                </span>
-              </div>
-              <div className="flex justify-between items-baseline py-0.5">
-                <span className="text-xs font-medium text-muted-foreground mr-2">
-                  FCF Range:
-                </span>
-                <span className="text-xs font-semibold text-foreground text-right">
-                  {staticData.fcfRangePeriodLabel}
-                </span>
-              </div>
-              <div className="flex justify-between items-baseline py-0.5">
-                <span className="text-xs font-medium text-muted-foreground mr-2">
-                  Dividends Range:
-                </span>
-                <span className="text-xs font-semibold text-foreground text-right">
-                  {staticData.dividendsRangePeriodLabel}
-                </span>
-              </div>
             </div>
           </ShadCardContent>
         </div>
@@ -263,7 +317,7 @@ export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
                   staticData.latestSharesFloatDate
                     ? staticData.latestSharesFloatDate.substring(0, 4)
                     : null
-                } // Display year part of date
+                }
                 data-testid="outstanding-shares-metric"
                 onMetricClick={() =>
                   handleInteraction("TRIGGER_CARD_ACTION", {
@@ -272,6 +326,16 @@ export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
                 }
                 tooltip="Total shares currently held by all shareholders"
                 isMonetary={false}
+                isSelectionMode={isSelectionMode}
+                isSelected={isSelected(`${id}-outstanding-shares`)}
+                onSelect={() =>
+                  onSelect({
+                    sourceCardId: id,
+                    sourceCardSymbol: symbol,
+                    label: "Outstanding Shares",
+                    value: liveData.currentOutstandingShares,
+                  })
+                }
               />
               <MetricDisplayWithRange
                 label="Total Debt"
@@ -288,6 +352,18 @@ export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
                   } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
                 }
                 tooltip="Sum of all short-term and long-term debt"
+                isSelectionMode={isSelectionMode}
+                isSelected={isSelected(`${id}-total-debt`)}
+                onSelect={() =>
+                  onSelect({
+                    sourceCardId: id,
+                    sourceCardSymbol: symbol,
+                    label: "Total Debt",
+                    value: liveData.currentTotalDebt,
+                    isMonetary: true,
+                    currency: currency,
+                  })
+                }
               />
               <MetricDisplayWithRange
                 label="Free Cash Flow"
@@ -304,6 +380,18 @@ export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
                   } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
                 }
                 tooltip="Cash flow available after capital expenditures"
+                isSelectionMode={isSelectionMode}
+                isSelected={isSelected(`${id}-free-cash-flow`)}
+                onSelect={() =>
+                  onSelect({
+                    sourceCardId: id,
+                    sourceCardSymbol: symbol,
+                    label: "Free Cash Flow",
+                    value: liveData.currentFreeCashFlow,
+                    isMonetary: true,
+                    currency: currency,
+                  })
+                }
               />
               <MetricDisplayWithRange
                 label="Net Dividends Paid"
@@ -320,6 +408,18 @@ export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
                   } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
                 }
                 tooltip="Total dividends paid to shareholders"
+                isSelectionMode={isSelectionMode}
+                isSelected={isSelected(`${id}-net-dividends-paid`)}
+                onSelect={() =>
+                  onSelect({
+                    sourceCardId: id,
+                    sourceCardSymbol: symbol,
+                    label: "Net Dividends Paid",
+                    value: liveData.currentNetDividendsPaid,
+                    isMonetary: true,
+                    currency: currency,
+                  })
+                }
               />
             </div>
           </ShadCardContent>

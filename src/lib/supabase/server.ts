@@ -1,7 +1,8 @@
 // src/lib/supabase/server.ts
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import type { Database } from "@/lib/supabase/database.types"; // Import generated types
+import type { Database } from "@/lib/supabase/database.types";
+import { Result } from "neverthrow";
 
 export async function createSupabaseServerClient() {
   const cookieStore = await cookies();
@@ -30,15 +31,16 @@ export async function createSupabaseServerClient() {
             options: CookieOptions;
           }[]
         ) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              // And set() is available
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // The `setAll` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing user sessions.
-          }
+          Result.fromThrowable(
+            () => {
+              cookiesToSet.forEach(({ name, value, options }) =>
+                cookieStore.set(name, value, options)
+              );
+            },
+            (e) => e as Error
+          )();
+          // The result is intentionally not handled, as the original comment indicates
+          // the error can be ignored.
         },
       },
     }

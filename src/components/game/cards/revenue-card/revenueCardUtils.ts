@@ -1,4 +1,5 @@
 // src/components/game/cards/revenue-card/revenueCardUtils.ts
+import { ok, err, fromPromise, Result } from "neverthrow";
 import type {
   RevenueCardData,
   RevenueCardStaticData,
@@ -27,6 +28,13 @@ import { applyProfileCoreUpdates } from "../cardUtils";
 type FinancialStatementDBRowFromSupabase =
   Database["public"]["Tables"]["financial_statements"]["Row"];
 type ProfileDBRowFromSupabase = Database["public"]["Tables"]["profiles"]["Row"];
+
+class RevenueCardError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RevenueCardError";
+  }
+}
 
 function constructRevenueCardData(
   dbRow: FinancialStatementDBRowFromSupabase,
@@ -113,41 +121,44 @@ async function initializeRevenueCard({
   supabase,
   toast,
   activeCards,
-}: CardInitializationContext): Promise<DisplayableCard | null> {
-  try {
-    const profileCardForSymbol = activeCards?.find(
-      (c) => c.symbol === symbol && c.type === "profile"
-    ) as ProfileDBRowFromSupabase | undefined;
+}: CardInitializationContext): Promise<
+  Result<DisplayableCard, RevenueCardError>
+> {
+  const profileCardForSymbol = activeCards?.find(
+    (c) => c.symbol === symbol && c.type === "profile"
+  ) as ProfileDBRowFromSupabase | undefined;
 
-    const fetchedProfileInfo = {
-      companyName: profileCardForSymbol?.company_name ?? symbol,
-      logoUrl: profileCardForSymbol?.image ?? null,
-      websiteUrl: profileCardForSymbol?.website ?? null,
-    };
+  let fetchedProfileInfo = {
+    companyName: profileCardForSymbol?.company_name ?? symbol,
+    logoUrl: profileCardForSymbol?.image ?? null,
+    websiteUrl: profileCardForSymbol?.website ?? null,
+  };
 
-    if (!profileCardForSymbol) {
-      const { data: profileData, error: profileError } = await supabase
+  if (!profileCardForSymbol) {
+    const profileResult = await fromPromise(
+      supabase
         .from("profiles")
         .select("company_name, image, website")
         .eq("symbol", symbol)
-        .maybeSingle();
+        .maybeSingle(),
+      (e) =>
+        new RevenueCardError(`Failed to fetch profile: ${(e as Error).message}`)
+    );
 
-      if (profileError) {
-        console.warn(
-          `[initializeRevenueCard] Error fetching profile for ${symbol}:`,
-          profileError.message
-        );
-      }
-      fetchedProfileInfo.companyName =
-        (profileData as ProfileDBRowFromSupabase | null)?.company_name ??
-        symbol;
-      fetchedProfileInfo.logoUrl =
-        (profileData as ProfileDBRowFromSupabase | null)?.image ?? null;
-      fetchedProfileInfo.websiteUrl =
-        (profileData as ProfileDBRowFromSupabase | null)?.website ?? null;
+    if (profileResult.isOk() && profileResult.value.data) {
+      const profileData = profileResult.value.data as ProfileDBRowFromSupabase;
+      fetchedProfileInfo = {
+        companyName: profileData.company_name ?? symbol,
+        logoUrl: profileData.image ?? null,
+        websiteUrl: profileData.website ?? null,
+      };
+    } else if (profileResult.isErr()) {
+      console.warn(profileResult.error.message);
     }
+  }
 
-    const { data: statementData, error: statementError } = await supabase
+  const statementResult = await fromPromise(
+    supabase
       .from("financial_statements")
       .select(
         "symbol, date, period, reported_currency, filing_date, accepted_date, fiscal_year, income_statement_payload, cash_flow_payload"
@@ -156,61 +167,42 @@ async function initializeRevenueCard({
       .order("date", { ascending: false })
       .order("period", { ascending: false })
       .limit(1)
-      .maybeSingle();
+      .maybeSingle(),
+    (e) =>
+      new RevenueCardError(
+        `Failed to fetch financial statement: ${(e as Error).message}`
+      )
+  );
 
-    if (statementError) {
-      console.error(
-        `[initializeRevenueCard] Supabase error fetching financial statement for ${symbol}:`,
-        statementError
-      );
-      throw statementError;
-    }
-
-    if (statementData) {
-      const financialStatement =
-        statementData as FinancialStatementDBRowFromSupabase;
-      const concreteCardData = constructRevenueCardData(
-        financialStatement,
-        fetchedProfileInfo
-      );
-
-      const cardState: Pick<DisplayableCardState, "isFlipped"> = {
-        isFlipped: false,
-      };
-
-      return {
-        ...concreteCardData,
-        ...cardState,
-      } as RevenueCardData & DisplayableCardState;
-    } else {
-      if (toast) {
-        toast({
-          title: "Statement Not Found",
-          description: `No financial statements currently available for ${symbol}.`,
-          variant: "default",
-        });
-      }
-      return null;
-    }
-  } catch (error: unknown) {
-    const errorMessage =
-      error instanceof Error ? error.message : "An unknown error occurred.";
-    if (process.env.NODE_ENV === "development") {
-      console.error(
-        `[initializeRevenueCard] Error initializing revenue card for ${symbol}:`,
-        errorMessage,
-        error
-      );
-    }
-    if (toast) {
-      toast({
-        title: "Error Initializing Revenue Card",
-        description: `Could not fetch financial data for ${symbol}. ${errorMessage}`,
-        variant: "destructive",
-      });
-    }
-    return null;
+  if (statementResult.isErr()) {
+    return err(statementResult.error);
   }
+
+  const statementData = statementResult.value.data;
+
+  if (statementData) {
+    const financialStatement =
+      statementData as FinancialStatementDBRowFromSupabase;
+    const concreteCardData = constructRevenueCardData(
+      financialStatement,
+      fetchedProfileInfo
+    );
+    const cardState: Pick<DisplayableCardState, "isFlipped"> = {
+      isFlipped: false,
+    };
+    return ok({ ...concreteCardData, ...cardState });
+  }
+
+  if (toast) {
+    toast({
+      title: "Statement Not Found",
+      description: `No financial statements currently available for ${symbol}.`,
+      variant: "default",
+    });
+  }
+  return err(
+    new RevenueCardError(`No financial statements found for ${symbol}.`)
+  );
 }
 
 registerCardInitializer("revenue", initializeRevenueCard);
@@ -268,9 +260,6 @@ const handleRevenueCardStatementUpdate: CardUpdateHandler<
       currentRevenueCardData.staticData.statementPeriod !==
       newFinancialStatementRow.period
     ) {
-      // This condition is a bit broad; it implies any differing period (even lower in hierarchy)
-      // could trigger an update if accepted dates are also more recent or equal.
-      // This might be desired to catch corrections or restatements for the same date but different period label.
       if (
         newFinancialStatementRow.accepted_date &&
         currentRevenueCardData.staticData.acceptedDate
@@ -282,7 +271,6 @@ const handleRevenueCardStatementUpdate: CardUpdateHandler<
           shouldUpdate = true;
         }
       } else {
-        // If accepted dates are not available, a different period for the same statement date is considered an update
         shouldUpdate = true;
       }
     }
@@ -297,21 +285,15 @@ const handleRevenueCardStatementUpdate: CardUpdateHandler<
         } ${newFinancialStatementRow.fiscal_year || ""} available.`,
       });
     }
-    // Reconstruct the card data using the new financial statement row
-    // and existing profile information.
-    // Important: We pass Date.now() for createdAt to signify an update,
-    // unless you have specific logic to retain original creation time of the card instance itself.
-    // If id needs to remain exactly the same, ensure idOverride is currentRevenueCardData.id
-    // If createdAt needs to be the original creation time of this card *instance*, pass currentRevenueCardData.createdAt
     return constructRevenueCardData(
-      newFinancialStatementRow, // This is the new FinancialStatementDBRowFromRealtime
+      newFinancialStatementRow,
       {
         companyName: currentRevenueCardData.companyName,
         logoUrl: currentRevenueCardData.logoUrl,
         websiteUrl: currentRevenueCardData.websiteUrl,
       },
-      currentRevenueCardData.id, // Preserve the original card ID
-      Date.now() // Update createdAt to reflect new data freshness on the card itself
+      currentRevenueCardData.id,
+      Date.now()
     );
   }
   return currentRevenueCardData;
@@ -332,7 +314,6 @@ const handleRevenueCardProfileUpdate: CardUpdateHandler<
   );
 
   if (coreDataChanged) {
-    // If core data like companyName changed, update the description in backData
     const newBackDataDescription: BaseCardBackData = {
       description: `Key financial metrics for ${updatedCardData.companyName} (${
         updatedCardData.staticData.periodLabel
@@ -345,7 +326,7 @@ const handleRevenueCardProfileUpdate: CardUpdateHandler<
       backData: newBackDataDescription,
     };
   }
-  return currentRevenueCardData; // No change if core data didn't change
+  return currentRevenueCardData;
 };
 registerCardUpdateHandler(
   "revenue",

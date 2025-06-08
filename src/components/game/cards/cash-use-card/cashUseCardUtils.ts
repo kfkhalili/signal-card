@@ -1,4 +1,5 @@
 // src/components/game/cards/cash-use-card/cashUseCardUtils.ts
+import { ok, err, fromPromise, Result } from "neverthrow";
 import type {
   CashUseCardData,
   CashUseCardStaticData,
@@ -21,48 +22,40 @@ import type { Database, Json } from "@/lib/supabase/database.types";
 import type { FinancialStatementDBRow as FinancialStatementDBRowFromRealtime } from "@/lib/supabase/realtime-service";
 import type { ProfileDBRow as ProfileDBRowFromHook } from "@/hooks/useStockData";
 import { applyProfileCoreUpdates } from "../cardUtils";
+import { safeJsonParse } from "@/lib/utils";
 
-type FinancialStatementDBRowFromSupabase =
-  Database["public"]["Tables"]["financial_statements"]["Row"];
 type SharesFloatDBRowFromSupabase =
   Database["public"]["Tables"]["shares_float"]["Row"];
 type ProfileDBRowFromSupabase = Database["public"]["Tables"]["profiles"]["Row"];
 
-function safeJsonParse<T>(
+class CashUseCardError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CashUseCardError";
+  }
+}
+
+function safeJsonParseWithField<T>(
   json: Json | null | undefined,
   fieldName: string,
   defaultValue: T
 ): T {
-  if (json === null || json === undefined) {
-    return defaultValue;
+  if (json === null || json === undefined) return defaultValue;
+
+  const parseAndExtract = (text: string): T => {
+    return safeJsonParse<Record<string, unknown>>(text)
+      .map((parsed) => (parsed[fieldName] as T) ?? defaultValue)
+      .unwrapOr(defaultValue);
+  };
+
+  if (typeof json === "object" && json !== null) {
+    return ((json as Record<string, unknown>)[fieldName] as T) ?? defaultValue;
   }
-  try {
-    if (typeof json === "object" && json !== null) {
-      if (fieldName in json) {
-        const val = (json as Record<string, unknown>)[fieldName];
-        return val === undefined || val === null ? defaultValue : (val as T);
-      }
-      return defaultValue;
-    }
-    if (typeof json === "string") {
-      const parsed = JSON.parse(json);
-      if (
-        typeof parsed === "object" &&
-        parsed !== null &&
-        fieldName in parsed
-      ) {
-        const val = (parsed as Record<string, unknown>)[fieldName];
-        return val === undefined || val === null ? defaultValue : (val as T);
-      }
-      return defaultValue;
-    }
-  } catch (e) {
-    console.warn(
-      `Failed to parse or access field '${fieldName}' from JSON:`,
-      json,
-      e
-    );
+
+  if (typeof json === "string") {
+    return parseAndExtract(json);
   }
+
   return defaultValue;
 }
 
@@ -97,10 +90,7 @@ function getMinMaxAndLatestForFinancialMetrics<
     latestPeriod: undefined,
     latestFiscalYear: undefined,
   };
-
-  if (!records || records.length === 0) {
-    return defaultResult;
-  }
+  if (!records || records.length === 0) return defaultResult;
 
   interface MappedRecord {
     value: number | null;
@@ -108,7 +98,6 @@ function getMinMaxAndLatestForFinancialMetrics<
     period: string | undefined;
     fiscal_year: string | undefined;
   }
-
   interface ValidatedRecord {
     value: number;
     date: string;
@@ -128,15 +117,11 @@ function getMinMaxAndLatestForFinancialMetrics<
     .filter((r): r is ValidatedRecord => r.value !== null)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  if (validRecords.length === 0) {
-    return defaultResult;
-  }
+  if (validRecords.length === 0) return defaultResult;
 
   const latestRecord = validRecords[0];
   const oldestRecord = validRecords[validRecords.length - 1];
-
   const values: number[] = validRecords.map((r) => r.value);
-
   const minVal = Math.min(...values);
   const maxVal = Math.max(...values);
 
@@ -149,9 +134,8 @@ function getMinMaxAndLatestForFinancialMetrics<
       }`;
     }
   } else {
-    const formatDateForLabel = (dateStr: string | null | undefined): string => {
-      return dateStr ? dateStr.substring(0, 4) : "N/A";
-    };
+    const formatDateForLabel = (dateStr: string | null | undefined): string =>
+      dateStr ? dateStr.substring(0, 4) : "N/A";
     rangeLabel = `${formatDateForLabel(
       oldestRecord?.date
     )} - ${formatDateForLabel(latestRecord?.date)}`;
@@ -245,157 +229,151 @@ async function fetchAndProcessCashUseData(
   symbol: string,
   supabase: CardInitializationContext["supabase"],
   activeCards?: DisplayableCard[]
-): Promise<{
-  sharesData: SharesDataPoint;
-  totalDebtData: MinMaxLatestResult<number | null>;
-  freeCashFlowData: MinMaxLatestResult<number | null>;
-  netDividendsPaidData: MinMaxLatestResult<number | null>;
-  latestFinancialStatementInfo: {
-    reportedCurrency: string | null;
-    statementDate: string | null;
-    statementPeriod: string | null;
+): Promise<
+  Result<ReturnType<typeof constructCashUseCardData>, CashUseCardError>
+> {
+  const profileCardForSymbol = activeCards?.find(
+    (c) => c.symbol === symbol && c.type === "profile"
+  ) as ProfileDBRowFromSupabase | undefined;
+  let fetchedProfileInfo = {
+    companyName: profileCardForSymbol?.company_name ?? symbol,
+    logoUrl: profileCardForSymbol?.image ?? null,
+    websiteUrl: profileCardForSymbol?.website ?? null,
   };
-  profileInfo: {
-    companyName?: string | null;
-    logoUrl?: string | null;
-    websiteUrl?: string | null;
-  };
-} | null> {
-  try {
-    const profileCardForSymbol = activeCards?.find(
-      (c) => c.symbol === symbol && c.type === "profile"
-    ) as ProfileDBRowFromSupabase | undefined;
-
-    let fetchedProfileInfo = {
-      companyName: profileCardForSymbol?.company_name ?? symbol,
-      logoUrl: profileCardForSymbol?.image ?? null,
-      websiteUrl: profileCardForSymbol?.website ?? null,
-    };
-    if (!profileCardForSymbol) {
-      const { data: profileDataFromDB, error: profileError } = await supabase
+  if (!profileCardForSymbol) {
+    const profileResult = await fromPromise(
+      supabase
         .from("profiles")
         .select("company_name, image, website")
         .eq("symbol", symbol)
-        .maybeSingle();
-
-      if (profileError) {
-        console.warn(
-          `[CashUseCard] Error fetching profile for ${symbol}: ${profileError.message}`
-        );
-      }
+        .maybeSingle(),
+      (e) =>
+        new CashUseCardError(`Profile fetch failed: ${(e as Error).message}`)
+    );
+    if (profileResult.isOk() && profileResult.value.data) {
       fetchedProfileInfo = {
-        companyName:
-          (profileDataFromDB as ProfileDBRowFromSupabase | null)
-            ?.company_name ?? symbol,
-        logoUrl:
-          (profileDataFromDB as ProfileDBRowFromSupabase | null)?.image ?? null,
-        websiteUrl:
-          (profileDataFromDB as ProfileDBRowFromSupabase | null)?.website ??
-          null,
+        companyName: profileResult.value.data.company_name ?? symbol,
+        logoUrl: profileResult.value.data.image ?? null,
+        websiteUrl: profileResult.value.data.website ?? null,
       };
+    } else if (profileResult.isErr()) {
+      console.warn(profileResult.error.message);
     }
+  }
 
-    const { data: fsRecords, error: fsError } = await supabase
+  const fsResult = await fromPromise(
+    supabase
       .from("financial_statements")
       .select(
         "date, period, fiscal_year, reported_currency, balance_sheet_payload, cash_flow_payload"
       )
       .eq("symbol", symbol)
       .order("date", { ascending: false })
-      .limit(20); // Fetch more for 5-year range potentially (5 years * 4 quarters)
+      .limit(20),
+    (e) =>
+      new CashUseCardError(
+        `Financial statements fetch failed: ${(e as Error).message}`
+      )
+  );
 
-    if (fsError) throw fsError;
-    const financialStatements =
-      (fsRecords as FinancialStatementDBRowFromSupabase[]) || [];
+  if (fsResult.isErr()) {
+    return err(fsResult.error);
+  }
+  const financialStatements = fsResult.value.data || [];
 
-    const debtRecords = financialStatements.map((fs) => ({
-      date: fs.date,
-      period: fs.period ?? undefined,
-      fiscal_year: fs.fiscal_year ?? undefined,
-      totalDebt_value: safeJsonParse<number | null>(
-        fs.balance_sheet_payload,
-        "totalDebt", // Ensure this key matches your JSONB structure
-        null
-      ),
-    }));
-    const fcfRecords = financialStatements.map((fs) => ({
-      date: fs.date,
-      period: fs.period ?? undefined,
-      fiscal_year: fs.fiscal_year ?? undefined,
-      freeCashFlow_value: safeJsonParse<number | null>(
+  const debtRecords = financialStatements.map((fs) => ({
+    date: fs.date,
+    period: fs.period ?? undefined,
+    fiscal_year: fs.fiscal_year ?? undefined,
+    totalDebt_value: safeJsonParseWithField<number | null>(
+      fs.balance_sheet_payload,
+      "totalDebt",
+      null
+    ),
+  }));
+  const fcfRecords = financialStatements.map((fs) => ({
+    date: fs.date,
+    period: fs.period ?? undefined,
+    fiscal_year: fs.fiscal_year ?? undefined,
+    freeCashFlow_value: safeJsonParseWithField<number | null>(
+      fs.cash_flow_payload,
+      "freeCashFlow",
+      null
+    ),
+  }));
+  const dividendRecords = financialStatements.map((fs) => ({
+    date: fs.date,
+    period: fs.period ?? undefined,
+    fiscal_year: fs.fiscal_year ?? undefined,
+    netDividendsPaid_value: Math.abs(
+      safeJsonParseWithField<number | null>(
         fs.cash_flow_payload,
-        "freeCashFlow", // Ensure this key matches
-        null
-      ),
-    }));
-    const dividendRecords = financialStatements.map((fs) => {
-      const rawValue = safeJsonParse<number | null>(
-        fs.cash_flow_payload,
-        "dividendsPaid", // FMP often uses "dividendsPaid" for this; Supabase has "netDividendsPaid" in type.
-        // For the sake of consistency, let's assume your DB payload also uses `netDividendsPaid`.
-        // If FMP directly stores a field like `dividendsPaid` that is negative, you'd use that.
-        // The current type `CashUseCardFmpCashFlowData` suggests `netDividendsPaid` is the FMP field.
-        null
-      );
-      return {
-        date: fs.date,
-        period: fs.period ?? undefined,
-        fiscal_year: fs.fiscal_year ?? undefined,
-        // Assuming "netDividendsPaid" from your types, usually negative in cash flow statements.
-        // The card displays it as a positive "use" of cash.
-        netDividendsPaid_value: rawValue !== null ? Math.abs(rawValue) : null,
-      };
-    });
+        "dividendsPaid",
+        0
+      ) ?? 0
+    ),
+  }));
 
-    const totalDebtData = getMinMaxAndLatestForFinancialMetrics(
-      debtRecords,
-      "totalDebt_value"
-    );
-    const freeCashFlowData = getMinMaxAndLatestForFinancialMetrics(
-      fcfRecords,
-      "freeCashFlow_value"
-    );
-    const netDividendsPaidData = getMinMaxAndLatestForFinancialMetrics(
-      dividendRecords,
-      "netDividendsPaid_value"
-    );
+  const totalDebtData = getMinMaxAndLatestForFinancialMetrics(
+    debtRecords,
+    "totalDebt_value"
+  );
+  const freeCashFlowData = getMinMaxAndLatestForFinancialMetrics(
+    fcfRecords,
+    "freeCashFlow_value"
+  );
+  const netDividendsPaidData = getMinMaxAndLatestForFinancialMetrics(
+    dividendRecords,
+    "netDividendsPaid_value"
+  );
 
-    const latestFinancialStatementInfo = {
-      reportedCurrency: financialStatements[0]?.reported_currency ?? null,
-      statementDate: financialStatements[0]?.date ?? null,
-      statementPeriod: financialStatements[0]?.period ?? null,
-    };
+  const latestFinancialStatementInfo = {
+    reportedCurrency: financialStatements[0]?.reported_currency ?? null,
+    statementDate: financialStatements[0]?.date ?? null,
+    statementPeriod: financialStatements[0]?.period ?? null,
+  };
 
-    const { data: sfRecord, error: sfError } = await supabase
+  const sharesFloatResult = await fromPromise(
+    supabase
       .from("shares_float")
       .select("date, outstanding_shares")
       .eq("symbol", symbol)
       .order("date", { ascending: false })
       .limit(1)
-      .maybeSingle();
-
-    if (sfError) throw sfError;
-
-    const sharesDataPoint: SharesDataPoint = {
-      latest:
-        (sfRecord as SharesFloatDBRowFromSupabase | null)?.outstanding_shares ??
-        null,
-      latestDate:
-        (sfRecord as SharesFloatDBRowFromSupabase | null)?.date ?? null,
+      .maybeSingle(),
+    (e) =>
+      new CashUseCardError(`Shares float fetch failed: ${(e as Error).message}`)
+  );
+  let sharesData: SharesDataPoint = { latest: null, latestDate: null };
+  if (sharesFloatResult.isOk() && sharesFloatResult.value.data) {
+    sharesData = {
+      latest: sharesFloatResult.value.data.outstanding_shares ?? null,
+      latestDate: sharesFloatResult.value.data.date ?? null,
     };
+  } else if (sharesFloatResult.isErr()) {
+    console.warn(sharesFloatResult.error.message);
+  }
 
-    return {
-      sharesData: sharesDataPoint,
+  if (
+    totalDebtData.latest === null &&
+    freeCashFlowData.latest === null &&
+    netDividendsPaidData.latest === null &&
+    sharesData.latest === null
+  ) {
+    return err(new CashUseCardError("No financial or shares data found."));
+  }
+
+  return ok(
+    constructCashUseCardData(
+      symbol,
+      fetchedProfileInfo,
+      sharesData,
       totalDebtData,
       freeCashFlowData,
       netDividendsPaidData,
-      latestFinancialStatementInfo,
-      profileInfo: fetchedProfileInfo,
-    };
-  } catch (error: unknown) {
-    console.error(`[CashUseCard] Error fetching data for ${symbol}:`, error);
-    return null;
-  }
+      latestFinancialStatementInfo
+    )
+  );
 }
 
 async function initializeCashUseCard({
@@ -403,64 +381,32 @@ async function initializeCashUseCard({
   supabase,
   toast,
   activeCards,
-}: CardInitializationContext): Promise<DisplayableCard | null> {
-  const fetchedData = await fetchAndProcessCashUseData(
+}: CardInitializationContext): Promise<
+  Result<DisplayableCard, CashUseCardError>
+> {
+  const result = await fetchAndProcessCashUseData(
     symbol,
     supabase,
     activeCards
   );
 
-  if (!fetchedData) {
-    if (toast) {
-      toast({
-        title: "Cash Use Card Error",
-        description: `Could not fetch necessary data for ${symbol}.`,
-        variant: "destructive",
-      });
-    }
-    return null;
-  }
-
-  const {
-    sharesData,
-    totalDebtData,
-    freeCashFlowData,
-    netDividendsPaidData,
-    latestFinancialStatementInfo,
-    profileInfo,
-  } = fetchedData;
-
-  const hasAnyFinancialData =
-    totalDebtData.latest !== null ||
-    freeCashFlowData.latest !== null ||
-    netDividendsPaidData.latest !== null;
-  const hasSharesData = sharesData.latest !== null;
-
-  if (!hasAnyFinancialData && !hasSharesData) {
-    if (toast) {
-      toast({
-        title: "Insufficient Data",
-        description: `No financial or shares data found for ${symbol} to create a Cash Use Card.`,
-        variant: "default",
-      });
-    }
-    return null;
-  }
-
-  const concreteCardData = constructCashUseCardData(
-    symbol,
-    profileInfo,
-    sharesData,
-    totalDebtData,
-    freeCashFlowData,
-    netDividendsPaidData,
-    latestFinancialStatementInfo
-  );
-
-  const cardState: Pick<DisplayableCardState, "isFlipped"> = {
-    isFlipped: false,
-  };
-  return { ...concreteCardData, ...cardState };
+  return result
+    .andThen((cardData) => {
+      const cardState: Pick<DisplayableCardState, "isFlipped"> = {
+        isFlipped: false,
+      };
+      return ok({ ...cardData, ...cardState });
+    })
+    .mapErr((error) => {
+      if (toast) {
+        toast({
+          title: "Cash Use Card Error",
+          description: `Could not fetch necessary data for ${symbol}: ${error.message}`,
+          variant: "destructive",
+        });
+      }
+      return error;
+    });
 }
 
 registerCardInitializer("cashuse", initializeCashUseCard);
@@ -474,20 +420,20 @@ const handleCashUseCardFinancialStatementUpdate: CardUpdateHandler<
   _currentDisplayableCard,
   context
 ): CashUseCardData => {
-  const newTotalDebt = safeJsonParse<number | null>(
+  const newTotalDebt = safeJsonParseWithField<number | null>(
     newFinancialStatementRow.balance_sheet_payload,
     "totalDebt",
     null
   );
-  const newFreeCashFlow = safeJsonParse<number | null>(
+  const newFreeCashFlow = safeJsonParseWithField<number | null>(
     newFinancialStatementRow.cash_flow_payload,
     "freeCashFlow",
     null
   );
 
-  const rawNewNetDividendsPaid = safeJsonParse<number | null>(
+  const rawNewNetDividendsPaid = safeJsonParseWithField<number | null>(
     newFinancialStatementRow.cash_flow_payload,
-    "netDividendsPaid", // Assuming this key aligns with your type and typical FMP data for this field
+    "netDividendsPaid",
     null
   );
   const newNetDividendsPaid =
@@ -506,11 +452,6 @@ const handleCashUseCardFinancialStatementUpdate: CardUpdateHandler<
     (!updatedStaticData.latestStatementDate ||
       new Date(newDate) >= new Date(updatedStaticData.latestStatementDate))
   ) {
-    // Only update if the new statement is for the same or newer date,
-    // and if the values actually differ or it's a newer period for the same date.
-    // This simple check assumes newer date/period implies more relevant data.
-    // More complex logic might be needed if periods can arrive out of order for the same date.
-
     let periodIsSameOrNewer = true;
     if (
       new Date(newDate).getTime() ===
@@ -521,7 +462,7 @@ const handleCashUseCardFinancialStatementUpdate: CardUpdateHandler<
         updatedStaticData.latestStatementPeriod || ""
       );
       const newPeriodIndex = periodHierarchy.indexOf(newPeriod || "");
-      periodIsSameOrNewer = newPeriodIndex <= currentPeriodIndex; // Lower index means more comprehensive/recent
+      periodIsSameOrNewer = newPeriodIndex <= currentPeriodIndex;
     }
 
     if (periodIsSameOrNewer) {
@@ -530,8 +471,6 @@ const handleCashUseCardFinancialStatementUpdate: CardUpdateHandler<
         updatedLiveData.currentTotalDebt !== newTotalDebt
       ) {
         updatedLiveData.currentTotalDebt = newTotalDebt;
-        // Note: Min/max for 5y range are NOT updated here as this handles single statement updates.
-        // Min/max would typically be recalculated if the entire historical dataset changed.
         hasChanged = true;
       }
       if (
@@ -550,15 +489,15 @@ const handleCashUseCardFinancialStatementUpdate: CardUpdateHandler<
       }
 
       if (
-        hasChanged || // If any value changed
-        updatedStaticData.latestStatementDate !== newDate || // Or if statement date is newer
-        updatedStaticData.latestStatementPeriod !== newPeriod // Or if period is different for same date
+        hasChanged ||
+        updatedStaticData.latestStatementDate !== newDate ||
+        updatedStaticData.latestStatementPeriod !== newPeriod
       ) {
         updatedStaticData.latestStatementDate = newDate;
         updatedStaticData.latestStatementPeriod = newPeriod;
         updatedStaticData.reportedCurrency =
           newReportedCurrency ?? updatedStaticData.reportedCurrency;
-        hasChanged = true; // Ensure flag is set if only date/period changed
+        hasChanged = true;
       }
     }
   }
@@ -688,7 +627,6 @@ const handleCashUseCardProfileUpdate: CardUpdateHandler<
 
   if (coreDataChanged || currencyChanged) {
     if (context.toast && coreDataChanged) {
-      // Only toast for core changes, currency is less visible
       context.toast({
         title: "Profile Info Updated",
         description: `Company details for ${currentCashUseCardData.symbol} card refreshed.`,
@@ -703,7 +641,7 @@ const handleCashUseCardProfileUpdate: CardUpdateHandler<
     };
 
     const newBackDataDescription = `Cash usage metrics for ${
-      finalCardData.companyName // Use new name
+      finalCardData.companyName
     }. Financial data from ${
       finalCardData.staticData.latestStatementDate || "N/A"
     } (${

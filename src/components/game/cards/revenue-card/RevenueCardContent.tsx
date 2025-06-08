@@ -10,15 +10,28 @@ import type {
 import { DataRow } from "@/components/ui/DataRow";
 import { formatFinancialValue } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
+import type { SelectedDataItem } from "@/hooks/useWorkspaceManager";
 
 interface RevenueCardContentProps {
   cardData: RevenueCardData;
   isBackFace: boolean;
   onGenericInteraction: OnGenericInteraction;
+  // NEW PROPS
+  isSelectionMode: boolean;
+  selectedDataItems: SelectedDataItem[];
+  onToggleItemSelection: (item: SelectedDataItem) => void;
 }
 
 export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
-  ({ cardData, isBackFace, onGenericInteraction }) => {
+  ({
+    cardData,
+    isBackFace,
+    onGenericInteraction,
+    // NEW PROPS
+    isSelectionMode,
+    selectedDataItems,
+    onToggleItemSelection,
+  }) => {
     const { staticData, liveData, symbol, id, type: cardType } = cardData;
     const currencyCode = staticData.reportedCurrency;
 
@@ -39,6 +52,17 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
       onGenericInteraction(payload);
     };
 
+    const isSelected = (itemId: string) =>
+      selectedDataItems.some((item) => item.id === itemId);
+
+    const onSelect = (item: Omit<SelectedDataItem, "id">) => {
+      const fullItem: SelectedDataItem = {
+        id: `${id}-${item.label.toLowerCase().replace(/\s/g, "-")}`,
+        ...item,
+      };
+      onToggleItemSelection(fullItem);
+    };
+
     if (isBackFace) {
       return (
         <div
@@ -49,9 +73,9 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
               <DataRow
                 label="Period:"
                 value={staticData.periodLabel}
-                isInteractive={!!staticData.periodLabel}
+                isInteractive={isSelectionMode || !!staticData.periodLabel}
                 onClick={() => {
-                  if (staticData.periodLabel) {
+                  if (staticData.periodLabel && !isSelectionMode) {
                     handleInteraction("REQUEST_NEW_CARD", {
                       targetCardType: "revenue",
                       originatingElement: "periodLabelBack",
@@ -60,13 +84,23 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
                 }}
                 labelClassName="text-xs font-medium text-muted-foreground"
                 valueClassName="text-xs font-semibold text-foreground"
+                isSelectionMode={isSelectionMode}
+                isSelected={isSelected(`${id}-period`)}
+                onSelect={() =>
+                  onSelect({
+                    sourceCardId: id,
+                    sourceCardSymbol: symbol,
+                    label: "Period",
+                    value: staticData.periodLabel,
+                  })
+                }
               />
               <DataRow
                 label="Currency:"
                 value={staticData.reportedCurrency || "N/A"}
-                isInteractive={!!staticData.reportedCurrency}
+                isInteractive={isSelectionMode || !!staticData.reportedCurrency}
                 onClick={() => {
-                  if (staticData.reportedCurrency) {
+                  if (staticData.reportedCurrency && !isSelectionMode) {
                     handleInteraction("REQUEST_NEW_CARD", {
                       targetCardType: "revenue",
                       originatingElement: "currencyValueBack",
@@ -75,20 +109,41 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
                 }}
                 labelClassName="text-xs font-medium text-muted-foreground"
                 valueClassName="text-xs font-semibold text-foreground"
+                isSelectionMode={isSelectionMode}
+                isSelected={isSelected(`${id}-currency`)}
+                onSelect={() =>
+                  onSelect({
+                    sourceCardId: id,
+                    sourceCardSymbol: symbol,
+                    label: "Currency",
+                    value: staticData.reportedCurrency || "N/A",
+                  })
+                }
               />
               {staticData.statementDate && (
                 <DataRow
                   label="Statement Date:"
                   value={staticData.statementDate}
                   isInteractive={true}
-                  onClick={() =>
-                    handleInteraction("REQUEST_NEW_CARD", {
-                      targetCardType: "revenue",
-                      originatingElement: "statementDateBack",
-                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-                  }
+                  onClick={() => {
+                    if (!isSelectionMode)
+                      handleInteraction("REQUEST_NEW_CARD", {
+                        targetCardType: "revenue",
+                        originatingElement: "statementDateBack",
+                      } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                  }}
                   labelClassName="text-xs font-medium text-muted-foreground"
                   valueClassName="text-xs font-semibold text-foreground"
+                  isSelectionMode={isSelectionMode}
+                  isSelected={isSelected(`${id}-statement-date`)}
+                  onSelect={() =>
+                    onSelect({
+                      sourceCardId: id,
+                      sourceCardSymbol: symbol,
+                      label: "Statement Date",
+                      value: staticData.statementDate,
+                    })
+                  }
                 />
               )}
               {staticData.filingDate && (
@@ -96,14 +151,25 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
                   label="Filing Date:"
                   value={staticData.filingDate}
                   isInteractive={true}
-                  onClick={() =>
-                    handleInteraction("REQUEST_NEW_CARD", {
-                      targetCardType: "revenue",
-                      originatingElement: "filingDateBack",
-                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-                  }
+                  onClick={() => {
+                    if (!isSelectionMode)
+                      handleInteraction("REQUEST_NEW_CARD", {
+                        targetCardType: "revenue",
+                        originatingElement: "filingDateBack",
+                      } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                  }}
                   labelClassName="text-xs font-medium text-muted-foreground"
                   valueClassName="text-xs font-semibold text-foreground"
+                  isSelectionMode={isSelectionMode}
+                  isSelected={isSelected(`${id}-filing-date`)}
+                  onSelect={() =>
+                    onSelect({
+                      sourceCardId: id,
+                      sourceCardSymbol: symbol,
+                      label: "Filing Date",
+                      value: staticData.filingDate,
+                    })
+                  }
                 />
               )}
               {staticData.acceptedDate && (
@@ -111,14 +177,25 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
                   label="Accepted Date:"
                   value={staticData.acceptedDate.substring(0, 10)}
                   isInteractive={true}
-                  onClick={() =>
-                    handleInteraction("REQUEST_NEW_CARD", {
-                      targetCardType: "revenue",
-                      originatingElement: "acceptedDateBack",
-                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-                  }
+                  onClick={() => {
+                    if (!isSelectionMode)
+                      handleInteraction("REQUEST_NEW_CARD", {
+                        targetCardType: "revenue",
+                        originatingElement: "acceptedDateBack",
+                      } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                  }}
                   labelClassName="text-xs font-medium text-muted-foreground"
                   valueClassName="text-xs font-semibold text-foreground"
+                  isSelectionMode={isSelectionMode}
+                  isSelected={isSelected(`${id}-accepted-date`)}
+                  onSelect={() =>
+                    onSelect({
+                      sourceCardId: id,
+                      sourceCardSymbol: symbol,
+                      label: "Accepted Date",
+                      value: staticData.acceptedDate?.substring(0, 10),
+                    })
+                  }
                 />
               )}
             </div>
@@ -141,11 +218,24 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
                 valueClassName="text-xl font-bold sm:text-2xl text-foreground"
                 data-testid="revenue-value-front"
                 isInteractive={true}
-                onClick={() =>
-                  handleInteraction("REQUEST_NEW_CARD", {
-                    targetCardType: "price",
-                    originatingElement: "revenueMetric",
-                  } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                onClick={() => {
+                  if (!isSelectionMode)
+                    handleInteraction("REQUEST_NEW_CARD", {
+                      targetCardType: "price",
+                      originatingElement: "revenueMetric",
+                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                }}
+                isSelectionMode={isSelectionMode}
+                isSelected={isSelected(`${id}-revenue`)}
+                onSelect={() =>
+                  onSelect({
+                    sourceCardId: id,
+                    sourceCardSymbol: symbol,
+                    label: "Revenue",
+                    value: liveData.revenue,
+                    isMonetary: true,
+                    currency: currencyCode,
+                  })
                 }
               />
               <DataRow
@@ -155,11 +245,24 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
                 valueClassName="text-sm font-semibold text-foreground"
                 data-testid="gross-profit-value-front"
                 isInteractive={true}
-                onClick={() =>
-                  handleInteraction("REQUEST_NEW_CARD", {
-                    targetCardType: "price",
-                    originatingElement: "grossProfitMetric",
-                  } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                onClick={() => {
+                  if (!isSelectionMode)
+                    handleInteraction("REQUEST_NEW_CARD", {
+                      targetCardType: "price",
+                      originatingElement: "grossProfitMetric",
+                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                }}
+                isSelectionMode={isSelectionMode}
+                isSelected={isSelected(`${id}-gross-profit`)}
+                onSelect={() =>
+                  onSelect({
+                    sourceCardId: id,
+                    sourceCardSymbol: symbol,
+                    label: "Gross Profit",
+                    value: liveData.grossProfit,
+                    isMonetary: true,
+                    currency: currencyCode,
+                  })
                 }
               />
               <DataRow
@@ -172,11 +275,24 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
                 valueClassName="text-sm font-semibold text-foreground"
                 data-testid="operating-income-value-front"
                 isInteractive={true}
-                onClick={() =>
-                  handleInteraction("REQUEST_NEW_CARD", {
-                    targetCardType: "price",
-                    originatingElement: "operatingIncomeMetric",
-                  } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                onClick={() => {
+                  if (!isSelectionMode)
+                    handleInteraction("REQUEST_NEW_CARD", {
+                      targetCardType: "price",
+                      originatingElement: "operatingIncomeMetric",
+                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                }}
+                isSelectionMode={isSelectionMode}
+                isSelected={isSelected(`${id}-operating-income`)}
+                onSelect={() =>
+                  onSelect({
+                    sourceCardId: id,
+                    sourceCardSymbol: symbol,
+                    label: "Operating Income",
+                    value: liveData.operatingIncome,
+                    isMonetary: true,
+                    currency: currencyCode,
+                  })
                 }
               />
               <DataRow
@@ -186,11 +302,24 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
                 valueClassName="text-sm font-semibold text-foreground"
                 data-testid="net-income-value-front"
                 isInteractive={true}
-                onClick={() =>
-                  handleInteraction("REQUEST_NEW_CARD", {
-                    targetCardType: "price",
-                    originatingElement: "netIncomeMetric",
-                  } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                onClick={() => {
+                  if (!isSelectionMode)
+                    handleInteraction("REQUEST_NEW_CARD", {
+                      targetCardType: "price",
+                      originatingElement: "netIncomeMetric",
+                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                }}
+                isSelectionMode={isSelectionMode}
+                isSelected={isSelected(`${id}-net-income`)}
+                onSelect={() =>
+                  onSelect({
+                    sourceCardId: id,
+                    sourceCardSymbol: symbol,
+                    label: "Net Income",
+                    value: liveData.netIncome,
+                    isMonetary: true,
+                    currency: currencyCode,
+                  })
                 }
               />
               <DataRow
@@ -203,11 +332,24 @@ export const RevenueCardContent: React.FC<RevenueCardContentProps> = React.memo(
                 valueClassName="text-sm font-semibold text-foreground"
                 data-testid="fcf-value-front"
                 isInteractive={true}
-                onClick={() =>
-                  handleInteraction("REQUEST_NEW_CARD", {
-                    targetCardType: "price",
-                    originatingElement: "fcfMetric",
-                  } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                onClick={() => {
+                  if (!isSelectionMode)
+                    handleInteraction("REQUEST_NEW_CARD", {
+                      targetCardType: "price",
+                      originatingElement: "fcfMetric",
+                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                }}
+                isSelectionMode={isSelectionMode}
+                isSelected={isSelected(`${id}-free-cash-flow`)}
+                onSelect={() =>
+                  onSelect({
+                    sourceCardId: id,
+                    sourceCardSymbol: symbol,
+                    label: "Free Cash Flow",
+                    value: liveData.freeCashFlow,
+                    isMonetary: true,
+                    currency: currencyCode,
+                  })
                 }
               />
             </div>

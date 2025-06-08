@@ -1,41 +1,19 @@
 // src/components/game/cards/GenericCardContainerRenderer.tsx
 import React from "react";
 import BaseCard from "./base-card/BaseCard";
-import type { DisplayableCard, ConcreteCardData } from "../types";
-import type {
-  OnGenericInteraction,
-  CardActionContext,
-} from "./base-card/base-card.types";
+import type { ConcreteCardData } from "../types";
 import { cn } from "@/lib/utils";
+import {
+  type RegisteredCardRendererProps,
+  type SpecificCardContentComponent,
+} from "@/components/game/cardRenderers";
 
-// Props for the specific content component (e.g., PriceCardContent)
-interface SpecificCardContentComponentProps<
-  TCardDataType extends ConcreteCardData
-> {
-  cardData: TCardDataType;
-  isBackFace: boolean;
-  onGenericInteraction: OnGenericInteraction;
-}
-
-// Type for the ContentComponent itself
-type SpecificCardContentComponent<TCardDataType extends ConcreteCardData> =
-  React.ComponentType<SpecificCardContentComponentProps<TCardDataType>>;
-
-// Props for the GenericCardContainerRenderer
+// Define the component's own props by extending the registered props
 interface GenericCardContainerRendererProps<
   TCardDataType extends ConcreteCardData
-> {
-  cardData: DisplayableCard;
-  isFlipped: boolean;
-  onFlip: () => void;
-  cardContext: CardActionContext;
-  onDeleteRequest: (context: CardActionContext) => void;
-  className?: string;
-  innerCardClassName?: string;
-  onGenericInteraction: OnGenericInteraction;
+> extends RegisteredCardRendererProps {
   ContentComponent: SpecificCardContentComponent<TCardDataType>;
   expectedCardType: TCardDataType["type"];
-  children?: React.ReactNode; // <<< ADDED children prop here
 }
 
 export const GenericCardContainerRenderer = <
@@ -51,11 +29,14 @@ export const GenericCardContainerRenderer = <
   onGenericInteraction,
   ContentComponent,
   expectedCardType,
-  children, // <<< DESTRUCTURE children prop here
+  children,
+  isSelectionMode,
+  selectedDataItems,
+  onToggleItemSelection,
 }: GenericCardContainerRendererProps<TCardDataType>) => {
   if (cardData.type !== expectedCardType) {
     console.error(
-      `[GenericCardContainerRenderer] Mismatched card type for card ID ${cardData.id}. Expected ${expectedCardType}, got ${cardData.type}. This may indicate a problem in the card registry or data.`
+      `[GenericCardContainerRenderer] Mismatched card type for card ID ${cardData.id}. Expected ${expectedCardType}, got ${cardData.type}.`
     );
     return (
       <div
@@ -73,9 +54,13 @@ export const GenericCardContainerRenderer = <
 
   const specificCardData = cardData as unknown as TCardDataType;
 
+  // Ensure all props, including selection props, are passed down.
   const contentProps = {
     cardData: specificCardData,
     onGenericInteraction,
+    isSelectionMode,
+    selectedDataItems,
+    onToggleItemSelection,
   };
 
   const faceContentForBaseCard = (
@@ -96,7 +81,7 @@ export const GenericCardContainerRenderer = <
       className={className}
       innerCardClassName={innerCardClassName}
       onGenericInteraction={onGenericInteraction}>
-      {children} {/* <<< PASS children to BaseCard here */}
+      {children}
     </BaseCard>
   );
 };

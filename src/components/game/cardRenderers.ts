@@ -6,6 +6,7 @@ import type {
   CardActionContext,
 } from "@/components/game/cards/base-card/base-card.types";
 import type { DisplayableCard, ConcreteCardData } from "./types";
+import type { SelectedDataItem } from "@/hooks/useWorkspaceManager"; // NEW IMPORT
 
 /**
  * Common props expected by all registered card renderers (containers).
@@ -17,13 +18,16 @@ export interface RegisteredCardRendererProps {
   onFlip: () => void;
   cardContext: CardActionContext; // Contextual info about the card for actions
   onDeleteRequest: (context: CardActionContext) => void;
-  onHeaderIdentityClick?: (context: CardActionContext) => void; // Optional: For BaseCard header clicks
   className?: string; // For outer styling of the card component
   innerCardClassName?: string; // For styling the inner flippable surfaces
-  children?: React.ReactNode; // For potential future extensibility
+  children?: React.ReactNode;
 
-  // The primary generic interaction handler passed from the top
   onGenericInteraction: OnGenericInteraction;
+
+  // NEW PROPS
+  isSelectionMode: boolean;
+  selectedDataItems: SelectedDataItem[];
+  onToggleItemSelection: (item: SelectedDataItem) => void;
 }
 
 /**
@@ -36,6 +40,10 @@ export interface SpecificCardContentComponentProps<
   cardData: TCardDataType; // The specific, concrete data for this card type
   isBackFace: boolean;
   onGenericInteraction: OnGenericInteraction;
+  // NEW PROPS
+  isSelectionMode: boolean;
+  selectedDataItems: SelectedDataItem[];
+  onToggleItemSelection: (item: SelectedDataItem) => void;
 }
 
 /**

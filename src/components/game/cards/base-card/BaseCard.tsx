@@ -65,6 +65,7 @@ const CARD_TYPE_LABELS: Record<CardType, string> = {
   dividendshistory: "Dividends History",
   revenuebreakdown: "Revenue Breakdown",
   analystgrades: "Analyst Grades",
+  custom: "Custom",
 };
 
 const capitalize = (s: string): string => {
@@ -82,6 +83,11 @@ const CardTypeHeaderBadge: React.FC<{
     type: sourceCardType,
     companyName,
   } = cardContext;
+
+  // Selectively hide the badge for the 'custom' card type.
+  if (sourceCardType === "custom") {
+    return null;
+  }
 
   const handleBadgeClick = () => {
     const payload: RequestNewCardInteraction = {
@@ -414,7 +420,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
           <div
             className={cn(
               "flex-grow overflow-y-auto relative p-3 sm:p-4 md:px-5 md:pb-5 md:pt-2",
-              backData?.description ? "border-t" : "" // Add border-t only if description was present
+              backData?.description ? "border-t" : ""
             )}>
             {backContent}
           </div>

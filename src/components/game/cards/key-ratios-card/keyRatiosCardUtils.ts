@@ -1,4 +1,5 @@
 // src/components/game/cards/key-ratios-card/keyRatiosCardUtils.ts
+import { ok, err, fromPromise, Result } from "neverthrow";
 import type {
   KeyRatiosCardData,
   KeyRatiosCardStaticData,
@@ -21,9 +22,15 @@ import type { Database } from "@/lib/supabase/database.types";
 import type { ProfileDBRow } from "@/hooks/useStockData";
 import { applyProfileCoreUpdates } from "../cardUtils";
 
-// Corrected: Use a type alias instead of an empty interface extension
 type RatiosTtmDBRow = Database["public"]["Tables"]["ratios_ttm"]["Row"];
 type ProfileDBRowFromSupabase = Database["public"]["Tables"]["profiles"]["Row"];
+
+class KeyRatiosCardError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "KeyRatiosCardError";
+  }
+}
 
 function mapDbRowToLiveData(dbRow: RatiosTtmDBRow): KeyRatiosCardLiveData {
   return {
@@ -95,107 +102,80 @@ async function initializeKeyRatiosCard({
   supabase,
   toast,
   activeCards,
-}: CardInitializationContext): Promise<DisplayableCard | null> {
-  try {
-    const profileCardForSymbol = activeCards?.find(
-      (c) => c.symbol === symbol && c.type === "profile"
-    ) as ProfileDBRowFromSupabase | undefined;
+}: CardInitializationContext): Promise<
+  Result<DisplayableCard, KeyRatiosCardError>
+> {
+  const profileCardForSymbol = activeCards?.find(
+    (c) => c.symbol === symbol && c.type === "profile"
+  ) as ProfileDBRowFromSupabase | undefined;
 
-    let fetchedProfileInfo = {
-      companyName: profileCardForSymbol?.company_name ?? symbol,
-      logoUrl: profileCardForSymbol?.image ?? null,
-      websiteUrl: profileCardForSymbol?.website ?? null,
-      currency: profileCardForSymbol?.currency ?? null,
-    };
+  let fetchedProfileInfo = {
+    companyName: profileCardForSymbol?.company_name ?? symbol,
+    logoUrl: profileCardForSymbol?.image ?? null,
+    websiteUrl: profileCardForSymbol?.website ?? null,
+    currency: profileCardForSymbol?.currency ?? null,
+  };
 
-    if (!profileCardForSymbol) {
-      const { data: profileData, error: profileError } = await supabase
+  if (!profileCardForSymbol) {
+    const profileResult = await fromPromise(
+      supabase
         .from("profiles")
         .select("company_name, image, website, currency")
         .eq("symbol", symbol)
-        .maybeSingle();
-
-      if (profileError) {
-        console.warn(
-          `[initializeKeyRatiosCard] Error fetching profile for ${symbol}:`,
-          profileError.message
-        );
-      }
-      fetchedProfileInfo = {
-        companyName:
-          (profileData as ProfileDBRowFromSupabase | null)?.company_name ??
-          symbol,
-        logoUrl:
-          (profileData as ProfileDBRowFromSupabase | null)?.image ?? null,
-        websiteUrl:
-          (profileData as ProfileDBRowFromSupabase | null)?.website ?? null,
-        currency:
-          (profileData as ProfileDBRowFromSupabase | null)?.currency ?? null,
-      };
-    }
-
-    const { data: ratiosData, error: ratiosError } = await supabase
-      .from("ratios_ttm")
-      .select("*")
-      .eq("symbol", symbol)
-      .single();
-
-    if (ratiosError) {
-      console.error(
-        `[initializeKeyRatiosCard] Supabase error fetching TTM ratios for ${symbol}:`,
-        ratiosError
-      );
-      if (ratiosError.code === "PGRST116") {
-        if (toast) {
-          toast({
-            title: "Ratios Not Found",
-            description: `No TTM ratios currently available for ${symbol}.`,
-            variant: "default",
-          });
-        }
-        return null;
-      }
-      throw ratiosError;
-    }
-
-    if (!ratiosData) {
-      if (toast) {
-        toast({
-          title: "Ratios Data Missing",
-          description: `TTM ratios data is unexpectedly missing for ${symbol}.`,
-          variant: "destructive",
-        });
-      }
-      return null;
-    }
-
-    const concreteCardData = constructKeyRatiosCardData(
-      ratiosData as RatiosTtmDBRow,
-      fetchedProfileInfo
+        .maybeSingle(),
+      (e) =>
+        new KeyRatiosCardError(
+          `Failed to fetch profile: ${(e as Error).message}`
+        )
     );
-    const cardState: Pick<DisplayableCardState, "isFlipped"> = {
-      isFlipped: false,
-    };
-    return { ...concreteCardData, ...cardState };
-  } catch (error: unknown) {
-    const errorMessage =
-      error instanceof Error ? error.message : "An unknown error occurred.";
-    if (process.env.NODE_ENV === "development") {
-      console.error(
-        `[initializeKeyRatiosCard] Error initializing Key Ratios card for ${symbol}:`,
-        errorMessage,
-        error
-      );
+    if (profileResult.isOk() && profileResult.value.data) {
+      const profileData = profileResult.value.data;
+      fetchedProfileInfo = {
+        companyName: profileData.company_name ?? symbol,
+        logoUrl: profileData.image ?? null,
+        websiteUrl: profileData.website ?? null,
+        currency: profileData.currency ?? null,
+      };
+    } else if (profileResult.isErr()) {
+      console.warn(profileResult.error.message);
     }
-    if (toast) {
-      toast({
-        title: "Error Initializing Key Ratios Card",
-        description: `Could not fetch TTM ratios for ${symbol}. ${errorMessage}`,
-        variant: "destructive",
-      });
-    }
-    return null;
   }
+
+  const ratiosResult = await fromPromise(
+    supabase.from("ratios_ttm").select("*").eq("symbol", symbol).single(),
+    (e) => new KeyRatiosCardError((e as Error).message)
+  );
+
+  if (ratiosResult.isErr()) {
+    const error = ratiosResult.error;
+    const description = error.message.includes("PGRST116")
+      ? `No TTM ratios currently available for ${symbol}.`
+      : `Could not fetch TTM ratios for ${symbol}: ${error.message}`;
+    if (toast) {
+      toast({ title: "Ratios Not Found", description, variant: "default" });
+    }
+    return err(new KeyRatiosCardError(description));
+  }
+
+  const ratiosData = ratiosResult.value.data;
+
+  if (!ratiosData) {
+    // This case should theoretically be covered by the .single() error above, but as a safeguard:
+    return err(
+      new KeyRatiosCardError(
+        `TTM ratios data is unexpectedly missing for ${symbol}.`
+      )
+    );
+  }
+
+  const concreteCardData = constructKeyRatiosCardData(
+    ratiosData as RatiosTtmDBRow,
+    fetchedProfileInfo
+  );
+  const cardState: Pick<DisplayableCardState, "isFlipped"> = {
+    isFlipped: false,
+  };
+  return ok({ ...concreteCardData, ...cardState });
 }
 registerCardInitializer("keyratios", initializeKeyRatiosCard);
 

@@ -5,6 +5,7 @@ import React from "react";
 import GameCard from "@/components/game/GameCard";
 import type { DisplayableCard } from "./types";
 import type { OnGenericInteraction } from "./cards/base-card/base-card.types";
+import type { SelectedDataItem } from "@/hooks/useWorkspaceManager";
 
 import {
   AlertDialog,
@@ -25,6 +26,10 @@ interface ActiveCardsProps {
   onConfirmDeletion: () => void;
   onCancelDeletion: () => void;
   onGenericInteraction: OnGenericInteraction;
+  // NEW PROPS
+  isSelectionMode: boolean;
+  selectedDataItems: SelectedDataItem[];
+  onToggleItemSelection: (item: SelectedDataItem) => void;
 }
 
 export const ActiveCards: React.FC<ActiveCardsProps> = ({
@@ -35,6 +40,10 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
   onConfirmDeletion,
   onCancelDeletion,
   onGenericInteraction,
+  // NEW PROPS
+  isSelectionMode,
+  selectedDataItems,
+  onToggleItemSelection,
 }) => {
   const [hasMounted, setHasMounted] = React.useState(false);
   React.useEffect(() => {
@@ -68,6 +77,10 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
                 onToggleFlip={onToggleFlipCard}
                 onDeleteCardRequest={onDeleteCardRequest}
                 onGenericInteraction={onGenericInteraction}
+                // NEW PROPS PASSED DOWN
+                isSelectionMode={isSelectionMode}
+                selectedDataItems={selectedDataItems}
+                onToggleItemSelection={onToggleItemSelection}
               />
             </div>
           ))}

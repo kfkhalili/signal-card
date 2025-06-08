@@ -1,4 +1,5 @@
 // src/components/game/cards/solvency-card/solvencyCardUtils.ts
+import { ok, err, fromPromise, Result } from "neverthrow";
 import type {
   SolvencyCardData,
   SolvencyCardStaticData,
@@ -27,6 +28,13 @@ import { applyProfileCoreUpdates } from "../cardUtils";
 type FinancialStatementDBRowFromSupabase =
   Database["public"]["Tables"]["financial_statements"]["Row"];
 type ProfileDBRowFromSupabase = Database["public"]["Tables"]["profiles"]["Row"];
+
+class SolvencyCardError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SolvencyCardError";
+  }
+}
 
 function constructSolvencyCardData(
   dbRow: FinancialStatementDBRowFromSupabase,
@@ -116,40 +124,46 @@ async function initializeSolvencyCard({
   supabase,
   toast,
   activeCards,
-}: CardInitializationContext): Promise<DisplayableCard | null> {
-  try {
-    const profileCardForSymbol = activeCards?.find(
-      (c) => c.symbol === symbol && c.type === "profile"
-    ) as ProfileDBRowFromSupabase | undefined;
+}: CardInitializationContext): Promise<
+  Result<DisplayableCard, SolvencyCardError>
+> {
+  const profileCardForSymbol = activeCards?.find(
+    (c) => c.symbol === symbol && c.type === "profile"
+  ) as ProfileDBRowFromSupabase | undefined;
 
-    const fetchedProfileInfo = {
-      companyName: profileCardForSymbol?.company_name ?? symbol,
-      logoUrl: profileCardForSymbol?.image ?? null,
-      websiteUrl: profileCardForSymbol?.website ?? null,
-    };
-    if (!profileCardForSymbol) {
-      const { data: profileData, error: profileError } = await supabase
+  let fetchedProfileInfo = {
+    companyName: profileCardForSymbol?.company_name ?? symbol,
+    logoUrl: profileCardForSymbol?.image ?? null,
+    websiteUrl: profileCardForSymbol?.website ?? null,
+  };
+
+  if (!profileCardForSymbol) {
+    const profileResult = await fromPromise(
+      supabase
         .from("profiles")
         .select("company_name, image, website")
         .eq("symbol", symbol)
-        .maybeSingle();
+        .maybeSingle(),
+      (e) =>
+        new SolvencyCardError(
+          `Failed to fetch profile: ${(e as Error).message}`
+        )
+    );
 
-      if (profileError) {
-        console.warn(
-          `[initializeSolvencyCard] Error fetching profile for ${symbol}:`,
-          profileError.message
-        );
-      }
-      fetchedProfileInfo.companyName =
-        (profileData as ProfileDBRowFromSupabase | null)?.company_name ??
-        symbol;
-      fetchedProfileInfo.logoUrl =
-        (profileData as ProfileDBRowFromSupabase | null)?.image ?? null;
-      fetchedProfileInfo.websiteUrl =
-        (profileData as ProfileDBRowFromSupabase | null)?.website ?? null;
+    if (profileResult.isOk() && profileResult.value.data) {
+      const profileData = profileResult.value.data as ProfileDBRowFromSupabase;
+      fetchedProfileInfo = {
+        companyName: profileData.company_name ?? symbol,
+        logoUrl: profileData.image ?? null,
+        websiteUrl: profileData.website ?? null,
+      };
+    } else if (profileResult.isErr()) {
+      console.warn(profileResult.error.message);
     }
+  }
 
-    const { data: statementData, error: statementError } = await supabase
+  const statementResult = await fromPromise(
+    supabase
       .from("financial_statements")
       .select(
         "symbol, date, period, reported_currency, filing_date, accepted_date, fiscal_year, balance_sheet_payload, cash_flow_payload"
@@ -158,61 +172,42 @@ async function initializeSolvencyCard({
       .order("date", { ascending: false })
       .order("period", { ascending: false })
       .limit(1)
-      .maybeSingle();
+      .maybeSingle(),
+    (e) =>
+      new SolvencyCardError(
+        `Failed to fetch financial statement: ${(e as Error).message}`
+      )
+  );
 
-    if (statementError) {
-      console.error(
-        `[initializeSolvencyCard] Supabase error fetching financial statement for ${symbol}:`,
-        statementError
-      );
-      throw statementError;
-    }
-
-    if (statementData) {
-      const financialStatement =
-        statementData as FinancialStatementDBRowFromSupabase;
-      const concreteCardData = constructSolvencyCardData(
-        financialStatement,
-        fetchedProfileInfo
-      );
-
-      const cardState: Pick<DisplayableCardState, "isFlipped"> = {
-        isFlipped: false,
-      };
-
-      return {
-        ...concreteCardData,
-        ...cardState,
-      } as SolvencyCardData & DisplayableCardState;
-    } else {
-      if (toast) {
-        toast({
-          title: "Statement Not Found",
-          description: `No financial statements currently available for ${symbol} to create a Solvency Card.`,
-          variant: "default",
-        });
-      }
-      return null;
-    }
-  } catch (error: unknown) {
-    const errorMessage =
-      error instanceof Error ? error.message : "An unknown error occurred.";
-    if (process.env.NODE_ENV === "development") {
-      console.error(
-        `[initializeSolvencyCard] Error initializing solvency card for ${symbol}:`,
-        errorMessage,
-        error
-      );
-    }
-    if (toast) {
-      toast({
-        title: "Error Initializing Solvency Card",
-        description: `Could not fetch financial data for ${symbol}. ${errorMessage}`,
-        variant: "destructive",
-      });
-    }
-    return null;
+  if (statementResult.isErr()) {
+    return err(statementResult.error);
   }
+
+  const statementData = statementResult.value.data;
+
+  if (statementData) {
+    const financialStatement =
+      statementData as FinancialStatementDBRowFromSupabase;
+    const concreteCardData = constructSolvencyCardData(
+      financialStatement,
+      fetchedProfileInfo
+    );
+    const cardState: Pick<DisplayableCardState, "isFlipped"> = {
+      isFlipped: false,
+    };
+    return ok({ ...concreteCardData, ...cardState });
+  }
+
+  if (toast) {
+    toast({
+      title: "Statement Not Found",
+      description: `No financial statements currently available for ${symbol} to create a Solvency Card.`,
+      variant: "default",
+    });
+  }
+  return err(
+    new SolvencyCardError(`No financial statements found for ${symbol}.`)
+  );
 }
 
 registerCardInitializer("solvency", initializeSolvencyCard);
@@ -325,9 +320,9 @@ const handleSolvencyCardProfileUpdate: CardUpdateHandler<
 
   if (coreDataChanged) {
     const newBackDataDescription: BaseCardBackData = {
-      description: `Key solvency metrics for ${
-        updatedCardData.companyName // Use the new company name
-      } (${updatedCardData.staticData.periodLabel}, ending ${
+      description: `Key solvency metrics for ${updatedCardData.companyName} (${
+        updatedCardData.staticData.periodLabel
+      }, ending ${
         updatedCardData.staticData.statementDate || "N/A"
       }). Includes assets, liabilities, debt, and cash flow.`,
     };
