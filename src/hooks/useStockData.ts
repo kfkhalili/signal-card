@@ -1,8 +1,8 @@
 // src/hooks/useStockData.ts
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { fromPromise, Result, ok } from "neverthrow";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
+import { useAuth } from "@/contexts/AuthContext"; // <<< 1. IMPORT useAuth
 import type { Database } from "@/lib/supabase/database.types";
 import type { FinancialStatementDBRow } from "@/lib/supabase/realtime-service";
 
@@ -108,7 +108,8 @@ export function useStockData({
     "Initializing..."
   );
 
-  const supabaseClient = useMemo(() => createSupabaseBrowserClient(false), []);
+  // <<< 2. GET THE CLIENT FROM THE AUTH CONTEXT
+  const { supabase: supabaseClient } = useAuth();
   const isMountedRef = useRef<boolean>(false);
 
   const symbolChannelRef = useRef<RealtimeChannel | null>(null);

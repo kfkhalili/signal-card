@@ -1,7 +1,7 @@
 // src/components/workspace/AddCardForm.tsx
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -18,7 +18,6 @@ import {
 } from "@/components/ui/dialog";
 import {
   Command,
-  CommandDialog,
   CommandEmpty,
   CommandGroup,
   CommandInput,
@@ -31,16 +30,10 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage,
 } from "@/components/ui/form";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { PlusCircle, Check, ChevronsUpDown, Search } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { PlusCircle, ArrowLeft } from "lucide-react";
 import type { CardType } from "@/components/game/cards/base-card/base-card.types";
-import { cn } from "@/lib/utils";
 
 const AVAILABLE_CARD_TYPES: { value: CardType; label: string }[] = [
   { value: "profile", label: "Profile Card" },
@@ -57,17 +50,11 @@ const AVAILABLE_CARD_TYPES: { value: CardType; label: string }[] = [
 const AddCardFormSchema = z.object({
   symbol: z
     .string()
-    .min(1, { message: "Symbol cannot be empty." })
-    .max(10, { message: "Symbol is too long." })
-    .regex(/^[A-Za-z0-9.-]+$/, { message: "Invalid characters in symbol." })
+    .min(1, { message: "A symbol must be selected." })
+    .max(10)
     .transform((val) => val.toUpperCase()),
   cardTypes: z
-    .array(
-      z.custom<CardType>(
-        (val) => AVAILABLE_CARD_TYPES.some((ct) => ct.value === val),
-        { message: "Invalid card type selected." }
-      )
-    )
+    .array(z.custom<CardType>())
     .nonempty({ message: "Please select at least one card type." }),
 });
 
@@ -92,10 +79,8 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
   lockedSymbolForRegularUser,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [isSymbolDialogOpen, setIsSymbolDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isCardTypePopoverOpen, setIsCardTypePopoverOpen] = useState(false);
-  const cardTypeTriggerRef = useRef<HTMLButtonElement>(null);
+  const [view, setView] = useState<"symbol" | "types">("symbol");
 
   const form = useForm<AddCardFormValues>({
     resolver: zodResolver(AddCardFormSchema),
@@ -107,216 +92,154 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      const defaultSymbol = lockedSymbolForRegularUser || "";
       form.reset({
-        symbol: defaultSymbol,
-        cardTypes: form.getValues("cardTypes") || ["profile"],
+        symbol: lockedSymbolForRegularUser || "",
+        cardTypes: ["profile"],
       });
-      if (lockedSymbolForRegularUser) {
-        setTimeout(() => cardTypeTriggerRef.current?.focus(), 50);
-      } else {
-        setTimeout(() => setIsSymbolDialogOpen(true), 50);
-      }
+      setView(lockedSymbolForRegularUser ? "types" : "symbol");
+      setIsSubmitting(false);
     }
   }, [isOpen, lockedSymbolForRegularUser, form]);
 
   const handleSubmit = async (values: AddCardFormValues) => {
     setIsSubmitting(true);
-    const finalSymbol = lockedSymbolForRegularUser || values.symbol;
-    await onAddCard({ ...values, symbol: finalSymbol.toUpperCase() });
+    await onAddCard(values);
     setIsSubmitting(false);
     setIsOpen(false);
   };
 
-  const getCardTypesDisplayText = (selectedTypes?: CardType[]): string => {
-    const numSelected = selectedTypes?.length ?? 0;
-    if (numSelected === 0) return "Select card type(s)...";
-    if (numSelected === 1 && selectedTypes) {
-      const typeValue = selectedTypes[0];
-      return (
-        AVAILABLE_CARD_TYPES.find((ct) => ct.value === typeValue)?.label ||
-        typeValue
-      );
-    }
-    return `${numSelected} types selected`;
-  };
-
-  return (
-    <>
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogTrigger asChild>
-          {triggerButton || (
-            <Button variant="outline">
-              <PlusCircle className="mr-2 h-4 w-4" /> Add Card(s)
-            </Button>
-          )}
-        </DialogTrigger>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Add New Card(s) to Workspace</DialogTitle>
-            <DialogDescription>
-              {lockedSymbolForRegularUser
-                ? `Adding card(s) for symbol: ${lockedSymbolForRegularUser}. Select card type(s).`
-                : "Enter a symbol and select card type(s)."}
-            </DialogDescription>
-          </DialogHeader>
-          <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(handleSubmit)}
-              className="space-y-4 pt-2">
-              {!lockedSymbolForRegularUser && (
-                <FormField
-                  control={form.control}
-                  name="symbol"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Symbol</FormLabel>
-                      <FormControl>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="w-full justify-between font-normal"
-                          onClick={() => setIsSymbolDialogOpen(true)}>
-                          <span className="truncate">
-                            {field.value || "Select a symbol..."}
-                          </span>
-                          <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-              <FormField
-                control={form.control}
-                name="cardTypes"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Card Type(s)</FormLabel>
-                    <Popover
-                      modal={true}
-                      open={isCardTypePopoverOpen}
-                      onOpenChange={setIsCardTypePopoverOpen}>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            ref={cardTypeTriggerRef}
-                            variant="outline"
-                            role="combobox"
-                            className={cn(
-                              "w-full justify-between font-normal",
-                              !field.value?.length && "text-muted-foreground"
-                            )}
-                            disabled={isSubmitting}>
-                            <span className="truncate">
-                              {getCardTypesDisplayText(field.value)}
-                            </span>
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                        <Command>
-                          <CommandInput placeholder="Search card types..." />
-                          <CommandList>
-                            <CommandEmpty>No card type found.</CommandEmpty>
-                            <CommandGroup>
-                              {AVAILABLE_CARD_TYPES.map((typeOpt) => (
-                                <CommandItem
-                                  key={typeOpt.value}
-                                  value={typeOpt.label}
-                                  onSelect={() => {
-                                    const currentSelection = field.value || [];
-                                    const isSelected =
-                                      currentSelection.includes(typeOpt.value);
-                                    field.onChange(
-                                      isSelected
-                                        ? currentSelection.filter(
-                                            (v) => v !== typeOpt.value
-                                          )
-                                        : [...currentSelection, typeOpt.value]
-                                    );
-                                  }}>
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      (field.value || []).includes(
-                                        typeOpt.value
-                                      )
-                                        ? "opacity-100"
-                                        : "opacity-0"
-                                    )}
-                                  />
-                                  {typeOpt.label}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <DialogFooter className="pt-4">
-                <DialogClose asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={isSubmitting}>
-                    Cancel
-                  </Button>
-                </DialogClose>
-                <Button
-                  type="submit"
-                  disabled={
-                    isSubmitting ||
-                    (!form.getValues("symbol") &&
-                      !lockedSymbolForRegularUser) ||
-                    (form.getValues("cardTypes") || []).length === 0
-                  }>
-                  {isSubmitting ? "Adding..." : "Add Card(s)"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-      <CommandDialog
-        open={isSymbolDialogOpen}
-        onOpenChange={setIsSymbolDialogOpen}
-        title="Select a Symbol"
-        description="Search for a stock symbol and select one to add to the form.">
+  const SymbolSelector = (
+    <div className="pt-2">
+      <DialogTitle>Select a Symbol</DialogTitle>
+      <DialogDescription className="pt-1">
+        Search for a stock symbol to add cards for.
+      </DialogDescription>
+      <Command className="rounded-lg border shadow-md mt-4">
         <CommandInput placeholder="Type a symbol to search..." />
-        <CommandList>
+        <CommandList className="max-h-[250px]">
           <CommandEmpty>No results found.</CommandEmpty>
           <CommandGroup>
             {supportedSymbols.map((suggestion) => (
               <CommandItem
                 key={suggestion.value}
-                value={suggestion.value}
-                onSelect={(currentValue) => {
-                  form.setValue("symbol", currentValue.toUpperCase(), {
+                value={suggestion.label}
+                onSelect={() => {
+                  form.setValue("symbol", suggestion.value, {
                     shouldValidate: true,
                   });
-                  setIsSymbolDialogOpen(false);
+                  setView("types");
                 }}>
-                <Check
-                  className={cn(
-                    "mr-2 h-4 w-4",
-                    form.getValues("symbol") === suggestion.value
-                      ? "opacity-100"
-                      : "opacity-0"
-                  )}
-                />
                 {suggestion.label}
               </CommandItem>
             ))}
           </CommandGroup>
         </CommandList>
-      </CommandDialog>
-    </>
+      </Command>
+    </div>
+  );
+
+  const CardTypeSelector = (
+    <div>
+      <DialogHeader className="flex flex-row items-center gap-2">
+        {!lockedSymbolForRegularUser && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => setView("symbol")}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        )}
+        <div>
+          <DialogTitle>Add Cards for {form.getValues("symbol")}</DialogTitle>
+          <DialogDescription>
+            Select one or more card types to add.
+          </DialogDescription>
+        </div>
+      </DialogHeader>
+      <div className="py-4">
+        <FormField
+          control={form.control}
+          name="cardTypes"
+          render={() => (
+            <FormItem className="space-y-3">
+              <div className="relative">
+                <div className="max-h-[250px] overflow-y-auto pr-2 space-y-2">
+                  {AVAILABLE_CARD_TYPES.map((item) => (
+                    <FormField
+                      key={item.value}
+                      control={form.control}
+                      name="cardTypes"
+                      render={({ field }) => (
+                        <FormItem
+                          key={item.value}
+                          className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 hover:bg-accent hover:text-accent-foreground transition-colors">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value?.includes(item.value)}
+                              onCheckedChange={(checked) => {
+                                const currentValue = field.value ?? [];
+                                return checked
+                                  ? field.onChange([
+                                      ...currentValue,
+                                      item.value,
+                                    ])
+                                  : field.onChange(
+                                      currentValue?.filter(
+                                        (value) => value !== item.value
+                                      )
+                                    );
+                              }}
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal cursor-pointer w-full">
+                            {item.label}
+                          </FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                  ))}
+                </div>
+                <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background to-transparent pointer-events-none" />
+              </div>
+            </FormItem>
+          )}
+        />
+      </div>
+      <DialogFooter>
+        <DialogClose asChild>
+          <Button type="button" variant="outline" disabled={isSubmitting}>
+            Cancel
+          </Button>
+        </DialogClose>
+        <Button
+          type="submit"
+          disabled={
+            isSubmitting || (form.getValues("cardTypes") || []).length === 0
+          }>
+          {isSubmitting ? "Adding..." : "Add Card(s)"}
+        </Button>
+      </DialogFooter>
+    </div>
+  );
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        {triggerButton || (
+          <Button variant="outline">
+            <PlusCircle className="mr-2 h-4 w-4" /> Add Card(s)
+          </Button>
+        )}
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)}>
+            {view === "symbol" ? SymbolSelector : CardTypeSelector}
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
   );
 };
