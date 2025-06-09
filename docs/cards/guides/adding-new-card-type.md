@@ -1,6 +1,6 @@
 # **Process for Adding a New Card Type: "Revenue Card" Example**
 
-Adding a new card type to the FinCard Explorer application involves a series of steps to define its data structure, appearance, behavior, and integration with the existing system. This document outlines the process, reflecting the updated generic interaction model, using the "Revenue Card" as an example.
+Adding a new card type to the Tickered application involves a series of steps to define its data structure, appearance, behavior, and integration with the existing system. This document outlines the process, reflecting the updated generic interaction model, using the "Revenue Card" as an example.
 
 ## **1\. Define Core Types & Card-Specific Data Structures**
 
