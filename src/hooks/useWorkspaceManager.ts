@@ -108,8 +108,6 @@ export function useWorkspaceManager() {
     return INITIAL_ACTIVE_CARDS;
   });
 
-  const [workspaceSymbolForRegularUser, setWorkspaceSymbolForRegularUser] =
-    useState<string | null>(null);
   const [isAddingCardInProgress, setIsAddingCardInProgress] =
     useState<boolean>(false);
   const [exchangeStatuses, setExchangeStatuses] = useState<
@@ -154,14 +152,6 @@ export function useWorkspaceManager() {
 
     fetchAllSymbols();
   }, [supabase]);
-
-  useEffect(() => {
-    if (activeCards.length > 0) {
-      setWorkspaceSymbolForRegularUser(activeCards[0].symbol);
-    } else if (activeCards.length === 0) {
-      setWorkspaceSymbolForRegularUser(null);
-    }
-  }, [activeCards]);
 
   useEffect(() => {
     setCardsInLocalStorage(activeCards as unknown as StoredCardRawArray);
@@ -603,7 +593,6 @@ export function useWorkspaceManager() {
 
   const clearWorkspace = useCallback(() => {
     setActiveCards(INITIAL_ACTIVE_CARDS);
-    setWorkspaceSymbolForRegularUser(null);
     setTimeout(
       () =>
         toast({
@@ -632,7 +621,6 @@ export function useWorkspaceManager() {
   return {
     activeCards,
     setActiveCards,
-    workspaceSymbolForRegularUser,
     isAddingCardInProgress,
     addCardToWorkspace,
     clearWorkspace,

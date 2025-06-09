@@ -45,7 +45,6 @@ export default function WorkspacePage() {
   const {
     activeCards,
     setActiveCards,
-    workspaceSymbolForRegularUser,
     isAddingCardInProgress,
     addCardToWorkspace,
     clearWorkspace,
@@ -178,7 +177,6 @@ export default function WorkspacePage() {
             <AddCardForm
               onAddCard={addCardToWorkspace}
               supportedSymbols={supportedSymbols}
-              lockedSymbolForRegularUser={workspaceSymbolForRegularUser}
             />
           </div>
         </div>
@@ -226,7 +224,6 @@ export default function WorkspacePage() {
             <AddCardForm
               onAddCard={addCardToWorkspace}
               supportedSymbols={supportedSymbols}
-              lockedSymbolForRegularUser={workspaceSymbolForRegularUser}
               triggerButton={
                 <Button size="lg">
                   <PlusCircle className="mr-2 h-5 w-5" /> Add Your First Card
