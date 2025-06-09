@@ -78,6 +78,13 @@ export interface SelectedDataItem {
   isValueAsPercentage?: boolean;
 }
 
+type SortKey = "symbol" | "type" | "createdAt";
+type SortOrder = "asc" | "desc";
+export interface SortConfig {
+  key: SortKey;
+  order: SortOrder;
+}
+
 const getConcreteCardData = (card: DisplayableCard): ConcreteCardData => {
   const cardClone = { ...card };
   delete (cardClone as Partial<DisplayableCardState>).isFlipped;
@@ -108,8 +115,6 @@ export function useWorkspaceManager() {
     return INITIAL_ACTIVE_CARDS;
   });
 
-  const [workspaceSymbolForRegularUser, setWorkspaceSymbolForRegularUser] =
-    useState<string | null>(null);
   const [isAddingCardInProgress, setIsAddingCardInProgress] =
     useState<boolean>(false);
   const [exchangeStatuses, setExchangeStatuses] = useState<
@@ -123,6 +128,32 @@ export function useWorkspaceManager() {
   const [selectedDataItems, setSelectedDataItems] = useState<
     SelectedDataItem[]
   >([]);
+  const [sortConfig, setSortConfig] = useState<SortConfig>({
+    key: "createdAt",
+    order: "desc",
+  });
+
+  const displayedCards = useMemo(() => {
+    const cardsToSort = [...activeCards];
+    cardsToSort.sort((a, b) => {
+      const { key, order } = sortConfig;
+
+      if (key === "createdAt") {
+        return order === "asc"
+          ? a.createdAt - b.createdAt
+          : b.createdAt - a.createdAt;
+      }
+
+      const valA = (key === "symbol" ? a.symbol : a.type).toLowerCase();
+      const valB = (key === "symbol" ? b.symbol : b.type).toLowerCase();
+
+      if (valA < valB) return order === "asc" ? -1 : 1;
+      if (valA > valB) return order === "asc" ? 1 : -1;
+
+      return b.createdAt - a.createdAt;
+    });
+    return cardsToSort;
+  }, [activeCards, sortConfig]);
 
   useEffect(() => {
     const fetchAllSymbols = async () => {
@@ -156,14 +187,6 @@ export function useWorkspaceManager() {
   }, [supabase]);
 
   useEffect(() => {
-    if (activeCards.length > 0) {
-      setWorkspaceSymbolForRegularUser(activeCards[0].symbol);
-    } else if (activeCards.length === 0) {
-      setWorkspaceSymbolForRegularUser(null);
-    }
-  }, [activeCards]);
-
-  useEffect(() => {
     setCardsInLocalStorage(activeCards as unknown as StoredCardRawArray);
   }, [activeCards, setCardsInLocalStorage]);
 
@@ -171,7 +194,6 @@ export function useWorkspaceManager() {
     const symbols = new Set<string>();
     activeCards.forEach((card) => {
       if (card.type !== "custom") {
-        // Exclude custom cards from this logic
         symbols.add(card.symbol);
       }
     });
@@ -353,10 +375,10 @@ export function useWorkspaceManager() {
                 if (sourceIndex !== -1) {
                   updatedCards.splice(sourceIndex + 1, 0, newCardToAdd);
                 } else {
-                  updatedCards.push(newCardToAdd);
+                  updatedCards.unshift(newCardToAdd);
                 }
               } else {
-                updatedCards.push(newCardToAdd);
+                updatedCards.unshift(newCardToAdd);
               }
               return updatedCards;
             });
@@ -603,7 +625,6 @@ export function useWorkspaceManager() {
 
   const clearWorkspace = useCallback(() => {
     setActiveCards(INITIAL_ACTIVE_CARDS);
-    setWorkspaceSymbolForRegularUser(null);
     setTimeout(
       () =>
         toast({
@@ -630,9 +651,8 @@ export function useWorkspaceManager() {
   );
 
   return {
-    activeCards,
+    activeCards: displayedCards,
     setActiveCards,
-    workspaceSymbolForRegularUser,
     isAddingCardInProgress,
     addCardToWorkspace,
     clearWorkspace,
@@ -646,5 +666,7 @@ export function useWorkspaceManager() {
     selectedDataItems,
     handleToggleItemSelection,
     createCustomStaticCard,
+    sortConfig,
+    setSortConfig,
   };
 }

@@ -69,14 +69,12 @@ interface AddCardFormProps {
   onAddCard: (values: AddCardFormValues) => Promise<void>;
   supportedSymbols: SymbolSuggestion[];
   triggerButton?: React.ReactNode;
-  lockedSymbolForRegularUser?: string | null;
 }
 
 export const AddCardForm: React.FC<AddCardFormProps> = ({
   onAddCard,
   supportedSymbols,
   triggerButton,
-  lockedSymbolForRegularUser,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -85,7 +83,7 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
   const form = useForm<AddCardFormValues>({
     resolver: zodResolver(AddCardFormSchema),
     defaultValues: {
-      symbol: lockedSymbolForRegularUser || "",
+      symbol: "",
       cardTypes: ["profile"],
     },
   });
@@ -93,13 +91,13 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
   useEffect(() => {
     if (isOpen) {
       form.reset({
-        symbol: lockedSymbolForRegularUser || "",
+        symbol: "",
         cardTypes: ["profile"],
       });
-      setView(lockedSymbolForRegularUser ? "types" : "symbol");
+      setView("symbol");
       setIsSubmitting(false);
     }
-  }, [isOpen, lockedSymbolForRegularUser, form]);
+  }, [isOpen, form]);
 
   const handleSubmit = async (values: AddCardFormValues) => {
     setIsSubmitting(true);
@@ -141,16 +139,14 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
   const CardTypeSelector = (
     <div>
       <DialogHeader className="flex flex-row items-center gap-2">
-        {!lockedSymbolForRegularUser && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => setView("symbol")}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={() => setView("symbol")}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
         <div>
           <DialogTitle>Add Cards for {form.getValues("symbol")}</DialogTitle>
           <DialogDescription>

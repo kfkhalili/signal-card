@@ -9,7 +9,21 @@ import { StockDataHandler } from "@/components/workspace/StockDataHandler";
 import MarketDataStatusBanner from "@/components/workspace/MarketStatusBanner";
 import { CustomCardCreatorPanel } from "@/components/workspace/CustomCardCreatorPanel";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, RefreshCw, Loader2, Edit, X } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  PlusCircle,
+  RefreshCw,
+  Loader2,
+  Edit,
+  X,
+  ArrowUpDown,
+} from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,6 +40,7 @@ import "@/components/game/cards/initializers";
 import "@/components/game/cards/updateHandlerInitializer";
 
 import { useWorkspaceManager } from "@/hooks/useWorkspaceManager";
+import type { SortConfig } from "@/hooks/useWorkspaceManager";
 import ActiveCardsSection from "@/components/game/ActiveCardsSection";
 import type { DerivedMarketStatus } from "@/hooks/useStockData";
 import type { FinancialStatementDBRow } from "@/lib/supabase/realtime-service";
@@ -45,7 +60,6 @@ export default function WorkspacePage() {
   const {
     activeCards,
     setActiveCards,
-    workspaceSymbolForRegularUser,
     isAddingCardInProgress,
     addCardToWorkspace,
     clearWorkspace,
@@ -58,6 +72,8 @@ export default function WorkspacePage() {
     selectedDataItems,
     handleToggleItemSelection,
     createCustomStaticCard,
+    sortConfig,
+    setSortConfig,
   } = useWorkspaceManager();
 
   const [marketStatuses, setMarketStatuses] = useState<MarketStatus>({});
@@ -80,6 +96,11 @@ export default function WorkspacePage() {
       setIsCreatorPanelOpen(false);
     }
   }, [isSelectionMode]);
+
+  const handleSortChange = (value: string) => {
+    const [key, order] = value.split("-");
+    setSortConfig({ key, order } as SortConfig);
+  };
 
   const handleCreateCustomCard = (narrative: string, description: string) => {
     createCustomStaticCard(narrative, description);
@@ -143,6 +164,28 @@ export default function WorkspacePage() {
     <div className="space-y-6 pb-10">
       {activeCards.length > 0 && (
         <div className="px-2 sm:px-4 pt-4 flex flex-col sm:flex-row sm:justify-end items-center gap-3">
+          <div className="flex-1">
+            <Select
+              onValueChange={handleSortChange}
+              defaultValue={`${sortConfig.key}-${sortConfig.order}`}>
+              <SelectTrigger className="w-[180px] h-9">
+                <ArrowUpDown className="mr-2 h-4 w-4 shrink-0" />
+                <SelectValue placeholder="Sort by..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="createdAt-desc">
+                  Date Added (Newest)
+                </SelectItem>
+                <SelectItem value="createdAt-asc">
+                  Date Added (Oldest)
+                </SelectItem>
+                <SelectItem value="symbol-asc">Symbol (A-Z)</SelectItem>
+                <SelectItem value="symbol-desc">Symbol (Z-A)</SelectItem>
+                <SelectItem value="type-asc">Card Type (A-Z)</SelectItem>
+                <SelectItem value="type-desc">Card Type (Z-A)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div
             className="flex gap-2 items-center"
             style={{ minHeight: "32px" }}>
@@ -178,7 +221,6 @@ export default function WorkspacePage() {
             <AddCardForm
               onAddCard={addCardToWorkspace}
               supportedSymbols={supportedSymbols}
-              lockedSymbolForRegularUser={workspaceSymbolForRegularUser}
             />
           </div>
         </div>
@@ -226,7 +268,6 @@ export default function WorkspacePage() {
             <AddCardForm
               onAddCard={addCardToWorkspace}
               supportedSymbols={supportedSymbols}
-              lockedSymbolForRegularUser={workspaceSymbolForRegularUser}
               triggerButton={
                 <Button size="lg">
                   <PlusCircle className="mr-2 h-5 w-5" /> Add Your First Card
