@@ -330,7 +330,6 @@ const handleProfileCardStaticProfileUpdate: CardUpdateHandler<
     ...cardWithCoreUpdates,
     staticData: newStaticData,
     backData: { description: newBackDataDescription },
-    createdAt: Date.now(),
   };
 };
 registerCardUpdateHandler(

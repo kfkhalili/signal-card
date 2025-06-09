@@ -1,8 +1,8 @@
 // src/hooks/useStockData.ts
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { fromPromise, Result, ok } from "neverthrow";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
+import { useAuth } from "@/contexts/AuthContext";
 import type { Database } from "@/lib/supabase/database.types";
 import type { FinancialStatementDBRow } from "@/lib/supabase/realtime-service";
 
@@ -108,7 +108,7 @@ export function useStockData({
     "Initializing..."
   );
 
-  const supabaseClient = useMemo(() => createSupabaseBrowserClient(false), []);
+  const { supabase: supabaseClient } = useAuth();
   const isMountedRef = useRef<boolean>(false);
 
   const symbolChannelRef = useRef<RealtimeChannel | null>(null);
@@ -149,102 +149,6 @@ export function useStockData({
         clearTimeout(exchangeStatusRetryTimeoutRef.current);
     };
   }, [symbol, supabaseClient]);
-
-  useEffect(() => {
-    if (!supabaseClient) {
-      if (isMountedRef.current && derivedMarketStatus !== "ClientUnavailable") {
-        setDerivedMarketStatus("ClientUnavailable");
-        setMarketStatusMessage(
-          "Data service unavailable: client configuration error."
-        );
-      }
-      return;
-    }
-    if (derivedMarketStatus === "ClientUnavailable" && supabaseClient) {
-      setDerivedMarketStatus("Fetching");
-      setMarketStatusMessage(`Initializing for ${symbol}...`);
-    }
-  }, [supabaseClient, symbol, derivedMarketStatus]);
-
-  useEffect(() => {
-    if (
-      !isMountedRef.current ||
-      !supabaseClient ||
-      derivedMarketStatus === "ClientUnavailable"
-    )
-      return;
-    if (!symbol) {
-      if (derivedMarketStatus !== "Unknown") {
-        setDerivedMarketStatus("Unknown");
-        setMarketStatusMessage("No symbol provided.");
-      }
-      return;
-    }
-    const relevantExchangeCode = profileData?.exchange || latestQuote?.exchange;
-    if (!relevantExchangeCode) {
-      if (derivedMarketStatus !== "Unknown") {
-        setDerivedMarketStatus("Unknown");
-        setMarketStatusMessage(`Exchange information missing for ${symbol}.`);
-      }
-      return;
-    }
-    if (
-      !exchangeStatus ||
-      exchangeStatus.exchange_code !== relevantExchangeCode
-    ) {
-      if (
-        derivedMarketStatus !== "Connecting" &&
-        derivedMarketStatus !== "Error"
-      ) {
-        setDerivedMarketStatus("Connecting");
-        setMarketStatusMessage(
-          `Connecting to market status for ${relevantExchangeCode}...`
-        );
-      }
-      return;
-    }
-    const isOpen = exchangeStatus.is_market_open ?? false;
-    const isHoliday = exchangeStatus.current_day_is_holiday ?? false;
-    let newStatus: DerivedMarketStatus = derivedMarketStatus;
-    let newMessage: string | null = marketStatusMessage;
-    if (isHoliday) {
-      newStatus = "Holiday";
-      newMessage =
-        exchangeStatus.status_message ||
-        `Market Closed (Holiday: ${
-          exchangeStatus.current_holiday_name || "Official Holiday"
-        })`;
-    } else if (isOpen) {
-      if (latestQuote?.api_timestamp) {
-        const diffMinutes =
-          (Date.now() - latestQuote.api_timestamp * 1000) / 60000;
-        newStatus = diffMinutes > 15 ? "Delayed" : "Open";
-        newMessage =
-          exchangeStatus.status_message ||
-          (newStatus === "Delayed"
-            ? "Live data is delayed."
-            : "Market is Open.");
-      } else {
-        newStatus = "Open";
-        newMessage =
-          exchangeStatus.status_message ||
-          "Market is Open (awaiting first quote).";
-      }
-    } else {
-      newStatus = "Closed";
-      newMessage = exchangeStatus.status_message || "Market is Closed.";
-    }
-    if (newStatus !== derivedMarketStatus) setDerivedMarketStatus(newStatus);
-    if (newMessage !== marketStatusMessage) setMarketStatusMessage(newMessage);
-  }, [
-    symbol,
-    latestQuote,
-    exchangeStatus,
-    profileData,
-    supabaseClient,
-    derivedMarketStatus,
-    marketStatusMessage,
-  ]);
 
   const setupExchangeStatusSubscription = useCallback(
     async (exchangeCodeToSubscribe: string | undefined | null) => {
@@ -402,19 +306,24 @@ export function useStockData({
   );
 
   useEffect(() => {
-    if (
-      !symbol ||
-      !isMountedRef.current ||
-      !supabaseClient ||
-      derivedMarketStatus === "ClientUnavailable"
-    ) {
-      setProfileData(null);
-      setLatestQuote(null);
-      if (supabaseClient) setupExchangeStatusSubscription(null);
+    if (!supabaseClient) {
+      setDerivedMarketStatus("ClientUnavailable");
+      setMarketStatusMessage(
+        "Data service unavailable: client configuration error."
+      );
+      return;
+    }
+
+    if (!symbol) {
+      setDerivedMarketStatus("Unknown");
+      setMarketStatusMessage("No symbol provided.");
       return;
     }
 
     let isSubscribed = true;
+
+    setDerivedMarketStatus("Fetching");
+    setMarketStatusMessage(`Initializing for ${symbol}...`);
 
     const fetchAndSubscribe = async () => {
       const profileRes = await fetchInitialProfile(supabaseClient, symbol);
@@ -422,8 +331,10 @@ export function useStockData({
 
       const fetchedProfile = profileRes.match(
         (data) => {
-          setProfileData(data);
-          if (data && onProfileUpdate) onProfileUpdate(data);
+          if (isSubscribed) {
+            setProfileData(data);
+            if (data && onProfileUpdate) onProfileUpdate(data);
+          }
           return data;
         },
         (error) => {
@@ -440,8 +351,10 @@ export function useStockData({
 
       const fetchedQuote = quoteRes.match(
         (data) => {
-          setLatestQuote(data);
-          if (data && onLiveQuoteUpdate) onLiveQuoteUpdate(data, "fetch");
+          if (isSubscribed) {
+            setLatestQuote(data);
+            if (data && onLiveQuoteUpdate) onLiveQuoteUpdate(data, "fetch");
+          }
           return data;
         },
         (error) => {
@@ -454,14 +367,14 @@ export function useStockData({
       );
 
       const exchangeCode = fetchedProfile?.exchange || fetchedQuote?.exchange;
-      if (exchangeCode) {
+      if (exchangeCode && isSubscribed) {
         setupExchangeStatusSubscription(exchangeCode);
       }
 
-      if (symbolChannelRef.current) {
+      if (symbolChannelRef.current && supabaseClient) {
         await supabaseClient.removeChannel(symbolChannelRef.current);
       }
-      if (!supabaseClient) return;
+      if (!isSubscribed) return;
 
       const channelName = `symbol-updates-${symbol
         .toLowerCase()
@@ -548,12 +461,6 @@ export function useStockData({
 
     return () => {
       isSubscribed = false;
-      if (symbolChannelRef.current && supabaseClient) {
-        supabaseClient
-          .removeChannel(symbolChannelRef.current)
-          .catch((err) => console.error(err));
-        symbolChannelRef.current = null;
-      }
     };
   }, [
     symbol,
@@ -562,8 +469,58 @@ export function useStockData({
     onLiveQuoteUpdate,
     onFinancialStatementUpdate,
     setupExchangeStatusSubscription,
-    derivedMarketStatus,
   ]);
+
+  useEffect(() => {
+    const relevantExchangeCode = profileData?.exchange || latestQuote?.exchange;
+
+    if (!relevantExchangeCode) return;
+    if (!exchangeStatus) {
+      setDerivedMarketStatus("Connecting");
+      setMarketStatusMessage(
+        `Connecting to market status for ${relevantExchangeCode}...`
+      );
+      return;
+    }
+
+    let newStatus: DerivedMarketStatus;
+    let newMessage: string | null;
+
+    if (exchangeStatus.current_day_is_holiday) {
+      newStatus = "Holiday";
+      newMessage =
+        exchangeStatus.status_message ||
+        `Market Closed (Holiday: ${
+          exchangeStatus.current_holiday_name || "Official Holiday"
+        })`;
+    } else if (exchangeStatus.is_market_open) {
+      if (latestQuote?.api_timestamp) {
+        const diffMinutes =
+          (Date.now() - latestQuote.api_timestamp * 1000) / 60000;
+        newStatus = diffMinutes > 15 ? "Delayed" : "Open";
+        newMessage =
+          exchangeStatus.status_message ||
+          (newStatus === "Delayed"
+            ? "Live data is delayed."
+            : "Market is Open.");
+      } else {
+        newStatus = "Open";
+        newMessage =
+          exchangeStatus.status_message ||
+          "Market is Open (awaiting first quote).";
+      }
+    } else {
+      newStatus = "Closed";
+      newMessage = exchangeStatus.status_message || "Market is Closed.";
+    }
+
+    setDerivedMarketStatus((prevStatus) =>
+      prevStatus !== newStatus ? newStatus : prevStatus
+    );
+    setMarketStatusMessage((prevMessage) =>
+      prevMessage !== newMessage ? newMessage : prevMessage
+    );
+  }, [profileData, latestQuote, exchangeStatus]);
 
   return { derivedMarketStatus, marketStatusMessage };
 }
