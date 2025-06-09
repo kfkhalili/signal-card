@@ -12,7 +12,7 @@ const geistSansClassName = geistSansLocal.variable;
 const geistMonoClassName = geistMonoLocal.variable;
 
 export const metadata: Metadata = {
-  title: "MarketEcho",
+  title: "Tickered",
   description: "Financial Signal Card Game MVP Prototype",
 };
 

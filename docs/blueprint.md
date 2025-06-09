@@ -1,4 +1,4 @@
-# **App Name**: MarketEcho
+# **App Name**: Tickered
 
 ## Style Guidelines:
 
