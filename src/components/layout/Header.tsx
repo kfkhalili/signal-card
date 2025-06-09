@@ -37,7 +37,7 @@ const Header: React.FC = () => {
         <Link
           href="/"
           className="text-2xl sm:text-3xl font-bold text-primary hover:opacity-80 transition-opacity">
-          MarketEcho
+          Tickered
         </Link>
         <nav className="flex items-center space-x-1 sm:space-x-2">
           {clientInitError && ( // Check for client initialization error first

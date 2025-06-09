@@ -524,7 +524,6 @@ export function useWorkspaceManager() {
     (updatedProfileDBRow: ProfileDBRow) => {
       const updateContext: CardUpdateContext = { toast };
       const eventType: CardUpdateEventType = "STATIC_PROFILE_UPDATE";
-      let wasProfileCardUpdated = false;
 
       setActiveCards((prevActiveCards) => {
         let overallChanged = false;
@@ -545,27 +544,12 @@ export function useWorkspaceManager() {
                 JSON.stringify(concreteCardDataForHandler)
               ) {
                 overallChanged = true;
-                if (card.type === "profile") {
-                  wasProfileCardUpdated = true;
-                }
                 return { ...card, ...updatedConcreteData };
               }
             }
           }
           return card;
         });
-
-        if (wasProfileCardUpdated) {
-          setTimeout(
-            () =>
-              toast({
-                title: `Profile Updated: ${updatedProfileDBRow.symbol}`,
-                description: "Company details have been refreshed.",
-              }),
-            0
-          );
-        }
-
         return overallChanged ? updatedCards : prevActiveCards;
       });
     },
