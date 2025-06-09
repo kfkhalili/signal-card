@@ -4,11 +4,11 @@
 import * as React from "react";
 import type { ToastActionElement, ToastProps } from "@/components/ui/toast";
 
-const TOAST_LIMIT = 1;
-const TOAST_REMOVE_DELAY = 1000; // 1 second
+// FIX: Increase the toast limit to allow stacking.
+const TOAST_LIMIT = 5;
+const TOAST_REMOVE_DELAY = 1000;
 
 type ToasterToast = ToastProps & {
-  // Export ToasterToast if not already implicitly
   id: string;
   title?: React.ReactNode;
   description?: React.ReactNode;
@@ -135,7 +135,7 @@ type ToastFunctionParams = Omit<ToasterToast, "id">;
 export type ToastFunctionType = (props: ToastFunctionParams) => {
   id: string;
   dismiss: () => void;
-  update: (props: Partial<ToasterToast>) => void; // Use Partial<ToasterToast> for update
+  update: (props: Partial<ToasterToast>) => void;
 };
 
 function toast({
@@ -143,12 +143,10 @@ function toast({
 }: ToastFunctionParams): ReturnType<ToastFunctionType> {
   const id = genId();
 
-  const update = (
-    updateProps: Partial<ToasterToast>
-  ): void => // Make updateProps partial
+  const update = (updateProps: Partial<ToasterToast>): void =>
     dispatch({
       type: "UPDATE_TOAST",
-      toast: { ...updateProps, id }, // Ensure id is always part of the update payload
+      toast: { ...updateProps, id },
     });
   const dismiss = (): void => dispatch({ type: "DISMISS_TOAST", toastId: id });
 
