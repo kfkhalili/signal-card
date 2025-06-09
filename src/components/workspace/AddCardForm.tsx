@@ -162,43 +162,56 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
         <FormField
           control={form.control}
           name="cardTypes"
-          render={() => (
+          render={({ field }) => (
             <FormItem className="space-y-3">
+              <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border bg-muted/50 p-3">
+                <FormControl>
+                  <Checkbox
+                    id="select-all-card-types"
+                    checked={
+                      field.value?.length === AVAILABLE_CARD_TYPES.length
+                    }
+                    onCheckedChange={(checked) => {
+                      return checked
+                        ? field.onChange(
+                            AVAILABLE_CARD_TYPES.map((t) => t.value)
+                          )
+                        : field.onChange([]);
+                    }}
+                  />
+                </FormControl>
+                <FormLabel
+                  htmlFor="select-all-card-types"
+                  className="font-normal cursor-pointer w-full">
+                  Select All
+                </FormLabel>
+              </FormItem>
+
               <div className="relative">
-                <div className="max-h-[250px] overflow-y-auto pr-2 space-y-2">
+                <div className="max-h-[250px] overflow-y-auto pr-2 space-y-2 border-t pt-2">
                   {AVAILABLE_CARD_TYPES.map((item) => (
-                    <FormField
+                    <FormItem
                       key={item.value}
-                      control={form.control}
-                      name="cardTypes"
-                      render={({ field }) => (
-                        <FormItem
-                          key={item.value}
-                          className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 hover:bg-accent hover:text-accent-foreground transition-colors">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value?.includes(item.value)}
-                              onCheckedChange={(checked) => {
-                                const currentValue = field.value ?? [];
-                                return checked
-                                  ? field.onChange([
-                                      ...currentValue,
-                                      item.value,
-                                    ])
-                                  : field.onChange(
-                                      currentValue?.filter(
-                                        (value) => value !== item.value
-                                      )
-                                    );
-                              }}
-                            />
-                          </FormControl>
-                          <FormLabel className="font-normal cursor-pointer w-full">
-                            {item.label}
-                          </FormLabel>
-                        </FormItem>
-                      )}
-                    />
+                      className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 hover:bg-accent hover:text-accent-foreground transition-colors">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value?.includes(item.value)}
+                          onCheckedChange={(checked) => {
+                            const currentValue = field.value ?? [];
+                            return checked
+                              ? field.onChange([...currentValue, item.value])
+                              : field.onChange(
+                                  currentValue.filter(
+                                    (value) => value !== item.value
+                                  )
+                                );
+                          }}
+                        />
+                      </FormControl>
+                      <FormLabel className="font-normal cursor-pointer w-full">
+                        {item.label}
+                      </FormLabel>
+                    </FormItem>
                   ))}
                 </div>
                 <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background to-transparent pointer-events-none" />
