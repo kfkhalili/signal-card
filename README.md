@@ -1,8 +1,8 @@
-# Executive Summary: FinCard Explorer (Working Title)
+# Executive Summary: Tickered
 
 ## 1. Introduction & Core Concept
 
-FinCard Explorer is a forthcoming web application designed to revolutionize financial education and investment analysis. It transforms complex financial data into an interactive, digestible, and engaging experience through a unique "Card-based" system. Users can explore stocks, cryptocurrencies, and other financial instruments by interacting with over 100 distinct types of dynamic "Financial Cards" (e.g., Company Profile, Price, Earnings, Volume, Dividends, Sentiment, News), each powered by live data.
+Tickered is a forthcoming web application designed to revolutionize financial education and investment analysis. It transforms complex financial data into an interactive, digestible, and engaging experience through a unique "Card-based" system. Users can explore stocks, cryptocurrencies, and other financial instruments by interacting with over 100 distinct types of dynamic "Financial Cards" (e.g., Company Profile, Price, Earnings, Volume, Dividends, Sentiment, News), each powered by live data.
 
 ## 2. Problem Addressed
 
@@ -10,7 +10,7 @@ Traditional financial information platforms often overwhelm users, especially be
 
 ## 3. Our Solution – Interactive & Social Financial Cards
 
-FinCard Explorer addresses these challenges by offering:
+Tickered addresses these challenges by offering:
 
 - **Modular Card System:** Users build personalized dashboards by adding various Financial Cards to a dynamic workspace. Each card displays self-contained, live-updated information.
 - **Deep Interactivity:** Metrics within cards (e.g., current price, 52-week high/low, SMA 50) are clickable, instantly generating new, related cards in the workspace, allowing for intuitive drill-down and discovery.
@@ -18,7 +18,7 @@ FinCard Explorer addresses these challenges by offering:
 
 ## 4. Target Audience
 
-FinCard Explorer caters to two primary user groups:
+Tickered caters to two primary user groups:
 
 - **Beginner Investors:** Individuals seeking to learn about investing and understand market data without being overwhelmed. They benefit from the simplified card format and community insights.
 - **Professionals & Experienced Investors:** Users who require powerful tools for in-depth financial metric exploration, company comparisons, and the creation of sophisticated, shareable dashboards and "Collections."
@@ -31,7 +31,7 @@ FinCard Explorer caters to two primary user groups:
 
 ## 6. Business Model
 
-FinCard Explorer will operate on a freemium model with revenue generated through:
+Tickered will operate on a freemium model with revenue generated through:
 
 - **Premium Subscriptions:** Features like multiple workspaces, public dashboard publishing, custom entry cards, and potentially advanced analytics.
 
@@ -283,4 +283,4 @@ erDiagram
 
 ## 8. Purpose of this Document
 
-This summary serves to clearly articulate the vision, functionality, target audience, and technical architecture of FinCard Explorer. It is intended to provide a comprehensive understanding for collaborative development and for training AI assistants on the project's background.
+This summary serves to clearly articulate the vision, functionality, target audience, and technical architecture of Tickered. It is intended to provide a comprehensive understanding for collaborative development and for training AI assistants on the project's background.
