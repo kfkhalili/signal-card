@@ -37,6 +37,7 @@ const defaultLogoUrl =
 const mockStaticData: PriceCardData["staticData"] = {
   // Correctly typed via PriceCardData
   exchange_code: "NASDAQ",
+  currency: "USD",
 };
 
 const mockLiveData: PriceCardData["liveData"] = {
@@ -130,7 +131,7 @@ const minimalInitialMockData: PriceCardData & { isFlipped: boolean } = {
   createdAt: Date.now(),
   isFlipped: false,
   websiteUrl: null, // Added missing optional BaseCardData property
-  staticData: { exchange_code: "Crypto" },
+  staticData: { exchange_code: "Crypto", currency: "USD" },
   liveData: {
     timestamp: Date.now(),
     price: 60000.0,

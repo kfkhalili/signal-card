@@ -75,11 +75,14 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, SetValue<T>] {
       }
 
       if (shouldReRead) {
-        // By wrapping the update in a setTimeout, we yield to the main thread,
-        // preventing the synchronous parsing from blocking the UI.
-        setTimeout(() => {
-          setStoredValue(readValueFromStorage());
-        }, 0);
+        const newValue = readValueFromStorage();
+        // This functional update prevents race conditions and unnecessary renders.
+        setStoredValue((currentValue) => {
+          if (JSON.stringify(currentValue) === JSON.stringify(newValue)) {
+            return currentValue; // Value is the same, no re-render needed.
+          }
+          return newValue; // Value has changed, trigger a re-render.
+        });
       }
     };
 

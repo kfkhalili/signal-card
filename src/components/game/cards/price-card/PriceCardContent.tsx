@@ -4,7 +4,10 @@ import { CardContent as ShadCardContent } from "@/components/ui/card";
 import type { PriceCardData } from "./price-card.types";
 import { cn } from "@/lib/utils";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
-import { formatNumberWithAbbreviations } from "@/lib/formatters";
+import {
+  formatFinancialValue,
+  formatNumberWithAbbreviations,
+} from "@/lib/formatters";
 import { RangeIndicator } from "@/components/ui/RangeIndicator";
 import type {
   OnGenericInteraction,
@@ -22,7 +25,6 @@ interface PriceCardContentProps {
   cardData: PriceCardData;
   isBackFace: boolean;
   onGenericInteraction: OnGenericInteraction;
-  // NEW PROPS
   isSelectionMode: boolean;
   selectedDataItems: SelectedDataItem[];
   onToggleItemSelection: (item: SelectedDataItem) => void;
@@ -33,12 +35,12 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
     cardData,
     isBackFace,
     onGenericInteraction,
-    // NEW PROPS
     isSelectionMode,
     selectedDataItems,
     onToggleItemSelection,
   }) => {
-    const { liveData, symbol, id, type } = cardData;
+    const { liveData, staticData, symbol, id, type } = cardData;
+    const currencyCode = staticData.currency;
     const gridCellClass = "min-w-0";
 
     const handleInteraction = (
@@ -88,7 +90,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                             label: "Open",
                             value: liveData.dayOpen,
                             isMonetary: true,
-                            currency: "USD",
+                            currency: currencyCode,
                           })
                       : () => {
                           if (liveData.dayOpen != null) {
@@ -105,12 +107,15 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                     isSelected(`${id}-open`) && "bg-primary/20"
                   )}
                   data-testid="open-price-interactive-area"
-                  title={`Open: ${liveData.dayOpen?.toFixed(2)}`}>
+                  title={`Open: ${formatFinancialValue(
+                    liveData.dayOpen,
+                    currencyCode
+                  )}`}>
                   <span className="text-xs font-medium text-muted-foreground block">
                     Open
                   </span>
                   <span className="text-xs font-semibold text-foreground">
-                    ${liveData.dayOpen?.toFixed(2) ?? "N/A"}
+                    {formatFinancialValue(liveData.dayOpen, currencyCode, 2)}
                   </span>
                 </ClickableDataItem>
               </div>
@@ -129,7 +134,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                             label: "Prev. Close",
                             value: liveData.previousClose,
                             isMonetary: true,
-                            currency: "USD",
+                            currency: currencyCode,
                           })
                       : () => {
                           if (liveData.previousClose != null) {
@@ -146,14 +151,19 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                     isSelected(`${id}-prev.-close`) && "bg-primary/20"
                   )}
                   data-testid="previous-close-interactive-area"
-                  title={`Previous Close: ${liveData.previousClose?.toFixed(
-                    2
+                  title={`Previous Close: ${formatFinancialValue(
+                    liveData.previousClose,
+                    currencyCode
                   )}`}>
                   <span className="text-xs font-medium text-muted-foreground block">
                     Prev Close
                   </span>
                   <span className="text-xs font-semibold text-foreground">
-                    ${liveData.previousClose?.toFixed(2) ?? "N/A"}
+                    {formatFinancialValue(
+                      liveData.previousClose,
+                      currencyCode,
+                      2
+                    )}
                   </span>
                 </ClickableDataItem>
               </div>
@@ -210,7 +220,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                             label: "Market Cap",
                             value: liveData.marketCap,
                             isMonetary: true,
-                            currency: "USD",
+                            currency: currencyCode,
                           })
                       : () => {
                           if (liveData.marketCap != null) {
@@ -227,14 +237,15 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                     isSelected(`${id}-market-cap`) && "bg-primary/20"
                   )}
                   data-testid="market-cap-interactive-area"
-                  title={`Market Cap: $${formatNumberWithAbbreviations(
-                    liveData.marketCap
+                  title={`Market Cap: ${formatFinancialValue(
+                    liveData.marketCap,
+                    currencyCode
                   )}`}>
                   <span className="text-xs font-medium text-muted-foreground block">
                     Market Cap
                   </span>
                   <span className="text-xs font-semibold text-foreground">
-                    ${formatNumberWithAbbreviations(liveData.marketCap)}
+                    {formatFinancialValue(liveData.marketCap, currencyCode)}
                   </span>
                 </ClickableDataItem>
               </div>
@@ -251,7 +262,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                             label: "50D SMA",
                             value: liveData.sma50d,
                             isMonetary: true,
-                            currency: "USD",
+                            currency: currencyCode,
                           })
                       : () => {
                           if (liveData.sma50d != null) {
@@ -271,12 +282,16 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                     isSelected(`${id}-50d-sma`) && "bg-primary/20"
                   )}
                   data-testid="sma-50d-interactive-area"
-                  title={`50D SMA: ${liveData.sma50d?.toFixed(2)}`}>
+                  title={`50D SMA: ${formatFinancialValue(
+                    liveData.sma50d,
+                    currencyCode,
+                    2
+                  )}`}>
                   <span className="text-xs font-medium text-muted-foreground block">
                     50D SMA
                   </span>
                   <span className="text-xs font-semibold text-foreground">
-                    ${liveData.sma50d?.toFixed(2) ?? "N/A"}
+                    {formatFinancialValue(liveData.sma50d, currencyCode, 2)}
                   </span>
                 </ClickableDataItem>
               </div>
@@ -292,7 +307,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                             label: "200D SMA",
                             value: liveData.sma200d,
                             isMonetary: true,
-                            currency: "USD",
+                            currency: currencyCode,
                           })
                       : () => {
                           if (liveData.sma200d != null) {
@@ -312,12 +327,16 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                     isSelected(`${id}-200d-sma`) && "bg-primary/20"
                   )}
                   data-testid="sma-200d-interactive-area"
-                  title={`200D SMA: ${liveData.sma200d?.toFixed(2)}`}>
+                  title={`200D SMA: ${formatFinancialValue(
+                    liveData.sma200d,
+                    currencyCode,
+                    2
+                  )}`}>
                   <span className="text-xs font-medium text-muted-foreground block">
                     200D SMA
                   </span>
                   <span className="text-xs font-semibold text-foreground">
-                    ${liveData.sma200d?.toFixed(2) ?? "N/A"}
+                    {formatFinancialValue(liveData.sma200d, currencyCode, 2)}
                   </span>
                 </ClickableDataItem>
               </div>
@@ -344,13 +363,17 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
               originatingElement: "currentPrice",
             } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
           }
-          title={`Current Price: ${liveData.price?.toFixed(2)}`}>
+          title={`Current Price: ${formatFinancialValue(
+            liveData.price,
+            currencyCode,
+            2
+          )}`}>
           <p
             className={cn(
               "text-xl font-bold sm:text-2xl",
               "group-hover/textgroup:text-primary"
             )}>
-            ${liveData.price != null ? liveData.price.toFixed(2) : "N/A"}
+            {formatFinancialValue(liveData.price, currencyCode, 2)}
           </p>
           <div
             className={cn(
@@ -398,7 +421,7 @@ export const PriceCardContent = React.memo<PriceCardContentProps>(
                         label: "Price",
                         value: liveData.price,
                         isMonetary: true,
-                        currency: "USD",
+                        currency: currencyCode,
                       })
                   : undefined
               }

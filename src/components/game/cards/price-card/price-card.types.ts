@@ -7,7 +7,7 @@ import type { BaseCardData } from "../base-card/base-card.types";
  */
 export interface PriceCardStaticData {
   readonly exchange_code?: string | null;
-  // Potentially other static identifiers or configurations related to the price feed.
+  readonly currency: string | null; // Added currency field
 }
 
 /**
