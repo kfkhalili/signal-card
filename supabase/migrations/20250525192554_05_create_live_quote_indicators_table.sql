@@ -41,12 +41,6 @@ ALTER TABLE ONLY "public"."live_quote_indicators"
 CREATE INDEX IF NOT EXISTS "idx_live_quote_indicators_fetched_at" ON "public"."live_quote_indicators" USING "btree" ("fetched_at" DESC);
 CREATE INDEX IF NOT EXISTS "idx_live_quote_indicators_symbol" ON "public"."live_quote_indicators" USING "btree" ("symbol");
 
--- Note: The following indexes idx_lqi_... appeared in your dump.
--- If they are functionally identical to the ones above, you should remove them to avoid redundancy.
--- If they serve a different purpose or you are unsure, making them IF NOT EXISTS is safe for now.
-CREATE INDEX IF NOT EXISTS "idx_lqi_fetched_at" ON "public"."live_quote_indicators" USING "btree" ("fetched_at" DESC);
-CREATE INDEX IF NOT EXISTS "idx_lqi_symbol" ON "public"."live_quote_indicators" USING "btree" ("symbol");
-
 -- Note: Foreign key constraints that were missing in the dump (e.g., for 'exchange' or 'symbol' to other tables)
 -- would need to be added here if they are desired and not already present. Example:
 -- ALTER TABLE "public"."live_quote_indicators" DROP CONSTRAINT IF EXISTS "fk_lqi_exchange";
