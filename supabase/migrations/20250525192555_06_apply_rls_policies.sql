@@ -7,25 +7,19 @@ DROP POLICY IF EXISTS "Allow public read-only access to live quotes" ON "public"
 CREATE POLICY "Allow public read-only access to live quotes" ON "public"."live_quote_indicators" FOR SELECT USING (true);
 
 -- user_profiles policies
-DROP POLICY IF EXISTS "Allow public read access to user profiles" ON "public"."user_profiles";
-CREATE POLICY "Allow public read access to user profiles" ON "public"."user_profiles" FOR SELECT USING (true);
--- WARNING: This makes all user profiles public.
-
 DROP POLICY IF EXISTS "Users can view their own profile" ON "public"."user_profiles";
 CREATE POLICY "Users can view their own profile" ON "public"."user_profiles"
-FOR SELECT USING (auth.uid() = id);
--- REVIEW: If "Allow public read access to user profiles" is active, this policy might be overshadowed for SELECT.
--- Decide which SELECT behavior you want for user_profiles. Typically, it's one or the other, or more specific role-based access.
+FOR SELECT USING ((select auth.uid()) = "id");
 
 DROP POLICY IF EXISTS "Allow users to insert their own profile" ON "public"."user_profiles";
-CREATE POLICY "Allow users to insert their own profile" ON "public"."user_profiles" FOR INSERT WITH CHECK (("auth"."uid"() = "id"));
+CREATE POLICY "Allow users to insert their own profile" ON "public"."user_profiles"
+FOR INSERT
+WITH CHECK (("id" = (select auth.uid())));
 
 DROP POLICY IF EXISTS "Allow users to update their own profile" ON "public"."user_profiles";
-CREATE POLICY "Allow users to update their own profile" ON "public"."user_profiles" FOR UPDATE USING (("auth"."uid"() = "id")) WITH CHECK (("auth"."uid"() = "id"));
-
-DROP POLICY IF EXISTS "Users can update their own profile" ON "public"."user_profiles";
-CREATE POLICY "Users can update their own profile" ON "public"."user_profiles" FOR UPDATE USING (("auth"."uid"() = "id")) WITH CHECK (("auth"."uid"() = "id"));
--- REVIEW: You have two very similar UPDATE policies for user_profiles. Consolidate to one.
+CREATE POLICY "Allow users to update their own profile" ON "public"."user_profiles"
+FOR UPDATE
+USING ("id" = (select auth.uid()));
 
 -- profiles policies
 DROP POLICY IF EXISTS "Allow public read-only access to profiles" ON "public"."profiles";
