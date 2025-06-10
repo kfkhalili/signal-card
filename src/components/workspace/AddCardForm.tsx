@@ -13,8 +13,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogClose,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Command,
@@ -84,7 +84,7 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
     resolver: zodResolver(AddCardFormSchema),
     defaultValues: {
       symbol: "",
-      cardTypes: ["profile"],
+      cardTypes: [],
     },
   });
 
@@ -92,7 +92,7 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
     if (isOpen) {
       form.reset({
         symbol: "",
-        cardTypes: ["profile"],
+        cardTypes: [],
       });
       setView("symbol");
       setIsSubmitting(false);
@@ -188,7 +188,19 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
                   {AVAILABLE_CARD_TYPES.map((item) => (
                     <FormItem
                       key={item.value}
-                      className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 hover:bg-accent hover:text-accent-foreground transition-colors">
+                      className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer"
+                      onClick={(e) => {
+                        if (e.target === e.currentTarget) {
+                          const currentValue = field.value ?? [];
+                          const isChecked = currentValue.includes(item.value);
+                          const newValue = isChecked
+                            ? currentValue.filter(
+                                (value) => value !== item.value
+                              )
+                            : [...currentValue, item.value];
+                          field.onChange(newValue);
+                        }
+                      }}>
                       <FormControl>
                         <Checkbox
                           checked={field.value?.includes(item.value)}
