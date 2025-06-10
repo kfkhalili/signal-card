@@ -1,8 +1,9 @@
-CREATE OR REPLACE FUNCTION "public"."handle_new_user"() RETURNS "trigger"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public, pg_catalog
+AS $$
 BEGIN
-  -- Corrected to use 'id' column as defined in user_profiles table
   INSERT INTO public.user_profiles (id, username)
   VALUES (NEW.id, NEW.email); -- Using email as initial username, can be updated by user
   RETURN NEW;
