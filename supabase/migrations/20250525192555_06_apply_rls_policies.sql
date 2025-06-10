@@ -1,18 +1,10 @@
 -- exchange_market_status policies
-DROP POLICY IF EXISTS "Allow public read access to exchange market status" ON "public"."exchange_market_status";
-CREATE POLICY "Allow public read access to exchange market status" ON "public"."exchange_market_status" FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Allow public read-only access to market status" ON "public"."exchange_market_status";
-CREATE POLICY "Allow public read-only access to market status" ON "public"."exchange_market_status" FOR SELECT USING (true);
--- REVIEW: You likely only need one of the above SELECT policies for exchange_market_status.
+DROP POLICY IF EXISTS "Allow public read-only access to exchange market status" ON "public"."exchange_market_status";
+CREATE POLICY "Allow public read-only access to exchange market status" ON "public"."exchange_market_status" FOR SELECT USING (true);
 
 -- live_quote_indicators policies
-DROP POLICY IF EXISTS "Allow public read access to live quotes" ON "public"."live_quote_indicators";
-CREATE POLICY "Allow public read access to live quotes" ON "public"."live_quote_indicators" FOR SELECT USING (true);
-
 DROP POLICY IF EXISTS "Allow public read-only access to live quotes" ON "public"."live_quote_indicators";
 CREATE POLICY "Allow public read-only access to live quotes" ON "public"."live_quote_indicators" FOR SELECT USING (true);
--- REVIEW: You likely only need one of the above SELECT policies for live_quote_indicators.
 
 -- user_profiles policies
 DROP POLICY IF EXISTS "Allow public read access to user profiles" ON "public"."user_profiles";
@@ -20,7 +12,8 @@ CREATE POLICY "Allow public read access to user profiles" ON "public"."user_prof
 -- WARNING: This makes all user profiles public.
 
 DROP POLICY IF EXISTS "Users can view their own profile" ON "public"."user_profiles";
-CREATE POLICY "Users can view their own profile" ON "public"."user_profiles" FOR SELECT USING (("auth"."uid"() = "id"));
+CREATE POLICY "Users can view their own profile" ON "public"."user_profiles"
+FOR SELECT USING (auth.uid() = id);
 -- REVIEW: If "Allow public read access to user profiles" is active, this policy might be overshadowed for SELECT.
 -- Decide which SELECT behavior you want for user_profiles. Typically, it's one or the other, or more specific role-based access.
 
@@ -37,10 +30,6 @@ CREATE POLICY "Users can update their own profile" ON "public"."user_profiles" F
 -- profiles policies
 DROP POLICY IF EXISTS "Allow public read-only access to profiles" ON "public"."profiles";
 CREATE POLICY "Allow public read-only access to profiles" ON "public"."profiles" FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Enable read access for all users" ON "public"."profiles";
-CREATE POLICY "Enable read access for all users" ON "public"."profiles" FOR SELECT USING (true);
--- REVIEW: You likely only need one of the above SELECT policies for profiles.
 
 -- Enable RLS on tables (these are idempotent)
 ALTER TABLE "public"."exchange_market_status" ENABLE ROW LEVEL SECURITY;
