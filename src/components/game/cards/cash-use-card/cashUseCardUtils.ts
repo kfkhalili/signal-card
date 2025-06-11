@@ -4,6 +4,7 @@ import type {
   CashUseCardData,
   CashUseCardStaticData,
   CashUseCardLiveData,
+  AnnualDataPoint,
 } from "./cash-use-card.types";
 import type {
   DisplayableCard,
@@ -59,98 +60,61 @@ function safeJsonParseWithField<T>(
   return defaultValue;
 }
 
-interface MinMaxLatestResult<V extends number | null> {
-  min: V;
-  max: V;
-  latest: V;
+interface AnnualDataAndStatsResult {
+  latest: number | null;
   latestDate: string | null;
-  rangeLabel: string;
   latestPeriod?: string | null;
-  latestFiscalYear?: string | null;
+  annualData: readonly AnnualDataPoint[];
 }
 
-function getMinMaxAndLatestForFinancialMetrics<
+function processFinancialRecords<
   K extends PropertyKey,
   TData extends {
     date: string;
     period?: string;
     fiscal_year?: string;
   } & Record<K, number | null>
->(
-  records: TData[] | null | undefined,
-  valueKey: K,
-  isFinancialStatementMetric = true
-): MinMaxLatestResult<number | null> {
-  const defaultResult: MinMaxLatestResult<number | null> = {
-    min: null,
-    max: null,
+>(records: TData[] | null | undefined, valueKey: K): AnnualDataAndStatsResult {
+  const defaultResult: AnnualDataAndStatsResult = {
     latest: null,
     latestDate: null,
-    rangeLabel: "N/A",
+    annualData: [],
     latestPeriod: undefined,
-    latestFiscalYear: undefined,
   };
   if (!records || records.length === 0) return defaultResult;
 
-  interface MappedRecord {
-    value: number | null;
-    date: string;
-    period: string | undefined;
-    fiscal_year: string | undefined;
-  }
-  interface ValidatedRecord {
-    value: number;
-    date: string;
-    period: string | undefined;
-    fiscal_year: string | undefined;
-  }
+  const yearlyTotals: Record<string, number> = {};
+  const quarterlyData: Record<string, number> = {};
+  let latestRecord: TData | null = null;
 
-  const validRecords = records
-    .map(
-      (record): MappedRecord => ({
-        value: record[valueKey],
-        date: record.date,
-        period: record.period,
-        fiscal_year: record.fiscal_year,
-      })
-    )
-    .filter((r): r is ValidatedRecord => r.value !== null)
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-  if (validRecords.length === 0) return defaultResult;
-
-  const latestRecord = validRecords[0];
-  const oldestRecord = validRecords[validRecords.length - 1];
-  const values: number[] = validRecords.map((r) => r.value);
-  const minVal = Math.min(...values);
-  const maxVal = Math.max(...values);
-
-  let rangeLabel: string;
-  if (validRecords.length === 1 || latestRecord.date === oldestRecord.date) {
-    rangeLabel = `As of ${latestRecord.date}`;
-    if (isFinancialStatementMetric && latestRecord.period) {
-      rangeLabel = `${latestRecord.period} ${
-        latestRecord.fiscal_year || latestRecord.date.substring(0, 4)
-      }`;
+  for (const record of records) {
+    if (!latestRecord || new Date(record.date) > new Date(latestRecord.date)) {
+      latestRecord = record;
     }
-  } else {
-    const formatDateForLabel = (dateStr: string | null | undefined): string =>
-      dateStr ? dateStr.substring(0, 4) : "N/A";
-    rangeLabel = `${formatDateForLabel(
-      oldestRecord?.date
-    )} - ${formatDateForLabel(latestRecord?.date)}`;
+
+    const year = record.fiscal_year;
+    const value = record[valueKey];
+
+    if (year && value !== null) {
+      if (record.period === "FY") {
+        yearlyTotals[year] = value;
+      } else if (record.period?.startsWith("Q")) {
+        quarterlyData[year] = (quarterlyData[year] || 0) + value;
+      }
+    }
   }
+
+  const finalAnnualData: AnnualDataPoint[] = Object.entries(yearlyTotals)
+    .map(([year, value]) => ({ year: parseInt(year, 10), value }))
+    .sort((a, b) => a.year - b.year);
+
+  const latestRecordValue = latestRecord ? latestRecord[valueKey] : null;
 
   return {
-    min: minVal,
-    max: maxVal,
-    latest: latestRecord.value,
-    latestDate: latestRecord.date,
-    rangeLabel,
-    latestPeriod: isFinancialStatementMetric ? latestRecord.period : undefined,
-    latestFiscalYear: isFinancialStatementMetric
-      ? latestRecord.fiscal_year
-      : undefined,
+    latest: latestRecordValue,
+    latestDate: latestRecord?.date ?? null,
+    latestPeriod: latestRecord?.period,
+    annualData: finalAnnualData.slice(-5),
   };
 }
 
@@ -167,9 +131,9 @@ function constructCashUseCardData(
     websiteUrl?: string | null;
   },
   sharesData: SharesDataPoint,
-  totalDebtData: MinMaxLatestResult<number | null>,
-  freeCashFlowData: MinMaxLatestResult<number | null>,
-  netDividendsPaidData: MinMaxLatestResult<number | null>,
+  totalDebtData: AnnualDataAndStatsResult,
+  freeCashFlowData: AnnualDataAndStatsResult,
+  netDividendsPaidData: AnnualDataAndStatsResult,
   latestFinancialStatementInfo: {
     reportedCurrency: string | null;
     statementDate: string | null;
@@ -180,9 +144,6 @@ function constructCashUseCardData(
 ): CashUseCardData {
   const staticData: CashUseCardStaticData = {
     reportedCurrency: latestFinancialStatementInfo.reportedCurrency,
-    debtRangePeriodLabel: totalDebtData.rangeLabel,
-    fcfRangePeriodLabel: freeCashFlowData.rangeLabel,
-    dividendsRangePeriodLabel: netDividendsPaidData.rangeLabel,
     latestStatementDate: latestFinancialStatementInfo.statementDate,
     latestStatementPeriod: latestFinancialStatementInfo.statementPeriod,
     latestSharesFloatDate: sharesData.latestDate,
@@ -191,14 +152,11 @@ function constructCashUseCardData(
   const liveData: CashUseCardLiveData = {
     currentOutstandingShares: sharesData.latest,
     currentTotalDebt: totalDebtData.latest,
-    totalDebt_5y_min: totalDebtData.min,
-    totalDebt_5y_max: totalDebtData.max,
+    totalDebt_annual_data: totalDebtData.annualData,
     currentFreeCashFlow: freeCashFlowData.latest,
-    freeCashFlow_5y_min: freeCashFlowData.min,
-    freeCashFlow_5y_max: freeCashFlowData.max,
+    freeCashFlow_annual_data: freeCashFlowData.annualData,
     currentNetDividendsPaid: netDividendsPaidData.latest,
-    netDividendsPaid_5y_min: netDividendsPaidData.min,
-    netDividendsPaid_5y_max: netDividendsPaidData.max,
+    netDividendsPaid_annual_data: netDividendsPaidData.annualData,
   };
 
   const cardBackData: BaseCardBackData = {
@@ -301,28 +259,26 @@ async function fetchAndProcessCashUseData(
       null
     ),
   }));
-  const dividendRecords = financialStatements.map((fs) => ({
-    date: fs.date,
-    period: fs.period ?? undefined,
-    fiscal_year: fs.fiscal_year ?? undefined,
-    netDividendsPaid_value: Math.abs(
-      safeJsonParseWithField<number | null>(
-        fs.cash_flow_payload,
-        "dividendsPaid",
-        0
-      ) ?? 0
-    ),
-  }));
+  const dividendRecords = financialStatements.map((fs) => {
+    const rawValue = safeJsonParseWithField<number | null>(
+      fs.cash_flow_payload,
+      "netDividendsPaid",
+      null
+    );
+    return {
+      date: fs.date,
+      period: fs.period ?? undefined,
+      fiscal_year: fs.fiscal_year ?? undefined,
+      netDividendsPaid_value: rawValue !== null ? Math.abs(rawValue) : null,
+    };
+  });
 
-  const totalDebtData = getMinMaxAndLatestForFinancialMetrics(
-    debtRecords,
-    "totalDebt_value"
-  );
-  const freeCashFlowData = getMinMaxAndLatestForFinancialMetrics(
+  const totalDebtData = processFinancialRecords(debtRecords, "totalDebt_value");
+  const freeCashFlowData = processFinancialRecords(
     fcfRecords,
     "freeCashFlow_value"
   );
-  const netDividendsPaidData = getMinMaxAndLatestForFinancialMetrics(
+  const netDividendsPaidData = processFinancialRecords(
     dividendRecords,
     "netDividendsPaid_value"
   );
@@ -508,7 +464,7 @@ const handleCashUseCardFinancialStatementUpdate: CardUpdateHandler<
         title: `Cash Use Figures Updated: ${currentCashUseCardData.symbol}`,
         description: `Latest statement data (${
           newPeriod ?? "N/A"
-        } ${newDate}) applied. 5-year ranges are based on initial card data.`,
+        } ${newDate}) applied. Annual charts are based on initial card data.`,
       });
     }
     const newBackDataDescription = `Cash usage metrics for ${

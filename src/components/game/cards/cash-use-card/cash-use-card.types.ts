@@ -16,35 +16,26 @@ export interface CashUseCardFmpCashFlowData {
   readonly reportedCurrency?: string | null;
 }
 
+export interface AnnualDataPoint {
+  readonly year: number;
+  readonly value: number;
+}
+
 export interface CashUseCardStaticData {
   readonly reportedCurrency: string | null;
-  // Labels for the periods covered by the 5-year range for each financial metric
-  readonly debtRangePeriodLabel: string;
-  readonly fcfRangePeriodLabel: string;
-  readonly dividendsRangePeriodLabel: string;
-  // Date of the latest financial statement used for current values
   readonly latestStatementDate: string | null;
   readonly latestStatementPeriod: string | null;
-  // Date of the latest shares float data used
-  readonly latestSharesFloatDate: string | null; // For currentOutstandingShares
+  readonly latestSharesFloatDate: string | null;
 }
 
 export interface CashUseCardLiveData {
-  // Current value for Outstanding Shares - NO MIN/MAX
   readonly currentOutstandingShares: number | null;
-
-  // Current values & 5-year Min/Max for financial metrics
   readonly currentTotalDebt: number | null;
-  readonly totalDebt_5y_min: number | null;
-  readonly totalDebt_5y_max: number | null;
-
+  readonly totalDebt_annual_data: readonly AnnualDataPoint[];
   readonly currentFreeCashFlow: number | null;
-  readonly freeCashFlow_5y_min: number | null;
-  readonly freeCashFlow_5y_max: number | null;
-
+  readonly freeCashFlow_annual_data: readonly AnnualDataPoint[];
   readonly currentNetDividendsPaid: number | null;
-  readonly netDividendsPaid_5y_min: number | null;
-  readonly netDividendsPaid_5y_max: number | null;
+  readonly netDividendsPaid_annual_data: readonly AnnualDataPoint[];
 }
 
 export interface CashUseCardData extends BaseCardData {

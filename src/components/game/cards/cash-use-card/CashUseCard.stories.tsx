@@ -36,9 +36,6 @@ const defaultLogoUrl =
 
 const mockStaticData: CashUseCardData["staticData"] = {
   reportedCurrency: "USD",
-  debtRangePeriodLabel: "2019 - 2023",
-  fcfRangePeriodLabel: "2019 - 2023",
-  dividendsRangePeriodLabel: "2019 - 2023",
   latestStatementDate: "2023-07-29",
   latestStatementPeriod: "FY",
   latestSharesFloatDate: "2023-10-27",
@@ -47,23 +44,33 @@ const mockStaticData: CashUseCardData["staticData"] = {
 const mockLiveData: CashUseCardData["liveData"] = {
   currentOutstandingShares: 4100000000,
   currentTotalDebt: 25000000000,
-  totalDebt_5y_min: 20000000000,
-  totalDebt_5y_max: 27000000000,
+  totalDebt_annual_data: [
+    { year: 2019, value: 22000000000 },
+    { year: 2020, value: 27000000000 },
+    { year: 2021, value: 24000000000 },
+    { year: 2022, value: 26000000000 },
+    { year: 2023, value: 25000000000 },
+  ],
   currentFreeCashFlow: 15000000000,
-  freeCashFlow_5y_min: 12000000000,
-  freeCashFlow_5y_max: 16000000000,
-  currentNetDividendsPaid: 6000000000,
-  netDividendsPaid_5y_min: 5500000000,
-  netDividendsPaid_5y_max: 6500000000,
+  freeCashFlow_annual_data: [
+    { year: 2019, value: 12500000000 },
+    { year: 2020, value: 12000000000 },
+    { year: 2021, value: 16000000000 },
+    { year: 2022, value: 14000000000 },
+    { year: 2023, value: 15000000000 },
+  ],
+  currentNetDividendsPaid: 6200000000,
+  netDividendsPaid_annual_data: [
+    { year: 2019, value: 5500000000 },
+    { year: 2020, value: 5800000000 },
+    { year: 2021, value: 6000000000 },
+    { year: 2022, value: 6100000000 },
+    { year: 2023, value: 6200000000 },
+  ],
 };
 
 const mockBaseBackData: BaseCardBackData = {
-  description: `Cash usage metrics for ${defaultCompanyName}. Financials from ${
-    mockStaticData.latestStatementPeriod
-  } ${mockStaticData.latestStatementDate?.substring(
-    0,
-    4
-  )}. Shares outstanding as of ${mockStaticData.latestSharesFloatDate}.`,
+  description: `Key metrics for ${defaultCompanyName} illustrating how the company utilizes its cash.`,
 };
 
 const initialMockCashUseCardData: CashUseCardData & DisplayableCardState = {
@@ -87,7 +94,7 @@ const mockCardContext: CardActionContext = {
   companyName: initialMockCashUseCardData.companyName,
   logoUrl: initialMockCashUseCardData.logoUrl,
   websiteUrl: initialMockCashUseCardData.websiteUrl,
-  backData: initialMockCashUseCardData.backData, // Ensure backData is included
+  backData: initialMockCashUseCardData.backData,
 };
 
 const mockOnGenericInteraction: OnGenericInteraction = (
@@ -121,21 +128,18 @@ export const Flipped: Story = {
 };
 
 const minimalMockBackData: BaseCardBackData = {
-  description:
-    "Minimal cash use data for Mini Corp. Shares outstanding as of 2024-01-15.",
+  description: "Minimal cash use data for Mini Corp.",
 };
-const minimalInitialMockData = {
-  ...initialMockCashUseCardData,
+const minimalInitialMockData: CashUseCardData & DisplayableCardState = {
   id: "cashuse-minimal",
+  type: "cashuse",
   symbol: "MINI",
   companyName: "Mini Corp",
   logoUrl: null,
   websiteUrl: null,
+  createdAt: Date.now(),
   staticData: {
     reportedCurrency: "USD",
-    debtRangePeriodLabel: "N/A",
-    fcfRangePeriodLabel: "N/A",
-    dividendsRangePeriodLabel: "N/A",
     latestStatementDate: null,
     latestStatementPeriod: null,
     latestSharesFloatDate: "2024-01-15",
@@ -143,14 +147,17 @@ const minimalInitialMockData = {
   liveData: {
     currentOutstandingShares: 1000000,
     currentTotalDebt: null,
-    totalDebt_5y_min: null,
-    totalDebt_5y_max: null,
+    totalDebt_annual_data: [], // empty array tests conditional render
     currentFreeCashFlow: 5000,
-    freeCashFlow_5y_min: 0,
-    freeCashFlow_5y_max: 10000,
-    currentNetDividendsPaid: null,
-    netDividendsPaid_5y_min: null,
-    netDividendsPaid_5y_max: null,
+    freeCashFlow_annual_data: [
+      { year: 2022, value: -1000 },
+      { year: 2023, value: 5000 },
+    ],
+    currentNetDividendsPaid: 0,
+    netDividendsPaid_annual_data: [
+      { year: 2022, value: 0 },
+      { year: 2023, value: 0 },
+    ], // All zeros tests conditional render
   },
   backData: minimalMockBackData,
   isFlipped: false,
@@ -167,7 +174,7 @@ export const MinimalData: Story = {
       companyName: "Mini Corp",
       logoUrl: null,
       websiteUrl: null,
-      backData: minimalMockBackData, // Ensure backData is included for minimal story
+      backData: minimalMockBackData,
     },
   },
 };
