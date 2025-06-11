@@ -54,10 +54,11 @@ function createPriceCardLiveData(
 
 function createPriceCardStaticData(
   leanQuote: LiveQuoteIndicatorDBRow,
-  profileContext?: Pick<ProfileDBRow, "exchange">
+  profileContext?: Pick<ProfileDBRow, "exchange" | "currency">
 ): PriceCardStaticData {
   return {
     exchange_code: leanQuote.exchange ?? profileContext?.exchange ?? null,
+    currency: profileContext?.currency ?? "USD", // Default to USD if not found
   };
 }
 
@@ -66,7 +67,7 @@ function createDisplayablePriceCard(
   apiTimestampMillis: number | null,
   profileContext?: Pick<
     ProfileDBRow,
-    "company_name" | "image" | "exchange" | "website"
+    "company_name" | "image" | "exchange" | "website" | "currency" // Added currency
   >,
   isShell = false
 ): PriceCardData & DisplayableCardState {
@@ -138,18 +139,41 @@ async function initializePriceCard({
 
   const quoteDataFromDB = quoteResult.isOk() ? quoteResult.value.data : null;
 
-  const profileCardForSymbol = activeCards?.find(
+  const profileCard = activeCards?.find(
     (c) => c.symbol === symbol && c.type === "profile"
   ) as ProfileCardDataType | undefined;
 
-  const profileContext = profileCardForSymbol
-    ? {
-        company_name: profileCardForSymbol.companyName ?? null,
-        image: profileCardForSymbol.logoUrl ?? null,
-        exchange: profileCardForSymbol.staticData.exchange ?? null,
-        website: profileCardForSymbol.websiteUrl ?? null,
-      }
-    : undefined;
+  let profileContext:
+    | Pick<
+        ProfileDBRow,
+        "company_name" | "image" | "exchange" | "website" | "currency"
+      >
+    | undefined;
+
+  if (profileCard) {
+    profileContext = {
+      company_name: profileCard.companyName ?? null,
+      image: profileCard.logoUrl ?? null,
+      exchange: profileCard.staticData.exchange ?? null,
+      website: profileCard.websiteUrl ?? null,
+      currency: profileCard.staticData.currency ?? "USD",
+    };
+  } else {
+    // If no profile card exists, fetch the necessary info from the DB
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("company_name, image, exchange, website, currency")
+      .eq("symbol", symbol)
+      .maybeSingle();
+
+    if (error) {
+      console.warn(
+        `Could not fetch profile context for ${symbol}: ${error.message}`
+      );
+    } else if (data) {
+      profileContext = data;
+    }
+  }
 
   if (quoteDataFromDB) {
     const liveQuote = quoteDataFromDB as LiveQuoteIndicatorDBRow;
@@ -221,13 +245,10 @@ const handlePriceCardLiveQuoteUpdate: CardUpdateHandler<
     leanQuotePayload,
     apiTimestampMillis
   );
-  const newStaticData = createPriceCardStaticData(leanQuotePayload);
 
   if (
     JSON.stringify(currentPriceCardData.liveData) ===
-      JSON.stringify(newLiveData) &&
-    currentPriceCardData.staticData.exchange_code ===
-      newStaticData.exchange_code
+    JSON.stringify(newLiveData)
   ) {
     return currentPriceCardData;
   }
@@ -235,10 +256,6 @@ const handlePriceCardLiveQuoteUpdate: CardUpdateHandler<
   return {
     ...currentPriceCardData,
     liveData: newLiveData,
-    staticData: {
-      ...currentPriceCardData.staticData,
-      exchange_code: newStaticData.exchange_code,
-    },
   };
 };
 registerCardUpdateHandler(
@@ -256,7 +273,10 @@ const handlePriceCardProfileUpdate: CardUpdateHandler<
     profilePayload
   );
 
-  if (coreDataChanged) {
+  const currencyChanged =
+    currentPriceCardData.staticData.currency !== profilePayload.currency;
+
+  if (coreDataChanged || currencyChanged) {
     const companyNameForDesc =
       updatedCardData.companyName ?? updatedCardData.symbol;
     const newBackData: BaseCardBackData = {
@@ -264,6 +284,10 @@ const handlePriceCardProfileUpdate: CardUpdateHandler<
     };
     return {
       ...updatedCardData,
+      staticData: {
+        ...updatedCardData.staticData,
+        currency: profilePayload.currency ?? "USD",
+      },
       backData: newBackData,
     };
   }

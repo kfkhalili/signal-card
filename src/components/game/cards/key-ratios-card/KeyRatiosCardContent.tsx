@@ -110,7 +110,7 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
               currency: isMonetaryValue
                 ? staticData.reportedCurrency
                 : undefined,
-              isValueAsPercentage: unit === "%", // <<< FIX APPLIED HERE
+              isValueAsPercentage: unit === "%",
             })
           }
         />

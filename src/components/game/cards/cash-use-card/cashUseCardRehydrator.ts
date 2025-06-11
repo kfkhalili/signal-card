@@ -8,56 +8,47 @@ import type {
   CashUseCardData,
   CashUseCardLiveData,
   CashUseCardStaticData,
+  AnnualDataPoint,
 } from "./cash-use-card.types";
 import type { BaseCardBackData } from "../base-card/base-card.types";
 
-// Shape of the card-specific static data expected in storage
+interface StoredAnnualDataPoint {
+  year?: number;
+  value?: number;
+}
+
 interface StoredCashUseCardStaticDataShape {
   reportedCurrency?: string | null;
-  // sharesRangePeriodLabel is removed as outstanding_shares is a single value
-  debtRangePeriodLabel?: string;
-  fcfRangePeriodLabel?: string;
-  dividendsRangePeriodLabel?: string;
   latestStatementDate?: string | null;
   latestStatementPeriod?: string | null;
   latestSharesFloatDate?: string | null;
 }
 
-// Shape of the card-specific live data expected in storage
 interface StoredCashUseCardLiveDataShape {
   currentOutstandingShares?: number | null;
-  // outstandingShares_5y_min and _max are removed
-
   currentTotalDebt?: number | null;
-  totalDebt_5y_min?: number | null;
-  totalDebt_5y_max?: number | null;
+  totalDebt_annual_data?: readonly StoredAnnualDataPoint[];
   currentFreeCashFlow?: number | null;
-  freeCashFlow_5y_min?: number | null;
-  freeCashFlow_5y_max?: number | null;
+  freeCashFlow_annual_data?: readonly StoredAnnualDataPoint[];
   currentNetDividendsPaid?: number | null;
-  netDividendsPaid_5y_min?: number | null;
-  netDividendsPaid_5y_max?: number | null;
+  netDividendsPaid_annual_data?: readonly StoredAnnualDataPoint[];
 }
 
-// Shape for the back face description
 interface StoredBaseCardBackDataShape {
   description?: string | null;
 }
 
-// Defines the expected structure of the CashUseCard-specific part of cardFromStorage
-// It does NOT include common properties like id, symbol, etc., as those are in commonProps.
 interface StoredCashUseCardObjectShape {
   staticData?: StoredCashUseCardStaticDataShape;
   liveData?: StoredCashUseCardLiveDataShape;
   backData?: StoredBaseCardBackDataShape;
-  websiteUrl?: string | null; // If CashUseCard specifically stores its own websiteUrl
+  websiteUrl?: string | null;
 }
 
 const rehydrateCashUseCardInstance: SpecificCardRehydrator = (
-  cardFromStorage: Record<string, unknown>, // Raw object from storage, contains only card-specific parts
-  commonProps: CommonCardPropsForRehydration // Common properties already parsed
+  cardFromStorage: Record<string, unknown>,
+  commonProps: CommonCardPropsForRehydration
 ): CashUseCardData | null => {
-  // Cast cardFromStorage to the shape of CashUseCard-specific stored data
   const storedSpecificData = cardFromStorage as StoredCashUseCardObjectShape;
 
   const staticDataSource = storedSpecificData.staticData || {};
@@ -66,26 +57,32 @@ const rehydrateCashUseCardInstance: SpecificCardRehydrator = (
 
   const rehydratedStaticData: CashUseCardStaticData = {
     reportedCurrency: staticDataSource.reportedCurrency ?? null,
-    debtRangePeriodLabel: staticDataSource.debtRangePeriodLabel ?? "N/A",
-    fcfRangePeriodLabel: staticDataSource.fcfRangePeriodLabel ?? "N/A",
-    dividendsRangePeriodLabel:
-      staticDataSource.dividendsRangePeriodLabel ?? "N/A",
     latestStatementDate: staticDataSource.latestStatementDate ?? null,
     latestStatementPeriod: staticDataSource.latestStatementPeriod ?? null,
     latestSharesFloatDate: staticDataSource.latestSharesFloatDate ?? null,
   };
 
+  const rehydrateAnnualData = (
+    data: readonly StoredAnnualDataPoint[] | undefined
+  ): AnnualDataPoint[] =>
+    (data ?? [])
+      .map((p) => ({ year: p.year ?? 0, value: p.value ?? 0 }))
+      .filter((p) => p.year > 0);
+
   const rehydratedLiveData: CashUseCardLiveData = {
     currentOutstandingShares: liveDataSource.currentOutstandingShares ?? null,
     currentTotalDebt: liveDataSource.currentTotalDebt ?? null,
-    totalDebt_5y_min: liveDataSource.totalDebt_5y_min ?? null,
-    totalDebt_5y_max: liveDataSource.totalDebt_5y_max ?? null,
+    totalDebt_annual_data: rehydrateAnnualData(
+      liveDataSource.totalDebt_annual_data
+    ),
     currentFreeCashFlow: liveDataSource.currentFreeCashFlow ?? null,
-    freeCashFlow_5y_min: liveDataSource.freeCashFlow_5y_min ?? null,
-    freeCashFlow_5y_max: liveDataSource.freeCashFlow_5y_max ?? null,
+    freeCashFlow_annual_data: rehydrateAnnualData(
+      liveDataSource.freeCashFlow_annual_data
+    ),
     currentNetDividendsPaid: liveDataSource.currentNetDividendsPaid ?? null,
-    netDividendsPaid_5y_min: liveDataSource.netDividendsPaid_5y_min ?? null,
-    netDividendsPaid_5y_max: liveDataSource.netDividendsPaid_5y_max ?? null,
+    netDividendsPaid_annual_data: rehydrateAnnualData(
+      liveDataSource.netDividendsPaid_annual_data
+    ),
   };
 
   const defaultDescription = `Cash usage metrics for ${
@@ -102,18 +99,14 @@ const rehydrateCashUseCardInstance: SpecificCardRehydrator = (
     description: backDataSource.description || defaultDescription,
   };
 
-  // Construct the full CashUseCardData using commonProps and rehydrated specific data
   const rehydratedCard: CashUseCardData = {
-    // Common properties supplied by the generic rehydration logic
     id: commonProps.id,
-    type: "cashuse", // This specific rehydrator is for "cashuse" type
+    type: "cashuse",
     symbol: commonProps.symbol,
     createdAt: commonProps.createdAt,
     companyName: commonProps.companyName,
     logoUrl: commonProps.logoUrl,
-
-    // Card-specific properties rehydrated here
-    websiteUrl: storedSpecificData.websiteUrl ?? null, // Sourced from card-specific stored data
+    websiteUrl: storedSpecificData.websiteUrl ?? null,
     staticData: rehydratedStaticData,
     liveData: rehydratedLiveData,
     backData: rehydratedBackData,

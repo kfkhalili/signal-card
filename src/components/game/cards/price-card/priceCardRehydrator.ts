@@ -12,7 +12,6 @@ import type {
 import type { BaseCardBackData } from "../base-card/base-card.types";
 import { parseTimestampSafe } from "@/lib/formatters";
 
-// Expected shape of the 'liveData' object in storage
 interface StoredPriceCardLiveDataShape {
   timestamp?: string | number | null;
   price?: number | null;
@@ -30,34 +29,29 @@ interface StoredPriceCardLiveDataShape {
   sma200d?: number | null;
 }
 
-// Expected shape of the 'staticData' object in storage
 interface StoredPriceCardStaticDataShape {
   exchange_code?: string | null;
+  currency?: string | null; // Added currency
 }
 
-// Expected shape of the 'backData' object (for description)
 interface StoredBaseCardBackDataShape {
   description?: string | null;
 }
 
-// Overall expected shape for a stored PriceCard
 interface StoredPriceCardObject {
   staticData?: StoredPriceCardStaticDataShape;
   liveData?: StoredPriceCardLiveDataShape;
-  backData?: StoredBaseCardBackDataShape; // For the description
-  // Old direct fields that might exist in older stored cards (for graceful migration if needed)
-  faceData?: StoredPriceCardLiveDataShape; // Old name for liveData parts
-  exchange_code?: string | null; // Old location for exchange_code
+  backData?: StoredBaseCardBackDataShape;
+  exchange_code?: string | null;
 }
 
 const rehydrateLivePriceCard: SpecificCardRehydrator = (
-  cardFromStorage: Record<string, unknown>, // Raw object from storage
+  cardFromStorage: Record<string, unknown>,
   commonProps: CommonCardPropsForRehydration
 ): PriceCardData | null => {
   const stored = cardFromStorage as StoredPriceCardObject;
 
-  // Prioritize new liveData structure, fallback to old faceData for migration
-  const liveDataSource = stored.liveData || stored.faceData || {};
+  const liveDataSource = stored.liveData || {};
   const staticDataSource = stored.staticData || {};
   const backDataSource = stored.backData || {};
 
@@ -82,13 +76,14 @@ const rehydrateLivePriceCard: SpecificCardRehydrator = (
 
   const rehydratedStaticData: PriceCardStaticData = {
     exchange_code:
-      staticDataSource.exchange_code ?? stored.exchange_code ?? null, // Fallback for older stored data
+      staticDataSource.exchange_code ?? stored.exchange_code ?? null,
+    currency: staticDataSource.currency ?? "USD", // Handle new currency field
   };
 
   const rehydratedBackData: BaseCardBackData = {
     description:
       backDataSource.description ||
-      `Market price information for ${commonProps.symbol}. Includes daily and historical price points, volume, and key moving averages.`, // Default description
+      `Market price information for ${commonProps.symbol}. Includes daily and historical price points, volume, and key moving averages.`,
   };
 
   return {

@@ -23,15 +23,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
       "message",
       "Server configuration error. Please contact support."
     );
-    // This specific check for pathname !== "/auth/auth-error" becomes less critical
-    // if /auth/auth-error is excluded by the matcher, but kept for safety.
-    if (pathname !== "/auth/auth-error") {
-      return NextResponse.redirect(errorUrl);
-    }
-    return new NextResponse("Server configuration error. Unable to proceed.", {
-      status: 500,
-      headers: { "Content-Type": "text/plain" },
-    });
+    return NextResponse.redirect(errorUrl);
   }
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
