@@ -38,11 +38,17 @@ const mockStaticData: CashUseCardData["staticData"] = {
   reportedCurrency: "USD",
   latestStatementDate: "2023-07-29",
   latestStatementPeriod: "FY",
-  latestSharesFloatDate: "2023-10-27",
 };
 
 const mockLiveData: CashUseCardData["liveData"] = {
   currentOutstandingShares: 4100000000,
+  outstandingShares_annual_data: [
+    { year: 2019, value: 4300000000 },
+    { year: 2020, value: 4250000000 },
+    { year: 2021, value: 4200000000 },
+    { year: 2022, value: 4150000000 },
+    { year: 2023, value: 4100000000 },
+  ],
   currentTotalDebt: 25000000000,
   totalDebt_annual_data: [
     { year: 2019, value: 22000000000 },
@@ -70,7 +76,7 @@ const mockLiveData: CashUseCardData["liveData"] = {
 };
 
 const mockBaseBackData: BaseCardBackData = {
-  description: `Key metrics for ${defaultCompanyName} illustrating how the company utilizes its cash.`,
+  description: `Cash usage metrics for ${defaultCompanyName}. Financial data from ${mockStaticData.latestStatementDate} (${mockStaticData.latestStatementPeriod}).`,
 };
 
 const initialMockCashUseCardData: CashUseCardData & DisplayableCardState = {
@@ -142,10 +148,13 @@ const minimalInitialMockData: CashUseCardData & DisplayableCardState = {
     reportedCurrency: "USD",
     latestStatementDate: null,
     latestStatementPeriod: null,
-    latestSharesFloatDate: "2024-01-15",
   },
   liveData: {
     currentOutstandingShares: 1000000,
+    outstandingShares_annual_data: [
+      { year: 2022, value: 1200000 },
+      { year: 2023, value: 1000000 },
+    ],
     currentTotalDebt: null,
     totalDebt_annual_data: [], // empty array tests conditional render
     currentFreeCashFlow: 5000,

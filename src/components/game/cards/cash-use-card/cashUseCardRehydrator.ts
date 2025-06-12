@@ -21,11 +21,11 @@ interface StoredCashUseCardStaticDataShape {
   reportedCurrency?: string | null;
   latestStatementDate?: string | null;
   latestStatementPeriod?: string | null;
-  latestSharesFloatDate?: string | null;
 }
 
 interface StoredCashUseCardLiveDataShape {
   currentOutstandingShares?: number | null;
+  outstandingShares_annual_data?: readonly StoredAnnualDataPoint[];
   currentTotalDebt?: number | null;
   totalDebt_annual_data?: readonly StoredAnnualDataPoint[];
   currentFreeCashFlow?: number | null;
@@ -59,7 +59,6 @@ const rehydrateCashUseCardInstance: SpecificCardRehydrator = (
     reportedCurrency: staticDataSource.reportedCurrency ?? null,
     latestStatementDate: staticDataSource.latestStatementDate ?? null,
     latestStatementPeriod: staticDataSource.latestStatementPeriod ?? null,
-    latestSharesFloatDate: staticDataSource.latestSharesFloatDate ?? null,
   };
 
   const rehydrateAnnualData = (
@@ -71,6 +70,9 @@ const rehydrateCashUseCardInstance: SpecificCardRehydrator = (
 
   const rehydratedLiveData: CashUseCardLiveData = {
     currentOutstandingShares: liveDataSource.currentOutstandingShares ?? null,
+    outstandingShares_annual_data: rehydrateAnnualData(
+      liveDataSource.outstandingShares_annual_data
+    ),
     currentTotalDebt: liveDataSource.currentTotalDebt ?? null,
     totalDebt_annual_data: rehydrateAnnualData(
       liveDataSource.totalDebt_annual_data
@@ -89,11 +91,7 @@ const rehydrateCashUseCardInstance: SpecificCardRehydrator = (
     commonProps.companyName || commonProps.symbol
   }. Financial data from ${
     rehydratedStaticData.latestStatementDate || "N/A"
-  } (${
-    rehydratedStaticData.latestStatementPeriod || "N/A"
-  }). Shares outstanding as of ${
-    rehydratedStaticData.latestSharesFloatDate || "N/A"
-  }.`;
+  } (${rehydratedStaticData.latestStatementPeriod || "N/A"}).`;
 
   const rehydratedBackData: BaseCardBackData = {
     description: backDataSource.description || defaultDescription,
