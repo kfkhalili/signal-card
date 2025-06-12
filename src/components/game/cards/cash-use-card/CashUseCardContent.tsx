@@ -187,8 +187,8 @@ export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
                     0
                   )}
                   isInteractive={false}
-                  labelClassName="text-xs font-medium text-muted-foreground"
-                  valueClassName="text-xs font-semibold text-foreground"
+                  labelClassName="text-sm font-medium text-muted-foreground"
+                  valueClassName="text-sm font-semibold text-foreground"
                   isSelectionMode={isSelectionMode}
                   isSelected={isSelected(`${id}-outstanding-shares-back`)}
                   onSelect={() =>
