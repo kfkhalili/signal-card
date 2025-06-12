@@ -3,6 +3,7 @@ import type { BaseCardData } from "../base-card/base-card.types";
 
 export interface CashUseCardFmpBalanceSheetData {
   readonly totalDebt?: number | null;
+  readonly commonStock?: number | null;
   readonly date?: string;
   readonly period?: string;
   readonly reportedCurrency?: string | null;
@@ -25,11 +26,11 @@ export interface CashUseCardStaticData {
   readonly reportedCurrency: string | null;
   readonly latestStatementDate: string | null;
   readonly latestStatementPeriod: string | null;
-  readonly latestSharesFloatDate: string | null;
 }
 
 export interface CashUseCardLiveData {
   readonly currentOutstandingShares: number | null;
+  readonly outstandingShares_annual_data: readonly AnnualDataPoint[];
   readonly currentTotalDebt: number | null;
   readonly totalDebt_annual_data: readonly AnnualDataPoint[];
   readonly currentFreeCashFlow: number | null;
@@ -43,6 +44,3 @@ export interface CashUseCardData extends BaseCardData {
   readonly staticData: CashUseCardStaticData;
   liveData: CashUseCardLiveData;
 }
-
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface CashUseCardInteractions {}

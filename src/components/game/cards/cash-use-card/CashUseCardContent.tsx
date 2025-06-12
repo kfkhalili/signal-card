@@ -16,7 +16,6 @@ import {
   CheckboxCheckedIcon,
   CheckboxUncheckedIcon,
 } from "@/components/ui/CheckboxIcons";
-import { DataRow } from "@/components/ui/DataRow";
 
 interface MetricDisplayWithChartProps {
   label: string;
@@ -109,7 +108,7 @@ const MetricDisplayWithChart: React.FC<MetricDisplayWithChartProps> = ({
         data={chartData}
         xAxisKey="name"
         yAxisKey="value"
-        currencySymbol={displayCurrencySymbol}
+        currencySymbol={isMonetary ? displayCurrencySymbol : ""}
       />
     </div>
   );
@@ -166,36 +165,30 @@ export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
     };
 
     if (isBackFace) {
-      const sharesYear = staticData.latestSharesFloatDate
-        ? staticData.latestSharesFloatDate.substring(0, 4)
-        : "";
-      const sharesLabel = `Outstanding Shares ${
-        sharesYear ? `(${sharesYear})` : ""
-      }`.trim();
-
       return (
         <div
           data-testid={`cashuse-card-back-${symbol}`}
           className="pointer-events-auto flex flex-col h-full">
           <ShadCardContent className={cn("p-0 flex-grow text-xs")}>
             <div className="pt-1.5 space-y-2">
-              {liveData.currentOutstandingShares ? (
-                <DataRow
-                  label={sharesLabel}
-                  value={formatNumberWithAbbreviations(
-                    liveData.currentOutstandingShares,
-                    0
-                  )}
-                  isInteractive={false}
-                  labelClassName="text-xs font-medium text-muted-foreground"
-                  valueClassName="text-xs font-semibold text-foreground"
+              {liveData.currentOutstandingShares ||
+              liveData.outstandingShares_annual_data?.some(
+                (d) => d.value !== 0
+              ) ? (
+                <MetricDisplayWithChart
+                  label="Outstanding Shares"
+                  currentValue={liveData.currentOutstandingShares}
+                  annualData={liveData.outstandingShares_annual_data}
+                  isMonetary={false}
+                  data-testid="outstanding-shares-metric-back"
+                  tooltip="Common shares outstanding"
                   isSelectionMode={isSelectionMode}
-                  isSelected={isSelected(`${id}-outstanding-shares-back`)}
+                  isSelected={isSelected(`${id}-outstanding-shares`)}
                   onSelect={() =>
                     onSelect({
                       sourceCardId: id,
                       sourceCardSymbol: symbol,
-                      label: sharesLabel,
+                      label: "Outstanding Shares",
                       value: liveData.currentOutstandingShares,
                     })
                   }

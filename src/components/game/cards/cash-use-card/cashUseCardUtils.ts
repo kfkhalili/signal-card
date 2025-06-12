@@ -25,8 +25,6 @@ import type { ProfileDBRow as ProfileDBRowFromHook } from "@/hooks/useStockData"
 import { applyProfileCoreUpdates } from "../cardUtils";
 import { safeJsonParse } from "@/lib/utils";
 
-type SharesFloatDBRowFromSupabase =
-  Database["public"]["Tables"]["shares_float"]["Row"];
 type ProfileDBRowFromSupabase = Database["public"]["Tables"]["profiles"]["Row"];
 
 class CashUseCardError extends Error {
@@ -118,11 +116,6 @@ function processFinancialRecords<
   };
 }
 
-interface SharesDataPoint {
-  latest: number | null;
-  latestDate: string | null;
-}
-
 function constructCashUseCardData(
   symbol: string,
   profileInfo: {
@@ -130,7 +123,7 @@ function constructCashUseCardData(
     logoUrl?: string | null;
     websiteUrl?: string | null;
   },
-  sharesData: SharesDataPoint,
+  sharesData: AnnualDataAndStatsResult,
   totalDebtData: AnnualDataAndStatsResult,
   freeCashFlowData: AnnualDataAndStatsResult,
   netDividendsPaidData: AnnualDataAndStatsResult,
@@ -146,11 +139,11 @@ function constructCashUseCardData(
     reportedCurrency: latestFinancialStatementInfo.reportedCurrency,
     latestStatementDate: latestFinancialStatementInfo.statementDate,
     latestStatementPeriod: latestFinancialStatementInfo.statementPeriod,
-    latestSharesFloatDate: sharesData.latestDate,
   };
 
   const liveData: CashUseCardLiveData = {
     currentOutstandingShares: sharesData.latest,
+    outstandingShares_annual_data: sharesData.annualData,
     currentTotalDebt: totalDebtData.latest,
     totalDebt_annual_data: totalDebtData.annualData,
     currentFreeCashFlow: freeCashFlowData.latest,
@@ -164,9 +157,7 @@ function constructCashUseCardData(
       profileInfo.companyName || symbol
     }. Financial data from ${
       latestFinancialStatementInfo.statementDate || "N/A"
-    } (${
-      latestFinancialStatementInfo.statementPeriod || "N/A"
-    }). Shares outstanding as of ${sharesData.latestDate || "N/A"}.`,
+    } (${latestFinancialStatementInfo.statementPeriod || "N/A"}).`,
   };
 
   return {
@@ -239,6 +230,16 @@ async function fetchAndProcessCashUseData(
   }
   const financialStatements = fsResult.value.data || [];
 
+  const sharesRecords = financialStatements.map((fs) => ({
+    date: fs.date,
+    period: fs.period ?? undefined,
+    fiscal_year: fs.fiscal_year ?? undefined,
+    commonStock_value: safeJsonParseWithField<number | null>(
+      fs.balance_sheet_payload,
+      "commonStock",
+      null
+    ),
+  }));
   const debtRecords = financialStatements.map((fs) => ({
     date: fs.date,
     period: fs.period ?? undefined,
@@ -273,6 +274,10 @@ async function fetchAndProcessCashUseData(
     };
   });
 
+  const sharesData = processFinancialRecords(
+    sharesRecords,
+    "commonStock_value"
+  );
   const totalDebtData = processFinancialRecords(debtRecords, "totalDebt_value");
   const freeCashFlowData = processFinancialRecords(
     fcfRecords,
@@ -289,34 +294,13 @@ async function fetchAndProcessCashUseData(
     statementPeriod: financialStatements[0]?.period ?? null,
   };
 
-  const sharesFloatResult = await fromPromise(
-    supabase
-      .from("shares_float")
-      .select("date, outstanding_shares")
-      .eq("symbol", symbol)
-      .order("date", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    (e) =>
-      new CashUseCardError(`Shares float fetch failed: ${(e as Error).message}`)
-  );
-  let sharesData: SharesDataPoint = { latest: null, latestDate: null };
-  if (sharesFloatResult.isOk() && sharesFloatResult.value.data) {
-    sharesData = {
-      latest: sharesFloatResult.value.data.outstanding_shares ?? null,
-      latestDate: sharesFloatResult.value.data.date ?? null,
-    };
-  } else if (sharesFloatResult.isErr()) {
-    console.warn(sharesFloatResult.error.message);
-  }
-
   if (
+    sharesData.latest === null &&
     totalDebtData.latest === null &&
     freeCashFlowData.latest === null &&
-    netDividendsPaidData.latest === null &&
-    sharesData.latest === null
+    netDividendsPaidData.latest === null
   ) {
-    return err(new CashUseCardError("No financial or shares data found."));
+    return err(new CashUseCardError("No financial data found."));
   }
 
   return ok(
@@ -376,6 +360,11 @@ const handleCashUseCardFinancialStatementUpdate: CardUpdateHandler<
   _currentDisplayableCard,
   context
 ): CashUseCardData => {
+  const newCommonStock = safeJsonParseWithField<number | null>(
+    newFinancialStatementRow.balance_sheet_payload,
+    "commonStock",
+    null
+  );
   const newTotalDebt = safeJsonParseWithField<number | null>(
     newFinancialStatementRow.balance_sheet_payload,
     "totalDebt",
@@ -422,6 +411,13 @@ const handleCashUseCardFinancialStatementUpdate: CardUpdateHandler<
     }
 
     if (periodIsSameOrNewer) {
+      if (
+        newCommonStock !== null &&
+        updatedLiveData.currentOutstandingShares !== newCommonStock
+      ) {
+        updatedLiveData.currentOutstandingShares = newCommonStock;
+        hasChanged = true;
+      }
       if (
         newTotalDebt !== null &&
         updatedLiveData.currentTotalDebt !== newTotalDebt
@@ -471,9 +467,7 @@ const handleCashUseCardFinancialStatementUpdate: CardUpdateHandler<
       currentCashUseCardData.companyName || currentCashUseCardData.symbol
     }. Financial data from ${updatedStaticData.latestStatementDate || "N/A"} (${
       updatedStaticData.latestStatementPeriod || "N/A"
-    }). Shares outstanding as of ${
-      updatedStaticData.latestSharesFloatDate || "N/A"
-    }.`;
+    }).`;
     return {
       ...currentCashUseCardData,
       liveData: updatedLiveData,
@@ -489,72 +483,6 @@ registerCardUpdateHandler(
   "cashuse",
   "FINANCIAL_STATEMENT_UPDATE",
   handleCashUseCardFinancialStatementUpdate
-);
-
-type SharesFloatDBRowForUpdate = SharesFloatDBRowFromSupabase;
-
-const handleCashUseCardSharesFloatUpdate: CardUpdateHandler<
-  CashUseCardData,
-  SharesFloatDBRowForUpdate
-> = (
-  currentCashUseCardData,
-  newSharesFloatRow,
-  _currentDisplayableCard,
-  context
-): CashUseCardData => {
-  const newOutstandingShares = newSharesFloatRow.outstanding_shares;
-  const newDate = newSharesFloatRow.date;
-
-  let hasChanged = false;
-  const updatedLiveData = { ...currentCashUseCardData.liveData };
-  const updatedStaticData = { ...currentCashUseCardData.staticData };
-
-  if (
-    newDate &&
-    (!updatedStaticData.latestSharesFloatDate ||
-      new Date(newDate) >= new Date(updatedStaticData.latestSharesFloatDate))
-  ) {
-    if (
-      newOutstandingShares !== null &&
-      updatedLiveData.currentOutstandingShares !== newOutstandingShares
-    ) {
-      updatedLiveData.currentOutstandingShares = newOutstandingShares;
-      hasChanged = true;
-    }
-    if (hasChanged || updatedStaticData.latestSharesFloatDate !== newDate) {
-      updatedStaticData.latestSharesFloatDate = newDate;
-      hasChanged = true;
-    }
-  }
-
-  if (hasChanged) {
-    if (context.toast) {
-      context.toast({
-        title: `Shares Outstanding Updated: ${currentCashUseCardData.symbol}`,
-        description: `Data as of ${newDate} applied.`,
-      });
-    }
-    const newBackDataDescription = `Cash usage metrics for ${
-      currentCashUseCardData.companyName || currentCashUseCardData.symbol
-    }. Financial data from ${updatedStaticData.latestStatementDate || "N/A"} (${
-      updatedStaticData.latestStatementPeriod || "N/A"
-    }). Shares outstanding as of ${
-      updatedStaticData.latestSharesFloatDate || "N/A"
-    }.`;
-    return {
-      ...currentCashUseCardData,
-      liveData: updatedLiveData,
-      staticData: updatedStaticData,
-      backData: { description: newBackDataDescription },
-    };
-  }
-  return currentCashUseCardData;
-};
-
-registerCardUpdateHandler(
-  "cashuse",
-  "SHARES_FLOAT_UPDATE",
-  handleCashUseCardSharesFloatUpdate
 );
 
 const handleCashUseCardProfileUpdate: CardUpdateHandler<
@@ -600,11 +528,7 @@ const handleCashUseCardProfileUpdate: CardUpdateHandler<
       finalCardData.companyName
     }. Financial data from ${
       finalCardData.staticData.latestStatementDate || "N/A"
-    } (${
-      finalCardData.staticData.latestStatementPeriod || "N/A"
-    }). Shares outstanding as of ${
-      finalCardData.staticData.latestSharesFloatDate || "N/A"
-    }.`;
+    } (${finalCardData.staticData.latestStatementPeriod || "N/A"}).`;
 
     return {
       ...finalCardData,
