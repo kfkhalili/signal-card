@@ -52,7 +52,7 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
 
   if (!hasMounted) {
     return (
-      <div className="flex-grow p-4 bg-secondary/30 rounded-lg shadow-inner min-h-[400px] flex items-center justify-center">
+      <div className="p-4 bg-secondary/30 rounded-lg shadow-inner min-h-[400px] flex items-center justify-center">
         <p className="text-muted-foreground text-center py-10">
           Loading cards...
         </p>
@@ -61,7 +61,7 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
   }
 
   return (
-    <div className="flex-grow p-4 bg-secondary/30 dark:bg-background/30 rounded-lg shadow-inner min-h-screen">
+    <div className="p-4 bg-secondary/30 dark:bg-background/30 rounded-lg shadow-inner">
       {cards.length === 0 ? (
         <div className="flex items-center justify-center h-[calc(100vh-15rem)]">
           <p className="text-muted-foreground text-center py-10">
