@@ -23,6 +23,14 @@ export type DerivedMarketStatus =
   | "Connecting"
   | "ClientUnavailable";
 
+export interface MarketStatusUpdate {
+  status: DerivedMarketStatus;
+  message: string | null;
+  openingTime: string | null;
+  closingTime: string | null;
+  timezone: string | null;
+}
+
 interface UseStockDataProps {
   symbol: string;
   onProfileUpdate?: (profile: ProfileDBRow) => void;
@@ -32,11 +40,6 @@ interface UseStockDataProps {
   ) => void;
   onExchangeStatusUpdate?: (status: ExchangeMarketStatusRecord) => void;
   onFinancialStatementUpdate?: (statement: FinancialStatementDBRow) => void;
-}
-
-interface UseStockDataReturn {
-  derivedMarketStatus: DerivedMarketStatus;
-  marketStatusMessage: string | null;
 }
 
 async function fetchInitialProfile(
@@ -95,7 +98,7 @@ export function useStockData({
   onLiveQuoteUpdate,
   onExchangeStatusUpdate,
   onFinancialStatementUpdate,
-}: UseStockDataProps): UseStockDataReturn {
+}: UseStockDataProps): MarketStatusUpdate {
   const instanceIdRef = useRef(Math.random().toString(36).substring(2, 7));
   const [profileData, setProfileData] = useState<ProfileDBRow | null>(null);
   const [latestQuote, setLatestQuote] =
@@ -107,6 +110,9 @@ export function useStockData({
   const [marketStatusMessage, setMarketStatusMessage] = useState<string | null>(
     "Initializing..."
   );
+  const [openingTime, setOpeningTime] = useState<string | null>(null);
+  const [closingTime, setClosingTime] = useState<string | null>(null);
+  const [timezone, setTimezone] = useState<string | null>(null);
 
   const { supabase: supabaseClient } = useAuth();
   const isMountedRef = useRef<boolean>(false);
@@ -475,6 +481,16 @@ export function useStockData({
     const relevantExchangeCode = profileData?.exchange || latestQuote?.exchange;
 
     if (!relevantExchangeCode) return;
+    if (exchangeStatus) {
+      setOpeningTime(exchangeStatus.opening_time_local);
+      setClosingTime(exchangeStatus.closing_time_local);
+      setTimezone(exchangeStatus.timezone);
+    } else {
+      setOpeningTime(null);
+      setClosingTime(null);
+      setTimezone(null);
+    }
+
     if (!exchangeStatus) {
       setDerivedMarketStatus("Connecting");
       setMarketStatusMessage(
@@ -500,18 +516,14 @@ export function useStockData({
         newStatus = diffMinutes > 15 ? "Delayed" : "Open";
         newMessage =
           exchangeStatus.status_message ||
-          (newStatus === "Delayed"
-            ? "Live data is delayed."
-            : "Market is Open.");
+          (newStatus === "Delayed" ? "Live data is delayed." : null);
       } else {
         newStatus = "Open";
-        newMessage =
-          exchangeStatus.status_message ||
-          "Market is Open (awaiting first quote).";
+        newMessage = exchangeStatus.status_message || "Awaiting first quote";
       }
     } else {
       newStatus = "Closed";
-      newMessage = exchangeStatus.status_message || "Market is Closed.";
+      newMessage = exchangeStatus.status_message || null;
     }
 
     setDerivedMarketStatus((prevStatus) =>
@@ -522,5 +534,11 @@ export function useStockData({
     );
   }, [profileData, latestQuote, exchangeStatus]);
 
-  return { derivedMarketStatus, marketStatusMessage };
+  return {
+    status: derivedMarketStatus,
+    message: marketStatusMessage,
+    openingTime,
+    closingTime,
+    timezone,
+  };
 }

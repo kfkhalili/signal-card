@@ -4,7 +4,7 @@
 import React, { useEffect } from "react";
 import {
   useStockData,
-  type DerivedMarketStatus,
+  type MarketStatusUpdate,
   type ProfileDBRow,
 } from "@/hooks/useStockData";
 import type {
@@ -21,8 +21,7 @@ interface StockDataHandlerProps {
   onStaticProfileUpdate: (updatedProfile: ProfileDBRow) => void;
   onMarketStatusChange?: (
     symbol: string,
-    status: DerivedMarketStatus,
-    message: string | null
+    statusInfo: MarketStatusUpdate
   ) => void;
   onFinancialStatementUpdate: (statement: FinancialStatementDBRow) => void;
 }
@@ -34,18 +33,35 @@ export const StockDataHandler: React.FC<StockDataHandlerProps> = ({
   onMarketStatusChange,
   onFinancialStatementUpdate,
 }) => {
-  const { derivedMarketStatus, marketStatusMessage } = useStockData({
+  const marketStatusInfo = useStockData({
     symbol: symbol,
     onLiveQuoteUpdate: onQuoteReceived,
     onProfileUpdate: onStaticProfileUpdate,
     onFinancialStatementUpdate: onFinancialStatementUpdate,
   });
 
+  const { status, message, openingTime, closingTime, timezone } =
+    marketStatusInfo;
+
   useEffect(() => {
     if (onMarketStatusChange) {
-      onMarketStatusChange(symbol, derivedMarketStatus, marketStatusMessage);
+      onMarketStatusChange(symbol, {
+        status,
+        message,
+        openingTime,
+        closingTime,
+        timezone,
+      });
     }
-  }, [symbol, derivedMarketStatus, marketStatusMessage, onMarketStatusChange]);
+  }, [
+    symbol,
+    status,
+    message,
+    openingTime,
+    closingTime,
+    timezone,
+    onMarketStatusChange,
+  ]);
 
   return null;
 };
