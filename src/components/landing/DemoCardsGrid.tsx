@@ -1,13 +1,17 @@
+// src/components/landing/DemoCardsGrid.tsx
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { useToast } from "@/hooks/use-toast";
+import { useRouter } from "next/navigation";
 import type { DisplayableCard } from "@/components/game/types";
 import { ActiveCards } from "@/components/game/ActiveCards";
-import { Loader2 } from "lucide-react";
+
+const CardSkeleton: React.FC = () => (
+  <div className="w-full aspect-[63/88] rounded-2xl bg-card/50 animate-pulse shadow-lg" />
+);
 
 const DemoCardsGrid: React.FC = () => {
-  const { toast } = useToast();
+  const router = useRouter();
   const [demoCards, setDemoCards] = useState<DisplayableCard[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -35,19 +39,19 @@ const DemoCardsGrid: React.FC = () => {
   }, [cardGenerationKey]);
 
   const handleInteraction = () => {
-    toast({
-      title: "Interaction Disabled",
-      description: "Please sign up or log in to interact with the cards.",
-    });
+    router.push("/auth#auth-sign-up");
   };
 
   if (isLoading) {
     return (
-      <div className="text-center py-20">
-        <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
-        <p className="mt-4 text-muted-foreground">
-          Generating live demo cards...
-        </p>
+      <div className="flex-grow p-4 bg-secondary/30 dark:bg-background/30 rounded-lg shadow-inner min-h-[400px]">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {Array.from({ length: 8 }).map((_, index) => (
+            <div key={index} className="flex justify-center items-start">
+              <CardSkeleton />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
