@@ -42,16 +42,10 @@ import "@/components/game/cards/updateHandlerInitializer";
 import { useWorkspaceManager } from "@/hooks/useWorkspaceManager";
 import type { SortConfig } from "@/hooks/useWorkspaceManager";
 import ActiveCardsSection from "@/components/game/ActiveCardsSection";
-import type { DerivedMarketStatus } from "@/hooks/useStockData";
+import type { MarketStatusUpdate } from "@/hooks/useStockData";
 import type { FinancialStatementDBRow } from "@/lib/supabase/realtime-service";
 
-type MarketStatus = Record<
-  string,
-  {
-    status: DerivedMarketStatus;
-    message: string | null;
-  }
->;
+type MarketStatus = Record<string, MarketStatusUpdate>;
 
 export default function WorkspacePage() {
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -123,10 +117,10 @@ export default function WorkspacePage() {
   };
 
   const handleMarketStatusChange = useCallback(
-    (symbol: string, status: DerivedMarketStatus, message: string | null) => {
+    (symbol: string, statusInfo: MarketStatusUpdate) => {
       setMarketStatuses((prev) => ({
         ...prev,
-        [symbol]: { status, message },
+        [symbol]: statusInfo,
       }));
     },
     []
