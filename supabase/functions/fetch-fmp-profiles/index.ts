@@ -165,7 +165,7 @@ async function fetchAndProcessSymbolProfile(
       symbol: profileData.symbol,
       price: profileData.price,
       beta: profileData.beta,
-      average_volume: profileData.averageVolume,
+      average_volume: Math.trunc(profileData.averageVolume),
       market_cap: profileData.marketCap,
       last_dividend: profileData.lastDividend,
       range: profileData.range,
