@@ -2,6 +2,13 @@
 import { test, expect, type Page } from "@playwright/test";
 
 const STORYBOOK_URL = process.env.STORYBOOK_URL || "http://localhost:6006";
+const CARD_STORY_URL = `${STORYBOOK_URL}/iframe.html?id=game-cards-basecard--default&viewMode=story`;
+
+// A small, transparent 1x1 pixel GIF
+const MOCK_IMAGE_BUFFER = Buffer.from(
+  "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",
+  "base64"
+);
 
 // Gets the DOM element representing the FRONT surface of the card
 const getFrontSurface = (page: Page) => {
@@ -18,16 +25,8 @@ const getBackSurface = (page: Page) => {
 };
 
 test.describe("BaseCard Component", () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto(
-      `${STORYBOOK_URL}/iframe.html?id=game-cards-basecard--default&viewMode=story`
-    );
-    await expect(
-      page.getByTestId("header-text-clickable").getByText("Storybook Inc.")
-    ).toBeVisible({ timeout: 10000 });
-  });
-
   test("should render front face content by default", async ({ page }) => {
+    await page.goto(CARD_STORY_URL);
     const frontSurface = getFrontSurface(page);
     const backSurface = getBackSurface(page);
 
@@ -48,7 +47,6 @@ test.describe("BaseCard Component", () => {
     ).toBeVisible();
 
     // Check back surface is hidden and correctly attributed
-    // Instead of toBeHidden(), check aria-hidden attribute
     await expect(backSurface).toHaveAttribute("aria-hidden", "true");
     await expect(backSurface).toHaveAttribute("aria-pressed", "true");
 
@@ -62,6 +60,7 @@ test.describe("BaseCard Component", () => {
   test("should display company name and symbol in the header", async ({
     page,
   }) => {
+    await page.goto(CARD_STORY_URL);
     const headerTextClickable = page.getByTestId("header-text-clickable");
     await expect(headerTextClickable).toBeVisible();
     await expect(headerTextClickable.getByText("Storybook Inc.")).toBeVisible();
@@ -69,12 +68,25 @@ test.describe("BaseCard Component", () => {
   });
 
   test("should display logo if logoUrl is provided", async ({ page }) => {
+    // Intercept network requests BEFORE navigating to the page.
+    await page.route("**/api/images/**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "image/gif",
+        body: MOCK_IMAGE_BUFFER,
+      });
+    });
+
+    await page.goto(CARD_STORY_URL);
+
+    // Now, the test assertion should pass.
     await expect(page.locator('img[alt="Storybook Inc. logo"]')).toBeVisible();
   });
 
   test("should flip to back face on click and then back to front", async ({
     page,
   }) => {
+    await page.goto(CARD_STORY_URL);
     const frontSurface = getFrontSurface(page);
     const backSurface = getBackSurface(page);
 
@@ -124,6 +136,7 @@ test.describe("BaseCard Component", () => {
   test("should call onDeleteRequest when delete button is clicked", async ({
     page,
   }) => {
+    await page.goto(CARD_STORY_URL);
     const frontSurface = getFrontSurface(page);
     await expect(frontSurface).toBeVisible();
 
@@ -153,6 +166,7 @@ test.describe("BaseCard Component", () => {
   test("should trigger generic interaction for header text click", async ({
     page,
   }) => {
+    await page.goto(CARD_STORY_URL);
     const headerTextClickable = page.getByTestId("header-text-clickable");
     await expect(headerTextClickable).toBeVisible();
 
@@ -177,6 +191,7 @@ test.describe("BaseCard Component", () => {
   test("should trigger generic interaction for logo click (if websiteUrl exists)", async ({
     page,
   }) => {
+    await page.goto(CARD_STORY_URL);
     const logoLink = page.getByLabel("Visit Storybook Inc. website");
     await expect(logoLink).toBeVisible();
 

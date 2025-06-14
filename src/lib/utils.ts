@@ -47,3 +47,28 @@ export function safeJsonParse<T>(text: string): Result<T, Error> {
     return err(error as Error);
   }
 }
+
+export const createSecureImageUrl = (
+  storageUrl: string | null | undefined
+): string => {
+  if (!storageUrl) {
+    return "/images/default-logo.png";
+  }
+  try {
+    const url = new URL(storageUrl);
+    const pathSegments = url.pathname.split("/");
+    const profileImagesIndex = pathSegments.indexOf("profile-images");
+
+    if (
+      profileImagesIndex === -1 ||
+      profileImagesIndex + 1 >= pathSegments.length
+    ) {
+      return "/images/default-logo.png";
+    }
+
+    const imagePath = pathSegments.slice(profileImagesIndex + 1).join("/");
+    return `/api/images/${imagePath}`;
+  } catch {
+    return "/images/default-logo.png";
+  }
+};

@@ -110,7 +110,8 @@ const mockCardContextDefault: CardActionContext = {
   symbol: "STCK",
   type: "price",
   companyName: "Storybook Inc.",
-  logoUrl: "https://picsum.photos/seed/storylogo/40/40",
+  logoUrl:
+    "https://api.tickered.com/storage/v1/object/public/profile-images/STCK.png",
   websiteUrl: "https://storybook.js.org",
   backData: mockDefaultBackData, // Ensure backData is included
 };

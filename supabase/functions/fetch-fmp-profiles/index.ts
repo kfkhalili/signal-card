@@ -16,13 +16,20 @@ const CORS_HEADERS: Record<string, string> = {
 
 const ENV_CONTEXT: string = Deno.env.get("ENV_CONTEXT") || "PROD";
 const FMP_API_KEY: string | undefined = Deno.env.get("FMP_API_KEY");
-const SUPABASE_URL: string | undefined = Deno.env.get("SUPABASE_URL");
+
+// --- START: MODIFICATION ---
+// Prioritize the custom URL environment variable, and fall back to the default.
+const SUPABASE_URL: string | undefined =
+  Deno.env.get("CUSTOM_SUPABASE_URL") || Deno.env.get("SUPABASE_URL");
+// --- END: MODIFICATION ---
+
 const SUPABASE_SERVICE_ROLE_KEY: string | undefined = Deno.env.get(
   "SUPABASE_SERVICE_ROLE_KEY"
 );
 
 const FMP_PROFILE_BASE_URL = "https://financialmodelingprep.com/stable/profile";
-const FMP_API_DELAY_MS = 250; // Delay between API calls
+const FMP_API_DELAY_MS = 250;
+const STORAGE_BUCKET_NAME = "profile-images";
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -48,10 +55,8 @@ function censorApiKey(url: string, apiKey: string | undefined): string {
   return url.replace(apiKeyPattern, `$1${displayApiKey}$3`);
 }
 
-function parseFmpFullTimeEmployees(
-  employeesStr: string | undefined // FmpProfileData.fullTimeEmployees is now string, not string | null | undefined
-): number | null {
-  if (employeesStr === undefined) return null; // Should not happen if FmpProfileData is strictly followed
+function parseFmpFullTimeEmployees(employeesStr: string): number | null {
+  if (employeesStr === undefined) return null;
   const num = parseInt(employeesStr.replace(/,/g, ""), 10);
   return isNaN(num) ? null : num;
 }
@@ -95,8 +100,8 @@ async function fetchAndProcessSymbolProfile(
     const profileData = fmpProfileResult[0] as FmpProfileData;
 
     if (
-      !profileData || // Basic sanity check
-      typeof profileData.symbol !== "string" || // `symbol` is string in FmpProfileData
+      !profileData ||
+      typeof profileData.symbol !== "string" ||
       profileData.symbol.trim() === ""
     ) {
       throw new Error(
@@ -106,23 +111,73 @@ async function fetchAndProcessSymbolProfile(
       );
     }
 
+    let finalImageUrl: string | null = profileData.image;
+
+    if (profileData.image && !profileData.defaultImage) {
+      const imageFileName = `${profileData.symbol}.png`;
+
+      try {
+        const { data: existingFiles, error: listError } =
+          await supabaseAdmin.storage
+            .from(STORAGE_BUCKET_NAME)
+            .list(undefined, { limit: 1, search: imageFileName });
+
+        if (listError) {
+          throw new Error(`Storage list error: ${listError.message}`);
+        }
+
+        if (!existingFiles || existingFiles.length === 0) {
+          const imageResponse = await fetch(profileData.image);
+          if (!imageResponse.ok) {
+            throw new Error(
+              `Failed to download image from ${profileData.image}`
+            );
+          }
+          const imageBlob = await imageResponse.blob();
+
+          const { error: uploadError } = await supabaseAdmin.storage
+            .from(STORAGE_BUCKET_NAME)
+            .upload(imageFileName, imageBlob, {
+              contentType: "image/png",
+              upsert: false,
+            });
+
+          if (uploadError) {
+            throw new Error(`Upload error: ${uploadError.message}`);
+          }
+        }
+
+        const { data: urlData } = supabaseAdmin.storage
+          .from(STORAGE_BUCKET_NAME)
+          .getPublicUrl(imageFileName);
+        finalImageUrl = urlData.publicUrl;
+      } catch (imageError) {
+        console.error(
+          `Image processing failed for ${profileData.symbol}: ${getErrorMessage(
+            imageError
+          )}`
+        );
+        finalImageUrl = profileData.image;
+      }
+    }
+
     const recordToUpsert: SupabaseProfileRecord = {
       symbol: profileData.symbol,
       price: profileData.price,
       beta: profileData.beta,
-      average_volume: profileData.averageVolume, // Was profileData.volAvg
+      average_volume: profileData.averageVolume,
       market_cap: profileData.marketCap,
       last_dividend: profileData.lastDividend,
       range: profileData.range,
       change: profileData.change,
-      change_percentage: profileData.changePercentage, // Was profileData.changePercentage ?? profileData.changePercentage
+      change_percentage: profileData.changePercentage,
       company_name: profileData.companyName,
       currency: profileData.currency,
       cik: profileData.cik,
       isin: profileData.isin,
       cusip: profileData.cusip,
       exchange: profileData.exchange,
-      exchange_full_name: profileData.exchangeFullName, // Was profileData.exchangeShortName ?? profileData.exchange
+      exchange_full_name: profileData.exchangeFullName,
       industry: profileData.industry,
       website: profileData.website,
       description: profileData.description,
@@ -137,13 +192,13 @@ async function fetchAndProcessSymbolProfile(
       city: profileData.city,
       state: profileData.state,
       zip: profileData.zip,
-      image: profileData.image,
+      image: finalImageUrl,
       ipo_date: profileData.ipoDate,
-      default_image: profileData.defaultImage, // Was profileData.defaultImage ?? false
-      is_etf: profileData.isEtf, // Was profileData.isEtf ?? false
-      is_actively_trading: profileData.isActivelyTrading, // Was profileData.isActivelyTrading ?? true
-      is_adr: profileData.isAdr, // Was profileData.isAdr ?? false
-      is_fund: profileData.isFund, // Was profileData.isFund ?? false
+      default_image: profileData.defaultImage,
+      is_etf: profileData.isEtf,
+      is_actively_trading: profileData.isActivelyTrading,
+      is_adr: profileData.isAdr,
+      is_fund: profileData.isFund,
       volume: profileData.volume,
     };
 
@@ -292,7 +347,7 @@ Deno.serve(async (_req: Request) => {
 
     return new Response(JSON.stringify(response), {
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
-      status: totalSucceeded === activeSymbols.length ? 200 : 207, // 207 Multi-Status
+      status: totalSucceeded === activeSymbols.length ? 200 : 207,
     });
   } catch (error: unknown) {
     const errorMessage = getErrorMessage(error);
