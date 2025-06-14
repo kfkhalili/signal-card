@@ -29,6 +29,8 @@ export interface MarketStatusUpdate {
   openingTime: string | null;
   closingTime: string | null;
   timezone: string | null;
+  exchangeName: string | null;
+  exchangeCode: string | null;
 }
 
 interface UseStockDataProps {
@@ -540,5 +542,7 @@ export function useStockData({
     openingTime,
     closingTime,
     timezone,
+    exchangeName: exchangeStatus?.name || null,
+    exchangeCode: exchangeStatus?.exchange_code || null,
   };
 }

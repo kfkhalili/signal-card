@@ -40,8 +40,15 @@ export const StockDataHandler: React.FC<StockDataHandlerProps> = ({
     onFinancialStatementUpdate: onFinancialStatementUpdate,
   });
 
-  const { status, message, openingTime, closingTime, timezone } =
-    marketStatusInfo;
+  const {
+    status,
+    message,
+    openingTime,
+    closingTime,
+    timezone,
+    exchangeName,
+    exchangeCode,
+  } = marketStatusInfo;
 
   useEffect(() => {
     if (onMarketStatusChange) {
@@ -51,6 +58,8 @@ export const StockDataHandler: React.FC<StockDataHandlerProps> = ({
         openingTime,
         closingTime,
         timezone,
+        exchangeName,
+        exchangeCode,
       });
     }
   }, [
@@ -60,6 +69,8 @@ export const StockDataHandler: React.FC<StockDataHandlerProps> = ({
     openingTime,
     closingTime,
     timezone,
+    exchangeName,
+    exchangeCode,
     onMarketStatusChange,
   ]);
 
