@@ -7,7 +7,7 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { cn, createSecureImageUrl } from "@/lib/utils";
 import { XIcon } from "lucide-react";
 import Image from "next/image";
 import type {
@@ -218,10 +218,12 @@ const BaseCard: React.FC<BaseCardProps> = ({
   const headerWrapperClassNames =
     "px-3 sm:px-4 md:px-5 pb-1 pt-3 sm:pt-4 shrink-0 min-h-[56px] sm:min-h-[64px] md:min-h-[72px]";
 
+  const secureLogoUrl = createSecureImageUrl(logoUrl);
+
   const logoImageElement = logoUrl ? (
     <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 relative shrink-0">
       <Image
-        src={logoUrl}
+        src={secureLogoUrl}
         alt={`${companyName || sourceCardSymbol} logo`}
         fill
         sizes="(max-width: 640px) 28px, (max-width: 768px) 32px, 40px"
