@@ -1,5 +1,5 @@
 // src/components/workspace/MarketStatusBanner.tsx
-import React from "react";
+import React, { useMemo } from "react";
 import type { MarketStatusUpdate } from "@/hooks/useStockData";
 
 type MarketStatus = Record<string, MarketStatusUpdate>;
@@ -70,64 +70,81 @@ const formatMarketTime = (
   }
 };
 
+interface GroupedStatus {
+  symbols: string[];
+  statusInfo: MarketStatusUpdate;
+  exchangeName: string;
+}
+
 const MarketStatusBanner: React.FC<MarketStatusBannerProps> = ({
   uniqueSymbolsInWorkspace,
   marketStatuses,
   isAddingCardInProgress,
 }) => {
+  const groupedStatuses = useMemo(() => {
+    const groups: Record<string, GroupedStatus> = {};
+    if (uniqueSymbolsInWorkspace.length === 0) {
+      return [];
+    }
+
+    uniqueSymbolsInWorkspace.forEach((symbol) => {
+      const statusInfo = marketStatuses[symbol];
+      if (statusInfo) {
+        const key = `${statusInfo.exchangeCode || "unknown"}-${
+          statusInfo.status
+        }`;
+        if (!groups[key]) {
+          groups[key] = {
+            symbols: [],
+            statusInfo,
+            exchangeName:
+              statusInfo.exchangeName || statusInfo.exchangeCode || "Unknown",
+          };
+        }
+        groups[key].symbols.push(symbol);
+      }
+    });
+
+    return Object.values(groups);
+  }, [uniqueSymbolsInWorkspace, marketStatuses]);
+
   if (uniqueSymbolsInWorkspace.length === 0) {
     return null;
   }
 
-  const renderStatusForSymbol = (symbol: string): JSX.Element | null => {
-    const statusInfo = marketStatuses[symbol];
-
-    if (!statusInfo && !isAddingCardInProgress) {
-      return (
-        <p key={`status-${symbol}`} className="text-xs text-muted-foreground">
-          {symbol}: Initializing stream...
-        </p>
-      );
-    }
-    if (!statusInfo) {
-      return null;
-    }
-
-    const { status, openingTime, closingTime, timezone } = statusInfo;
-    const localOpeningTime = formatMarketTime(openingTime, timezone);
-    const localClosingTime = formatMarketTime(closingTime, timezone);
-
-    return (
-      <div key={`status-${symbol}`} className="text-xs mb-0.5">
-        <strong>{symbol}:</strong>
-        <span>
-          {` ${status}`}
-          {localOpeningTime && localClosingTime && (
-            <span className="ml-1 text-muted-foreground">
-              ({localOpeningTime} - {localClosingTime})
-            </span>
-          )}
-        </span>
-      </div>
-    );
-  };
-
-  const allStatusesInitialized = uniqueSymbolsInWorkspace.every(
-    (s) => marketStatuses[s]
-  );
+  const allSymbolsAccountedFor =
+    uniqueSymbolsInWorkspace.length === Object.keys(marketStatuses).length;
 
   return (
     <div className="px-2 sm:px-4 text-center py-2 bg-card border text-card-foreground rounded-md text-xs sm:text-sm shadow max-h-48 overflow-y-auto">
       <h3 className="font-semibold mb-1 text-sm">Market Status:</h3>
-      {uniqueSymbolsInWorkspace.map(renderStatusForSymbol)}
-      {Object.keys(marketStatuses).length === 0 &&
-        uniqueSymbolsInWorkspace.length > 0 &&
-        !isAddingCardInProgress &&
-        !allStatusesInitialized && (
-          <p className="text-xs text-muted-foreground">
-            Awaiting data streams for active symbols...
-          </p>
-        )}
+
+      {groupedStatuses.map((group) => {
+        const { symbols, statusInfo, exchangeName } = group;
+        const { status, openingTime, closingTime, timezone } = statusInfo;
+        const localOpeningTime = formatMarketTime(openingTime, timezone);
+        const localClosingTime = formatMarketTime(closingTime, timezone);
+
+        return (
+          <div key={`${exchangeName}-${status}`} className="text-xs mb-0.5">
+            <strong>{symbols.join(", ")}:</strong>
+            <span>
+              {` ${exchangeName} - ${status}`}
+              {localOpeningTime && localClosingTime && (
+                <span className="ml-1 text-muted-foreground">
+                  ({localOpeningTime} - {localClosingTime})
+                </span>
+              )}
+            </span>
+          </div>
+        );
+      })}
+
+      {!allSymbolsAccountedFor && !isAddingCardInProgress && (
+        <p className="text-xs text-muted-foreground mt-1">
+          Initializing data streams for some symbols...
+        </p>
+      )}
     </div>
   );
 };
