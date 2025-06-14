@@ -4,20 +4,17 @@ deno_version = 2.1
 [functions.fetch-fmp-quote-indicators]
 enabled = true
 verify_jwt = false
-import_map = "./functions/fetch-fmp-quote-indicators/deno.json"
 entrypoint = "./functions/fetch-fmp-quote-indicators/index.ts"
 static_files = [ "./functions/fetch-fmp-quote-indicators/types.ts" ]
 
 [functions.fetch-fmp-all-exchange-market-status]
 enabled = true
 verify_jwt = false
-import_map = "./functions/fetch-fmp-all-exchange-market-status/deno.json"
 entrypoint = "./functions/fetch-fmp-all-exchange-market-status/index.ts"
 
 [functions.fetch-fmp-financial-statements]
 enabled = true
 verify_jwt = false
-import_map = "./functions/fetch-fmp-financial-statements/deno.json"
 entrypoint = "./functions/fetch-fmp-financial-statements/index.ts"
 static_files = [ "./functions/fetch-fmp-financial-statements/types.ts" ]
 
@@ -27,63 +24,27 @@ verify_jwt = false
 entrypoint = "./functions/fetch-fmp-profiles/index.ts"
 static_files = [ "./functions/fetch-fmp-profiles/types.ts" ]
 
-[functions.test-fun]
-enabled = true
-verify_jwt = true
-import_map = "./functions/test-fun/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
-entrypoint = "./functions/test-fun/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/test-fun/*.html" ]
-
 [functions.fetch-fmp-shares-float]
 enabled = true
 verify_jwt = true
-import_map = "./functions/fetch-fmp-shares-float/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
 entrypoint = "./functions/fetch-fmp-shares-float/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/fetch-fmp-shares-float/*.html" ]
 
 [functions.fetch-fmp-ratios-ttm]
 enabled = true
 verify_jwt = false
-import_map = "./functions/fetch-fmp-ratios-ttm/deno.json"
 entrypoint = "./functions/fetch-fmp-ratios-ttm/index.ts"
 
 [functions.fetch-fmp-dividend-history]
 enabled = true
 verify_jwt = true
-import_map = "./functions/fetch-fmp-dividend-history/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
 entrypoint = "./functions/fetch-fmp-dividend-history/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/fetch-fmp-dividend-history/*.html" ]
 
 [functions.fetch-fmp-revenue-segmentation]
 enabled = true
 verify_jwt = true
-import_map = "./functions/fetch-fmp-revenue-segmentation/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
 entrypoint = "./functions/fetch-fmp-revenue-segmentation/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/fetch-fmp-revenue-segmentation/*.html" ]
 
 [functions.fetch-fmp-grades-historical]
 enabled = true
 verify_jwt = true
-import_map = "./functions/fetch-fmp-grades-historical/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
 entrypoint = "./functions/fetch-fmp-grades-historical/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/fetch-fmp-grades-historical/*.html" ]
