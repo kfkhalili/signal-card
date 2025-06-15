@@ -9,6 +9,39 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      available_exchanges: {
+        Row: {
+          country_code: string | null
+          country_name: string | null
+          delay: string | null
+          exchange: string
+          fetched_at: string
+          name: string | null
+          symbol_suffix: string | null
+          updated_at: string
+        }
+        Insert: {
+          country_code?: string | null
+          country_name?: string | null
+          delay?: string | null
+          exchange: string
+          fetched_at?: string
+          name?: string | null
+          symbol_suffix?: string | null
+          updated_at?: string
+        }
+        Update: {
+          country_code?: string | null
+          country_name?: string | null
+          delay?: string | null
+          exchange?: string
+          fetched_at?: string
+          name?: string | null
+          symbol_suffix?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       dividend_history: {
         Row: {
           adj_dividend: number | null
