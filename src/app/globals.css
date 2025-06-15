@@ -128,3 +128,19 @@ pre,
     border-width: 0;
   }
 }
+
+.leaflet-control-attribution {
+  /* Make the background less distracting */
+  background-color: rgba(255, 255, 255, 0.7) !important;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+
+  /* Make the text smaller */
+  font-size: 7px !important;
+}
+
+/* Optional: Style it for dark mode */
+.dark .leaflet-control-attribution {
+  background-color: rgba(10, 10, 10, 0.6) !important;
+  color: hsl(var(--muted-foreground)) !important;
+}

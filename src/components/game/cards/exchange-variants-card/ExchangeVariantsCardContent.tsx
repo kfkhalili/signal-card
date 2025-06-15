@@ -13,7 +13,14 @@ import {
   CheckboxCheckedIcon,
   CheckboxUncheckedIcon,
 } from "@/components/ui/CheckboxIcons";
-import { WorldMap, type MapMarker } from "@/components/ui/WorldMap";
+import dynamic from "next/dynamic"; // Import dynamic from next/dynamic
+import type { MapMarker } from "@/components/ui/WorldMap"; // Import MapMarker type
+
+// Dynamically import WorldMap
+const DynamicWorldMap = dynamic(
+  () => import("@/components/ui/WorldMap").then((mod) => mod.WorldMap),
+  { ssr: false } // Disable server-side rendering for this component
+);
 
 interface ExchangeVariantsCardContentProps {
   cardData: ExchangeVariantsCardData;
@@ -166,7 +173,10 @@ export const ExchangeVariantsCardContent: React.FC<ExchangeVariantsCardContentPr
           data-testid={`exchangevariants-card-front-${symbol}`}
           className="pointer-events-auto flex flex-col h-full">
           <div className="relative flex-grow w-full">
-            <WorldMap markers={mapMarkers} className="absolute inset-0" />
+            <DynamicWorldMap
+              markers={mapMarkers}
+              className="absolute inset-0"
+            />
           </div>
         </div>
       );
