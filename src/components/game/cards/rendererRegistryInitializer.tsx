@@ -37,6 +37,9 @@ import type { AnalystGradesCardData } from "./analyst-grades-card/analyst-grades
 import { CustomCardContent } from "./custom-card/CustomCardContent";
 import type { CustomCardData } from "./custom-card/custom-card.types";
 
+import { ExchangeVariantsCardContent } from "./exchange-variants-card/ExchangeVariantsCardContent";
+import type { ExchangeVariantsCardData } from "./exchange-variants-card/exchange-variants-card.types";
+
 import type { ConcreteCardData } from "@/components/game/types";
 
 // Helper to correctly type the props for the generic renderer within the registration
@@ -107,4 +110,12 @@ registerCardRenderer(
 registerCardRenderer(
   "custom",
   createTypedGenericRenderer<CustomCardData>(CustomCardContent, "custom")
+);
+
+registerCardRenderer(
+  "exchangevariants",
+  createTypedGenericRenderer<ExchangeVariantsCardData>(
+    ExchangeVariantsCardContent,
+    "exchangevariants"
+  )
 );

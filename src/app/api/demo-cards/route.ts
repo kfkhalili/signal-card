@@ -18,6 +18,7 @@ const DEMO_CARD_TYPES: CardType[] = [
   "keyratios",
   "revenuebreakdown",
   "analystgrades",
+  "exchangevariants",
 ];
 const GRID_SIZE = 8;
 

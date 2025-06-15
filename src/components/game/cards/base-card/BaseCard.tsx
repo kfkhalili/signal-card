@@ -65,6 +65,7 @@ const CARD_TYPE_LABELS: Record<CardType, string> = {
   dividendshistory: "Dividends History",
   revenuebreakdown: "Revenue Breakdown",
   analystgrades: "Analyst Grades",
+  exchangevariants: "Exchange Variants",
   custom: "Custom",
 };
 

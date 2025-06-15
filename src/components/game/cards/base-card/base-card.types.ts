@@ -10,6 +10,7 @@ export type CardType =
   | "dividendshistory"
   | "revenuebreakdown"
   | "analystgrades"
+  | "exchangevariants"
   | "custom"; // Add new card types here
 
 export interface BaseCardBackData {
