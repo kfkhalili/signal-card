@@ -23,7 +23,7 @@ const SUPABASE_SERVICE_ROLE_KEY: string | undefined = Deno.env.get(
 
 const FMP_EXCHANGE_VARIANTS_BASE_URL =
   "https://financialmodelingprep.com/stable/search-exchange-variants";
-const FMP_API_DELAY_MS = 350;
+const FMP_API_DELAY_MS = 150;
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -81,24 +81,27 @@ async function fetchAndProcessSymbolExchangeVariants(
       };
     }
 
-    const recordsToUpsert: SupabaseExchangeVariantRecord[] = [];
-    for (const fmpEntry of fmpVariantsResult as FmpExchangeVariantData[]) {
-      if (!fmpEntry.symbol || !fmpEntry.exchangeShortName) {
-        console.warn(
-          `Skipping invalid FMP exchange variant record for ${baseSymbol} due to missing symbol or exchangeShortName:`,
-          fmpEntry
-        );
-        continue;
-      }
-
-      recordsToUpsert.push({
-        base_symbol: baseSymbol, // The symbol from the supported_symbols table
-        variant_symbol: fmpEntry.symbol, // The symbol from the FMP variant data (e.g., AAPL.DE)
+    const recordsToUpsert: SupabaseExchangeVariantRecord[] = (
+      fmpVariantsResult as FmpExchangeVariantData[]
+    )
+      .filter((fmpEntry) => {
+        const isValid = fmpEntry.symbol && fmpEntry.exchangeShortName;
+        if (!isValid) {
+          console.warn(
+            `Skipping invalid FMP exchange variant record for ${baseSymbol} due to missing symbol or exchangeShortName:`,
+            fmpEntry
+          );
+        }
+        return isValid;
+      })
+      .map((fmpEntry) => ({
+        base_symbol: baseSymbol,
+        variant_symbol: fmpEntry.symbol,
         exchange_short_name: fmpEntry.exchangeShortName,
         price: fmpEntry.price,
         beta: fmpEntry.beta,
-        vol_avg: fmpEntry.volAvg,
-        mkt_cap: fmpEntry.mktCap,
+        vol_avg: fmpEntry.volAvg !== null ? Math.trunc(fmpEntry.volAvg) : null,
+        mkt_cap: fmpEntry.mktCap !== null ? Math.trunc(fmpEntry.mktCap) : null,
         last_div: fmpEntry.lastDiv,
         range: fmpEntry.range,
         changes: fmpEntry.changes,
@@ -113,8 +116,7 @@ async function fetchAndProcessSymbolExchangeVariants(
         ipo_date: fmpEntry.ipoDate,
         default_image: fmpEntry.defaultImage,
         is_actively_trading: fmpEntry.isActivelyTrading,
-      });
-    }
+      }));
 
     if (recordsToUpsert.length > 0) {
       const { error: upsertError, count } = await supabaseAdmin
