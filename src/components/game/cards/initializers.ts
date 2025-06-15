@@ -8,4 +8,5 @@ import "./dividends-history-card/dividendsHistoryCardUtils";
 import "./key-ratios-card/keyRatiosCardUtils";
 import "./revenue-breakdown-card/revenueBreakdownCardUtils";
 import "./analyst-grades-card/analystGradesCardUtils";
+import "./exchange-variants-card/exchangeVariantsCardUtils";
 // Add imports for other card types' utils files as they are created

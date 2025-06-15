@@ -8,4 +8,6 @@ import "./key-ratios-card/keyRatiosCardRehydrator";
 import "./dividends-history-card/dividendsHistoryCardRehydrator";
 import "./revenue-breakdown-card/revenueBreakdownCardRehydrator";
 import "./analyst-grades-card/analystGradesCardRehydrator";
+import "./exchange-variants-card/exchangeVariantsCardRehydrator";
+
 import "./custom-card/customCardRehydrator";
