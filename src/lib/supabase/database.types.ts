@@ -101,6 +101,92 @@ export type Database = {
         }
         Relationships: []
       }
+      exchange_variants: {
+        Row: {
+          base_symbol: string
+          beta: number | null
+          changes: number | null
+          cik: string | null
+          currency: string | null
+          cusip: string | null
+          dcf: number | null
+          dcf_diff: number | null
+          default_image: boolean | null
+          exchange: string | null
+          exchange_short_name: string
+          fetched_at: string
+          image: string | null
+          ipo_date: string | null
+          is_actively_trading: boolean | null
+          isin: string | null
+          last_div: number | null
+          mkt_cap: number | null
+          price: number | null
+          range: string | null
+          updated_at: string
+          variant_symbol: string
+          vol_avg: number | null
+        }
+        Insert: {
+          base_symbol: string
+          beta?: number | null
+          changes?: number | null
+          cik?: string | null
+          currency?: string | null
+          cusip?: string | null
+          dcf?: number | null
+          dcf_diff?: number | null
+          default_image?: boolean | null
+          exchange?: string | null
+          exchange_short_name: string
+          fetched_at?: string
+          image?: string | null
+          ipo_date?: string | null
+          is_actively_trading?: boolean | null
+          isin?: string | null
+          last_div?: number | null
+          mkt_cap?: number | null
+          price?: number | null
+          range?: string | null
+          updated_at?: string
+          variant_symbol: string
+          vol_avg?: number | null
+        }
+        Update: {
+          base_symbol?: string
+          beta?: number | null
+          changes?: number | null
+          cik?: string | null
+          currency?: string | null
+          cusip?: string | null
+          dcf?: number | null
+          dcf_diff?: number | null
+          default_image?: boolean | null
+          exchange?: string | null
+          exchange_short_name?: string
+          fetched_at?: string
+          image?: string | null
+          ipo_date?: string | null
+          is_actively_trading?: boolean | null
+          isin?: string | null
+          last_div?: number | null
+          mkt_cap?: number | null
+          price?: number | null
+          range?: string | null
+          updated_at?: string
+          variant_symbol?: string
+          vol_avg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_exchange_variants_base_symbol"
+            columns: ["base_symbol"]
+            isOneToOne: false
+            referencedRelation: "supported_symbols"
+            referencedColumns: ["symbol"]
+          },
+        ]
+      }
       financial_statements: {
         Row: {
           accepted_date: string | null

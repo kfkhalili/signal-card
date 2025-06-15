@@ -145,8 +145,6 @@ const BaseCard: React.FC<BaseCardProps> = ({
     backData,
   } = cardContext;
 
-  console.log(displayCompanyName);
-
   const frontFaceRef = useRef<HTMLDivElement>(null);
   const backFaceRef = useRef<HTMLDivElement>(null);
   const innerCardRef = useRef<HTMLDivElement>(null);

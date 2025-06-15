@@ -48,3 +48,8 @@ entrypoint = "./functions/fetch-fmp-revenue-segmentation/index.ts"
 enabled = true
 verify_jwt = true
 entrypoint = "./functions/fetch-fmp-grades-historical/index.ts"
+
+[functions.fetch-fmp-exchange-variants]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/fetch-fmp-exchange-variants/index.ts"
