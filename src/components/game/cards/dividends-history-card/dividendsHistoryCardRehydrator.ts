@@ -115,12 +115,8 @@ const rehydrateDividendsHistoryCardInstance: SpecificCardRehydrator = (
   };
 
   return {
-    id: commonProps.id,
+    ...commonProps,
     type: "dividendshistory",
-    symbol: commonProps.symbol,
-    createdAt: commonProps.createdAt,
-    companyName: commonProps.companyName,
-    logoUrl: commonProps.logoUrl,
     websiteUrl: stored.websiteUrl ?? null,
     staticData: rehydratedStaticData,
     liveData: rehydratedLiveData,

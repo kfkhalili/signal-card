@@ -37,6 +37,7 @@ interface StoredRevenueCardObject {
   staticData?: StoredRevenueCardStaticDataShape;
   liveData?: StoredRevenueCardLiveDataShape;
   backData?: StoredBaseCardBackDataShape;
+  websiteUrl?: string | null;
 }
 
 const rehydrateRevenueCardInstance: SpecificCardRehydrator = (
@@ -72,16 +73,12 @@ const rehydrateRevenueCardInstance: SpecificCardRehydrator = (
   };
 
   const rehydratedCard: RevenueCardData = {
-    id: commonProps.id,
+    ...commonProps,
     type: "revenue",
-    symbol: commonProps.symbol,
-    createdAt: commonProps.createdAt,
-    companyName: commonProps.companyName,
-    logoUrl: commonProps.logoUrl,
     staticData: rehydratedStaticData,
     liveData: rehydratedLiveData,
     backData: rehydratedBackData,
-    websiteUrl: null, // Revenue cards typically don't have a direct websiteUrl distinct from the company profile
+    websiteUrl: stored.websiteUrl ?? null,
   };
 
   return rehydratedCard;

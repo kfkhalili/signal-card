@@ -17,11 +17,8 @@ const CORS_HEADERS: Record<string, string> = {
 const ENV_CONTEXT: string = Deno.env.get("ENV_CONTEXT") || "PROD";
 const FMP_API_KEY: string | undefined = Deno.env.get("FMP_API_KEY");
 
-// --- START: MODIFICATION ---
-// Prioritize the custom URL environment variable, and fall back to the default.
 const SUPABASE_URL: string | undefined =
   Deno.env.get("CUSTOM_SUPABASE_URL") || Deno.env.get("SUPABASE_URL");
-// --- END: MODIFICATION ---
 
 const SUPABASE_SERVICE_ROLE_KEY: string | undefined = Deno.env.get(
   "SUPABASE_SERVICE_ROLE_KEY"
@@ -161,7 +158,8 @@ async function fetchAndProcessSymbolProfile(
       }
     }
 
-    const recordToUpsert: SupabaseProfileRecord = {
+    // This object maps directly to the JSONB expected by the PostgreSQL function
+    const recordToUpsert = {
       symbol: profileData.symbol,
       price: profileData.price,
       beta: profileData.beta,
@@ -202,23 +200,20 @@ async function fetchAndProcessSymbolProfile(
       volume: profileData.volume,
     };
 
-    const { error: upsertError, count } = await supabaseAdmin
-      .from("profiles")
-      .upsert(recordToUpsert, { onConflict: "symbol", count: "exact" });
+    const { error: rpcError } = await supabaseAdmin.rpc("upsert_profile", {
+      profile_data: recordToUpsert,
+    });
 
-    if (upsertError) {
-      console.error(
-        `Supabase upsert error for ${profileData.symbol}:`,
-        upsertError
-      );
+    if (rpcError) {
+      console.error(`Supabase RPC error for ${profileData.symbol}:`, rpcError);
       throw new Error(
-        `Supabase upsert failed for ${profileData.symbol}: ${upsertError.message}`
+        `Supabase RPC upsert failed for ${profileData.symbol}: ${rpcError.message}`
       );
     }
 
     if (ENV_CONTEXT === "DEV") {
       console.log(
-        `Successfully upserted profile data for ${profileData.symbol}. Count: ${count}`
+        `Successfully processed profile data for ${profileData.symbol} via RPC.`
       );
     }
     return {
@@ -325,7 +320,7 @@ Deno.serve(async (_req: Request) => {
       processingPromises
     );
     const totalSucceeded = results.filter((r) => r.success).length;
-    const totalUpserted = totalSucceeded; // Assumes one upsert per success
+    const totalUpserted = totalSucceeded; // Each success is now one successful RPC call
 
     const overallMessage = `Profile processing complete. Processed: ${activeSymbols.length}, Succeeded: ${totalSucceeded}, Upserted: ${totalUpserted}.`;
     console.log(overallMessage);

@@ -128,6 +128,7 @@ function constructAnalystGradesCardData(
   symbol: string,
   profileInfo: {
     companyName?: string | null;
+    displayCompanyName?: string | null;
     logoUrl?: string | null;
     websiteUrl?: string | null;
   },
@@ -192,6 +193,8 @@ function constructAnalystGradesCardData(
     type: "analystgrades",
     symbol,
     companyName: profileInfo.companyName ?? symbol,
+    displayCompanyName:
+      profileInfo.displayCompanyName ?? profileInfo.companyName ?? symbol,
     logoUrl: profileInfo.logoUrl ?? null,
     websiteUrl: profileInfo.websiteUrl ?? null,
     createdAt: existingCreatedAt ?? Date.now(),
@@ -211,6 +214,10 @@ async function fetchAnalystGradesData(
   ) as ProfileDBRowFromSupabase | undefined;
   let profileInfo = {
     companyName: profileCardForSymbol?.company_name ?? symbol,
+    displayCompanyName:
+      profileCardForSymbol?.display_company_name ??
+      profileCardForSymbol?.company_name ??
+      symbol,
     logoUrl: profileCardForSymbol?.image ?? null,
     websiteUrl: profileCardForSymbol?.website ?? null,
   };
@@ -219,7 +226,7 @@ async function fetchAnalystGradesData(
     const profileResult = await fromPromise(
       supabase
         .from("profiles")
-        .select("company_name, image, website")
+        .select("company_name, display_company_name, image, website")
         .eq("symbol", symbol)
         .maybeSingle(),
       (e) =>
@@ -230,6 +237,10 @@ async function fetchAnalystGradesData(
     if (profileResult.isOk() && profileResult.value.data) {
       profileInfo = {
         companyName: profileResult.value.data.company_name ?? symbol,
+        displayCompanyName:
+          profileResult.value.data.display_company_name ??
+          profileResult.value.data.company_name ??
+          symbol,
         logoUrl: profileResult.value.data.image ?? null,
         websiteUrl: profileResult.value.data.website ?? null,
       };

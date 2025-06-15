@@ -55,6 +55,7 @@ export interface SupabaseProfileRecord {
   volume?: number | null;
   average_volume?: number | null;
   company_name?: string | null;
+  display_company_name?: string | null;
   currency?: string | null;
   cik?: string | null;
   isin?: string | null;

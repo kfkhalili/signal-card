@@ -75,12 +75,8 @@ const rehydrateSolvencyCardInstance: SpecificCardRehydrator = (
   };
 
   const rehydratedCard: SolvencyCardData = {
-    id: commonProps.id,
+    ...commonProps,
     type: "solvency",
-    symbol: commonProps.symbol,
-    createdAt: commonProps.createdAt,
-    companyName: commonProps.companyName,
-    logoUrl: commonProps.logoUrl,
     staticData: rehydratedStaticData,
     liveData: rehydratedLiveData,
     backData: rehydratedBackData,

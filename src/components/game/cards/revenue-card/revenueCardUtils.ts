@@ -40,6 +40,7 @@ function constructRevenueCardData(
   dbRow: FinancialStatementDBRowFromSupabase,
   profileInfo: {
     companyName?: string | null;
+    displayCompanyName?: string | null;
     logoUrl?: string | null;
     websiteUrl?: string | null;
   },
@@ -107,6 +108,8 @@ function constructRevenueCardData(
     type: "revenue",
     symbol: dbRow.symbol,
     companyName: profileInfo.companyName ?? dbRow.symbol,
+    displayCompanyName:
+      profileInfo.displayCompanyName ?? profileInfo.companyName ?? dbRow.symbol,
     logoUrl: profileInfo.logoUrl ?? null,
     websiteUrl: profileInfo.websiteUrl ?? null,
     createdAt: existingCreatedAt ?? Date.now(),
@@ -130,6 +133,10 @@ async function initializeRevenueCard({
 
   let fetchedProfileInfo = {
     companyName: profileCardForSymbol?.company_name ?? symbol,
+    displayCompanyName:
+      profileCardForSymbol?.display_company_name ??
+      profileCardForSymbol?.company_name ??
+      symbol,
     logoUrl: profileCardForSymbol?.image ?? null,
     websiteUrl: profileCardForSymbol?.website ?? null,
   };
@@ -138,7 +145,7 @@ async function initializeRevenueCard({
     const profileResult = await fromPromise(
       supabase
         .from("profiles")
-        .select("company_name, image, website")
+        .select("company_name, display_company_name, image, website")
         .eq("symbol", symbol)
         .maybeSingle(),
       (e) =>
@@ -149,6 +156,10 @@ async function initializeRevenueCard({
       const profileData = profileResult.value.data as ProfileDBRowFromSupabase;
       fetchedProfileInfo = {
         companyName: profileData.company_name ?? symbol,
+        displayCompanyName:
+          profileData.display_company_name ??
+          profileData.company_name ??
+          symbol,
         logoUrl: profileData.image ?? null,
         websiteUrl: profileData.website ?? null,
       };
@@ -289,6 +300,7 @@ const handleRevenueCardStatementUpdate: CardUpdateHandler<
       newFinancialStatementRow,
       {
         companyName: currentRevenueCardData.companyName,
+        displayCompanyName: currentRevenueCardData.displayCompanyName,
         logoUrl: currentRevenueCardData.logoUrl,
         websiteUrl: currentRevenueCardData.websiteUrl,
       },

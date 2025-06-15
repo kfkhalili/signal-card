@@ -60,6 +60,10 @@ async function fetchAndProcessRevenueBreakdown(
   ) as ProfileDBRowFromSupabase | undefined;
   let profileInfo = {
     companyName: profileCardForSymbol?.company_name ?? symbol,
+    displayCompanyName:
+      profileCardForSymbol?.display_company_name ??
+      profileCardForSymbol?.company_name ??
+      symbol,
     logoUrl: profileCardForSymbol?.image ?? null,
     websiteUrl: profileCardForSymbol?.website ?? null,
     currencySymbol:
@@ -72,7 +76,7 @@ async function fetchAndProcessRevenueBreakdown(
     const profileResult = await fromPromise(
       supabase
         .from("profiles")
-        .select("company_name, image, currency, website")
+        .select("company_name, display_company_name, image, currency, website")
         .eq("symbol", symbol)
         .maybeSingle(),
       (e) =>
@@ -84,6 +88,10 @@ async function fetchAndProcessRevenueBreakdown(
       const profileData = profileResult.value.data;
       profileInfo = {
         companyName: profileData.company_name ?? symbol,
+        displayCompanyName:
+          profileData.display_company_name ??
+          profileData.company_name ??
+          symbol,
         logoUrl: profileData.image ?? null,
         websiteUrl: profileData.website ?? null,
         currencySymbol:
@@ -124,6 +132,7 @@ function constructRevenueBreakdownCardData(
   symbol: string,
   profileInfo: {
     companyName?: string | null;
+    displayCompanyName?: string | null;
     logoUrl?: string | null;
     websiteUrl?: string | null;
     currencySymbol: string;
@@ -180,6 +189,8 @@ function constructRevenueBreakdownCardData(
     type: "revenuebreakdown",
     symbol,
     companyName: profileInfo.companyName ?? symbol,
+    displayCompanyName:
+      profileInfo.displayCompanyName ?? profileInfo.companyName ?? symbol,
     logoUrl: profileInfo.logoUrl ?? null,
     websiteUrl: profileInfo.websiteUrl ?? null,
     createdAt: existingCreatedAt ?? Date.now(),

@@ -280,6 +280,7 @@ export type Database = {
           cusip: string | null
           default_image: boolean | null
           description: string | null
+          display_company_name: string | null
           exchange: string | null
           exchange_full_name: string | null
           full_time_employees: number | null
@@ -320,6 +321,7 @@ export type Database = {
           cusip?: string | null
           default_image?: boolean | null
           description?: string | null
+          display_company_name?: string | null
           exchange?: string | null
           exchange_full_name?: string | null
           full_time_employees?: number | null
@@ -360,6 +362,7 @@ export type Database = {
           cusip?: string | null
           default_image?: boolean | null
           description?: string | null
+          display_company_name?: string | null
           exchange?: string | null
           exchange_full_name?: string | null
           full_time_employees?: number | null
@@ -711,7 +714,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      upsert_profile: {
+        Args: { profile_data: Json }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

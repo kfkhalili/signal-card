@@ -98,12 +98,8 @@ const rehydrateCashUseCardInstance: SpecificCardRehydrator = (
   };
 
   const rehydratedCard: CashUseCardData = {
-    id: commonProps.id,
+    ...commonProps,
     type: "cashuse",
-    symbol: commonProps.symbol,
-    createdAt: commonProps.createdAt,
-    companyName: commonProps.companyName,
-    logoUrl: commonProps.logoUrl,
     websiteUrl: storedSpecificData.websiteUrl ?? null,
     staticData: rehydratedStaticData,
     liveData: rehydratedLiveData,

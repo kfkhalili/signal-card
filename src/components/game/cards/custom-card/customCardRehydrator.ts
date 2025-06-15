@@ -27,8 +27,13 @@ const rehydrateCustomCardInstance: SpecificCardRehydrator = (
   };
 
   return {
-    ...commonProps,
+    id: commonProps.id,
     type: "custom",
+    symbol: commonProps.symbol,
+    createdAt: commonProps.createdAt,
+    companyName: commonProps.companyName,
+    displayCompanyName: commonProps.displayCompanyName,
+    logoUrl: commonProps.logoUrl,
     narrative: stored.narrative ?? "Custom Card",
     items: stored.items ?? [],
     backData: rehydratedBackData,

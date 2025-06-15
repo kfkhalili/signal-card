@@ -54,6 +54,7 @@ interface BaseStoredCard {
   createdAt: number;
   isFlipped: boolean;
   companyName?: string | null;
+  displayCompanyName?: string | null;
   logoUrl?: string | null;
   [key: string]: unknown;
 }
@@ -244,6 +245,10 @@ export function useWorkspaceManager() {
         type: "custom",
         symbol: sourceCard?.symbol ?? "CUSTOM",
         companyName: sourceCard?.companyName ?? narrative,
+        displayCompanyName:
+          sourceCard?.displayCompanyName ??
+          sourceCard?.companyName ??
+          narrative,
         logoUrl: sourceCard?.logoUrl ?? null,
         createdAt: Date.now(),
         isFlipped: false,

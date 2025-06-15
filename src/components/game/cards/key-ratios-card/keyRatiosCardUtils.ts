@@ -60,6 +60,7 @@ function constructKeyRatiosCardData(
   dbRow: RatiosTtmDBRow,
   profileInfo: {
     companyName?: string | null;
+    displayCompanyName?: string | null;
     logoUrl?: string | null;
     websiteUrl?: string | null;
     currency?: string | null;
@@ -88,6 +89,8 @@ function constructKeyRatiosCardData(
     type: "keyratios",
     symbol: dbRow.symbol,
     companyName: profileInfo.companyName ?? dbRow.symbol,
+    displayCompanyName:
+      profileInfo.displayCompanyName ?? profileInfo.companyName ?? dbRow.symbol,
     logoUrl: profileInfo.logoUrl ?? null,
     websiteUrl: profileInfo.websiteUrl ?? null,
     createdAt: existingCreatedAt ?? Date.now(),
@@ -111,6 +114,10 @@ async function initializeKeyRatiosCard({
 
   let fetchedProfileInfo = {
     companyName: profileCardForSymbol?.company_name ?? symbol,
+    displayCompanyName:
+      profileCardForSymbol?.display_company_name ??
+      profileCardForSymbol?.company_name ??
+      symbol,
     logoUrl: profileCardForSymbol?.image ?? null,
     websiteUrl: profileCardForSymbol?.website ?? null,
     currency: profileCardForSymbol?.currency ?? null,
@@ -120,7 +127,7 @@ async function initializeKeyRatiosCard({
     const profileResult = await fromPromise(
       supabase
         .from("profiles")
-        .select("company_name, image, website, currency")
+        .select("company_name, display_company_name, image, website, currency")
         .eq("symbol", symbol)
         .maybeSingle(),
       (e) =>
@@ -132,6 +139,10 @@ async function initializeKeyRatiosCard({
       const profileData = profileResult.value.data;
       fetchedProfileInfo = {
         companyName: profileData.company_name ?? symbol,
+        displayCompanyName:
+          profileData.display_company_name ??
+          profileData.company_name ??
+          symbol,
         logoUrl: profileData.image ?? null,
         websiteUrl: profileData.website ?? null,
         currency: profileData.currency ?? null,

@@ -22,6 +22,7 @@ export interface BaseCardData {
   readonly symbol: string;
   readonly createdAt: number; // Unix timestamp
   readonly companyName?: string | null;
+  readonly displayCompanyName?: string | null;
   readonly logoUrl?: string | null;
   readonly backData: BaseCardBackData;
   readonly websiteUrl?: string | null;
@@ -32,6 +33,7 @@ export interface CardActionContext {
   readonly symbol: string;
   readonly type: CardType;
   readonly companyName?: string | null;
+  readonly displayCompanyName?: string | null;
   readonly logoUrl?: string | null;
   readonly websiteUrl?: string | null;
   readonly backData: BaseCardBackData;

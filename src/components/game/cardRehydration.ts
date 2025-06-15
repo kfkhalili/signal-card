@@ -13,6 +13,7 @@ export interface CommonCardPropsForRehydration extends DisplayableCardState {
   symbol: string;
   createdAt: number;
   companyName?: string | null;
+  displayCompanyName?: string | null;
   logoUrl?: string | null;
 }
 
@@ -73,6 +74,8 @@ export function rehydrateCardFromStorage(
         : false,
     createdAt: finalCreatedAt,
     companyName: (cardFromStorage.companyName as string | undefined) ?? null,
+    displayCompanyName:
+      (cardFromStorage.displayCompanyName as string | undefined) ?? null,
     logoUrl: (cardFromStorage.logoUrl as string | undefined) ?? null,
   };
 

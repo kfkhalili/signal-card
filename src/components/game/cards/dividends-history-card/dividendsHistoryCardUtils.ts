@@ -141,6 +141,10 @@ async function fetchAndProcessDividendsData(
   ) as ProfileDBRowFromSupabase | undefined;
   let profileInfo = {
     companyName: profileCardForSymbol?.company_name ?? symbol,
+    displayCompanyName:
+      profileCardForSymbol?.display_company_name ??
+      profileCardForSymbol?.company_name ??
+      symbol,
     logoUrl: profileCardForSymbol?.image ?? null,
     websiteUrl: profileCardForSymbol?.website ?? null,
     reportedCurrency: profileCardForSymbol?.currency ?? null,
@@ -149,7 +153,7 @@ async function fetchAndProcessDividendsData(
     const profileResult = await fromPromise(
       supabase
         .from("profiles")
-        .select("company_name, image, currency, website")
+        .select("company_name, display_company_name, image, currency, website")
         .eq("symbol", symbol)
         .maybeSingle(),
       (e) =>
@@ -161,6 +165,10 @@ async function fetchAndProcessDividendsData(
       const profileData = profileResult.value.data;
       profileInfo = {
         companyName: profileData.company_name ?? symbol,
+        displayCompanyName:
+          profileData.display_company_name ??
+          profileData.company_name ??
+          symbol,
         logoUrl: profileData.image ?? null,
         websiteUrl: profileData.website ?? null,
         reportedCurrency: profileData.currency ?? null,
@@ -212,6 +220,7 @@ function constructDividendsHistoryCardData(
   symbol: string,
   profileInfo: {
     companyName: string | null;
+    displayCompanyName: string | null;
     logoUrl: string | null;
     websiteUrl: string | null;
     reportedCurrency: string | null;
@@ -280,6 +289,8 @@ function constructDividendsHistoryCardData(
     type: "dividendshistory",
     symbol,
     companyName: profileInfo.companyName ?? symbol,
+    displayCompanyName:
+      profileInfo.displayCompanyName ?? profileInfo.companyName ?? symbol,
     logoUrl: profileInfo.logoUrl ?? null,
     websiteUrl: profileInfo.websiteUrl ?? null,
     createdAt: existingCreatedAt ?? Date.now(),

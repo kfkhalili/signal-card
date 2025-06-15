@@ -174,6 +174,7 @@ function createDisplayableProfileCardFromDB(
     type: "profile",
     symbol: dbData.symbol,
     companyName: dbData.company_name,
+    displayCompanyName: dbData.display_company_name,
     logoUrl: dbData.image,
     createdAt: existingCreatedAt ?? Date.now(),
     staticData,

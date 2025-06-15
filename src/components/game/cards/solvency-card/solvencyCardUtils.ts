@@ -40,6 +40,7 @@ function constructSolvencyCardData(
   dbRow: FinancialStatementDBRowFromSupabase,
   profileInfo: {
     companyName?: string | null;
+    displayCompanyName?: string | null;
     logoUrl?: string | null;
     websiteUrl?: string | null;
   },
@@ -110,6 +111,8 @@ function constructSolvencyCardData(
     type: "solvency",
     symbol: dbRow.symbol,
     companyName: profileInfo.companyName ?? dbRow.symbol,
+    displayCompanyName:
+      profileInfo.displayCompanyName ?? profileInfo.companyName ?? dbRow.symbol,
     logoUrl: profileInfo.logoUrl ?? null,
     websiteUrl: profileInfo.websiteUrl ?? null,
     createdAt: existingCreatedAt ?? Date.now(),
@@ -133,6 +136,10 @@ async function initializeSolvencyCard({
 
   let fetchedProfileInfo = {
     companyName: profileCardForSymbol?.company_name ?? symbol,
+    displayCompanyName:
+      profileCardForSymbol?.display_company_name ??
+      profileCardForSymbol?.company_name ??
+      symbol,
     logoUrl: profileCardForSymbol?.image ?? null,
     websiteUrl: profileCardForSymbol?.website ?? null,
   };
@@ -141,7 +148,7 @@ async function initializeSolvencyCard({
     const profileResult = await fromPromise(
       supabase
         .from("profiles")
-        .select("company_name, image, website")
+        .select("company_name, display_company_name, image, website")
         .eq("symbol", symbol)
         .maybeSingle(),
       (e) =>
@@ -154,6 +161,10 @@ async function initializeSolvencyCard({
       const profileData = profileResult.value.data as ProfileDBRowFromSupabase;
       fetchedProfileInfo = {
         companyName: profileData.company_name ?? symbol,
+        displayCompanyName:
+          profileData.display_company_name ??
+          profileData.company_name ??
+          symbol,
         logoUrl: profileData.image ?? null,
         websiteUrl: profileData.website ?? null,
       };
@@ -294,6 +305,7 @@ const handleSolvencyCardStatementUpdate: CardUpdateHandler<
       newFinancialStatementRow,
       {
         companyName: currentSolvencyCardData.companyName,
+        displayCompanyName: currentSolvencyCardData.displayCompanyName,
         logoUrl: currentSolvencyCardData.logoUrl,
         websiteUrl: currentSolvencyCardData.websiteUrl,
       },

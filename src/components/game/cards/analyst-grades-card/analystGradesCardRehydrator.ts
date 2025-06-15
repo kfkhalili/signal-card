@@ -101,6 +101,7 @@ const rehydrateAnalystGradesCardInstance: SpecificCardRehydrator = (
     symbol: commonProps.symbol,
     createdAt: commonProps.createdAt,
     companyName: commonProps.companyName,
+    displayCompanyName: commonProps.displayCompanyName,
     logoUrl: commonProps.logoUrl,
     websiteUrl: stored.websiteUrl ?? null,
     staticData: rehydratedStaticData,

@@ -67,7 +67,12 @@ function createDisplayablePriceCard(
   apiTimestampMillis: number | null,
   profileContext?: Pick<
     ProfileDBRow,
-    "company_name" | "image" | "exchange" | "website" | "currency" // Added currency
+    | "company_name"
+    | "display_company_name"
+    | "image"
+    | "exchange"
+    | "website"
+    | "currency"
   >,
   isShell = false
 ): PriceCardData & DisplayableCardState {
@@ -101,6 +106,10 @@ function createDisplayablePriceCard(
     symbol: leanQuote.symbol,
     createdAt: Date.now(),
     companyName: profileContext?.company_name ?? leanQuote.symbol,
+    displayCompanyName:
+      profileContext?.display_company_name ??
+      profileContext?.company_name ??
+      leanQuote.symbol,
     logoUrl: profileContext?.image ?? null,
     websiteUrl: profileContext?.website ?? null,
     staticData,
@@ -146,13 +155,19 @@ async function initializePriceCard({
   let profileContext:
     | Pick<
         ProfileDBRow,
-        "company_name" | "image" | "exchange" | "website" | "currency"
+        | "company_name"
+        | "display_company_name"
+        | "image"
+        | "exchange"
+        | "website"
+        | "currency"
       >
     | undefined;
 
   if (profileCard) {
     profileContext = {
       company_name: profileCard.companyName ?? null,
+      display_company_name: profileCard.displayCompanyName ?? null,
       image: profileCard.logoUrl ?? null,
       exchange: profileCard.staticData.exchange ?? null,
       website: profileCard.websiteUrl ?? null,
@@ -162,7 +177,9 @@ async function initializePriceCard({
     // If no profile card exists, fetch the necessary info from the DB
     const { data, error } = await supabase
       .from("profiles")
-      .select("company_name, image, exchange, website, currency")
+      .select(
+        "company_name, display_company_name, image, exchange, website, currency"
+      )
       .eq("symbol", symbol)
       .maybeSingle();
 

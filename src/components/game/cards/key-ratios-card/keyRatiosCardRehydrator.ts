@@ -101,12 +101,8 @@ const rehydrateKeyRatiosCardInstance: SpecificCardRehydrator = (
   };
 
   const rehydratedCard: KeyRatiosCardData = {
-    id: commonProps.id,
+    ...commonProps,
     type: "keyratios",
-    symbol: commonProps.symbol,
-    createdAt: commonProps.createdAt,
-    companyName: commonProps.companyName,
-    logoUrl: commonProps.logoUrl,
     websiteUrl: storedSpecificData.websiteUrl ?? null,
     staticData: rehydratedStaticData,
     liveData: rehydratedLiveData,

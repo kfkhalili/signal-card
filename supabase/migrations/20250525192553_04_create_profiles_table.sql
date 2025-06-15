@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS "public"."profiles" (
     "volume" bigint,
     "average_volume" bigint,
     "company_name" "text",
+    "display_company_name" "text",
     "currency" character varying(3),
     "cik" "text",
     "isin" "text",
@@ -43,6 +44,7 @@ ALTER TABLE "public"."profiles" OWNER TO "postgres";
 COMMENT ON TABLE "public"."profiles" IS 'Stores detailed static company information.';
 COMMENT ON COLUMN "public"."profiles"."id" IS 'Unique identifier for the profile record (UUID).';
 COMMENT ON COLUMN "public"."profiles"."symbol" IS 'Stock ticker or financial instrument symbol. Should be Unique.';
+COMMENT ON COLUMN "public"."profiles"."display_company_name" IS 'The display name of the company, can be set manually. Defaults to company_name on insert and is not updated automatically thereafter.';
 COMMENT ON COLUMN "public"."profiles"."full_time_employees" IS 'Number of full-time employees (parsed from source).';
 COMMENT ON COLUMN "public"."profiles"."modified_at" IS 'Timestamp of the last modification in this database.';
 

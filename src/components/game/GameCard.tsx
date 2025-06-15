@@ -56,6 +56,7 @@ const GameCard: React.FC<GameCardProps> = ({
       symbol: card.symbol,
       type: card.type,
       companyName: card.companyName ?? null,
+      displayCompanyName: card.displayCompanyName ?? null,
       logoUrl: card.logoUrl ?? null,
       websiteUrl: websiteUrlForContext ?? card.websiteUrl ?? null,
       backData: card.backData,
@@ -106,7 +107,6 @@ const GameCard: React.FC<GameCardProps> = ({
     className: cardWrapperClassName,
     innerCardClassName: innerCardClassName,
     onGenericInteraction: onGenericInteraction,
-    // NEW PROPS PASSED TO RENDERER
     isSelectionMode,
     selectedDataItems,
     onToggleItemSelection,

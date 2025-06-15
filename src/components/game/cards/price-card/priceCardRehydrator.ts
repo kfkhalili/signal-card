@@ -31,7 +31,7 @@ interface StoredPriceCardLiveDataShape {
 
 interface StoredPriceCardStaticDataShape {
   exchange_code?: string | null;
-  currency?: string | null; // Added currency
+  currency?: string | null;
 }
 
 interface StoredBaseCardBackDataShape {
@@ -42,7 +42,8 @@ interface StoredPriceCardObject {
   staticData?: StoredPriceCardStaticDataShape;
   liveData?: StoredPriceCardLiveDataShape;
   backData?: StoredBaseCardBackDataShape;
-  exchange_code?: string | null;
+  websiteUrl?: string | null;
+  exchange_code?: string | null; // Legacy support
 }
 
 const rehydrateLivePriceCard: SpecificCardRehydrator = (
@@ -77,7 +78,7 @@ const rehydrateLivePriceCard: SpecificCardRehydrator = (
   const rehydratedStaticData: PriceCardStaticData = {
     exchange_code:
       staticDataSource.exchange_code ?? stored.exchange_code ?? null,
-    currency: staticDataSource.currency ?? "USD", // Handle new currency field
+    currency: staticDataSource.currency ?? "USD",
   };
 
   const rehydratedBackData: BaseCardBackData = {
@@ -87,15 +88,12 @@ const rehydrateLivePriceCard: SpecificCardRehydrator = (
   };
 
   return {
-    id: commonProps.id,
+    ...commonProps,
     type: "price",
-    symbol: commonProps.symbol,
-    createdAt: commonProps.createdAt,
-    companyName: commonProps.companyName,
-    logoUrl: commonProps.logoUrl,
     staticData: rehydratedStaticData,
     liveData: rehydratedLiveData,
     backData: rehydratedBackData,
+    websiteUrl: stored.websiteUrl ?? null,
   };
 };
 

@@ -35,7 +35,7 @@ interface StoredRevenueBreakdownLiveDataShape {
 interface StoredRevenueBreakdownCardObject {
   staticData?: StoredRevenueBreakdownStaticDataShape;
   liveData?: StoredRevenueBreakdownLiveDataShape;
-  backData?: Partial<BaseCardBackData>; // Using Partial from BaseCardBackData
+  backData?: Partial<BaseCardBackData>;
   websiteUrl?: string | null;
 }
 
@@ -91,6 +91,7 @@ const rehydrateRevenueBreakdownCardInstance: SpecificCardRehydrator = (
     symbol: commonProps.symbol,
     createdAt: commonProps.createdAt,
     companyName: commonProps.companyName,
+    displayCompanyName: commonProps.displayCompanyName,
     logoUrl: commonProps.logoUrl,
     websiteUrl: stored.websiteUrl ?? null,
     staticData: rehydratedStaticData,

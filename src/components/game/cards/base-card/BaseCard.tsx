@@ -139,10 +139,13 @@ const BaseCard: React.FC<BaseCardProps> = ({
     symbol: sourceCardSymbol,
     type: sourceCardType,
     companyName,
+    displayCompanyName,
     logoUrl,
     websiteUrl,
     backData,
   } = cardContext;
+
+  console.log(displayCompanyName);
 
   const frontFaceRef = useRef<HTMLDivElement>(null);
   const backFaceRef = useRef<HTMLDivElement>(null);
@@ -276,7 +279,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
             "text-sm sm:text-base md:text-lg font-semibold leading-tight line-clamp-2 text-right"
           )}
           title={companyName || sourceCardSymbol}>
-          {companyName || sourceCardSymbol}
+          {displayCompanyName || companyName || sourceCardSymbol}
         </CardTitle>
         <div className="h-[1.1em] sm:h-[1.2em] md:h-[1.25em] flex items-end justify-end">
           {companyName && (

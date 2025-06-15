@@ -153,16 +153,12 @@ const rehydrateProfileCardInstance: SpecificCardRehydrator = (
   };
 
   const rehydratedCard: ProfileCardData = {
-    id: commonProps.id,
+    ...commonProps,
     type: "profile",
-    symbol: commonProps.symbol,
-    createdAt: commonProps.createdAt,
-    companyName: commonProps.companyName,
-    logoUrl: commonProps.logoUrl,
     staticData: rehydratedStaticData,
     liveData: rehydratedLiveData,
     backData: rehydratedBackData,
-    websiteUrl: profileStorageData.websiteUrl ?? rehydratedStaticData.website, // Prefer specific, then static
+    websiteUrl: profileStorageData.websiteUrl ?? rehydratedStaticData.website,
   };
   return rehydratedCard;
 };
