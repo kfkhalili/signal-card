@@ -9,6 +9,7 @@ import Footer from "@/components/layout/Footer";
 import { cn } from "../lib/utils";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CookieBanner } from "@/components/layout/CookieBanner";
+import { RealtimeStockProvider } from "@/contexts/RealtimeStockContext";
 
 const geistSansClassName = geistSansLocal.variable;
 const geistMonoClassName = geistMonoLocal.variable;
@@ -74,14 +75,16 @@ const RootLayout: React.FC<RootLayoutProps> = ({ children }) => {
           "antialiased font-sans"
         )}>
         <AuthProvider>
-          <div className="flex flex-col min-h-screen">
-            <Header />
-            <main className="flex-grow container mx-auto px-4 py-8">
-              {children}
-            </main>
-            <Footer />
-          </div>
-          <Toaster />
+          <RealtimeStockProvider>
+            <div className="flex flex-col min-h-screen">
+              <Header />
+              <main className="flex-grow container mx-auto px-4 py-8">
+                {children}
+              </main>
+              <Footer />
+            </div>
+            <Toaster />
+          </RealtimeStockProvider>
         </AuthProvider>
         <CookieBanner />
       </body>

@@ -1,14 +1,16 @@
 // src/hooks/useStockData.ts
 import { useState, useEffect, useCallback, useRef } from "react";
 import { fromPromise, Result, ok } from "neverthrow";
-import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Database } from "@/lib/supabase/database.types";
-import type { FinancialStatementDBRow } from "@/lib/supabase/realtime-service";
+import { useRealtimeStock } from "@/contexts/RealtimeStockContext";
 
 export type ProfileDBRow = Database["public"]["Tables"]["profiles"]["Row"];
 type LiveQuoteIndicatorDBRow =
   Database["public"]["Tables"]["live_quote_indicators"]["Row"];
+type FinancialStatementDBRow =
+  Database["public"]["Tables"]["financial_statements"]["Row"];
 type ExchangeMarketStatusRecord =
   Database["public"]["Tables"]["exchange_market_status"]["Row"];
 
@@ -94,6 +96,27 @@ async function fetchExchangeStatus(
   return result.map((response) => response.data);
 }
 
+async function fetchInitialFinancialStatement(
+  supabase: SupabaseClient<Database>,
+  symbol: string
+): Promise<Result<FinancialStatementDBRow | null, Error>> {
+  const result = await fromPromise(
+    supabase
+      .from("financial_statements")
+      .select("*")
+      .eq("symbol", symbol)
+      .order("date", { ascending: false })
+      .limit(1)
+      .single(),
+    (e) => e as Error
+  );
+
+  if (result.isErr() && result.error.message.includes("PGRST116")) {
+    return ok(null);
+  }
+  return result.map((response) => response.data);
+}
+
 export function useStockData({
   symbol,
   onProfileUpdate,
@@ -101,7 +124,6 @@ export function useStockData({
   onExchangeStatusUpdate,
   onFinancialStatementUpdate,
 }: UseStockDataProps): MarketStatusUpdate {
-  const instanceIdRef = useRef(Math.random().toString(36).substring(2, 7));
   const [profileData, setProfileData] = useState<ProfileDBRow | null>(null);
   const [latestQuote, setLatestQuote] =
     useState<LiveQuoteIndicatorDBRow | null>(null);
@@ -117,367 +139,166 @@ export function useStockData({
   const [timezone, setTimezone] = useState<string | null>(null);
 
   const { supabase: supabaseClient } = useAuth();
+  const { manager: realtimeManager } = useRealtimeStock();
   const isMountedRef = useRef<boolean>(false);
-
-  const symbolChannelRef = useRef<RealtimeChannel | null>(null);
-  const exchangeStatusChannelRef = useRef<RealtimeChannel | null>(null);
-  const currentSubscribedExchangeCode = useRef<string | null>(null);
-  const exchangeStatusRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
-      if (symbolChannelRef.current && supabaseClient) {
-        supabaseClient
-          .removeChannel(symbolChannelRef.current)
-          .catch((err) =>
-            console.error(
-              `[useStockData ${symbol}] Error removing symbol channel:`,
-              (err as Error).message
-            )
-          );
-        symbolChannelRef.current = null;
-      }
-      if (exchangeStatusChannelRef.current && supabaseClient) {
-        supabaseClient
-          .removeChannel(exchangeStatusChannelRef.current)
-          .catch((err) =>
-            console.error(
-              `[useStockData ${
-                currentSubscribedExchangeCode.current || symbol
-              }] Error removing exchange status channel:`,
-              (err as Error).message
-            )
-          );
-        exchangeStatusChannelRef.current = null;
-      }
-      currentSubscribedExchangeCode.current = null;
-      if (exchangeStatusRetryTimeoutRef.current)
-        clearTimeout(exchangeStatusRetryTimeoutRef.current);
     };
-  }, [symbol, supabaseClient]);
+  }, []);
 
-  const setupExchangeStatusSubscription = useCallback(
-    async (exchangeCodeToSubscribe: string | undefined | null) => {
-      if (!isMountedRef.current || !supabaseClient) return;
-      if (exchangeStatusRetryTimeoutRef.current)
-        clearTimeout(exchangeStatusRetryTimeoutRef.current);
-
-      if (
-        currentSubscribedExchangeCode.current &&
-        (currentSubscribedExchangeCode.current !== exchangeCodeToSubscribe ||
-          !exchangeCodeToSubscribe)
-      ) {
-        if (exchangeStatusChannelRef.current) {
-          await supabaseClient
-            .removeChannel(exchangeStatusChannelRef.current)
-            .catch((err) =>
-              console.error(
-                "Error removing old exchange status channel",
-                (err as Error).message
-              )
-            );
-          exchangeStatusChannelRef.current = null;
-        }
-        currentSubscribedExchangeCode.current = null;
-        if (isMountedRef.current) setExchangeStatus(null);
-      }
-      if (!exchangeCodeToSubscribe) return;
-      if (
-        currentSubscribedExchangeCode.current === exchangeCodeToSubscribe &&
-        exchangeStatusChannelRef.current?.state === "joined"
-      )
-        return;
-
-      currentSubscribedExchangeCode.current = exchangeCodeToSubscribe;
-      if (isMountedRef.current) {
-        setDerivedMarketStatus("Connecting");
-        setMarketStatusMessage(
-          `Subscribing to market status for ${exchangeCodeToSubscribe}...`
-        );
-      }
-
-      const result = await fetchExchangeStatus(
-        supabaseClient,
-        exchangeCodeToSubscribe
-      );
-      if (!isMountedRef.current) return;
-
-      result.match(
-        (data) => {
-          setExchangeStatus(data);
-          if (data && onExchangeStatusUpdate) onExchangeStatusUpdate(data);
-          else if (!data) {
-            setDerivedMarketStatus("Unknown");
-            setMarketStatusMessage(
-              `No market status data for ${exchangeCodeToSubscribe}.`
-            );
-          }
-        },
-        (error) => {
-          setExchangeStatus(null);
-          setDerivedMarketStatus("Error");
-          setMarketStatusMessage(
-            `Exception fetching market status for ${exchangeCodeToSubscribe}: ${error.message}`
-          );
-          console.error(
-            `[useStockData] Exception fetching market status for ${exchangeCodeToSubscribe}:`,
-            error
-          );
-        }
-      );
-
-      if (exchangeStatusChannelRef.current) {
-        await supabaseClient
-          .removeChannel(exchangeStatusChannelRef.current)
-          .catch((err) =>
-            console.error(
-              "Error removing stale exchange status channel",
-              (err as Error).message
-            )
-          );
-        exchangeStatusChannelRef.current = null;
-      }
-
-      const channelName = `exchange-status-${exchangeCodeToSubscribe
-        .toLowerCase()
-        .replace(/[^a-z0-9_.-]/gi, "-")}-${instanceIdRef.current}`;
-      const channel = supabaseClient.channel(channelName);
-      channel
-        .on<ExchangeMarketStatusRecord>(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "exchange_market_status",
-            filter: `exchange_code=eq.${exchangeCodeToSubscribe}`,
-          },
-          (payloadIncoming) => {
-            if (!isMountedRef.current) return;
-            if (
-              payloadIncoming.eventType === "DELETE" ||
-              !payloadIncoming.new
-            ) {
-              if (isMountedRef.current) setExchangeStatus(null);
-              return;
-            }
-            const newRecord = payloadIncoming.new as ExchangeMarketStatusRecord;
-            if (isMountedRef.current) {
-              setExchangeStatus(newRecord);
-              if (onExchangeStatusUpdate) onExchangeStatusUpdate(newRecord);
-            }
-          }
-        )
-        .subscribe((statusChange, errSubscribe) => {
-          if (!isMountedRef.current) return;
-          const retry = () => {
-            if (exchangeStatusRetryTimeoutRef.current)
-              clearTimeout(exchangeStatusRetryTimeoutRef.current);
-            exchangeStatusRetryTimeoutRef.current = setTimeout(() => {
-              if (
-                isMountedRef.current &&
-                currentSubscribedExchangeCode.current ===
-                  exchangeCodeToSubscribe
-              ) {
-                setupExchangeStatusSubscription(exchangeCodeToSubscribe);
-              }
-            }, 5000 + Math.random() * 5000);
-          };
-          if (
-            statusChange === "CHANNEL_ERROR" ||
-            statusChange === "TIMED_OUT"
-          ) {
-            if (isMountedRef.current) {
-              setDerivedMarketStatus("Error");
-              setMarketStatusMessage(
-                `Market status for ${exchangeCodeToSubscribe} issue: ${
-                  errSubscribe?.message || statusChange
-                }. Retrying...`
-              );
-              console.error(
-                `[useStockData] Exchange status channel error for ${exchangeCodeToSubscribe}:`,
-                errSubscribe || statusChange
-              );
-              retry();
-            }
-          } else if (statusChange === "CLOSED") {
-            retry();
-          } else if (statusChange === "SUBSCRIBED") {
-            if (exchangeStatusRetryTimeoutRef.current)
-              clearTimeout(exchangeStatusRetryTimeoutRef.current);
-          }
-        });
-      exchangeStatusChannelRef.current = channel;
-    },
-    [onExchangeStatusUpdate, supabaseClient]
-  );
-
+  // New effect for live quote handling via RealtimeStockManager
   useEffect(() => {
-    if (!supabaseClient) {
-      setDerivedMarketStatus("ClientUnavailable");
-      setMarketStatusMessage(
-        "Data service unavailable: client configuration error."
-      );
-      return;
-    }
+    if (!realtimeManager || !symbol) return;
 
-    if (!symbol) {
-      setDerivedMarketStatus("Unknown");
-      setMarketStatusMessage("No symbol provided.");
-      return;
-    }
+    realtimeManager.addSymbol(symbol);
 
-    let isSubscribed = true;
-
-    setDerivedMarketStatus("Fetching");
-    setMarketStatusMessage(`Initializing for ${symbol}...`);
-
-    const fetchAndSubscribe = async () => {
-      const profileRes = await fetchInitialProfile(supabaseClient, symbol);
-      if (!isSubscribed) return;
-
-      const fetchedProfile = profileRes.match(
-        (data) => {
-          if (isSubscribed) {
-            setProfileData(data);
-            if (data && onProfileUpdate) onProfileUpdate(data);
-          }
-          return data;
-        },
-        (error) => {
-          console.error(
-            `[useStockData ${symbol}] Initial profile fetch error:`,
-            error.message
-          );
-          return null;
+    const handleQuoteUpdate = (quote: LiveQuoteIndicatorDBRow) => {
+      if (quote.symbol === symbol) {
+        if (isMountedRef.current) {
+          setLatestQuote(quote);
+          if (onLiveQuoteUpdate) onLiveQuoteUpdate(quote, "realtime");
         }
-      );
-
-      const quoteRes = await fetchInitialQuote(supabaseClient, symbol);
-      if (!isSubscribed) return;
-
-      const fetchedQuote = quoteRes.match(
-        (data) => {
-          if (isSubscribed) {
-            setLatestQuote(data);
-            if (data && onLiveQuoteUpdate) onLiveQuoteUpdate(data, "fetch");
-          }
-          return data;
-        },
-        (error) => {
-          console.error(
-            `[useStockData ${symbol}] Initial quote fetch error:`,
-            error.message
-          );
-          return null;
-        }
-      );
-
-      const exchangeCode = fetchedProfile?.exchange || fetchedQuote?.exchange;
-      if (exchangeCode && isSubscribed) {
-        setupExchangeStatusSubscription(exchangeCode);
       }
-
-      if (symbolChannelRef.current && supabaseClient) {
-        await supabaseClient.removeChannel(symbolChannelRef.current);
-      }
-      if (!isSubscribed) return;
-
-      const channelName = `symbol-updates-${symbol
-        .toLowerCase()
-        .replace(/[^a-z0-9_.-]/gi, "-")}-${instanceIdRef.current}`;
-      const channel = supabaseClient.channel(channelName);
-
-      if (onProfileUpdate) {
-        channel.on<ProfileDBRow>(
-          "postgres_changes",
-          {
-            event: "UPDATE",
-            schema: "public",
-            table: "profiles",
-            filter: `symbol=eq.${symbol}`,
-          },
-          (payload) => {
-            if (isSubscribed && payload.new) {
-              const updatedRecord = payload.new as ProfileDBRow;
-              setProfileData(updatedRecord);
-              onProfileUpdate(updatedRecord);
-            }
-          }
-        );
-      }
-
-      if (onLiveQuoteUpdate) {
-        channel.on<LiveQuoteIndicatorDBRow>(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "live_quote_indicators",
-            filter: `symbol=eq.${symbol}`,
-          },
-          (payload) => {
-            if (isSubscribed && payload.new) {
-              const newQuote = payload.new as LiveQuoteIndicatorDBRow;
-              setLatestQuote(newQuote);
-              onLiveQuoteUpdate(newQuote, "realtime");
-            }
-          }
-        );
-      }
-
-      if (onFinancialStatementUpdate) {
-        channel.on<FinancialStatementDBRow>(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "financial_statements",
-            filter: `symbol=eq.${symbol}`,
-          },
-          (payload) => {
-            if (isSubscribed && payload.new) {
-              onFinancialStatementUpdate(
-                payload.new as FinancialStatementDBRow
-              );
-            }
-          }
-        );
-      }
-
-      channel.subscribe((status, err) => {
-        if (!isSubscribed) return;
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          setDerivedMarketStatus("Error");
-          setMarketStatusMessage(
-            `Data connection issue for ${symbol}: ${
-              err?.message || status
-            }. Retrying...`
-          );
-          console.error(
-            `[useStockData ${symbol}] Symbol channel error:`,
-            err || status
-          );
-        }
-      });
-
-      symbolChannelRef.current = channel;
     };
 
-    fetchAndSubscribe();
+    realtimeManager.on("quote", handleQuoteUpdate);
 
     return () => {
-      isSubscribed = false;
+      if (realtimeManager) {
+        realtimeManager.removeListener("quote", handleQuoteUpdate);
+        realtimeManager.removeSymbol(symbol);
+      }
     };
+  }, [symbol, realtimeManager, onLiveQuoteUpdate]);
+
+  // New effect for exchange status handling via RealtimeStockManager
+  useEffect(() => {
+    if (!realtimeManager || !profileData?.exchange) return;
+
+    const exchangeCode = profileData.exchange;
+    realtimeManager.addExchange(exchangeCode);
+
+    const handleStatusUpdate = (status: ExchangeMarketStatusRecord) => {
+      if (status.exchange_code === exchangeCode) {
+        if (isMountedRef.current) {
+          setExchangeStatus(status);
+          if (onExchangeStatusUpdate) onExchangeStatusUpdate(status);
+        }
+      }
+    };
+
+    realtimeManager.on("exchange_status", handleStatusUpdate);
+
+    return () => {
+      if (realtimeManager) {
+        realtimeManager.removeListener("exchange_status", handleStatusUpdate);
+        realtimeManager.removeExchange(exchangeCode);
+      }
+    };
+  }, [profileData?.exchange, realtimeManager, onExchangeStatusUpdate]);
+
+  const fetchInitialData = useCallback(async () => {
+    if (!isMountedRef.current || !supabaseClient || !symbol) return;
+
+    // Fetch Profile
+    const profileResult = await fetchInitialProfile(supabaseClient, symbol);
+    if (!isMountedRef.current) return;
+
+    const fetchedProfile = profileResult.match(
+      (data) => {
+        if (data) {
+          setProfileData(data);
+          if (onProfileUpdate) onProfileUpdate(data);
+        }
+        return data;
+      },
+      (error) => {
+        console.error(
+          `[useStockData ${symbol}] Exception fetching initial profile:`,
+          error
+        );
+        return null;
+      }
+    );
+
+    // Fetch Quote
+    const quoteResult = await fetchInitialQuote(supabaseClient, symbol);
+    if (!isMountedRef.current) return;
+
+    quoteResult.match(
+      (data) => {
+        if (data) {
+          setLatestQuote(data);
+          if (onLiveQuoteUpdate) onLiveQuoteUpdate(data, "fetch");
+        }
+      },
+      (error) =>
+        console.error(
+          `[useStockData ${symbol}] Exception fetching initial quote:`,
+          error
+        )
+    );
+
+    // Fetch Exchange Status
+    if (fetchedProfile?.exchange) {
+      const statusResult = await fetchExchangeStatus(
+        supabaseClient,
+        fetchedProfile.exchange
+      );
+      if (!isMountedRef.current) return;
+      statusResult.match(
+        (data) => {
+          if (data) {
+            setExchangeStatus(data);
+            if (onExchangeStatusUpdate) onExchangeStatusUpdate(data);
+          }
+        },
+        (error) =>
+          console.error(
+            `[useStockData ${symbol}] Exception fetching initial exchange status:`,
+            error
+          )
+      );
+    }
+
+    // Fetch Financial Statement
+    const statementResult = await fetchInitialFinancialStatement(
+      supabaseClient,
+      symbol
+    );
+    if (!isMountedRef.current) return;
+    statementResult.match(
+      (data) => {
+        if (data && onFinancialStatementUpdate) {
+          onFinancialStatementUpdate(data);
+        }
+      },
+      (error) =>
+        console.error(
+          `[useStockData ${symbol}] Exception fetching initial financial statement:`,
+          error
+        )
+    );
   }, [
     symbol,
     supabaseClient,
     onProfileUpdate,
     onLiveQuoteUpdate,
+    onExchangeStatusUpdate,
     onFinancialStatementUpdate,
-    setupExchangeStatusSubscription,
   ]);
+
+  useEffect(() => {
+    fetchInitialData().catch((err) =>
+      console.error(
+        `[useStockData ${symbol}] Unhandled error in fetchInitialData`,
+        (err as Error).message
+      )
+    );
+  }, [symbol, supabaseClient, fetchInitialData]);
 
   useEffect(() => {
     const relevantExchangeCode = profileData?.exchange || latestQuote?.exchange;
