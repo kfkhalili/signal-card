@@ -62,7 +62,26 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user && !(pathname.startsWith("/auth") || pathname === "/")) {
+  const publicPaths = [
+    "/",
+    "/about",
+    "/api",
+    "/blog",
+    "/careers",
+    "/contact",
+    "/cookies",
+    "/features",
+    "/help",
+    "/press",
+    "/pricing",
+    "/privacy",
+    "/status",
+    "/terms",
+  ];
+
+  const isPublicPath = publicPaths.includes(pathname);
+
+  if (!user && !pathname.startsWith("/auth") && !isPublicPath) {
     const url = request.nextUrl.clone();
     url.pathname = "/auth";
     url.searchParams.set("message", "Please log in to access this page.");
