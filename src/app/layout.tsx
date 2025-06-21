@@ -5,6 +5,7 @@ import { geistSansLocal, geistMonoLocal } from "./fonts";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import Header from "@/components/layout/Header";
+import Footer from "@/components/layout/Footer";
 import { cn } from "../lib/utils";
 import { AuthProvider } from "@/contexts/AuthContext";
 
@@ -77,6 +78,7 @@ const RootLayout: React.FC<RootLayoutProps> = ({ children }) => {
             <main className="flex-grow container mx-auto px-4 py-8">
               {children}
             </main>
+            <Footer />
           </div>
           <Toaster />
         </AuthProvider>

@@ -1,0 +1,359 @@
+# Cursor Rules for Tickered
+
+## Project Overview
+
+**Tickered** is a financial data visualization and analysis web application that transforms complex financial data into an interactive, digestible experience through a unique "Card-based" system. Users can explore stocks, cryptocurrencies, and other financial instruments by interacting with over 100 distinct types of dynamic "Financial Cards" (e.g., Company Profile, Price, Earnings, Volume, Dividends, Sentiment, News), each powered by live data.
+
+### Core Concept
+
+- **Modular Card System**: Users build personalized dashboards by adding various Financial Cards to a dynamic workspace
+- **Deep Interactivity**: Metrics within cards are clickable, instantly generating new, related cards for intuitive drill-down
+- **Real-time Data**: Live financial data updates powered by Supabase Realtime
+- **Dual Audience**: Simplifies complexity for beginners while offering depth for professionals
+
+### Problem Addressed
+
+Traditional financial information platforms often overwhelm users, especially beginners, with vast amounts of non-contextualized data. This creates a steep learning curve and can make investment analysis feel boring, inaccessible, and isolating.
+
+### Solution
+
+- **Interactive & Social Financial Cards**: Self-contained, live-updated information
+- **Sleek, User-Centric Design**: Minimalist, visualization-rich, and gamified interface
+- **Personalized & Dynamic Dashboards**: Users tailor their workspace to specific interests
+
+## Technical Architecture
+
+### Frontend Stack
+
+- **Framework**: Next.js 15 with App Router (React Server Components & Client Components)
+- **Styling**: Tailwind CSS with utility-first approach
+- **Component Library**: Shadcn UI for reusable components
+- **Language**: TypeScript for type safety
+- **State Management**: React hooks + custom hooks (useWorkspaceManager, useStockData)
+- **Testing**: Jest with JSDOM, Playwright for E2E, Storybook for component testing
+- **Charts**: Recharts for data visualization
+- **Maps**: Leaflet for geographical data
+
+### Backend Stack
+
+- **Database**: Supabase (PostgreSQL) with Row Level Security (RLS)
+- **Authentication**: Supabase Auth with custom user profiles
+- **Serverless Functions**: Supabase Edge Functions (Deno runtime)
+- **Real-time**: Supabase Realtime for live data updates
+- **External API**: FinancialModelingPrep (FMP) API for financial data
+- **Hosting**: Vercel for frontend, Supabase for backend
+- **Scheduling**: pg_cron for automated data fetching
+
+### Key Design Patterns
+
+- **Plugin-like Card Architecture**: Extensible card system with registries and initializers
+- **Generic Interaction System**: Unified interaction model for all card types
+- **Error Handling**: Comprehensive error handling with neverthrow library
+- **Performance**: React.memo, useMemo, useCallback for optimization
+- **Functional Programming**: Result types for error handling
+
+## Card System Architecture
+
+### Core Components
+
+- **BaseCard**: Common UI shell (flippable, header, interactions)
+- **GameCard**: Generic renderer that routes to specific card types
+- **Card Registries**: Initializers, renderers, rehydrators, update handlers
+- **Card Types**: Profile, Price, Revenue, Solvency, Cash Use, Key Ratios, Dividends History, Revenue Breakdown, Analyst Grades, Exchange Variants, Custom
+
+### Card Development Process
+
+1. **Define Types**: Extend CardType union, create card-specific data interfaces
+2. **Implement Initializer**: Async function to fetch and construct card data
+3. **Create UI Components**: Content and Container components
+4. **Add Rehydrator**: Reconstruct card state from localStorage
+5. **Implement Update Handlers**: Process real-time data updates
+6. **Add Real-time Subscriptions**: If needed for new data types
+7. **Create Storybook Stories**: For testing and documentation
+8. **Make Selectable**: Add to AddCardForm UI
+
+### File Structure for New Cards
+
+```
+src/components/game/cards/[card-name]/
+├── [card-name].types.ts          # TypeScript interfaces
+├── [CardName]Content.tsx         # UI content component
+├── [CardName]Container.tsx       # Container wrapper
+├── [card-name]Utils.ts           # Initializer and update handlers
+├── [card-name]Rehydrator.ts      # localStorage reconstruction
+└── [CardName].stories.tsx        # Storybook stories
+```
+
+### Card Data Structure
+
+```typescript
+interface CardData {
+  id: string;
+  type: CardType;
+  symbol: string;
+  createdAt: number;
+  companyName?: string;
+  displayCompanyName?: string;
+  logoUrl?: string;
+  websiteUrl?: string;
+  backData: BaseCardBackData;
+  staticData: CardSpecificStaticData;
+  liveData: CardSpecificLiveData;
+}
+```
+
+## Database Schema
+
+### Core Tables
+
+- **auth.users**: Supabase auth users
+- **public.user_profiles**: Extended user profile data (auto-populated on user creation)
+- **public.profiles**: Company information and metadata
+- **public.live_quote_indicators**: Real-time market data (updated every minute)
+- **public.exchange_market_status**: Market status for exchanges (updated daily)
+- **public.financial_statements**: Financial statement data (monthly updates)
+- **public.supported_symbols**: Available stock symbols
+- **public.shares_float**: Shares float data
+- **public.ratios_ttm**: Trailing twelve months ratios
+- **public.dividend_history**: Historical dividend data
+- **public.revenue_product_segmentation**: Revenue breakdown data
+- **public.grades_historical**: Historical analyst grades
+- **public.exchange_variants**: Exchange variant information
+- **public.available_exchanges**: Available exchanges list
+
+### Key Features
+
+- **Row Level Security (RLS)**: Granular access control with policies
+- **Real-time Publications**: Automatic data broadcasting via Supabase Realtime
+- **Triggers**: Automatic timestamp updates via moddatetime extension
+- **Indexes**: Optimized for common query patterns
+- **Foreign Keys**: Proper relationships between tables
+
+### Data Flow
+
+1. **Scheduled Edge Functions**: pg_cron triggers Edge Functions
+2. **FMP API Calls**: Edge Functions fetch data from FinancialModelingPrep
+3. **Database Updates**: Data upserted into PostgreSQL tables
+4. **Realtime Broadcasting**: Database changes trigger realtime events
+5. **Frontend Updates**: Client subscribes to realtime updates
+
+## Development Guidelines
+
+### Code Style
+
+- **TypeScript**: Strict mode enabled, comprehensive type safety
+- **ESLint**: Next.js + TypeScript ESLint configuration with flat config
+- **Error Handling**: Use neverthrow for functional error handling
+- **Performance**: React.memo for components, useMemo/useCallback for expensive operations
+- **Testing**: Jest for unit tests, Playwright for E2E, Storybook for components
+- **Imports**: Use absolute imports with @/ prefix
+
+### Error Handling Patterns
+
+- **Functional Error Handling**: Use neverthrow Result type
+- **Graceful Degradation**: Handle missing data gracefully
+- **User Feedback**: Toast notifications for user-facing errors
+- **Logging**: Comprehensive error logging for debugging
+- **Error Boundaries**: React error boundaries for component errors
+
+### Performance Considerations
+
+- **Card Rendering**: Optimize for many cards in workspace (virtual scrolling potential)
+- **Real-time Subscriptions**: Efficient subscription management with cleanup
+- **Data Fetching**: Minimize unnecessary API calls with caching
+- **Bundle Size**: Code splitting and lazy loading
+- **Image Optimization**: Next.js Image component with proper sizing
+
+### Security
+
+- **Authentication**: Supabase Auth with proper session management
+- **Authorization**: RLS policies for database access
+- **Input Validation**: Comprehensive validation for all inputs
+- **API Security**: Proper CORS and rate limiting
+- **Environment Variables**: Secure handling of sensitive data
+
+## Business Context
+
+### Target Audience
+
+- **Beginner Investors**: Simplified card format, educational content, guided exploration
+- **Professional Investors**: Advanced analytics, sophisticated dashboards, custom cards
+
+### Business Model
+
+- **Freemium**: Free core features, premium subscriptions for advanced features
+- **Revenue Streams**: Multiple workspaces, public dashboard publishing, custom entry cards, advanced analytics
+
+### Key Features
+
+- **Interactive Cards**: Clickable metrics for drill-down analysis
+- **Real-time Updates**: Live market data and financial information
+- **Custom Dashboards**: Personalized workspace configurations
+- **Data Persistence**: Local storage for user preferences
+- **Market Status**: Real-time exchange status and holiday information
+
+### Design Guidelines
+
+- **Primary Color**: White or light gray backgrounds for readability
+- **Secondary Color**: Dark gray or black text for strong contrast
+- **Accent Color**: Blue (#3498db) for interactive elements
+- **Layout**: Clear and functional with designated areas for Active Cards and Discovered Signals
+- **Opacity Changes**: Simple opacity changes for time-sensitive data indication
+
+## Development Workflow
+
+### Adding New Features
+
+1. **Card Types**: Follow the 8-step card development process
+2. **Database Changes**: Use migrations with proper RLS policies
+3. **Edge Functions**: For external API integration with proper error handling
+4. **Testing**: Unit tests, E2E tests, Storybook stories
+
+### Testing Strategy
+
+- **Unit Tests**: Jest for business logic and utilities
+- **Component Tests**: Storybook for isolated component testing
+- **E2E Tests**: Playwright for user workflows
+- **Integration Tests**: For API and database interactions
+- **Visual Regression**: Storybook for UI consistency
+
+### Deployment
+
+- **Frontend**: Vercel with automatic deployments
+- **Backend**: Supabase with migration-based deployments
+- **Environment**: Proper environment variable management
+- **Monitoring**: Error tracking and performance monitoring
+
+## Common Patterns
+
+### Card Interaction System
+
+```typescript
+// Generic interaction payload
+interface InteractionPayload {
+  intent:
+    | "REQUEST_NEW_CARD"
+    | "NAVIGATE_EXTERNAL"
+    | "FILTER_WORKSPACE_DATA"
+    | "TRIGGER_CARD_ACTION";
+  sourceCardId: string;
+  sourceCardSymbol: string;
+  sourceCardType: CardType;
+  originatingElement?: string;
+  // Additional fields based on intent
+}
+```
+
+### Error Handling
+
+```typescript
+// Use neverthrow for functional error handling
+import { Result, ok, err, fromPromise } from "neverthrow";
+
+function processData(): Result<ProcessedData, Error> {
+  try {
+    // processing logic
+    return ok(processedData);
+  } catch (error) {
+    return err(error as Error);
+  }
+}
+
+// For async operations
+const result = await fromPromise(asyncOperation(), (error) => error as Error);
+```
+
+### Real-time Data Updates
+
+```typescript
+// Subscribe to real-time updates
+const { data, error } = await supabase
+  .channel("table_name")
+  .on(
+    "postgres_changes",
+    {
+      event: "*",
+      schema: "public",
+      table: "table_name",
+    },
+    callback
+  )
+  .subscribe();
+```
+
+### Edge Function Pattern
+
+```typescript
+// Standard Edge Function structure
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: CORS_HEADERS });
+  }
+
+  try {
+    // Function logic
+    return new Response(JSON.stringify(result), {
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      status: 200,
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      status: 500,
+    });
+  }
+});
+```
+
+## Important Notes
+
+- **Always use TypeScript**: No JavaScript files in the project
+- **Follow Card Architecture**: New cards must follow the established 8-step pattern
+- **Test Everything**: Unit tests, component tests, and E2E tests
+- **Error Handling**: Comprehensive error handling with user feedback
+- **Performance**: Optimize for real-time data and many cards
+- **Security**: Proper authentication, authorization, and input validation
+- **Documentation**: Keep documentation updated with code changes
+- **Financial Data**: Handle missing or delayed financial data gracefully
+- **Real-time Subscriptions**: Always clean up subscriptions to prevent memory leaks
+
+## File Naming Conventions
+
+- **Components**: PascalCase (e.g., `PriceCard.tsx`)
+- **Utilities**: camelCase (e.g., `priceCardUtils.ts`)
+- **Types**: camelCase with `.types.ts` suffix (e.g., `price-card.types.ts`)
+- **Stories**: Component name with `.stories.tsx` suffix
+- **Tests**: Component name with `.spec.ts` suffix
+- **Edge Functions**: kebab-case (e.g., `fetch-fmp-quote-indicators`)
+
+## Environment Variables
+
+- **NEXT_PUBLIC_SUPABASE_URL**: Supabase project URL
+- **NEXT_PUBLIC_SUPABASE_ANON_KEY**: Supabase anonymous key
+- **FMP_API_KEY**: FinancialModelingPrep API key
+- **NEXT_PUBLIC_BASE_URL**: Application base URL
+- **ENV_CONTEXT**: Environment context (DEV/PROD)
+
+## Supabase Edge Functions
+
+### Standard Structure
+
+- **types.ts**: TypeScript interfaces
+- **index.ts**: Main function logic
+- **deno.json**: Import map for dependencies
+
+### Common Patterns
+
+- **Error Handling**: Comprehensive try-catch with proper error responses
+- **CORS**: Standard CORS headers for all functions
+- **Environment Variables**: Proper validation of required env vars
+- **Logging**: Structured logging for debugging
+- **Rate Limiting**: Respect external API rate limits
+
+Remember: This is a financial application with real-time data, so prioritize reliability, performance, and user experience in all development decisions. Financial data accuracy and timely updates are critical for user trust.
