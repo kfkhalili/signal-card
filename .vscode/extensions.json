@@ -1,0 +1,20 @@
+{
+  "recommendations": [
+    // Core Frontend & TypeScript
+    "dbaeumer.vscode-eslint", // Integrates ESLint into VS Code
+    "esbenp.prettier-vscode", // Code formatter
+    "bradlc.vscode-tailwindcss", // Tailwind CSS IntelliSense
+    "csstools.postcss", // PostCSS language support
+
+    // Testing
+    "orta.vscode-jest", // Jest test runner integration
+    "ms-playwright.playwright", // Playwright E2E testing tools
+
+    // Component Development
+    "storybookjs.storybooks-vscode", // Storybook integration
+
+    // Backend & Database
+    "supabase.supabase", // Supabase schema and tools integration
+    "denoland.vscode-deno" // Deno runtime support for Edge Functions
+  ]
+}

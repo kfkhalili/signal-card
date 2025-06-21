@@ -8,6 +8,7 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { cn } from "../lib/utils";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { CookieBanner } from "@/components/layout/CookieBanner";
 
 const geistSansClassName = geistSansLocal.variable;
 const geistMonoClassName = geistMonoLocal.variable;
@@ -82,6 +83,7 @@ const RootLayout: React.FC<RootLayoutProps> = ({ children }) => {
           </div>
           <Toaster />
         </AuthProvider>
+        <CookieBanner />
       </body>
     </html>
   );
