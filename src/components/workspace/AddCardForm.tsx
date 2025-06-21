@@ -32,20 +32,90 @@ import {
   FormLabel,
 } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PlusCircle, ArrowLeft } from "lucide-react";
+import {
+  PlusCircle,
+  ArrowLeft,
+  UserSquare,
+  Activity,
+  BarChart3,
+  Scale,
+  CircleDollarSign,
+  Star,
+  BookOpen,
+  PieChart,
+  Landmark,
+  Layers3,
+  Check,
+} from "lucide-react";
 import type { CardType } from "@/components/game/cards/base-card/base-card.types";
+import { cn } from "@/lib/utils";
 
-const AVAILABLE_CARD_TYPES: { value: CardType; label: string }[] = [
-  { value: "profile", label: "Profile Card" },
-  { value: "price", label: "Price Card" },
-  { value: "revenue", label: "Revenue Card" },
-  { value: "solvency", label: "Solvency Card" },
-  { value: "cashuse", label: "Cash Use Card" },
-  { value: "keyratios", label: "Key Ratios Card" },
-  { value: "dividendshistory", label: "Dividends History Card" },
-  { value: "revenuebreakdown", label: "Revenue Breakdown Card" },
-  { value: "analystgrades", label: "Analyst Grades Card" },
-  { value: "exchangevariants", label: "Exchange Variants Card" },
+const AVAILABLE_CARD_TYPES: {
+  value: CardType;
+  label: string;
+  description: string;
+  icon: React.ElementType;
+}[] = [
+  {
+    value: "profile",
+    label: "Profile",
+    description: "Company overview, description, and key stats.",
+    icon: UserSquare,
+  },
+  {
+    value: "price",
+    label: "Price",
+    description: "Live price, daily range, and moving averages.",
+    icon: Activity,
+  },
+  {
+    value: "keyratios",
+    label: "Key Ratios",
+    description: "TTM valuation, profitability, and solvency ratios.",
+    icon: BarChart3,
+  },
+  {
+    value: "revenue",
+    label: "Revenue",
+    description: "Quarterly or annual revenue and profitability.",
+    icon: CircleDollarSign,
+  },
+  {
+    value: "solvency",
+    label: "Solvency",
+    description: "Assets, liabilities, and debt overview.",
+    icon: Landmark,
+  },
+  {
+    value: "cashuse",
+    label: "Cash Use",
+    description: "Free cash flow, debt, and share changes.",
+    icon: Layers3,
+  },
+  {
+    value: "dividendshistory",
+    label: "Dividends",
+    description: "Historical dividend payments and growth.",
+    icon: Star,
+  },
+  {
+    value: "revenuebreakdown",
+    label: "Segments",
+    description: "Revenue breakdown by product or segment.",
+    icon: PieChart,
+  },
+  {
+    value: "analystgrades",
+    label: "Analyst Grades",
+    description: "Analyst consensus and rating distribution.",
+    icon: BookOpen,
+  },
+  {
+    value: "exchangevariants",
+    label: "Exchanges",
+    description: "Listings on other international exchanges.",
+    icon: Scale,
+  },
 ];
 
 const AddCardFormSchema = z.object({
@@ -193,21 +263,7 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
               <div className="relative">
                 <div className="max-h-[250px] overflow-y-auto pr-2 space-y-2 border-t pt-2">
                   {AVAILABLE_CARD_TYPES.map((item) => (
-                    <FormItem
-                      key={item.value}
-                      className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer"
-                      onClick={(e) => {
-                        if (e.target === e.currentTarget) {
-                          const currentValue = field.value ?? [];
-                          const isChecked = currentValue.includes(item.value);
-                          const newValue = isChecked
-                            ? currentValue.filter(
-                                (value) => value !== item.value
-                              )
-                            : [...currentValue, item.value];
-                          field.onChange(newValue);
-                        }
-                      }}>
+                    <FormItem key={item.value}>
                       <FormControl>
                         <Checkbox
                           checked={field.value?.includes(item.value)}
@@ -221,10 +277,33 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
                                   )
                                 );
                           }}
+                          id={`card-type-${item.value}`}
+                          className="sr-only peer"
                         />
                       </FormControl>
-                      <FormLabel className="font-normal cursor-pointer w-full">
-                        {item.label}
+                      <FormLabel
+                        htmlFor={`card-type-${item.value}`}
+                        className={cn(
+                          "flex items-center p-3 rounded-md border transition-colors cursor-pointer",
+                          "peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 hover:bg-accent/50"
+                        )}>
+                        <item.icon className="h-5 w-5 mr-4 text-muted-foreground shrink-0" />
+                        <div className="flex-grow">
+                          <p className="font-semibold text-foreground">
+                            {item.label}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {item.description}
+                          </p>
+                        </div>
+                        <Check
+                          className={cn(
+                            "h-5 w-5 ml-4 text-primary transition-opacity",
+                            field.value?.includes(item.value)
+                              ? "opacity-100"
+                              : "opacity-0"
+                          )}
+                        />
                       </FormLabel>
                     </FormItem>
                   ))}

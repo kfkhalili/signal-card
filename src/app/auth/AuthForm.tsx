@@ -141,13 +141,13 @@ export default function AuthForm() {
             email_label: "Email address",
             password_label: "Password",
             button_label: "Log in",
-            link_text: "New here? Create an account",
+            link_text: "Already have an account? Log in",
           },
           sign_up: {
             email_label: "Email address",
             password_label: "Create a Password",
             button_label: "Sign up",
-            link_text: "Already have an account? Log in",
+            link_text: "New here? Create an account",
           },
         },
       }}
