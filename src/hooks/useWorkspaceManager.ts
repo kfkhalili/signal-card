@@ -64,7 +64,8 @@ const INITIAL_RAW_CARDS: StoredCardRawArray = [];
 
 interface SymbolSuggestion {
   value: string;
-  label: string;
+  label: string; // Combination of symbol and name for searching.
+  companyName: string;
 }
 
 export interface SelectedDataItem {
@@ -159,29 +160,69 @@ export function useWorkspaceManager() {
   useEffect(() => {
     const fetchAllSymbols = async () => {
       if (!supabase) return;
-      const result = await fromPromise(
+
+      const symbolsResult = await fromPromise(
         supabase
           .from("supported_symbols")
           .select("symbol")
-          .eq("is_active", true)
-          .order("symbol", { ascending: true }),
+          .eq("is_active", true),
         (e) => e as Error
       );
 
-      result.match(
-        (response) => {
-          if (response.data) {
-            const symbols = response.data.map((s) => ({
-              value: s.symbol,
-              label: s.symbol,
-            }));
-            setSupportedSymbols(symbols);
-          }
-        },
-        (error) => {
-          console.error("Failed to fetch supported symbols:", error);
-        }
+      if (symbolsResult.isErr() || !symbolsResult.value.data) {
+        console.error(
+          "Failed to fetch supported symbols:",
+          symbolsResult.isErr() && symbolsResult.error
+        );
+        return;
+      }
+
+      const symbolStrings = symbolsResult.value.data.map((s) => s.symbol);
+
+      const profilesResult = await fromPromise(
+        supabase
+          .from("profiles")
+          .select("symbol, display_company_name")
+          .in("symbol", symbolStrings),
+        (e) => e as Error
       );
+
+      if (profilesResult.isErr() || !profilesResult.value.data) {
+        console.error(
+          "Failed to fetch profiles for symbols:",
+          profilesResult.isErr() && profilesResult.error
+        );
+        // Fallback to symbols only if profiles fail
+        const symbolOnlySuggestions = symbolStrings
+          .map((s) => ({
+            value: s,
+            label: s,
+            companyName: "Name not available",
+          }))
+          .sort((a, b) => a.value.localeCompare(b.value));
+        setSupportedSymbols(symbolOnlySuggestions);
+        return;
+      }
+
+      const companyNamesMap = new Map<string, string>();
+      profilesResult.value.data.forEach((p) => {
+        if (p.symbol && p.display_company_name) {
+          companyNamesMap.set(p.symbol, p.display_company_name);
+        }
+      });
+
+      const suggestions: SymbolSuggestion[] = symbolStrings
+        .map((symbol) => {
+          const companyName = companyNamesMap.get(symbol) ?? "Unknown Company";
+          return {
+            value: symbol,
+            companyName,
+            label: `${symbol} ${companyName}`,
+          };
+        })
+        .sort((a, b) => a.value.localeCompare(b.value));
+
+      setSupportedSymbols(suggestions);
     };
 
     fetchAllSymbols();

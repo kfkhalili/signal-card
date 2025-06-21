@@ -63,7 +63,8 @@ export type AddCardFormValues = z.infer<typeof AddCardFormSchema>;
 
 interface SymbolSuggestion {
   value: string;
-  label: string;
+  label: string; // Combination of symbol and name for searching.
+  companyName: string;
 }
 
 interface AddCardFormProps {
@@ -111,10 +112,10 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
     <div className="pt-2">
       <DialogTitle>Select a Symbol</DialogTitle>
       <DialogDescription className="pt-1">
-        Search for a stock symbol to add cards for.
+        Search for a stock symbol or company name to add cards for.
       </DialogDescription>
       <Command className="rounded-lg border shadow-md mt-4">
-        <CommandInput placeholder="Type a symbol to search..." />
+        <CommandInput placeholder="Type a symbol or company name..." />
         <CommandList className="max-h-[250px]">
           <CommandEmpty>No results found.</CommandEmpty>
           <CommandGroup>
@@ -128,7 +129,12 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
                   });
                   setView("types");
                 }}>
-                {suggestion.label}
+                <div className="flex justify-between w-full items-center">
+                  <span className="font-semibold">{suggestion.value}</span>
+                  <span className="text-muted-foreground text-xs truncate ml-4">
+                    {suggestion.companyName}
+                  </span>
+                </div>
               </CommandItem>
             ))}
           </CommandGroup>
