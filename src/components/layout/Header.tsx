@@ -1,12 +1,17 @@
 // src/components/layout/Header.tsx
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { LogOut, LayoutDashboard, Loader2, AlertTriangle } from "lucide-react";
+import Avatar from "@/components/ui/Avatar";
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'
+import { Database } from '@/lib/supabase/database.types'
+
+type Profile = Database['public']['Tables']['user_profiles']['Row'];
 
 const NavLinkItem: React.FC<{
   href: string;
@@ -31,6 +36,27 @@ const NavLinkItem: React.FC<{
 
 const Header: React.FC = () => {
   const { user, signOut, isLoading, clientInitError } = useAuth();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const supabase = createSupabaseBrowserClient();
+
+  useEffect(() => {
+    if (user && supabase) {
+      const fetchProfile = async () => {
+        const { data, error } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching profile for header:', error);
+        } else {
+          setProfile(data);
+        }
+      };
+      fetchProfile();
+    }
+  }, [user, supabase]);
 
   return (
     <header className="bg-card border-b shadow-sm sticky top-0 z-50">
@@ -72,13 +98,22 @@ const Header: React.FC = () => {
                 icon={LayoutDashboard}
                 text="Workspace"
               />
-              {user.email && (
-                <span
-                  className="text-xs sm:text-sm text-muted-foreground hidden md:inline truncate max-w-[100px] lg:max-w-[150px]"
-                  title={user.email}>
-                  {user.email}
-                </span>
-              )}
+              <Link href="/profile" title="Your Profile" className="flex items-center space-x-2 p-1 rounded-md hover:bg-muted transition-colors">
+                {profile && (
+                    <Avatar
+                        src={profile.avatar_url}
+                        alt={profile.full_name || profile.username || 'User Avatar'}
+                        size={30}
+                    />
+                )}
+                {profile?.username && (
+                  <span
+                    className="text-xs sm:text-sm text-muted-foreground hidden md:inline truncate max-w-[100px] lg:max-w-[150px]"
+                    title={profile.username}>
+                    @{profile.username}
+                  </span>
+                )}
+              </Link>
               <Button
                 variant="outline"
                 size="sm"

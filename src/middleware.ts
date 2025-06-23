@@ -62,6 +62,20 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     data: { user },
   } = await supabase.auth.getUser();
 
+  if (user) {
+    const { data: profile } = await supabase
+      .from("user_profiles")
+      .select("is_profile_complete")
+      .eq("id", user.id)
+      .single();
+
+    if (profile && !profile.is_profile_complete && pathname !== '/auth/complete-profile') {
+      const url = request.nextUrl.clone();
+      url.pathname = '/auth/complete-profile';
+      return NextResponse.redirect(url);
+    }
+  }
+
   const publicPaths = [
     "/",
     "/about",
@@ -103,10 +117,11 @@ export const config = {
      * - fonts (fonts folder)
      * - images (images folder)
      * - auth/auth-error (our specific auth error page) <--- ADDED EXCLUSION
+     * - auth/complete-profile (our specific complete profile page) <--- ADDED EXCLUSION
      *
      * This ensures the middleware's auth logic only runs on page navigation
      * and not on the error page itself when it's trying to report a config error.
      */
-    "/((?!api|_next/static|_next/image|favicon.ico|fonts|images|auth/auth-error).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|fonts|images|auth/auth-error|auth/complete-profile).*)",
   ],
 };
