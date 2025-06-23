@@ -1,79 +1,35 @@
 // src/app/layout.tsx
-import type { Metadata } from "next";
-import { geistSansLocal, geistMonoLocal } from "./fonts";
-
-import "./globals.css";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
+import { homeMetadata, generateStructuredData } from "./metadata";
 import { Toaster } from "@/components/ui/toaster";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
-import { cn } from "../lib/utils";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CookieBanner } from "@/components/layout/CookieBanner";
 import { RealtimeStockProvider } from "@/contexts/RealtimeStockContext";
 
-const geistSansClassName = geistSansLocal.variable;
-const geistMonoClassName = geistMonoLocal.variable;
+import "./globals.css";
 
-const siteDescription =
-  "Tickered is a web application for financial data visualization and analysis. Dive into dynamic financial data, capture key market events, and build your unique collection of stock market insights.";
+export const metadata = homeMetadata;
 
-export const metadata: Metadata = {
-  title: "Tickered - Financial Analysis & Stock Data",
-  description: siteDescription,
-  keywords: [
-    "Tickered",
-    "finance",
-    "stock market",
-    "financial analysis",
-    "stock data",
-    "investment research",
-    "trading signals",
-  ],
-};
-
-interface RootLayoutProps {
+export default function RootLayout({
+  children,
+}: {
   children: React.ReactNode;
-}
-
-const RootLayout: React.FC<RootLayoutProps> = ({ children }) => {
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    name: "Tickered",
-    url: process.env.NEXT_PUBLIC_BASE_URL || "https://www.tickered.com",
-    logo: `${
-      process.env.NEXT_PUBLIC_BASE_URL || "https://www.tickered.com"
-    }/images/tickered.png`,
-    description: siteDescription,
-    mainEntityOfPage: {
-      "@type": "WebApplication",
-      name: "Tickered",
-      applicationCategory: "FinancialApplication",
-      operatingSystem: "Web",
-      description: siteDescription,
-      offers: {
-        "@type": "Offer",
-        price: "0",
-        priceCurrency: "USD",
-        description: "Free sign-up with core features available.",
-      },
-    },
-  };
+}) {
+  const structuredData = generateStructuredData(homeMetadata);
 
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: structuredData }}
         />
       </head>
       <body
-        className={cn(
-          geistSansClassName,
-          geistMonoClassName,
-          "antialiased font-sans"
-        )}>
+        className={`${GeistSans.variable} ${GeistMono.variable} font-sans`}>
         <AuthProvider>
           <RealtimeStockProvider>
             <div className="flex flex-col min-h-screen">
@@ -90,6 +46,4 @@ const RootLayout: React.FC<RootLayoutProps> = ({ children }) => {
       </body>
     </html>
   );
-};
-
-export default RootLayout;
+}
