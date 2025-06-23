@@ -58,11 +58,20 @@ export default function CompleteProfilePage() {
       .eq('id', user.id)
 
     if (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      })
+      console.error("Profile update failed:", error)
+      if (error.code === '23505') {
+        toast({
+          title: "Username already taken",
+          description: "Please choose a different username.",
+          variant: "destructive",
+        })
+      } else {
+        toast({
+          title: "Error updating profile",
+          description: "An unexpected error occurred. Please check the console for details.",
+          variant: "destructive",
+        })
+      }
     } else {
       toast({
         title: "Profile Complete!",
