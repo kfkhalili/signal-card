@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 
 export const homeMetadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000",
+  ),
   title: "Tickered - Financial Data Visualization & Analysis Platform",
   description:
     "Transform complex financial data into interactive, digestible experiences. Spot trends, see moves, and build your unique collection of market insights with our innovative card-based system.",
@@ -22,7 +25,7 @@ export const homeMetadata: Metadata = {
     description:
       "Transform complex financial data into interactive, digestible experiences. Spot trends, see moves, and build your unique collection of market insights.",
     type: "website",
-    url: "https://www.tickered.com",
+    url: process.env.NEXT_PUBLIC_BASE_URL || "https://www.tickered.com",
     siteName: "Tickered",
     images: [
       {
@@ -54,7 +57,7 @@ export function generateStructuredData(metadata: Metadata): string {
     "@type": "WebApplication",
     name: metadata.title,
     description: metadata.description,
-    url: "https://www.tickered.com",
+    url: process.env.NEXT_PUBLIC_BASE_URL || "https://www.tickered.com",
     applicationCategory: "Finance",
     operatingSystem: "All",
     browserRequirements: "Requires modern browser",
