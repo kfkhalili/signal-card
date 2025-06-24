@@ -77,8 +77,25 @@ export default function CompleteProfilePage() {
         title: "Profile Complete!",
         description: "Welcome! Your profile has been set up.",
       })
-      router.push('/workspace') // or router.push('/')
-      router.refresh() // To ensure header gets updated profile info
+
+      // Verify the profile was actually updated before redirecting
+      const { data: verifyProfile } = await supabase
+        .from('user_profiles')
+        .select('is_profile_complete')
+        .eq('id', user.id)
+        .single()
+
+      if (verifyProfile?.is_profile_complete) {
+        router.push('/workspace') // or router.push('/')
+        router.refresh() // To ensure header gets updated profile info
+      } else {
+        // If verification failed, show error and let user try again
+        toast({
+          title: "Profile update verification failed",
+          description: "Please try clicking Continue again.",
+          variant: "destructive",
+        })
+      }
     }
 
     setLoading(false)
