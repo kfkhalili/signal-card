@@ -6,7 +6,7 @@ import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { AlertTriangle } from "lucide-react"; // For displaying an error
+import { AlertTriangle } from "lucide-react";
 
 type AuthViewType =
   | "sign_in"
@@ -16,8 +16,7 @@ type AuthViewType =
   | "magic_link";
 
 export default function AuthForm() {
-  // supabase can now be SupabaseClient | null
-  const supabase = createSupabaseBrowserClient(false); // Pass false to prevent throwing
+  const supabase = createSupabaseBrowserClient(false);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -26,8 +25,6 @@ export default function AuthForm() {
 
   useEffect(() => {
     const currentHash = window.location.hash;
-    // Development console.debug calls removed for brevity as per user preference
-    // but can be re-added if needed for debugging.
 
     let newView: AuthViewType = "sign_in";
     if (currentHash === "#auth-sign-up") {
@@ -59,7 +56,6 @@ export default function AuthForm() {
   }, []);
 
   useEffect(() => {
-    // If supabase client is null, auth features are unavailable.
     if (!supabase) {
       console.warn(
         "[AuthForm] Supabase client is not initialized. Auth listeners and session checks skipped."
@@ -76,11 +72,10 @@ export default function AuthForm() {
     });
 
     const checkSession = async () => {
-      // Ensure supabase is not null before calling getUser
       if (supabase) {
         const {
           data: { user },
-        } = await supabase.auth.getUser(); // Destructure user from data
+        } = await supabase.auth.getUser();
         if (user) {
           const nextUrl = searchParams.get("next") || "/";
           router.push(nextUrl);
@@ -98,8 +93,6 @@ export default function AuthForm() {
     };
   }, [supabase, router, searchParams]);
 
-  // If Supabase client failed to initialize (e.g., missing env vars client-side)
-  // display an error message instead of the Auth UI.
   if (!supabase) {
     return (
       <div className="flex flex-col items-center justify-center text-center p-4">
@@ -115,11 +108,10 @@ export default function AuthForm() {
     );
   }
 
-  // supabase is guaranteed to be non-null here, so we can pass it to Auth component
   return (
     <Auth
       key={authView}
-      supabaseClient={supabase} // Now correctly expects and receives a non-null client
+      supabaseClient={supabase}
       appearance={{
         theme: ThemeSupa,
         variables: {
@@ -133,7 +125,7 @@ export default function AuthForm() {
         },
       }}
       view={authView}
-      providers={[]}
+      providers={['google']}
       redirectTo={`${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`}
       localization={{
         variables: {
@@ -150,6 +142,9 @@ export default function AuthForm() {
             link_text: "New here? Create an account",
           },
         },
+      }}
+      queryParams={{
+        hl: 'en',
       }}
     />
   );
