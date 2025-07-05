@@ -146,12 +146,15 @@ export const RevenueBreakdownCardContent: React.FC<RevenueBreakdownCardContentPr
     }) => {
       const { staticData, liveData, symbol, id } = cardData;
 
+      const generateItemId = (label: string) =>
+        `${id}-${label.toLowerCase().replace(/\s|\//g, "-")}`;
+
       const isSelected = (itemId: string) =>
         selectedDataItems.some((item) => item.id === itemId);
 
       const onSelect = (item: Omit<SelectedDataItem, "id">) => {
         const fullItem: SelectedDataItem = {
-          id: `${id}-${item.label.toLowerCase().replace(/\s|\//g, "-")}`,
+          id: generateItemId(item.label),
           ...item,
         };
         onToggleItemSelection(fullItem);
@@ -221,12 +224,12 @@ export const RevenueBreakdownCardContent: React.FC<RevenueBreakdownCardContentPr
           (sum, seg) => sum + (seg.previousRevenue ?? 0),
           0
         );
-        const anyPreviousRevenueExistsForOthers = otherSegments.some(
+        const previousRevenueExistsForOthers = otherSegments.some(
           (seg) => seg.previousRevenue !== null
         );
 
         let yoyChangeForOthers: number | null = null;
-        if (anyPreviousRevenueExistsForOthers && othersPreviousRevenueSum > 0) {
+        if (previousRevenueExistsForOthers && othersPreviousRevenueSum > 0) {
           yoyChangeForOthers =
             (othersCurrentRevenue - othersPreviousRevenueSum) /
             othersPreviousRevenueSum;
@@ -235,7 +238,7 @@ export const RevenueBreakdownCardContent: React.FC<RevenueBreakdownCardContentPr
         othersData = {
           segmentName: "Others",
           currentRevenue: othersCurrentRevenue,
-          previousRevenue: anyPreviousRevenueExistsForOthers
+          previousRevenue: previousRevenueExistsForOthers
             ? othersPreviousRevenueSum
             : null,
           yoyChange: yoyChangeForOthers,
@@ -257,7 +260,11 @@ export const RevenueBreakdownCardContent: React.FC<RevenueBreakdownCardContentPr
                 className={cn(
                   "flex justify-between items-baseline mb-1.5 p-1 rounded-md transition-colors",
                   isSelectionMode && "hover:bg-primary/10 cursor-pointer",
-                  isSelected(`${id}-total-revenue`) && "bg-primary/20"
+                  isSelected(
+                    generateItemId(
+                      `Total Revenue (${staticData.latestPeriodLabel})`
+                    )
+                  ) && "bg-primary/20"
                 )}
                 onClick={
                   isSelectionMode
@@ -289,28 +296,32 @@ export const RevenueBreakdownCardContent: React.FC<RevenueBreakdownCardContentPr
               </div>
               <div className="flex-grow space-y-0.5 overflow-y-auto pr-0.5">
                 {displayItems.length > 0 ? (
-                  displayItems.map((item) => (
-                    <SegmentRow
-                      key={item.segmentName}
-                      segmentName={item.segmentName}
-                      currentRevenue={item.currentRevenue}
-                      yoyChange={item.yoyChange}
-                      currencySymbol={staticData.currencySymbol}
-                      isInteractive={isSelectionMode} // A segment row is only interactive in selection mode
-                      isSelectionMode={isSelectionMode}
-                      isSelected={isSelected(`${id}-${item.segmentName}`)}
-                      onSelect={() =>
-                        onSelect({
-                          sourceCardId: id,
-                          sourceCardSymbol: symbol,
-                          label: `${item.segmentName} Revenue`,
-                          value: item.currentRevenue,
-                          isMonetary: true,
-                          currency: staticData.currencySymbol,
-                        })
-                      }
-                    />
-                  ))
+                  displayItems.map((item) => {
+                    const itemLabel = `${item.segmentName} Revenue`;
+                    const itemId = generateItemId(itemLabel);
+                    return (
+                      <SegmentRow
+                        key={item.segmentName}
+                        segmentName={item.segmentName}
+                        currentRevenue={item.currentRevenue}
+                        yoyChange={item.yoyChange}
+                        currencySymbol={staticData.currencySymbol}
+                        isInteractive={isSelectionMode} // A segment row is only interactive in selection mode
+                        isSelectionMode={isSelectionMode}
+                        isSelected={isSelected(itemId)}
+                        onSelect={() =>
+                          onSelect({
+                            sourceCardId: id,
+                            sourceCardSymbol: symbol,
+                            label: itemLabel,
+                            value: item.currentRevenue,
+                            isMonetary: true,
+                            currency: staticData.currencySymbol,
+                          })
+                        }
+                      />
+                    );
+                  })
                 ) : (
                   <p className="text-sm text-muted-foreground text-center py-4">
                     No breakdown data available.

@@ -72,33 +72,18 @@ export default function CompleteProfilePage() {
           variant: "destructive",
         })
       }
+      setLoading(false)
     } else {
       toast({
         title: "Profile Complete!",
         description: "Welcome! Your profile has been set up.",
       })
 
-      // Verify the profile was actually updated before redirecting
-      const { data: verifyProfile } = await supabase
-        .from('user_profiles')
-        .select('is_profile_complete')
-        .eq('id', user.id)
-        .single()
-
-      if (verifyProfile?.is_profile_complete) {
-        router.push('/workspace') // or router.push('/')
-        router.refresh() // To ensure header gets updated profile info
-      } else {
-        // If verification failed, show error and let user try again
-        toast({
-          title: "Profile update verification failed",
-          description: "Please try clicking Continue again.",
-          variant: "destructive",
-        })
-      }
+      // Navigate to workspace - middleware will handle any profile completion checks
+      router.push('/workspace')
+      router.refresh() // To ensure header gets updated profile info
+      // Keep loading state active during navigation
     }
-
-    setLoading(false)
   }
 
   if (loading || !user) {
