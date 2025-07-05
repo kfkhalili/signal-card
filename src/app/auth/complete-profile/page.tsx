@@ -72,16 +72,18 @@ export default function CompleteProfilePage() {
           variant: "destructive",
         })
       }
+      setLoading(false)
     } else {
       toast({
         title: "Profile Complete!",
         description: "Welcome! Your profile has been set up.",
       })
-      router.push('/workspace') // or router.push('/')
-      router.refresh() // To ensure header gets updated profile info
-    }
 
-    setLoading(false)
+      // Navigate to workspace - middleware will handle any profile completion checks
+      router.push('/workspace')
+      router.refresh() // To ensure header gets updated profile info
+      // Keep loading state active during navigation
+    }
   }
 
   if (loading || !user) {

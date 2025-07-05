@@ -809,6 +809,7 @@ export type Database = {
           avatar_url: string | null
           full_name: string | null
           id: string
+          is_profile_complete: boolean
           updated_at: string | null
           username: string | null
         }
@@ -816,6 +817,7 @@ export type Database = {
           avatar_url?: string | null
           full_name?: string | null
           id: string
+          is_profile_complete?: boolean
           updated_at?: string | null
           username?: string | null
         }
@@ -823,6 +825,7 @@ export type Database = {
           avatar_url?: string | null
           full_name?: string | null
           id?: string
+          is_profile_complete?: boolean
           updated_at?: string | null
           username?: string | null
         }
@@ -833,6 +836,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      handle_user_created_webhook: {
+        Args: { user_data: Json }
+        Returns: Json
+      }
       upsert_profile: {
         Args: { profile_data: Json }
         Returns: undefined
