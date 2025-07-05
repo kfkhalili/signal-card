@@ -125,7 +125,7 @@ export default function AuthForm() {
         },
       }}
       view={authView}
-      providers={['google']}
+      providers={["google"]}
       redirectTo={`${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`}
       localization={{
         variables: {
@@ -144,7 +144,7 @@ export default function AuthForm() {
         },
       }}
       queryParams={{
-        hl: 'en',
+        hl: "en",
       }}
     />
   );
