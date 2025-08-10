@@ -171,25 +171,25 @@ export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
           className="pointer-events-auto flex flex-col h-full">
           <ShadCardContent className={cn("p-0 flex-grow text-xs")}>
             <div className="pt-1.5 space-y-2">
-              {liveData.currentOutstandingShares ||
+              {liveData.weightedAverageShsOut ||
               liveData.outstandingShares_annual_data?.some(
                 (d) => d.value !== 0
               ) ? (
                 <MetricDisplayWithChart
-                  label="Outstanding Shares"
-                  currentValue={liveData.currentOutstandingShares}
+                  label="Basic Average Shares"
+                  currentValue={liveData.weightedAverageShsOut}
                   annualData={liveData.outstandingShares_annual_data}
                   isMonetary={false}
                   data-testid="outstanding-shares-metric-back"
-                  tooltip="Common shares outstanding"
+                  tooltip="Number of shares"
                   isSelectionMode={isSelectionMode}
-                  isSelected={isSelected(`${id}-outstanding-shares`)}
+                  isSelected={isSelected(`${id}-avg-shares-out`)}
                   onSelect={() =>
                     onSelect({
                       sourceCardId: id,
                       sourceCardSymbol: symbol,
-                      label: "Outstanding Shares",
-                      value: liveData.currentOutstandingShares,
+                      label: "Basic Avg. Shares",
+                      value: liveData.weightedAverageShsOut,
                     })
                   }
                 />

@@ -1,6 +1,13 @@
 // src/components/game/cards/cash-use-card/cash-use-card.types.ts
 import type { BaseCardData } from "../base-card/base-card.types";
 
+export interface CashUseCardFmpIncomeStatementData {
+    readonly weightedAverageShsOut?: number | null;
+    readonly date?: string;
+    readonly period?: string;
+    readonly reportedCurrency?: string | null;
+}
+
 export interface CashUseCardFmpBalanceSheetData {
   readonly totalDebt?: number | null;
   readonly commonStock?: number | null;
@@ -29,7 +36,7 @@ export interface CashUseCardStaticData {
 }
 
 export interface CashUseCardLiveData {
-  readonly currentOutstandingShares: number | null;
+  readonly weightedAverageShsOut: number | null;
   readonly outstandingShares_annual_data: readonly AnnualDataPoint[];
   readonly currentTotalDebt: number | null;
   readonly totalDebt_annual_data: readonly AnnualDataPoint[];

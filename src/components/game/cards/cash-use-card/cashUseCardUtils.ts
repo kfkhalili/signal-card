@@ -143,7 +143,7 @@ function constructCashUseCardData(
   };
 
   const liveData: CashUseCardLiveData = {
-    currentOutstandingShares: sharesData.latest,
+    weightedAverageShsOut: sharesData.latest,
     outstandingShares_annual_data: sharesData.annualData,
     currentTotalDebt: totalDebtData.latest,
     totalDebt_annual_data: totalDebtData.annualData,
@@ -225,7 +225,7 @@ async function fetchAndProcessCashUseData(
     supabase
       .from("financial_statements")
       .select(
-        "date, period, fiscal_year, reported_currency, balance_sheet_payload, cash_flow_payload"
+        "date, period, fiscal_year, reported_currency, balance_sheet_payload, cash_flow_payload, income_statement_payload"
       )
       .eq("symbol", symbol)
       .order("date", { ascending: false })
@@ -245,9 +245,9 @@ async function fetchAndProcessCashUseData(
     date: fs.date,
     period: fs.period ?? undefined,
     fiscal_year: fs.fiscal_year ?? undefined,
-    commonStock_value: safeJsonParseWithField<number | null>(
-      fs.balance_sheet_payload,
-      "commonStock",
+    weightedAverageShsOut_value: safeJsonParseWithField<number | null>(
+      fs.income_statement_payload,
+      "weightedAverageShsOut",
       null
     ),
   }));
@@ -287,7 +287,7 @@ async function fetchAndProcessCashUseData(
 
   const sharesData = processFinancialRecords(
     sharesRecords,
-    "commonStock_value"
+    "weightedAverageShsOut_value"
   );
   const totalDebtData = processFinancialRecords(debtRecords, "totalDebt_value");
   const freeCashFlowData = processFinancialRecords(
@@ -371,9 +371,9 @@ const handleCashUseCardFinancialStatementUpdate: CardUpdateHandler<
   _currentDisplayableCard,
   context
 ): CashUseCardData => {
-  const newCommonStock = safeJsonParseWithField<number | null>(
-    newFinancialStatementRow.balance_sheet_payload,
-    "commonStock",
+  const newWeightedAverageShsOut = safeJsonParseWithField<number | null>(
+    newFinancialStatementRow.income_statement_payload,
+    "weightedAverageShsOut",
     null
   );
   const newTotalDebt = safeJsonParseWithField<number | null>(
@@ -423,10 +423,10 @@ const handleCashUseCardFinancialStatementUpdate: CardUpdateHandler<
 
     if (periodIsSameOrNewer) {
       if (
-        newCommonStock !== null &&
-        updatedLiveData.currentOutstandingShares !== newCommonStock
+        newWeightedAverageShsOut !== null &&
+        updatedLiveData.weightedAverageShsOut !== newWeightedAverageShsOut
       ) {
-        updatedLiveData.currentOutstandingShares = newCommonStock;
+        updatedLiveData.weightedAverageShsOut = newWeightedAverageShsOut;
         hasChanged = true;
       }
       if (

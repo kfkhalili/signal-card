@@ -41,7 +41,7 @@ const mockStaticData: CashUseCardData["staticData"] = {
 };
 
 const mockLiveData: CashUseCardData["liveData"] = {
-  currentOutstandingShares: 4100000000,
+  weightedAverageShsOut: 4100000000,
   outstandingShares_annual_data: [
     { year: 2019, value: 4300000000 },
     { year: 2020, value: 4250000000 },
@@ -150,7 +150,7 @@ const minimalInitialMockData: CashUseCardData & DisplayableCardState = {
     latestStatementPeriod: null,
   },
   liveData: {
-    currentOutstandingShares: 1000000,
+    weightedAverageShsOut: 1000000,
     outstandingShares_annual_data: [
       { year: 2022, value: 1200000 },
       { year: 2023, value: 1000000 },

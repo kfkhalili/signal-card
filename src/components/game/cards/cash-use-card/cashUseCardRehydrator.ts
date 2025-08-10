@@ -24,7 +24,7 @@ interface StoredCashUseCardStaticDataShape {
 }
 
 interface StoredCashUseCardLiveDataShape {
-  currentOutstandingShares?: number | null;
+  weightedAverageShsOut?: number | null;
   outstandingShares_annual_data?: readonly StoredAnnualDataPoint[];
   currentTotalDebt?: number | null;
   totalDebt_annual_data?: readonly StoredAnnualDataPoint[];
@@ -69,7 +69,7 @@ const rehydrateCashUseCardInstance: SpecificCardRehydrator = (
       .filter((p) => p.year > 0);
 
   const rehydratedLiveData: CashUseCardLiveData = {
-    currentOutstandingShares: liveDataSource.currentOutstandingShares ?? null,
+    weightedAverageShsOut: liveDataSource.weightedAverageShsOut ?? null,
     outstandingShares_annual_data: rehydrateAnnualData(
       liveDataSource.outstandingShares_annual_data
     ),
