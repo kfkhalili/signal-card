@@ -1,4 +1,5 @@
 // src/lib/formatters.ts
+import { convertToUsd } from "./utils";
 
 /**
  * Formats a number into a string with abbreviations (K, M, B, T) for thousands, millions, billions, trillions.
@@ -111,19 +112,22 @@ export function getCurrencySymbol(
  * @param value The numeric value to format.
  * @param currencyCode The ISO 4217 currency code.
  * @param decimals The number of decimal places for abbreviations. Default is 2.
+ * @param rates Optional exchange rates map for conversion to USD.
  * @returns Formatted financial string (e.g., "$1.23M", "€100K") or 'N/A'.
  */
 export function formatFinancialValue(
   value: number | null | undefined,
   currencyCode: string | null | undefined,
-  decimals = 2
+  decimals = 2,
+  rates?: Record<string, number>
 ): string {
   if (value === null || typeof value === "undefined" || isNaN(value)) {
     return "N/A";
   }
 
-  const symbol = getCurrencySymbol(currencyCode);
-  const abbreviatedValue = formatNumberWithAbbreviations(value, decimals);
+  const convertedValue = rates ? convertToUsd(value, currencyCode, rates) : value;
+  const symbol = "$"; // Always USD
+  const abbreviatedValue = formatNumberWithAbbreviations(convertedValue, decimals);
 
   if (abbreviatedValue === "N/A") return "N/A";
 

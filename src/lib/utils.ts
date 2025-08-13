@@ -48,6 +48,24 @@ export function safeJsonParse<T>(text: string): Result<T, Error> {
   }
 }
 
+export function convertToUsd(
+  value: number | null | undefined,
+  sourceCurrency: string | null | undefined,
+  rates: Record<string, number>
+): number | null {
+  if (value === null || value === undefined || !sourceCurrency) {
+    return null;
+  }
+  if (sourceCurrency === "USD") {
+    return value;
+  }
+  const rate = rates[sourceCurrency];
+  if (rate) {
+    return value / rate;
+  }
+  return null;
+}
+
 export const createSecureImageUrl = (
   storageUrl: string | null | undefined
 ): string => {
