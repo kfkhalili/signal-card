@@ -125,6 +125,7 @@ export function formatFinancialValue(
     return "N/A";
   }
 
+  console.log("currencyCode", currencyCode)
   const convertedValue = rates ? convertToUsd(value, currencyCode, rates) : value;
   const symbol = getCurrencySymbol(rates ? "USD" : currencyCode);
   const abbreviatedValue = formatNumberWithAbbreviations(convertedValue, decimals);
