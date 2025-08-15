@@ -233,86 +233,71 @@ async function initializeProfileCard({
     priceToBookRatioTTM: null,
   };
 
-  const initialQuoteResult = await fromPromise(
-    supabase
-      .from("live_quote_indicators")
-      .select("current_price, market_cap")
-      .eq("symbol", symbol)
-      .order("api_timestamp", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    (e) => new ProfileCardError((e as Error).message)
-  );
+  const [quoteResult, fsResult, ratiosResult] = await Promise.all([
+    fromPromise(
+      supabase
+        .from("live_quote_indicators")
+        .select("current_price, market_cap")
+        .eq("symbol", symbol)
+        .order("api_timestamp", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      (e) => new ProfileCardError((e as Error).message)
+    ),
+    fromPromise(
+      supabase
+        .from("financial_statements")
+        .select("income_statement_payload, period, date, reported_currency")
+        .eq("symbol", symbol)
+        .order("date", { ascending: false })
+        .order("period", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      (e) => new ProfileCardError((e as Error).message)
+    ),
+    fromPromise(
+      supabase
+        .from("ratios_ttm")
+        .select(
+          "price_to_earnings_ratio_ttm, net_income_per_share_ttm, price_to_book_ratio_ttm"
+        )
+        .eq("symbol", symbol)
+        .maybeSingle(),
+      (e) => new ProfileCardError((e as Error).message)
+    ),
+  ]);
 
-  if (initialQuoteResult.isOk() && initialQuoteResult.value.data) {
-    const newQuoteData = createProfileCardLiveData(
-      initialQuoteResult.value.data,
-      null,
-      null,
-      liveDataForCard
-    );
-    liveDataForCard = { ...liveDataForCard, ...newQuoteData };
-  } else if (initialQuoteResult.isErr()) {
+  if (quoteResult.isErr()) {
     console.warn(
-      `[ProfileCard] Could not fetch initial quote: ${initialQuoteResult.error.message}`
+      `[ProfileCard] Could not fetch initial quote: ${quoteResult.error.message}`
     );
   }
 
-  const fsResult = await fromPromise(
-    supabase
-      .from("financial_statements")
-      .select("income_statement_payload, period, date, reported_currency")
-      .eq("symbol", symbol)
-      .order("date", { ascending: false })
-      .order("period", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    (e) => new ProfileCardError((e as Error).message)
-  );
-
-  if (fsResult.isOk() && fsResult.value.data) {
-    const statement = fsResult.value.data as ProfileFinancialStatementSource;
-    const newFSData = createProfileCardLiveData(
-      null,
-      fsResult.value.data as ProfileFinancialStatementSource,
-      null,
-      liveDataForCard
-    );
-    liveDataForCard = {
-      ...liveDataForCard,
-      ...newFSData,
-      financialsCurrency: statement.reported_currency ?? null,
-    }
-  } else if (fsResult.isErr()) {
+  if (fsResult.isErr()) {
     console.warn(
       `[ProfileCard] Could not fetch financial statement: ${fsResult.error.message}`
     );
   }
-
-  const ratiosResult = await fromPromise(
-    supabase
-      .from("ratios_ttm")
-      .select(
-        "price_to_earnings_ratio_ttm, net_income_per_share_ttm, price_to_book_ratio_ttm"
-      )
-      .eq("symbol", symbol)
-      .maybeSingle(),
-    (e) => new ProfileCardError((e as Error).message)
-  );
-
-  if (ratiosResult.isOk() && ratiosResult.value.data) {
-    const newRatiosData = createProfileCardLiveData(
-      null,
-      null,
-      ratiosResult.value.data,
-      liveDataForCard
-    );
-    liveDataForCard = { ...liveDataForCard, ...newRatiosData };
-  } else if (ratiosResult.isErr()) {
+  if (ratiosResult.isErr()) {
     console.warn(
       `[ProfileCard] Could not fetch TTM ratios: ${ratiosResult.error.message}`
     );
   }
+
+  const quoteData =
+    quoteResult.isOk() && quoteResult.value.data ? quoteResult.value.data : null;
+  const statementData =
+    fsResult.isOk() && fsResult.value.data ? fsResult.value.data : null;
+  const ratiosData =
+    ratiosResult.isOk() && ratiosResult.value.data
+      ? ratiosResult.value.data
+      : null;
+
+  liveDataForCard = {
+    ...liveDataForCard,
+    ...createProfileCardLiveData(quoteData, statementData, ratiosData, liveDataForCard),
+    financialsCurrency: statementData?.reported_currency ?? null,
+  };
 
   const displayableCard = createDisplayableProfileCardFromDB(
     profileData,
