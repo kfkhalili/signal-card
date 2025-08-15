@@ -12,6 +12,7 @@ import { DataRow } from "@/components/ui/DataRow";
 import { formatFinancialValue } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import type { SelectedDataItem } from "@/hooks/useWorkspaceManager";
+import { useExchangeRate } from "@/hooks/useExchangeRate";
 
 interface SolvencyCardContentProps {
   cardData: SolvencyCardData;
@@ -36,6 +37,7 @@ export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
     }) => {
       const { staticData, liveData, symbol, id, type: cardType } = cardData;
       const currencyCode = staticData.reportedCurrency;
+      const exchangeRates = useExchangeRate();
 
       const handleInteraction = (
         intent: InteractionPayload["intent"],
@@ -212,7 +214,9 @@ export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
                   label="Total Assets"
                   value={formatFinancialValue(
                     liveData.totalAssets,
-                    currencyCode
+                    currencyCode,
+                    2,
+                    exchangeRates
                   )}
                   className="mb-0.5"
                   labelClassName="text-sm font-medium text-muted-foreground"
@@ -245,7 +249,9 @@ export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
                   label="Cash"
                   value={formatFinancialValue(
                     liveData.cashAndShortTermInvestments,
-                    currencyCode
+                    currencyCode,
+                    2,
+                    exchangeRates
                   )}
                   tooltip="includes short-term investments"
                   labelClassName="text-sm font-medium text-muted-foreground"
@@ -278,7 +284,9 @@ export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
                   label="Liabilities"
                   value={formatFinancialValue(
                     liveData.totalCurrentLiabilities,
-                    currencyCode
+                    currencyCode,
+                    2,
+                    exchangeRates
                   )}
                   labelClassName="text-sm font-medium text-muted-foreground"
                   valueClassName="text-sm font-semibold text-foreground"
@@ -310,7 +318,9 @@ export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
                   label="Short-Term Debt"
                   value={formatFinancialValue(
                     liveData.shortTermDebt,
-                    currencyCode
+                    currencyCode,
+                    2,
+                    exchangeRates
                   )}
                   labelClassName="text-sm font-medium text-muted-foreground"
                   valueClassName="text-sm font-semibold text-foreground"
@@ -342,7 +352,9 @@ export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
                   label="Long-Term Debt"
                   value={formatFinancialValue(
                     liveData.longTermDebt,
-                    currencyCode
+                    currencyCode,
+                    2,
+                    exchangeRates
                   )}
                   labelClassName="text-sm font-medium text-muted-foreground"
                   valueClassName="text-sm font-semibold text-foreground"
@@ -374,7 +386,9 @@ export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
                   label="Free Cash Flow"
                   value={formatFinancialValue(
                     liveData.freeCashFlow,
-                    currencyCode
+                    currencyCode,
+                    2,
+                    exchangeRates
                   )}
                   labelClassName="text-sm font-medium text-muted-foreground"
                   valueClassName="text-sm font-semibold text-foreground"

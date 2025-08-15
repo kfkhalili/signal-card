@@ -164,3 +164,19 @@ SELECT
       ) AS request_id;
     $$
   );
+
+  SELECT
+  cron.schedule(
+    'daily-fetch-exchange-rates',
+    '0 1 * * *', -- Every day at 1:00 AM UTC
+    $$
+    SELECT
+      net.http_post(
+          url := current_setting('supabase.functions.url') || '/fetch-exchange-rates',
+          headers := jsonb_build_object(
+            'Content-Type', 'application/json',
+            'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'supabase_service_role_key')
+          )
+      ) AS request_id;
+    $$
+  );

@@ -3,7 +3,7 @@ import React from "react";
 import { CardContent as ShadCardContent } from "@/components/ui/card";
 import type { CashUseCardData, AnnualDataPoint } from "./cash-use-card.types";
 import { cn } from "@/lib/utils";
-import { formatNumberWithAbbreviations } from "@/lib/formatters";
+import { formatFinancialValue } from "@/lib/formatters";
 import { ClickableDataItem } from "@/components/ui/ClickableDataItem";
 import { LineChartComponent } from "@/components/ui/LineChart";
 import type {
@@ -16,6 +16,7 @@ import {
   CheckboxCheckedIcon,
   CheckboxUncheckedIcon,
 } from "@/components/ui/CheckboxIcons";
+import { useExchangeRate } from "@/hooks/useExchangeRate";
 
 interface MetricDisplayWithChartProps {
   label: string;
@@ -29,6 +30,7 @@ interface MetricDisplayWithChartProps {
   isSelectionMode?: boolean;
   isSelected?: boolean;
   onSelect?: () => void;
+  exchangeRates: Record<string, number>;
 }
 
 const MetricDisplayWithChart: React.FC<MetricDisplayWithChartProps> = ({
@@ -43,17 +45,14 @@ const MetricDisplayWithChart: React.FC<MetricDisplayWithChartProps> = ({
   isSelectionMode,
   isSelected,
   onSelect,
+  exchangeRates,
 }) => {
-  const displayCurrencySymbol =
-    currency === "USD" ? "$" : currency || (isMonetary ? "$" : "");
   const formattedValue =
     currentValue === null ||
     currentValue === undefined ||
     Number.isNaN(currentValue)
       ? "N/A"
-      : `${
-          isMonetary ? displayCurrencySymbol : ""
-        }${formatNumberWithAbbreviations(currentValue, 2)}`;
+      : formatFinancialValue(currentValue, currency, 2, exchangeRates);
 
   const title = tooltip
     ? `${label}: ${formattedValue} (${tooltip})`
@@ -108,7 +107,7 @@ const MetricDisplayWithChart: React.FC<MetricDisplayWithChartProps> = ({
         data={chartData}
         xAxisKey="name"
         yAxisKey="value"
-        currencySymbol={isMonetary ? displayCurrencySymbol : ""}
+        currencySymbol={isMonetary ? "$" : ""}
       />
     </div>
   );
@@ -134,6 +133,7 @@ export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
   }) => {
     const { staticData, liveData, symbol, id, type: cardType } = cardData;
     const currency = staticData.reportedCurrency;
+    const exchangeRates = useExchangeRate();
 
     const handleInteraction = (
       intent: InteractionPayload["intent"],
@@ -192,6 +192,7 @@ export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
                       value: liveData.weightedAverageShsOut,
                     })
                   }
+                  exchangeRates={exchangeRates}
                 />
               ) : null}
 
@@ -224,6 +225,7 @@ export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
                       currency: currency,
                     })
                   }
+                  exchangeRates={exchangeRates}
                 />
               ) : null}
             </div>
@@ -265,6 +267,7 @@ export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
                       currency: currency,
                     })
                   }
+                  exchangeRates={exchangeRates}
                 />
               ) : null}
               {liveData.currentFreeCashFlow !== null ||
@@ -294,6 +297,7 @@ export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
                       currency: currency,
                     })
                   }
+                  exchangeRates={exchangeRates}
                 />
               ) : null}
             </div>

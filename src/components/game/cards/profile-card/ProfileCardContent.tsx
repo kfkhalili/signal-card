@@ -4,7 +4,7 @@ import { CardContent as ShadCardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { ProfileCardData } from "./profile-card.types";
 import { getFlagEmoji, getCountryName } from "@/lib/utils";
-import { formatNumberWithAbbreviations } from "@/lib/formatters";
+import { formatNumberWithAbbreviations, formatFinancialValue } from "@/lib/formatters";
 import { DataRow } from "@/components/ui/DataRow";
 import type {
   OnGenericInteraction,
@@ -15,6 +15,7 @@ import type {
 } from "../base-card/base-card.types";
 import { cn } from "@/lib/utils";
 import type { SelectedDataItem } from "@/hooks/useWorkspaceManager";
+import { useExchangeRate } from "@/hooks/useExchangeRate";
 
 const truncateText = (
   text: string | null | undefined,
@@ -46,6 +47,8 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
     onToggleItemSelection,
   }) => {
     const { staticData, liveData, symbol, id, type: cardType } = cardData;
+    console.log(liveData)
+    const exchangeRates = useExchangeRate();
 
     const handleInteraction = (
       intent: InteractionPayload["intent"],
@@ -204,8 +207,12 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                   liveData?.revenue !== undefined && (
                     <DataRow
                       label="Revenue (TTM)"
-                      value={formatNumberWithAbbreviations(liveData.revenue)}
-                      currency={staticData?.currency}
+                      value={formatFinancialValue(
+                        liveData.revenue,
+                        liveData.financialsCurrency ?? staticData?.currency,
+                        2,
+                        exchangeRates
+                      )}
                       isMonetary={true}
                       onClick={() =>
                         handleInteraction("REQUEST_NEW_CARD", {
@@ -213,9 +220,7 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                           originatingElement: "revenueDisplayTriggerProfile",
                         } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
                       }
-                      title={`Revenue (TTM): ${formatNumberWithAbbreviations(
-                        liveData.revenue
-                      )} ${staticData?.currency || ""}`}
+                      title={`Revenue (TTM): ${liveData.revenue.toLocaleString()} ${liveData.financialsCurrency ?? staticData?.currency ?? ""}`}
                       labelClassName="text-sm font-medium text-muted-foreground"
                       valueClassName="text-sm font-semibold text-foreground"
                       originatingElement="revenue-ttm-profile-item"
@@ -232,7 +237,7 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                           label: "Revenue (TTM)",
                           value: liveData.revenue,
                           isMonetary: true,
-                          currency: staticData?.currency,
+                          currency: liveData.financialsCurrency ?? staticData?.currency,
                         })
                       }
                     />
@@ -240,8 +245,12 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                 {liveData?.eps !== null && liveData?.eps !== undefined && (
                   <DataRow
                     label={`EPS (TTM)`}
-                    value={liveData.eps}
-                    currency={staticData?.currency}
+                    value={formatFinancialValue(
+                      liveData.eps,
+                      liveData.financialsCurrency ?? staticData?.currency,
+                      2,
+                      exchangeRates
+                    )}
                     isMonetary={true}
                     precision={2}
                     onClick={() =>
@@ -251,7 +260,7 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                       } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
                     }
                     title={`EPS (TTM): ${liveData.eps.toFixed(2)} ${
-                      staticData?.currency || ""
+                      liveData.financialsCurrency ?? staticData?.currency ?? ""
                     }`}
                     labelClassName="text-sm font-medium text-muted-foreground"
                     valueClassName="text-sm font-semibold text-foreground"
@@ -269,7 +278,7 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                         label: "EPS (TTM)",
                         value: liveData.eps,
                         isMonetary: true,
-                        currency: staticData?.currency,
+                        currency: liveData.financialsCurrency ?? staticData?.currency,
                       })
                     }
                   />
