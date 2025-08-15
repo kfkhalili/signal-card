@@ -125,10 +125,18 @@ export function formatFinancialValue(
     return "N/A";
   }
 
-  console.log("currencyCode", currencyCode)
-  const convertedValue = rates ? convertToUsd(value, currencyCode, rates) : value;
-  const symbol = getCurrencySymbol(rates ? "USD" : currencyCode);
-  const abbreviatedValue = formatNumberWithAbbreviations(convertedValue, decimals);
+  let valueToFormat: number | null = value;
+  let currencyToFormat = currencyCode;
+
+  if (rates && currencyCode !== "USD") {
+    const converted = convertToUsd(value, currencyCode, rates);
+    if (converted !== null) {
+      valueToFormat = converted;
+      currencyToFormat = "USD";
+    }
+  }
+  const symbol = getCurrencySymbol(currencyToFormat);
+  const abbreviatedValue = formatNumberWithAbbreviations(valueToFormat, decimals)
 
   if (abbreviatedValue === "N/A") return "N/A";
 

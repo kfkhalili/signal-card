@@ -461,25 +461,12 @@ const handleDividendsHistoryProfileUpdate: CardUpdateHandler<
     profilePayload
   );
 
-  let currencyChanged = false;
-  const newReportedCurrency = profilePayload.currency ?? null;
-  if (currentCardData.staticData.reportedCurrency !== newReportedCurrency) {
-    currencyChanged = true;
-  }
-
-  if (coreDataChanged || currencyChanged) {
-    const finalCardData = {
-      ...updatedCardData,
-      staticData: {
-        ...updatedCardData.staticData,
-        reportedCurrency: newReportedCurrency,
-      },
-    };
+  if (coreDataChanged) {
     const newBackDataDescription: BaseCardBackData = {
-      description: `Historical dividend payments and trends for ${finalCardData.companyName}, including recent payments and annual totals. Next year estimate based on latest payment.`,
+      description: `Historical dividend payments and trends for ${updatedCardData.companyName}, including recent payments and annual totals. Next year estimate based on latest payment.`,
     };
     return {
-      ...finalCardData,
+      ...updatedCardData,
       backData: newBackDataDescription,
     };
   }

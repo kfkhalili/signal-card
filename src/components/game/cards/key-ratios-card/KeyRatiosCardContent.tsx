@@ -11,6 +11,8 @@ import type { CardType } from "../base-card/base-card.types";
 import { DataRow } from "@/components/ui/DataRow";
 import { cn } from "@/lib/utils";
 import type { SelectedDataItem } from "@/hooks/useWorkspaceManager";
+import { useExchangeRate } from "@/hooks/useExchangeRate";
+import { formatFinancialValue } from "@/lib/formatters";
 
 interface KeyRatiosCardContentProps {
   cardData: KeyRatiosCardData;
@@ -32,6 +34,7 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
       onToggleItemSelection,
     }) => {
       const { staticData, liveData, symbol, id, type: cardType } = cardData;
+      const exchangeRates = useExchangeRate();
 
       const handleInteraction = (
         intent: InteractionPayload["intent"],
@@ -73,48 +76,58 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
         isMonetaryValue = false,
         labelClassName = "text-sm font-medium text-muted-foreground",
         valueClassName = "text-sm font-semibold text-foreground"
-      ) => (
-        <DataRow
-          label={label}
-          value={value && unit === "%" ? value * 100 : value}
-          unit={unit === "%" ? undefined : unit}
-          isValueAsPercentage={unit === "%"}
-          precision={precision}
-          tooltip={tooltip}
-          isMonetary={isMonetaryValue}
-          currency={isMonetaryValue ? staticData.reportedCurrency : undefined}
-          isInteractive={isSelectionMode || !!relatedCardType}
-          onClick={
-            relatedCardType
-              ? () =>
-                  handleInteraction("REQUEST_NEW_CARD", {
-                    targetCardType: relatedCardType,
-                    originatingElement: originatingElement || label,
-                  } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-              : undefined
-          }
-          labelClassName={labelClassName}
-          valueClassName={valueClassName}
-          isSelectionMode={isSelectionMode}
-          isSelected={isSelected(
-            `${id}-${label.toLowerCase().replace(/\s|\//g, "-")}`
-          )}
-          onSelect={() =>
-            onSelect({
-              sourceCardId: id,
-              sourceCardSymbol: symbol,
-              label: label,
-              value: value,
-              unit: unit,
-              isMonetary: isMonetaryValue,
-              currency: isMonetaryValue
-                ? staticData.reportedCurrency
-                : undefined,
-              isValueAsPercentage: unit === "%",
-            })
-          }
-        />
-      );
+      ) => {
+
+        return (
+          <DataRow
+            label={label}
+            value={isMonetaryValue
+                ? formatFinancialValue(
+                    value,
+                    staticData.reportedCurrency,
+                    precision,
+                    exchangeRates
+                )
+                : (value && unit === "%" ? value * 100 : value)}
+            unit={isMonetaryValue ? "" : unit === "%" ? undefined : unit}
+            isValueAsPercentage={!isMonetaryValue && unit === "%"}
+            precision={precision}
+            tooltip={tooltip}
+            isMonetary={isMonetaryValue}
+            currency={isMonetaryValue ? staticData.reportedCurrency : undefined}
+            isInteractive={isSelectionMode || !!relatedCardType}
+            onClick={
+              relatedCardType
+                ? () =>
+                    handleInteraction("REQUEST_NEW_CARD", {
+                      targetCardType: relatedCardType,
+                      originatingElement: originatingElement || label,
+                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                : undefined
+            }
+            labelClassName={labelClassName}
+            valueClassName={valueClassName}
+            isSelectionMode={isSelectionMode}
+            isSelected={isSelected(
+              `${id}-${label.toLowerCase().replace(/\s|\//g, "-")}`
+            )}
+            onSelect={() =>
+              onSelect({
+                sourceCardId: id,
+                sourceCardSymbol: symbol,
+                label: label,
+                value: value,
+                unit: unit,
+                isMonetary: isMonetaryValue,
+                currency: isMonetaryValue
+                  ? staticData.reportedCurrency
+                  : undefined,
+                isValueAsPercentage: unit === "%",
+              })
+            }
+          />
+        );
+      };
 
       if (isBackFace) {
         // ... Back face implementation remains the same

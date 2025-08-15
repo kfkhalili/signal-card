@@ -510,39 +510,22 @@ const handleCashUseCardProfileUpdate: CardUpdateHandler<
     profilePayload
   );
 
-  let currencyChanged = false;
-  const newReportedCurrency =
-    profilePayload.currency ??
-    currentCashUseCardData.staticData.reportedCurrency;
-  if (
-    currentCashUseCardData.staticData.reportedCurrency !== newReportedCurrency
-  ) {
-    currencyChanged = true;
-  }
-
-  if (coreDataChanged || currencyChanged) {
-    if (context.toast && coreDataChanged) {
+  if (coreDataChanged) {
+    if (context.toast) {
       context.toast({
         title: "Profile Info Updated",
         description: `Company details for ${currentCashUseCardData.symbol} card refreshed.`,
       });
     }
-    const finalCardData = {
-      ...updatedCardData,
-      staticData: {
-        ...updatedCardData.staticData,
-        reportedCurrency: newReportedCurrency,
-      },
-    };
 
     const newBackDataDescription = `Cash usage metrics for ${
-      finalCardData.companyName
+      updatedCardData.companyName
     }. Financial data from ${
-      finalCardData.staticData.latestStatementDate || "N/A"
-    } (${finalCardData.staticData.latestStatementPeriod || "N/A"}).`;
+      updatedCardData.staticData.latestStatementDate || "N/A"
+    } (${updatedCardData.staticData.latestStatementPeriod || "N/A"}).`;
 
     return {
-      ...finalCardData,
+      ...updatedCardData,
       backData: {
         description: newBackDataDescription,
       },

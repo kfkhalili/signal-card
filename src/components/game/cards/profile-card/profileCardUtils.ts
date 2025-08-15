@@ -43,6 +43,7 @@ interface ProfileCardFmpIncomeStatementPayload {
 
 interface ProfileFinancialStatementSource {
   income_statement_payload: Json | null;
+  reported_currency?: string | null;
 }
 
 function parseFmpIncomePayloadForProfile(
@@ -227,6 +228,7 @@ async function initializeProfileCard({
     marketCap: profileData.market_cap ?? null,
     revenue: null,
     eps: null,
+    financialsCurrency: null,
     priceToEarningsRatioTTM: null,
     priceToBookRatioTTM: null,
   };
@@ -243,12 +245,13 @@ async function initializeProfileCard({
   );
 
   if (initialQuoteResult.isOk() && initialQuoteResult.value.data) {
-    liveDataForCard = createProfileCardLiveData(
+    const newQuoteData = createProfileCardLiveData(
       initialQuoteResult.value.data,
       null,
       null,
       liveDataForCard
     );
+    liveDataForCard = { ...liveDataForCard, ...newQuoteData };
   } else if (initialQuoteResult.isErr()) {
     console.warn(
       `[ProfileCard] Could not fetch initial quote: ${initialQuoteResult.error.message}`
@@ -258,7 +261,7 @@ async function initializeProfileCard({
   const fsResult = await fromPromise(
     supabase
       .from("financial_statements")
-      .select("income_statement_payload, period, date")
+      .select("income_statement_payload, period, date, reported_currency")
       .eq("symbol", symbol)
       .order("date", { ascending: false })
       .order("period", { ascending: false })
@@ -268,12 +271,18 @@ async function initializeProfileCard({
   );
 
   if (fsResult.isOk() && fsResult.value.data) {
-    liveDataForCard = createProfileCardLiveData(
+    const statement = fsResult.value.data as ProfileFinancialStatementSource;
+    const newFSData = createProfileCardLiveData(
       null,
       fsResult.value.data as ProfileFinancialStatementSource,
       null,
       liveDataForCard
     );
+    liveDataForCard = {
+      ...liveDataForCard,
+      ...newFSData,
+      financialsCurrency: statement.reported_currency ?? null,
+    }
   } else if (fsResult.isErr()) {
     console.warn(
       `[ProfileCard] Could not fetch financial statement: ${fsResult.error.message}`
@@ -292,12 +301,13 @@ async function initializeProfileCard({
   );
 
   if (ratiosResult.isOk() && ratiosResult.value.data) {
-    liveDataForCard = createProfileCardLiveData(
+    const newRatiosData = createProfileCardLiveData(
       null,
       null,
       ratiosResult.value.data,
       liveDataForCard
     );
+    liveDataForCard = { ...liveDataForCard, ...newRatiosData };
   } else if (ratiosResult.isErr()) {
     console.warn(
       `[ProfileCard] Could not fetch TTM ratios: ${ratiosResult.error.message}`
@@ -375,6 +385,7 @@ const handleProfileCardFinancialStatementUpdate: CardUpdateHandler<
 ): ProfileCardData => {
   const statementSource: ProfileFinancialStatementSource = {
     income_statement_payload: financialStatementRow.income_statement_payload,
+    reported_currency: financialStatementRow.reported_currency,
   };
   const currentLiveDataReadOnly = { ...currentProfileCardData.liveData };
   const newLiveData = createProfileCardLiveData(
@@ -390,7 +401,10 @@ const handleProfileCardFinancialStatementUpdate: CardUpdateHandler<
         description: `TTM Revenue from statement ${financialStatementRow.date} (${financialStatementRow.period}) applied.`,
       });
     }
-    return { ...currentProfileCardData, liveData: newLiveData };
+    return {
+      ...currentProfileCardData,
+      liveData: { ...newLiveData, financialsCurrency: statementSource.reported_currency },
+    };
   }
   return currentProfileCardData;
 };
