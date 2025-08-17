@@ -8,3 +8,4 @@ SELECT cron.unschedule('quarterly-fetch-fmp-dividend-history');
 SELECT cron.unschedule('yearly-fetch-fmp-revenue-segmentation');
 SELECT cron.unschedule('yearly-fetch-fmp-grades-historical');
 SELECT cron.unschedule('daily-fetch-fmp-exchange-variants');
+SELECT cron.unschedule('daily-fetch-exchange-rates');

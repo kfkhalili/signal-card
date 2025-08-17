@@ -135,6 +135,10 @@ const rehydrateProfileCardInstance: SpecificCardRehydrator = (
       typeof liveDataFromStorage.eps === "number"
         ? liveDataFromStorage.eps
         : null,
+    financialsCurrency:
+      typeof liveDataFromStorage.financialsCurrency === "string"
+        ? liveDataFromStorage.financialsCurrency
+        : null,
     priceToEarningsRatioTTM:
       typeof liveDataFromStorage.priceToEarningsRatioTTM === "number"
         ? liveDataFromStorage.priceToEarningsRatioTTM

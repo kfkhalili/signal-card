@@ -33,6 +33,7 @@ export interface ProfileCardLiveData {
   marketCap?: number | null;
   revenue?: number | null; // TTM Revenue, if available from financial_statements
   eps?: number | null; // EPS TTM from ratios_ttm table
+  financialsCurrency?: string | null;
   priceToEarningsRatioTTM?: number | null; // From ratios_ttm
   priceToBookRatioTTM?: number | null; // From ratios_ttm
 }

@@ -63,15 +63,15 @@ function constructKeyRatiosCardData(
     displayCompanyName?: string | null;
     logoUrl?: string | null;
     websiteUrl?: string | null;
-    currency?: string | null;
   },
+  reportedCurrency: string | null,
   idOverride?: string | null,
   existingCreatedAt?: number | null
 ): KeyRatiosCardData {
   const liveData = mapDbRowToLiveData(dbRow);
   const staticData: KeyRatiosCardStaticData = {
     lastUpdated: dbRow.updated_at,
-    reportedCurrency: profileInfo.currency ?? null,
+    reportedCurrency: reportedCurrency,
   };
 
   const lastUpdatedDateString = staticData.lastUpdated
@@ -152,6 +152,28 @@ async function initializeKeyRatiosCard({
     }
   }
 
+  const fsResult = await fromPromise(
+    supabase
+      .from("financial_statements")
+      .select("reported_currency")
+      .eq("symbol", symbol)
+      .order("date", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    (e) =>
+      new KeyRatiosCardError(
+        `Financial statement fetch failed: ${(e as Error).message}`
+      )
+  );
+
+  let reportedCurrency: string | null = fetchedProfileInfo.currency ?? null;
+  if (fsResult.isOk() && fsResult.value.data) {
+    reportedCurrency =
+      fsResult.value.data.reported_currency ?? reportedCurrency;
+  } else if (fsResult.isErr()) {
+    console.warn(fsResult.error.message);
+  }
+
   const ratiosResult = await fromPromise(
     supabase.from("ratios_ttm").select("*").eq("symbol", symbol).single(),
     (e) => new KeyRatiosCardError((e as Error).message)
@@ -181,7 +203,8 @@ async function initializeKeyRatiosCard({
 
   const concreteCardData = constructKeyRatiosCardData(
     ratiosData as RatiosTtmDBRow,
-    fetchedProfileInfo
+    fetchedProfileInfo,
+    reportedCurrency
   );
   const cardState: Pick<DisplayableCardState, "isFlipped"> = {
     isFlipped: false,
@@ -251,28 +274,14 @@ const handleKeyRatiosProfileUpdate: CardUpdateHandler<
     profilePayload
   );
 
-  let currencyChanged = false;
-  const newCurrency = profilePayload.currency ?? null;
-  if (currentCardData.staticData.reportedCurrency !== newCurrency) {
-    currencyChanged = true;
-  }
-
-  if (coreDataChanged || currencyChanged) {
-    const finalCardData = {
-      ...updatedCardData,
-      staticData: {
-        ...updatedCardData.staticData,
-        reportedCurrency: newCurrency,
-      },
-    };
-
-    const lastUpdatedDateString = finalCardData.staticData.lastUpdated
-      ? new Date(finalCardData.staticData.lastUpdated).toLocaleDateString()
+  if (coreDataChanged) {
+    const lastUpdatedDateString = updatedCardData.staticData.lastUpdated
+      ? new Date(updatedCardData.staticData.lastUpdated).toLocaleDateString()
       : "N/A";
-    const newBackDataDescription = `Key Trailing Twelve Months (TTM) financial ratios for ${finalCardData.companyName}. Ratios last updated on ${lastUpdatedDateString}.`;
+    const newBackDataDescription = `Key Trailing Twelve Months (TTM) financial ratios for ${updatedCardData.companyName}. Ratios last updated on ${lastUpdatedDateString}.`;
 
     return {
-      ...finalCardData,
+      ...updatedCardData,
       backData: {
         description: newBackDataDescription,
       },
