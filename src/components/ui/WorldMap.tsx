@@ -1,7 +1,7 @@
 // src/components/ui/WorldMap.tsx
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { MapContainer, TileLayer, Marker, Tooltip } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -108,7 +108,9 @@ const locationCoordinates: Record<string, [number, number]> = {
 };
 
 // --- Main Component ---
-export const WorldMap: React.FC<WorldMapProps> = ({ markers, className }) => {
+export const WorldMap: React.FC<WorldMapProps> = React.memo(({ markers, className }) => {
+  const [map, setMap] = useState<L.Map | null>(null);
+
   const validMarkers = useMemo(
     () =>
       markers
@@ -123,23 +125,18 @@ export const WorldMap: React.FC<WorldMapProps> = ({ markers, className }) => {
     return L.latLngBounds(latLngs);
   }, [validMarkers]);
 
-  return (
-    <div
-      className={cn(
-        "w-full h-full bg-background rounded-lg border overflow-hidden",
-        className
-      )}>
-      <MapContainer
-        bounds={mapBounds}
-        boundsOptions={{ padding: [50, 50] }}
-        style={{
-          height: "100%",
-          width: "100%",
-          backgroundColor: "transparent",
-        }}
-        zoomControl={false}
-        scrollWheelZoom={true}
-        dragging={true}>
+  useEffect(() => {
+    if (map && mapBounds) {
+      map.fitBounds(mapBounds, { padding: [50, 50] });
+      // This can help if the map's container size changes during render
+      map.invalidateSize();
+    }
+  }, [map, mapBounds]);
+
+  // Memoize the layers to prevent re-creating them on every render
+  const displayLayers = useMemo(() => {
+    return (
+      <>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -157,7 +154,34 @@ export const WorldMap: React.FC<WorldMapProps> = ({ markers, className }) => {
             </Tooltip>
           </Marker>
         ))}
+      </>
+    );
+  }, [validMarkers]);
+
+  return (
+    <div
+      className={cn(
+        "w-full h-full bg-background rounded-lg border overflow-hidden",
+        className
+      )}>
+      <MapContainer
+        ref={setMap}
+        center={[20, 0]}
+        zoom={2}
+        bounds={mapBounds}
+        boundsOptions={{ padding: [50, 50] }}
+        style={{
+          height: "100%",
+          width: "100%",
+          backgroundColor: "transparent",
+        }}
+        zoomControl={false}
+        scrollWheelZoom={true}
+        dragging={true}>
+        {map ? displayLayers : null}
       </MapContainer>
     </div>
   );
-};
+});
+
+WorldMap.displayName = "WorldMap";

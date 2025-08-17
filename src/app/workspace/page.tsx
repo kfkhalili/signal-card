@@ -23,6 +23,7 @@ import {
   Edit,
   X,
   ArrowUpDown,
+  Undo2,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -68,6 +69,7 @@ export default function WorkspacePage() {
     createCustomStaticCard,
     sortConfig,
     setSortConfig,
+    onDragEnd,
   } = useWorkspaceManager();
 
   const [marketStatuses, setMarketStatuses] = useState<MarketStatus>({});
@@ -94,6 +96,10 @@ export default function WorkspacePage() {
   const handleSortChange = (value: string) => {
     const [key, order] = value.split("-");
     setSortConfig({ key, order } as SortConfig);
+  };
+
+  const resetSortToDefault = () => {
+    setSortConfig({ key: "createdAt", order: "desc" });
   };
 
   const handleCreateCustomCard = (narrative: string, description: string) => {
@@ -177,12 +183,21 @@ export default function WorkspacePage() {
                 <SelectItem value="symbol-desc">Symbol (Z-A)</SelectItem>
                 <SelectItem value="type-asc">Card Type (A-Z)</SelectItem>
                 <SelectItem value="type-desc">Card Type (Z-A)</SelectItem>
+                <SelectItem value="manual-asc" className="hidden">
+                  Manual
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div
             className="flex gap-2 items-center"
             style={{ minHeight: "32px" }}>
+            {sortConfig.key === "manual" && (
+              <Button variant="outline" size="sm" onClick={resetSortToDefault}>
+                <Undo2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                Reset Order
+              </Button>
+            )}
             <Button
               variant={isSelectionMode ? "destructive" : "outline"}
               size="sm"
@@ -280,6 +295,7 @@ export default function WorkspacePage() {
             isSelectionMode={isSelectionMode}
             selectedDataItems={selectedDataItems}
             onToggleItemSelection={handleToggleItemSelection}
+            onDragEnd={onDragEnd}
           />
         )}
       </div>

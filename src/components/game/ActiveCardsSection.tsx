@@ -7,12 +7,13 @@ import { ActiveCards as ActiveCardsPresentational } from "./ActiveCards";
 import { useToast as useAppToast } from "@/hooks/use-toast";
 import type { OnGenericInteraction } from "./cards/base-card/base-card.types";
 import type { SelectedDataItem } from "@/hooks/useWorkspaceManager";
+import { DragEndEvent } from "@dnd-kit/core";
 
 interface ActiveCardsSectionProps {
   activeCards: DisplayableCard[];
   setActiveCards: React.Dispatch<React.SetStateAction<DisplayableCard[]>>;
   onGenericInteraction: OnGenericInteraction;
-  // NEW PROPS
+  onDragEnd: (event: DragEndEvent) => void;
   isSelectionMode: boolean;
   selectedDataItems: SelectedDataItem[];
   onToggleItemSelection: (item: SelectedDataItem) => void;
@@ -22,7 +23,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
   activeCards,
   setActiveCards,
   onGenericInteraction,
-  // NEW PROPS
+  onDragEnd,
   isSelectionMode,
   selectedDataItems,
   onToggleItemSelection,
@@ -67,7 +68,7 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
         onGenericInteraction={onGenericInteraction}
         onConfirmDeletion={confirmDeletion}
         onCancelDeletion={cancelDeletion}
-        // NEW PROPS PASSED DOWN
+        onDragEnd={onDragEnd}
         isSelectionMode={isSelectionMode}
         selectedDataItems={selectedDataItems}
         onToggleItemSelection={onToggleItemSelection}
