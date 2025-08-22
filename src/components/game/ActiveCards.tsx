@@ -1,11 +1,27 @@
 // src/components/game/ActiveCards.tsx
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import GameCard from "@/components/game/GameCard";
 import type { DisplayableCard } from "./types";
 import type { OnGenericInteraction } from "./cards/base-card/base-card.types";
 import type { SelectedDataItem } from "@/hooks/useWorkspaceManager";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 import {
   AlertDialog,
@@ -17,6 +33,41 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useDndStore } from "@/stores/dndStore";
+
+const SortableGameCard = ({
+  card,
+  ...props
+}: { card: DisplayableCard } & Omit<
+  React.ComponentProps<typeof GameCard>,
+  "card"
+>) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: card.id });
+  const setIsDraggingState = useDndStore((state) => state.setIsDragging);
+
+  useEffect(() => {
+    setIsDraggingState(isDragging);
+  }, [isDragging, setIsDraggingState]);
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="flex justify-center items-start">
+      <GameCard card={card} {...props} />
+    </div>
+  );
+};
 
 interface ActiveCardsProps {
   cards: DisplayableCard[];
@@ -30,6 +81,7 @@ interface ActiveCardsProps {
   isSelectionMode: boolean;
   selectedDataItems: SelectedDataItem[];
   onToggleItemSelection: (item: SelectedDataItem) => void;
+  onDragEnd: (event: DragEndEvent) => void;
 }
 
 export const ActiveCards: React.FC<ActiveCardsProps> = ({
@@ -44,11 +96,21 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
   isSelectionMode,
   selectedDataItems,
   onToggleItemSelection,
+  onDragEnd,
 }) => {
   const [hasMounted, setHasMounted] = React.useState(false);
   React.useEffect(() => {
     setHasMounted(true);
   }, []);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   if (!hasMounted) {
     return (
@@ -69,22 +131,24 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {cards.map((card) => (
-            <div key={card.id} className="flex justify-center items-start">
-              <GameCard
-                card={card}
-                onToggleFlip={onToggleFlipCard}
-                onDeleteCardRequest={onDeleteCardRequest}
-                onGenericInteraction={onGenericInteraction}
-                // NEW PROPS PASSED DOWN
-                isSelectionMode={isSelectionMode}
-                selectedDataItems={selectedDataItems}
-                onToggleItemSelection={onToggleItemSelection}
-              />
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+          <SortableContext items={cards.map((c) => c.id)} strategy={rectSortingStrategy}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {cards.map((card) => (
+                <SortableGameCard
+                  key={card.id}
+                  card={card}
+                  onToggleFlip={onToggleFlipCard}
+                  onDeleteCardRequest={onDeleteCardRequest}
+                  onGenericInteraction={onGenericInteraction}
+                  isSelectionMode={isSelectionMode}
+                  selectedDataItems={selectedDataItems}
+                  onToggleItemSelection={onToggleItemSelection}
+                />
+              ))}
             </div>
-          ))}
-        </div>
+          </SortableContext>
+        </DndContext>
       )}
 
       {cardIdToConfirmDelete && (

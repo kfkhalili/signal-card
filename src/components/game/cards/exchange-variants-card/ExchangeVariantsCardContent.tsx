@@ -9,17 +9,26 @@ import { cn } from "@/lib/utils";
 import { formatNumberWithAbbreviations } from "@/lib/formatters";
 import { getFlagEmoji } from "@/lib/utils";
 import type { SelectedDataItem } from "@/hooks/useWorkspaceManager";
+import { Loader2 } from "lucide-react";
 import {
   CheckboxCheckedIcon,
   CheckboxUncheckedIcon,
 } from "@/components/ui/CheckboxIcons";
 import dynamic from "next/dynamic"; // Import dynamic from next/dynamic
 import type { MapMarker } from "@/components/ui/WorldMap"; // Import MapMarker type
+import { useDndStore } from "@/stores/dndStore";
 
 // Dynamically import WorldMap
 const DynamicWorldMap = dynamic(
   () => import("@/components/ui/WorldMap").then((mod) => mod.WorldMap),
-  { ssr: false } // Disable server-side rendering for this component
+  {
+    ssr: false, // Disable server-side rendering for this component
+    loading: () => (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    ),
+  }
 );
 
 interface ExchangeVariantsCardContentProps {
@@ -97,6 +106,8 @@ export const ExchangeVariantsCardContent: React.FC<ExchangeVariantsCardContentPr
       selectedDataItems,
       onToggleItemSelection,
     }) => {
+      const isDragging = useDndStore((state) => state.isDragging);
+
       const { staticData, liveData, symbol, id } = cardData;
 
       const allVariantsToDisplay = useMemo((): ExchangeVariant[] => {
@@ -168,15 +179,24 @@ export const ExchangeVariantsCardContent: React.FC<ExchangeVariantsCardContentPr
         );
       }
 
+      if (isDragging) {
+        return (
+          <div className="flex h-full w-full items-center justify-center bg-muted/30">
+            <p className="text-xs text-muted-foreground">Map Preview</p>
+          </div>
+        );
+      }
+
       return (
         <div
           data-testid={`exchangevariants-card-front-${symbol}`}
           className="pointer-events-auto flex flex-col h-full">
-          <div className="relative flex-grow w-full">
-            <DynamicWorldMap
-              markers={mapMarkers}
-              className="absolute inset-0"
-            />
+          <div 
+            className="relative flex-grow w-full bg-muted/30"
+            onPointerDownCapture={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <DynamicWorldMap markers={mapMarkers} className="absolute inset-0" />
           </div>
         </div>
       );

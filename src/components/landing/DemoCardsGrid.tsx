@@ -77,6 +77,7 @@ const DemoCardsGrid: React.FC = () => {
         isSelectionMode={false}
         selectedDataItems={[]}
         onToggleItemSelection={handleInteraction}
+        onDragEnd={handleInteraction}
       />
     </div>
   );

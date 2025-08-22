@@ -2,6 +2,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { arrayMove } from "@dnd-kit/sortable";
+import { type DragEndEvent } from "@dnd-kit/core";
 import { useToast } from "@/hooks/use-toast";
 import useLocalStorage from "@/hooks/use-local-storage";
 import { useAuth } from "@/contexts/AuthContext";
@@ -80,7 +82,7 @@ export interface SelectedDataItem {
   isValueAsPercentage?: boolean;
 }
 
-type SortKey = "symbol" | "type" | "createdAt";
+type SortKey = "symbol" | "type" | "createdAt" | "manual";
 type SortOrder = "asc" | "desc";
 export interface SortConfig {
   key: SortKey;
@@ -139,6 +141,10 @@ export function useWorkspaceManager() {
     const cardsToSort = [...activeCards];
     cardsToSort.sort((a, b) => {
       const { key, order } = sortConfig;
+
+      if (key === "manual") {
+        return 0; // Keep the existing user-defined order
+      }
 
       if (key === "createdAt") {
         return order === "asc"
@@ -262,6 +268,22 @@ export function useWorkspaceManager() {
       });
     },
     [toast]
+  );
+
+  const onDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (over && active.id !== over.id) {
+        const oldIndex = displayedCards.findIndex((c) => c.id === active.id);
+        const newIndex = displayedCards.findIndex((c) => c.id === over.id);
+
+        if (oldIndex !== -1 && newIndex !== -1) {
+          setActiveCards(arrayMove(displayedCards, oldIndex, newIndex));
+          setSortConfig({ key: "manual", order: "asc" });
+        }
+      }
+    },
+    [displayedCards]
   );
 
   const createCustomStaticCard = useCallback(
@@ -714,5 +736,6 @@ export function useWorkspaceManager() {
     createCustomStaticCard,
     sortConfig,
     setSortConfig,
+    onDragEnd,
   };
 }
