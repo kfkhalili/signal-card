@@ -1,12 +1,12 @@
 // src/components/layout/Header.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React,  { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { LogOut, LayoutDashboard, Loader2, AlertTriangle } from "lucide-react";
+import { LogOut, LayoutDashboard, Loader2, AlertTriangle, Compass } from "lucide-react"; // Added Compass icon
 import Avatar from "@/components/ui/Avatar";
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { Database } from '@/lib/supabase/database.types'
@@ -98,6 +98,14 @@ const Header: React.FC = () => {
                 icon={LayoutDashboard}
                 text="Workspace"
               />
+              {/* --- NEW LINK ADDED HERE --- */}
+              <NavLinkItem
+                href="/compass"
+                title="Market Compass"
+                icon={Compass}
+                text="Compass"
+              />
+              {/* ------------------------- */}
               <Link href="/profile" title="Your Profile" className="flex items-center space-x-2 p-1 rounded-md hover:bg-muted transition-colors">
                 {profile && (
                     <Avatar

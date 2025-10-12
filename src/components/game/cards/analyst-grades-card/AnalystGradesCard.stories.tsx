@@ -1,6 +1,6 @@
 // src/components/game/cards/analyst-grades-card/AnalystGradesCard.stories.tsx
 import type { Meta, StoryObj } from "@storybook/react";
-import { action } from "@storybook/addon-actions";
+import { action } from "storybook/actions";
 import { AnalystGradesCardContent } from "./AnalystGradesCardContent";
 import type {
   AnalystGradesCardData,

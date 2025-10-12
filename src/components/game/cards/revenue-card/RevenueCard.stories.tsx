@@ -1,6 +1,6 @@
 // src/components/game/cards/revenue-card/RevenueCard.stories.tsx
 import type { Meta, StoryObj } from "@storybook/react";
-import { action } from "@storybook/addon-actions";
+import { action } from "storybook/actions";
 import { RevenueCardContent } from "./RevenueCardContent";
 import type { RevenueCardData } from "./revenue-card.types";
 import type {

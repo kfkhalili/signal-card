@@ -1,7 +1,7 @@
 // src/components/game/cards/base-card/BaseCard.stories.tsx
 import React, { useState, useCallback, useEffect } from "react";
 import type { Meta, StoryObj } from "@storybook/react";
-import { action } from "@storybook/addon-actions";
+import { action } from "storybook/actions";
 import BaseCard from "./BaseCard";
 import type {
   CardActionContext,

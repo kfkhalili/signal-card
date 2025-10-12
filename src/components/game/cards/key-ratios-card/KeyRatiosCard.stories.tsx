@@ -1,6 +1,6 @@
 // src/components/game/cards/key-ratios-card/KeyRatiosCard.stories.tsx
 import type { Meta, StoryObj } from "@storybook/react";
-import { action } from "@storybook/addon-actions";
+import { action } from "storybook/actions";
 import { KeyRatiosCardContent } from "./KeyRatiosCardContent";
 import type { KeyRatiosCardData } from "./key-ratios-card.types";
 import type {
