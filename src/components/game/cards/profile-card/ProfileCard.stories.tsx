@@ -1,6 +1,6 @@
 // src/components/game/cards/profile-card/ProfileCard.stories.tsx
 import type { Meta, StoryObj } from "@storybook/react";
-import { action } from "@storybook/addon-actions";
+import { action } from "storybook/actions";
 import { ProfileCardContent } from "./ProfileCardContent";
 import type { ProfileCardData } from "./profile-card.types";
 import type {

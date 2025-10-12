@@ -1,7 +1,7 @@
 // src/components/layout/Header.stories.tsx
 import React from "react";
 import type { Meta, StoryObj } from "@storybook/react";
-import { action } from "@storybook/addon-actions";
+import { action } from "storybook/actions";
 import Header from "./Header";
 import { AuthContext, type AuthContextType } from "@/contexts/AuthContext";
 import type {

@@ -1,6 +1,6 @@
 // src/components/game/cards/cash-use-card/CashUseCard.stories.tsx
 import type { Meta, StoryObj } from "@storybook/react";
-import { action } from "@storybook/addon-actions";
+import { action } from "storybook/actions";
 import { CashUseCardContent } from "./CashUseCardContent";
 import type { CashUseCardData } from "./cash-use-card.types";
 import type {

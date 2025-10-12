@@ -1,6 +1,6 @@
 // src/components/game/cards/price-card/PriceCard.stories.tsx
 import type { Meta, StoryObj } from "@storybook/react";
-import { action } from "@storybook/addon-actions";
+import { action } from "storybook/actions";
 import { PriceCardContent } from "./PriceCardContent";
 import type { PriceCardData } from "./price-card.types";
 import type {

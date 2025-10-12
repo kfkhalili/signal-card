@@ -1,6 +1,6 @@
 // src/components/game/cards/solvency-card/SolvencyCard.stories.tsx
 import type { Meta, StoryObj } from "@storybook/react";
-import { action } from "@storybook/addon-actions";
+import { action } from "storybook/actions";
 import { SolvencyCardContent } from "./SolvencyCardContent";
 import type { SolvencyCardData } from "./solvency-card.types";
 import type {
