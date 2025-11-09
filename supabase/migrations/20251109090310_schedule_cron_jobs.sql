@@ -26,28 +26,6 @@ END $$;
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM cron.job WHERE jobname = 'minute-fetch-fmp-batch-quote-indicators'
-  ) THEN
-    PERFORM cron.schedule(
-      'minute-fetch-fmp-batch-quote-indicators',
-      '* * * * *', -- every minute
-      $cron$
-      select
-        net.http_post(
-            url:= (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/fetch-fmp-batch-quote-indicators',
-            headers:=jsonb_build_object(
-              'Content-type', 'application/json',
-              'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'anon_key')
-            )
-        ) as request_id;
-      $cron$
-    );
-  END IF;
-END $$;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
     SELECT 1 FROM cron.job WHERE jobname = 'daily-fetch-fmp-all-exchange-market-status'
   ) THEN
     PERFORM cron.schedule(

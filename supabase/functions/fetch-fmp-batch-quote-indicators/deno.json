@@ -1,8 +1,0 @@
-{
-  "imports": {
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.50.0",
-    "@supabase/functions-js/edge-runtime.d.ts": "jsr:@supabase/functions-js@2/edge-runtime.d.ts",
-    "@std/assert": "https://deno.land/std@0.208.0/assert/mod.ts"
-  }
-}
-
