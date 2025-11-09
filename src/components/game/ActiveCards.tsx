@@ -58,7 +58,7 @@ const SortableGameCard = ({
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
-    transition,
+    ...(transition && { transition }),
     zIndex: isDragging ? 10 : undefined,
   };
 

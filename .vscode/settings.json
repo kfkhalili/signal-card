@@ -31,5 +31,17 @@
   "tailwindCSS.experimental.classRegex": [
     ["cva\\(([^)]*)\\)", "[\"'`]([^\"'`]*).*?[\"'`]"],
     ["cx\\(([^)]*)\\)", "(?:'|\"|`)([^']*)(?:'|\"|`)"]
-  ]
+  ],
+  "jest.jestCommandLine": "npm test --",
+  "jest.runMode": "on-demand",
+  "jest.autoRun": {
+    "watch": false,
+    "onStartup": ["all-tests"]
+  },
+  "jest.showCoverageOnLoad": false,
+  "jest.rootPath": ".",
+  "jest.configPath": "jest.config.mjs",
+  "jest.useDashedArgs": false,
+  "jest.autoRevealOutput": "on-run",
+  "jest.enable": true
 }

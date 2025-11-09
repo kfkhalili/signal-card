@@ -1,6 +1,9 @@
 [edge_runtime]
 deno_version = 2.1
 
+[db]
+major_version = 15
+
 [functions.fetch-fmp-quote-indicators]
 enabled = true
 verify_jwt = false

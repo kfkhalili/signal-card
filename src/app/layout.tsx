@@ -1,6 +1,26 @@
 // src/app/layout.tsx
 import { GeistSans } from "geist/font/sans";
-import { GeistMono } from "geist/font/mono";
+import localFont from "next/font/local";
+
+// Use TTF file directly since WOFF2 is missing from package installation
+// Path is relative to this file (src/app/layout.tsx)
+const GeistMono = localFont({
+  src: "../../public/fonts/geist-mono/GeistMono-Variable.ttf",
+  variable: "--font-geist-mono",
+  adjustFontFallback: false,
+  fallback: [
+    "ui-monospace",
+    "SFMono-Regular",
+    "Roboto Mono",
+    "Menlo",
+    "Monaco",
+    "Liberation Mono",
+    "DejaVu Sans Mono",
+    "Courier New",
+    "monospace",
+  ],
+  weight: "100 900",
+});
 import { homeMetadata, generateStructuredData } from "./metadata";
 import { Toaster } from "@/components/ui/toaster";
 import Header from "@/components/layout/Header";

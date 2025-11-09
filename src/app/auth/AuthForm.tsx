@@ -63,24 +63,24 @@ export default function AuthForm() {
       return;
     }
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_IN") {
-        const nextUrl = searchParams.get("next") || "/";
-        router.push(nextUrl);
-        router.refresh();
-      }
-    });
-
-    const checkSession = async () => {
-      if (supabase) {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (user) {
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event) => {
+        if (event === "SIGNED_IN") {
           const nextUrl = searchParams.get("next") || "/";
           router.push(nextUrl);
           router.refresh();
         }
+      }
+    );
+
+    const checkSession = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        const nextUrl = searchParams.get("next") || "/";
+        router.push(nextUrl);
+        router.refresh();
       }
     };
 
