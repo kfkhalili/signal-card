@@ -45,6 +45,9 @@ firebase-debug.log
 firestore-debug.log
 *storybook.log
 
+# Supabase
+supabase/.temp/
+
 # Playwright
 node_modules/
 /test-results/
