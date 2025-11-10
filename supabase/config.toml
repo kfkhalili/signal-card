@@ -15,6 +15,12 @@ enabled = true
 verify_jwt = false
 entrypoint = "./functions/fetch-fmp-all-exchange-market-status/index.ts"
 
+[functions.fetch-fmp-exchange-prices-api]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/fetch-fmp-exchange-prices-api/index.ts"
+static_files = [ "./functions/fetch-fmp-exchange-prices-api/types.ts" ]
+
 [functions.fetch-fmp-financial-statements]
 enabled = true
 verify_jwt = false
