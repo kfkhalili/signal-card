@@ -1,6 +1,7 @@
 // supabase/functions/fetch-fmp-quote-indicators/index.ts
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { CORS_HEADERS, ensureCronAuth } from "../_shared/auth.ts";
 import type {
   FmpQuoteData,
   LiveQuoteIndicatorRecord,
@@ -8,12 +9,6 @@ import type {
   SymbolQuoteProcessingResult,
   QuoteFunctionResponse,
 } from "./types.ts";
-
-const CORS_HEADERS: Record<string, string> = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
 
 const ENV_CONTEXT: string = Deno.env.get("ENV_CONTEXT") || "PROD";
 const FMP_API_KEY: string | undefined = Deno.env.get("FMP_API_KEY");
@@ -193,6 +188,13 @@ Deno.serve(async (_req: Request) => {
   if (_req.method === "OPTIONS") {
     return new Response("ok", { headers: CORS_HEADERS });
   }
+
+  // --- 🔒 Centralized Authorization Check ---
+  const authError = ensureCronAuth(_req);
+  if (authError) {
+    return authError; // Return the 401/500 response
+  }
+  // --- ✅ Auth Check Passed ---
 
   const invocationTime: string = new Date().toISOString();
   console.log(

@@ -1,13 +1,7 @@
 // supabase/functions/fetch-all-exchange-market-status/index.ts
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { CORS_HEADERS, ensureCronAuth } from "../_shared/auth.ts";
 import { parse, format } from "date-fns";
-
-// Standard CORS headers
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
 
 // --- Interfaces for FMP API Responses ---
 interface FmpAllExchangeHoursEntry {
@@ -170,6 +164,13 @@ Deno.serve(async (_req: Request) => {
   if (_req.method === "OPTIONS") {
     return new Response("ok", { headers: CORS_HEADERS });
   }
+
+  // --- 🔒 Centralized Authorization Check ---
+  const authError = ensureCronAuth(_req);
+  if (authError) {
+    return authError; // Return the 401/500 response
+  }
+  // --- ✅ Auth Check Passed ---
 
   try {
     const fmpApiKey = Deno.env.get("FMP_API_KEY");

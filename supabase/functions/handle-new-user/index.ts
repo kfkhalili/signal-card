@@ -3,18 +3,20 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { CORS_HEADERS, ensureCronAuth } from "../_shared/auth.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
-
-serve(async (req) => {
+serve(async (_req) => {
   // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+  if (_req.method === "OPTIONS") {
+    return new Response("ok", { headers: CORS_HEADERS });
   }
+  
+  // --- 🔒 Centralized Authorization Check ---
+  const authError = ensureCronAuth(_req);
+  if (authError) {
+    return authError; // Return the 401/500 response
+  }
+  // --- ✅ Auth Check Passed ---
 
   try {
     // Create Supabase client with service role key
@@ -24,7 +26,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Get the request body
-    const { type, record } = await req.json();
+    const { type, record } = await _req.json();
 
     // Only handle user creation events
     if (type === "INSERT" && record) {
@@ -48,7 +50,7 @@ serve(async (req) => {
           }),
           {
             status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
           }
         );
       }
@@ -58,7 +60,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
     });
   } catch (error) {
     console.error("Error in handle-new-user function:", error);
@@ -69,7 +71,7 @@ serve(async (req) => {
       }),
       {
         status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
       }
     );
   }
