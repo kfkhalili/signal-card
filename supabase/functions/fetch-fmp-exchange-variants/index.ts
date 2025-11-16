@@ -1,5 +1,6 @@
 // supabase/functions/fetch-fmp-exchange-variants/index.ts
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { CORS_HEADERS, ensureCronAuth } from "../_shared/auth.ts";
 import type {
   FmpExchangeVariantData,
   SupabaseExchangeVariantRecord,
@@ -7,12 +8,6 @@ import type {
   SymbolProcessingResult,
   FunctionResponse,
 } from "./types.ts";
-
-const CORS_HEADERS: Record<string, string> = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
 
 const ENV_CONTEXT: string = Deno.env.get("ENV_CONTEXT") || "PROD";
 const FMP_API_KEY: string | undefined = Deno.env.get("FMP_API_KEY");
@@ -157,6 +152,13 @@ Deno.serve(async (_req: Request) => {
   if (_req.method === "OPTIONS") {
     return new Response("ok", { headers: CORS_HEADERS });
   }
+
+  // --- 🔒 Centralized Authorization Check ---
+  const authError = ensureCronAuth(_req);
+  if (authError) {
+    return authError; // Return the 401/500 response
+  }
+  // --- ✅ Auth Check Passed ---
 
   if (!FMP_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     return new Response(

@@ -1,17 +1,19 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { CORS_HEADERS, ensureCronAuth } from "../_shared/auth.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
-
-serve(async (req) => {
+serve(async (_req) => {
   // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+  if (_req.method === "OPTIONS") {
+    return new Response("ok", { headers: CORS_HEADERS });
   }
+
+  // --- 🔒 Centralized Authorization Check ---
+  const authError = ensureCronAuth(_req);
+  if (authError) {
+    return authError; // Return the 401/500 response
+  }
+  // --- ✅ Auth Check Passed ---
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -19,7 +21,7 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     // First, create a client with the user's auth token to verify their identity
-    const authHeader = req.headers.get("Authorization")!;
+    const authHeader = _req.headers.get("Authorization")!;
     const userSupabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -32,7 +34,7 @@ serve(async (req) => {
     if (userError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized access" }), {
         status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
       });
     }
 
@@ -48,7 +50,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
     });
   } catch (error) {
     return new Response(
@@ -58,7 +60,7 @@ serve(async (req) => {
       }),
       {
         status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
       }
     );
   }
