@@ -1,0 +1,534 @@
+---
+description: Quick reference guide for common Tickered development tasks and patterns
+globs:
+---
+
+# Quick Reference Guide
+
+## Common Development Tasks
+
+### Adding a New Card Type (Quick Checklist)
+
+1. ✅ Add card type to `CardType` union in `base-card.types.ts`
+2. ✅ Create directory: `src/components/game/cards/[card-name]/`
+3. ✅ Create `[card-name].types.ts` with `[CardName]CardData`, `[CardName]CardStaticData`, `[CardName]CardLiveData`
+4. ✅ Create `[CardName]Content.tsx` (face content UI component)
+5. ✅ Create `[CardName]Container.tsx` (wraps Content in BaseCard)
+6. ✅ Create `[card-name]Utils.ts` with initializer function
+7. ✅ Create `[card-name]Rehydrator.ts` with rehydrator function
+8. ✅ Register initializer in `src/components/game/cards/initializers.ts`
+9. ✅ Register renderer in `src/components/game/cards/rendererRegistryInitializer.tsx`
+10. ✅ Register rehydrator in `src/components/game/cards/rehydrators.ts`
+11. ✅ Add update handler in `[card-name]Utils.ts` if needed for real-time updates
+12. ✅ Register update handler in `src/components/game/cards/updateHandlerInitializer.ts`
+13. ✅ Add to `ConcreteCardData` union in `src/components/game/types.ts`
+14. ✅ Add card option to `AddCardForm.tsx` UI
+15. ✅ Create `[CardName].stories.tsx` for Storybook
+
+### Custom Hook Pattern
+
+```typescript
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+
+export function useCustomHook(param: string) {
+  const [state, setState] = useState<StateType>(initialValue);
+
+  const handleAction = useCallback(() => {
+    // Action logic
+  }, [dependencies]);
+
+  useEffect(() => {
+    // Effect logic
+    return () => {
+      // Cleanup
+    };
+  }, [dependencies]);
+
+  return {
+    state,
+    handleAction,
+    // ... other returns
+  };
+}
+```
+
+### Context Provider Pattern
+
+```typescript
+"use client";
+
+import React, { createContext, useContext, useState, useEffect } from "react";
+
+interface ContextValue {
+  value: string;
+  setValue: (value: string) => void;
+}
+
+const Context = createContext<ContextValue | undefined>(undefined);
+
+export function ContextProvider({ children }: { children: React.ReactNode }) {
+  const [value, setValue] = useState<string>("");
+
+  return (
+    <Context.Provider value={{ value, setValue }}>
+      {children}
+    </Context.Provider>
+  );
+}
+
+export function useContextHook(): ContextValue {
+  const context = useContext(Context);
+  if (!context) {
+    throw new Error("useContextHook must be used within ContextProvider");
+  }
+  return context;
+}
+```
+
+### Supabase Query Pattern
+
+```typescript
+import { ok, err, Result } from "neverthrow";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+async function fetchData(
+  supabase: SupabaseClient,
+  symbol: string
+): Promise<Result<Data[], Error>> {
+  const { data, error } = await supabase
+    .from("table_name")
+    .select("*")
+    .eq("symbol", symbol);
+
+  if (error) {
+    return err(new Error(error.message));
+  }
+
+  if (!data || data.length === 0) {
+    return err(new Error("No data found"));
+  }
+
+  return ok(data);
+}
+```
+
+### Real-time Subscription Pattern
+
+```typescript
+import { useEffect } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+function useRealtimeSubscription(
+  supabase: SupabaseClient,
+  symbol: string,
+  onUpdate: (payload: unknown) => void
+) {
+  useEffect(() => {
+    const channel = supabase
+      .channel(`table_name:${symbol}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "table_name",
+          filter: `symbol=eq.${symbol}`,
+        },
+        onUpdate
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabase, symbol, onUpdate]);
+}
+```
+
+### Card Initializer Template
+
+```typescript
+import { ok, err, Result } from "neverthrow";
+import type { CardInitializationContext, CardInitializer } from "@/components/game/cardInitializer.types";
+import type { DisplayableCard } from "@/components/game/types";
+
+class [CardName]CardError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "[CardName]CardError";
+  }
+}
+
+async function initialize[CardName]Card({
+  symbol,
+  supabase,
+  toast,
+}: CardInitializationContext): Promise<Result<DisplayableCard, [CardName]CardError>> {
+  // 1. Fetch data from Supabase
+  const dataResult = await fetchDataFromSupabase(supabase, symbol);
+
+  if (dataResult.isErr()) {
+    return err(new [CardName]CardError(dataResult.error.message));
+  }
+
+  const dbData = dataResult.value;
+
+  // 2. Transform data to card format
+  const cardData: [CardName]CardData = {
+    id: crypto.randomUUID(),
+    type: "[cardname]",
+    symbol,
+    createdAt: Date.now(),
+    companyName: dbData.companyName ?? null,
+    displayCompanyName: dbData.displayCompanyName ?? null,
+    logoUrl: dbData.logoUrl ?? null,
+    websiteUrl: dbData.websiteUrl ?? null,
+    backData: {
+      description: "Card description",
+    },
+    staticData: {
+      // Static data
+    },
+    liveData: {
+      // Live data
+    },
+  };
+
+  // 3. Return as DisplayableCard
+  return ok({
+    ...cardData,
+    isFlipped: false,
+  });
+}
+
+registerCardInitializer("[cardname]", initialize[CardName]Card);
+```
+
+### Card Container Template
+
+```typescript
+"use client";
+
+import React from "react";
+import BaseCard from "@/components/game/cards/base-card/BaseCard";
+import { [CardName]Content } from "./[CardName]Content";
+import type { RegisteredCardRendererProps } from "@/components/game/cardRenderers";
+import type { [CardName]CardData } from "./[card-name].types";
+
+interface [CardName]ContainerProps extends RegisteredCardRendererProps {
+  cardData: [CardName]CardData;
+}
+
+export function [CardName]Container({
+  cardData,
+  isFlipped,
+  onFlip,
+  cardContext,
+  onDeleteRequest,
+  onGenericInteraction,
+  className,
+  innerCardClassName,
+  isSelectionMode,
+  selectedDataItems,
+  onToggleItemSelection,
+}: [CardName]ContainerProps) {
+  const faceContent = (
+    <[CardName]Content
+      cardData={cardData}
+      onGenericInteraction={onGenericInteraction}
+      isSelectionMode={isSelectionMode}
+      selectedDataItems={selectedDataItems}
+      onToggleItemSelection={onToggleItemSelection}
+    />
+  );
+
+  const backContent = (
+    <div className="p-4">
+      {cardData.backData.description || "No description available"}
+    </div>
+  );
+
+  return (
+    <BaseCard
+      isFlipped={isFlipped}
+      faceContent={faceContent}
+      backContent={backContent}
+      cardContext={cardContext}
+      onDeleteRequest={onDeleteRequest}
+      onFlip={onFlip}
+      className={className}
+      innerCardClassName={innerCardClassName}
+      onGenericInteraction={onGenericInteraction}
+    />
+  );
+}
+```
+
+### Card Content Template
+
+```typescript
+"use client";
+
+import React from "react";
+import type { [CardName]CardData } from "./[card-name].types";
+import type { OnGenericInteraction } from "@/components/game/cards/base-card/base-card.types";
+import type { SelectedDataItem } from "@/hooks/useWorkspaceManager";
+
+interface [CardName]ContentProps {
+  cardData: [CardName]CardData;
+  onGenericInteraction: OnGenericInteraction;
+  isSelectionMode: boolean;
+  selectedDataItems: SelectedDataItem[];
+  onToggleItemSelection: (item: SelectedDataItem) => void;
+}
+
+export function [CardName]Content({
+  cardData,
+  onGenericInteraction,
+  isSelectionMode,
+  selectedDataItems,
+  onToggleItemSelection,
+}: [CardName]ContentProps) {
+  // Component implementation
+  return (
+    <div className="p-4">
+      {/* Card content */}
+    </div>
+  );
+}
+```
+
+### Edge Function Template
+
+```typescript
+// supabase/functions/[function-name]/index.ts
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
+serve(async (req: Request) => {
+  // Handle CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: CORS_HEADERS });
+  }
+
+  try {
+    // Validate environment variables
+    const apiKey = Deno.env.get("FMP_API_KEY");
+    if (!apiKey) {
+      throw new Error("FMP_API_KEY not set");
+    }
+
+    // Get Supabase client
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Parse request
+    const { symbol } = await req.json();
+
+    // Fetch external API data
+    const response = await fetch(`https://api.example.com/data?symbol=${symbol}`, {
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`External API error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    // Upsert to database
+    const { error: dbError } = await supabase
+      .from("table_name")
+      .upsert(data, { onConflict: "symbol" });
+
+    if (dbError) {
+      throw new Error(`Database error: ${dbError.message}`);
+    }
+
+    return new Response(
+      JSON.stringify({ success: true }),
+      {
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        status: 200,
+      }
+    );
+  } catch (error) {
+    console.error("[function-name] Error:", error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      {
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        status: 500,
+      }
+    );
+  }
+});
+```
+
+### Toast Notification Pattern
+
+```typescript
+import { useToast } from "@/hooks/use-toast";
+
+function MyComponent() {
+  const { toast } = useToast();
+
+  const handleAction = () => {
+    toast({
+      title: "Success",
+      description: "Action completed successfully",
+    });
+  };
+
+  const handleError = () => {
+    toast({
+      title: "Error",
+      description: "Something went wrong",
+      variant: "destructive",
+    });
+  };
+
+  // Component implementation
+}
+```
+
+### Form Validation Pattern (with react-hook-form + zod)
+
+```typescript
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+
+const formSchema = z.object({
+  symbol: z.string().min(1, "Symbol is required"),
+});
+
+type FormValues = z.infer<typeof formSchema>;
+
+function MyForm({ onSubmit }: { onSubmit: (values: FormValues) => void }) {
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      symbol: "",
+    },
+  });
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <FormField
+          control={form.control}
+          name="symbol"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Symbol</FormLabel>
+              <FormControl>
+                <Input {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type="submit">Submit</Button>
+      </form>
+    </Form>
+  );
+}
+```
+
+### Data Formatting Patterns
+
+```typescript
+import { format } from "date-fns";
+import type { Formatters } from "@/lib/formatters";
+
+// Currency formatting
+const formattedCurrency = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+}).format(value);
+
+// Percentage formatting
+const formattedPercent = new Intl.NumberFormat("en-US", {
+  style: "percent",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+}).format(value / 100);
+
+// Number formatting
+const formattedNumber = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+}).format(value);
+
+// Date formatting
+const formattedDate = format(new Date(timestamp), "MMM dd, yyyy");
+```
+
+### Common Import Patterns
+
+```typescript
+// External dependencies
+import React from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+
+// Internal utilities
+import { cn, createSecureImageUrl } from "@/lib/utils";
+import { ok, err, Result } from "neverthrow";
+
+// Internal types
+import type { DisplayableCard } from "@/components/game/types";
+import type { CardType } from "@/components/game/cards/base-card/base-card.types";
+
+// Internal components
+import { Button } from "@/components/ui/button";
+import BaseCard from "@/components/game/cards/base-card/BaseCard";
+
+// Hooks
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+```
+
+## Debugging Tips
+
+### Common Issues
+
+1. **Card not rendering**: Check if renderer is registered in `rendererRegistryInitializer.tsx`
+2. **Card not initializing**: Check if initializer is registered in `initializers.ts`
+3. **Real-time updates not working**: Verify subscription is set up and cleanup is implemented
+4. **Type errors**: Ensure card type is added to `CardType` union and `ConcreteCardData` union
+5. **Import errors**: Use absolute imports with `@/` prefix
+6. **Result type errors**: Always handle both success and error cases with `.match()`
+
+### Debugging Checklist
+
+- ✅ Check browser console for errors
+- ✅ Verify Supabase client is initialized
+- ✅ Check network tab for API calls
+- ✅ Verify RLS policies allow access
+- ✅ Check localStorage for persisted data
+- ✅ Verify all registrations are in place
+- ✅ Check TypeScript errors with `npm run typecheck`
+- ✅ Run linter with `npm run lint`

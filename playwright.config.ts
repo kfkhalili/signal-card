@@ -23,12 +23,20 @@ const config: Config = {
 
   // Why: This section automatically starts your Next.js development server
   // before the tests run, which is essential for end-to-end testing.
-  webServer: {
-    command: "npm run dev",
-    url: baseURL,
-    timeout: 120 * 1000,
-    reuseExistingServer: !process.env.CI,
-  },
+  webServer: [
+    {
+      command: "npm run dev",
+      url: baseURL,
+      timeout: 120 * 1000,
+      reuseExistingServer: !process.env.CI,
+    },
+    {
+      command: "npm run storybook",
+      url: "http://localhost:6006",
+      timeout: 120 * 1000,
+      reuseExistingServer: !process.env.CI,
+    },
+  ],
 
   projects: [
     {

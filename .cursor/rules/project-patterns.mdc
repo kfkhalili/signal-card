@@ -1,0 +1,536 @@
+---
+description: Tickered project-specific patterns, conventions, and architectural guidelines
+globs:
+---
+
+# Tickered Project Patterns
+
+## Project-Specific Conventions
+
+### Card System Architecture
+
+#### Card Development Checklist
+When adding a new card type, follow this exact order:
+
+1. **Add to CardType union** in `src/components/game/cards/base-card/base-card.types.ts`
+2. **Define card types** in `src/components/game/cards/[card-name]/[card-name].types.ts`
+3. **Implement initializer** in `src/components/game/cards/[card-name]/[card-name]Utils.ts`
+4. **Register initializer** in `src/components/game/cards/initializers.ts`
+5. **Create Content component** `[CardName]Content.tsx` (face content)
+6. **Create Container component** `[CardName]Container.tsx` (wraps Content in BaseCard)
+7. **Register renderer** in `src/components/game/cards/rendererRegistryInitializer.tsx`
+8. **Implement rehydrator** in `src/components/game/cards/[card-name]/[card-name]Rehydrator.ts`
+9. **Register rehydrator** in `src/components/game/cards/rehydrators.ts`
+10. **Implement update handler** if card needs real-time updates
+11. **Register update handler** in `src/components/game/cards/updateHandlerInitializer.ts`
+12. **Update ConcreteCardData union** in `src/components/game/types.ts`
+13. **Add to AddCardForm** UI for user selection
+14. **Create Storybook stories** for component testing
+
+#### Card Type File Structure
+```
+src/components/game/cards/[card-name]/
+├── [card-name].types.ts          # Type definitions (staticData, liveData interfaces)
+├── [CardName]Content.tsx         # Face content component (UI only)
+├── [CardName]Container.tsx        # Container that wraps Content in BaseCard
+├── [card-name]Utils.ts            # Initializer function, update handlers
+├── [card-name]Rehydrator.ts      # localStorage reconstruction logic
+└── [CardName].stories.tsx         # Storybook stories
+```
+
+#### Card Initializer Pattern
+```typescript
+import { ok, err, Result } from "neverthrow";
+import type { CardInitializationContext, CardInitializer } from "@/components/game/cardInitializer.types";
+import type { DisplayableCard } from "@/components/game/types";
+
+class [CardName]CardError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "[CardName]CardError";
+  }
+}
+
+async function initialize[CardName]Card({
+  symbol,
+  supabase,
+  toast,
+}: CardInitializationContext): Promise<Result<DisplayableCard, [CardName]CardError>> {
+  // Implementation
+}
+
+registerCardInitializer("[cardname]", initialize[CardName]Card);
+```
+
+#### Card Renderer Pattern
+```typescript
+// In rendererRegistryInitializer.tsx
+import { [CardName]Container } from "@/components/game/cards/[card-name]/[CardName]Container";
+
+registerCardRenderer("[cardname]", [CardName]Container);
+```
+
+#### Card Rehydrator Pattern
+```typescript
+// In [card-name]Rehydrator.ts
+import type { DisplayableCard } from "@/components/game/types";
+import type { [CardName]CardData } from "./[card-name].types";
+
+export function rehydrate[CardName]Card(
+  stored: StoredCard
+): Result<DisplayableCard, Error> {
+  // Validation and reconstruction logic
+}
+```
+
+### Error Handling Patterns
+
+#### Using neverthrow Result Types
+- **Always use Result types** for functions that can fail
+- **Never throw errors** directly; return `Result<T, Error>`
+- **Use `ok()` and `err()`** for creating results
+- **Use `fromPromise()`** for async operations
+- **Use `.match()`** for handling both success and error cases
+- **Use `.map()`, `.mapErr()`, `.andThen()`** for chaining operations
+
+```typescript
+import { ok, err, Result, fromPromise } from "neverthrow";
+
+// Synchronous function
+function processData(input: string): Result<ProcessedData, Error> {
+  if (!input) {
+    return err(new Error("Input is required"));
+  }
+  try {
+    const processed = /* processing logic */;
+    return ok(processed);
+  } catch (error) {
+    return err(error as Error);
+  }
+}
+
+// Async function
+async function fetchData(): Promise<Result<Data, Error>> {
+  return fromPromise(
+    fetch("/api/data").then(res => res.json()),
+    (error) => error as Error
+  );
+}
+
+// Using results
+result.match(
+  (data) => {
+    // Handle success
+  },
+  (error) => {
+    // Handle error
+  }
+);
+```
+
+#### Custom Error Classes
+Create custom error classes for domain-specific errors:
+
+```typescript
+class CardInitializationError extends Error {
+  constructor(
+    message: string,
+    public readonly cardType: CardType,
+    public readonly symbol: string
+  ) {
+    super(message);
+    this.name = "CardInitializationError";
+  }
+}
+```
+
+### Type System Patterns
+
+#### Card Data Type Structure
+All card data types must extend the base structure:
+
+```typescript
+interface BaseCardData {
+  readonly id: string;
+  readonly type: CardType;
+  readonly symbol: string;
+  readonly createdAt: number;
+  readonly companyName?: string | null;
+  readonly displayCompanyName?: string | null;
+  readonly logoUrl?: string | null;
+  readonly websiteUrl?: string | null;
+  readonly backData: BaseCardBackData;
+}
+
+interface [CardName]CardData extends BaseCardData {
+  readonly type: "[cardname]";
+  readonly staticData: [CardName]CardStaticData;
+  readonly liveData: [CardName]CardLiveData;
+}
+```
+
+#### Discriminated Unions
+Use discriminated unions for type-safe card handling:
+
+```typescript
+type ConcreteCardData =
+  | PriceCardData
+  | ProfileCardData
+  | RevenueCardData
+  // ... other card types
+```
+
+#### Readonly Properties
+Use `readonly` for all card data properties to ensure immutability.
+
+### Component Patterns
+
+#### Client Component Pattern
+Always mark client components explicitly:
+
+```typescript
+"use client";
+
+import React from "react";
+// ... rest of component
+```
+
+#### Container Component Pattern
+Container components wrap Content components in BaseCard:
+
+```typescript
+interface [CardName]ContainerProps extends RegisteredCardRendererProps {
+  cardData: [CardName]CardData;
+}
+
+export function [CardName]Container({
+  cardData,
+  isFlipped,
+  onFlip,
+  cardContext,
+  onDeleteRequest,
+  onGenericInteraction,
+  className,
+  innerCardClassName,
+  isSelectionMode,
+  selectedDataItems,
+  onToggleItemSelection,
+}: [CardName]ContainerProps) {
+  const faceContent = <[CardName]Content cardData={cardData} />;
+  const backContent = <div>{cardData.backData.description}</div>;
+
+  return (
+    <BaseCard
+      isFlipped={isFlipped}
+      faceContent={faceContent}
+      backContent={backContent}
+      cardContext={cardContext}
+      onDeleteRequest={onDeleteRequest}
+      onFlip={onFlip}
+      className={className}
+      innerCardClassName={innerCardClassName}
+      onGenericInteraction={onGenericInteraction}
+    />
+  );
+}
+```
+
+#### Performance Optimization
+- Use `React.memo()` for expensive card components
+- Use `useMemo()` for computed values
+- Use `useCallback()` for event handlers passed as props
+- Memoize card data transformations
+
+```typescript
+export default React.memo(GameCard);
+
+// In hooks
+const memoizedValue = useMemo(() => {
+  return expensiveComputation(data);
+}, [data]);
+
+const memoizedCallback = useCallback(() => {
+  // callback logic
+}, [dependencies]);
+```
+
+### State Management Patterns
+
+#### useWorkspaceManager Pattern
+- **Single source of truth** for workspace state
+- **Persists to localStorage** automatically
+- **Manages card lifecycle** (add, remove, update, sort)
+- **Handles interactions** via `onGenericInteraction`
+
+#### Local Storage Pattern
+- Use `useLocalStorage` hook for persistence
+- Always handle JSON parsing errors gracefully
+- Use versioned keys (e.g., `"finSignal-mainWorkspace-v1"`)
+
+#### Real-time Data Updates
+- Subscribe to Supabase Realtime channels in `StockDataHandler`
+- Use update handlers registered via `registerCardUpdateHandler`
+- Always clean up subscriptions in `useEffect` cleanup
+
+### Supabase Patterns
+
+#### Client Creation
+- **Browser client**: Use `createSupabaseBrowserClient()` from `@/lib/supabase/client`
+- **Server client**: Use `createSupabaseServerClient()` from `@/lib/supabase/server`
+- **Route handler client**: Use `createSupabaseRouteHandlerClient()` for API routes
+
+#### Query Patterns
+- Always handle errors from Supabase queries
+- Use TypeScript types from `@/lib/supabase/database.types`
+- Prefer explicit error handling over throwing
+
+```typescript
+const { data, error } = await supabase
+  .from("table_name")
+  .select("*")
+  .eq("column", "value");
+
+if (error) {
+  return err(new Error(error.message));
+}
+if (!data || data.length === 0) {
+  return err(new Error("No data found"));
+}
+return ok(data);
+```
+
+#### Real-time Subscription Pattern
+```typescript
+useEffect(() => {
+  const channel = supabase
+    .channel(`table_name:${symbol}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "table_name",
+        filter: `symbol=eq.${symbol}`,
+      },
+      (payload) => {
+        // Handle update
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [symbol, supabase]);
+```
+
+### Edge Function Patterns
+
+#### Standard Structure
+```typescript
+// supabase/functions/[function-name]/index.ts
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
+Deno.serve(async (req: Request) => {
+  // Handle CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: CORS_HEADERS });
+  }
+
+  try {
+    // Validate environment variables
+    const apiKey = Deno.env.get("FMP_API_KEY");
+    if (!apiKey) {
+      throw new Error("FMP_API_KEY not set");
+    }
+
+    // Function logic
+    const result = await fetchData();
+
+    return new Response(JSON.stringify(result), {
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      status: 200,
+    });
+  } catch (error) {
+    console.error("[function-name] Error:", error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      {
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        status: 500,
+      }
+    );
+  }
+});
+```
+
+### Import Patterns
+
+#### Absolute Imports
+- Always use `@/` prefix for absolute imports
+- Never use relative imports for cross-directory files
+
+```typescript
+// ✅ Good
+import { cn } from "@/lib/utils";
+import type { DisplayableCard } from "@/components/game/types";
+
+// ❌ Bad
+import { cn } from "../../../lib/utils";
+```
+
+#### Import Organization
+1. External dependencies (React, Next.js, etc.)
+2. Internal utilities (`@/lib/*`)
+3. Internal types (`@/components/game/types`)
+4. Internal components (`@/components/*`)
+5. Relative imports (only for same-directory files)
+
+### Testing Patterns
+
+#### Unit Test Structure
+```typescript
+// src/lib/[module].test.ts
+import { describe, it, expect } from "@jest/globals";
+import { functionName } from "./[module]";
+
+describe("functionName", () => {
+  it("should handle success case", () => {
+    // Test implementation
+  });
+
+  it("should handle error case", () => {
+    // Test implementation
+  });
+});
+```
+
+#### Storybook Stories
+- Create stories for all card Content components
+- Use multiple variants (empty state, loading, error, success)
+- Document props and interactions
+
+### File Naming Conventions
+
+- **Components**: PascalCase (e.g., `PriceCardContent.tsx`)
+- **Utilities**: camelCase (e.g., `priceCardUtils.ts`)
+- **Types**: camelCase with `.types.ts` suffix (e.g., `price-card.types.ts`)
+- **Stories**: Component name with `.stories.tsx` suffix
+- **Tests**: Module name with `.test.ts` or `.spec.ts` suffix
+- **Edge Functions**: kebab-case directory names (e.g., `fetch-fmp-quote-indicators`)
+- **Card directories**: kebab-case (e.g., `price-card/`)
+
+### Code Organization
+
+#### Function Order in Files
+1. Type definitions and interfaces
+2. Custom error classes
+3. Helper/utility functions
+4. Main exported functions
+5. Registry registrations
+
+#### Component Order
+1. Imports
+2. Type definitions
+3. Component implementation
+4. Default export with memoization
+
+### Common Utilities
+
+#### Using `cn()` for className
+Always use the `cn()` utility for conditional classNames:
+
+```typescript
+import { cn } from "@/lib/utils";
+
+<div className={cn(
+  "base-classes",
+  condition && "conditional-class",
+  anotherCondition && "another-class"
+)} />
+```
+
+#### Using `createSecureImageUrl()`
+For Supabase storage images:
+
+```typescript
+import { createSecureImageUrl } from "@/lib/utils";
+
+<img src={createSecureImageUrl(cardData.logoUrl)} alt="Logo" />
+```
+
+### Interaction System
+
+#### Handling Card Interactions
+Always use the generic interaction system:
+
+```typescript
+import type { OnGenericInteraction } from "@/components/game/cards/base-card/base-card.types";
+
+const handleClick = () => {
+  onGenericInteraction({
+    intent: "REQUEST_NEW_CARD",
+    targetCardType: "price",
+    sourceCardId: cardData.id,
+    sourceCardSymbol: cardData.symbol,
+    sourceCardType: cardData.type,
+    originatingElement: "metric-click",
+    contextData: {
+      // Additional context
+    },
+  });
+};
+```
+
+### Documentation
+
+#### Code Comments
+- Use JSDoc for exported functions and types
+- Explain **why**, not **what** (code should be self-documenting)
+- Document complex algorithms and business logic
+
+```typescript
+/**
+ * Initializes a price card by fetching live quote data from Supabase.
+ *
+ * @param context - The card initialization context containing symbol, supabase client, etc.
+ * @returns A Result containing either the initialized card data or an error
+ */
+async function initializePriceCard(
+  context: CardInitializationContext
+): Promise<Result<DisplayableCard, PriceCardError>> {
+  // Implementation
+}
+```
+
+### Security Considerations
+
+- **Never expose API keys** in client-side code
+- **Always validate user input** before database queries
+- **Use RLS policies** for database access control
+- **Sanitize URLs** for external navigation
+- **Validate Supabase client** initialization before use
+
+### Performance Best Practices
+
+- **Lazy load** non-critical components
+- **Memoize** expensive computations
+- **Debounce** user input for search/autocomplete
+- **Virtual scrolling** for large card lists (when implemented)
+- **Image optimization** using Next.js Image component
+- **Code splitting** for route-based components
+
+### Common Pitfalls to Avoid
+
+- ❌ Don't mutate card data directly (use readonly)
+- ❌ Don't forget to register card initializers/renderers
+- ❌ Don't use relative imports across directories
+- ❌ Don't throw errors in Result-returning functions
+- ❌ Don't forget to clean up real-time subscriptions
+- ❌ Don't create components without memoization when passed as props
+- ❌ Don't forget to update the CardType union when adding new cards
+- ❌ Don't forget to add to ConcreteCardData union in types.ts
