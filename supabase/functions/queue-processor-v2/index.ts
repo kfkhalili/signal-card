@@ -11,8 +11,8 @@
  * - All worker functions imported from /lib/ directory
  */
 
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import "@supabase/functions-js/edge-runtime.d.ts";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -21,8 +21,9 @@ const CORS_HEADERS = {
 
 // Import worker functions from /lib/ directory (monofunction architecture)
 import { fetchProfileLogic } from '../lib/fetch-fmp-profile.ts';
+import { fetchQuoteLogic } from '../lib/fetch-fmp-quote.ts';
 // TODO: Import other worker functions as they are migrated
-// import { fetchQuoteLogic } from '../lib/fetch-fmp-quote.ts';
+// import { fetchFinancialStatementsLogic } from './lib/fetch-fmp-financial-statements.ts';
 // ... etc for all data types
 
 interface QueueJob {
@@ -35,7 +36,7 @@ interface QueueJob {
   max_retries: number;
   created_at: string;
   estimated_data_size_bytes: number;
-  job_metadata: Record<string, any>;
+  job_metadata: Record<string, unknown>;
 }
 
 Deno.serve(async (req: Request) => {
@@ -45,10 +46,24 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    // CRITICAL: Validate environment variables before proceeding
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+    if (!supabaseUrl || !supabaseServiceRoleKey) {
+      console.error('[queue-processor-v2] Missing required environment variables');
+      return new Response(
+        JSON.stringify({
+          error: 'Server configuration error: Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY',
+        }),
+        {
+          status: 500,
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
     // Get batch of jobs from queue
     const { data: jobs, error: batchError } = await supabase.rpc('get_queue_batch_v2', {
@@ -185,7 +200,7 @@ Deno.serve(async (req: Request) => {
  */
 async function processJob(
   job: QueueJob,
-  supabase: any
+  supabase: SupabaseClient
 ): Promise<{ success: boolean; dataSizeBytes: number; error?: string }> {
   // CRITICAL: Route to correct handler based on data_type
   // This replaces FaaS-to-FaaS invocations with direct function calls
@@ -193,9 +208,9 @@ async function processJob(
   switch (job.data_type) {
     case 'profile':
       return await fetchProfileLogic(job, supabase);
+    case 'quote':
+      return await fetchQuoteLogic(job, supabase);
     // TODO: Add other data types as they are migrated to /lib/
-    // case 'quote':
-    //   return await fetchQuoteLogic(job, supabase);
     // case 'financial-statements':
     //   return await fetchFinancialStatementsLogic(job, supabase);
     // ... etc

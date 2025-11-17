@@ -49,7 +49,7 @@ END IF;
 
 **Edge Functions:**
 ```typescript
-// In track-subscription-v2
+// In refresh-analytics-from-presence-v2
 const { data: flag } = await supabase
   .from('feature_flags')
   .select('enabled')

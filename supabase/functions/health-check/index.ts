@@ -55,8 +55,14 @@ serve(async (req: Request) => {
       );
     }
 
+    // Type for job run data from database
+    interface JobRun {
+      jobname: string;
+      last_run: string | null;
+    }
+
     // Check if any critical job is stale (hasn't run in expected interval)
-    const staleJobs = (jobRuns || []).filter((job: any) => {
+    const staleJobs = (jobRuns || []).filter((job: JobRun) => {
       if (!job.last_run) {
         // Job has never run - this is a problem
         return true;
@@ -82,12 +88,12 @@ serve(async (req: Request) => {
         JSON.stringify({
           status: 'unhealthy',
           error: 'Cron jobs are stale',
-          stale_jobs: staleJobs.map((j: any) => ({
+          stale_jobs: staleJobs.map((j: JobRun) => ({
             name: j.jobname,
             last_run: j.last_run,
-            time_since_run_minutes: Math.round(
-              (Date.now() - new Date(j.last_run).getTime()) / 60000
-            ),
+            time_since_run_minutes: j.last_run
+              ? Math.round((Date.now() - new Date(j.last_run).getTime()) / 60000)
+              : null,
           })),
           all_jobs: jobRuns,
         }),

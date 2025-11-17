@@ -4,13 +4,13 @@
 -- CRITICAL: Jobs are idempotent and can be safely re-run
 
 -- Job 1: Background Staleness Checker (Primary - Catches data that becomes stale while users are viewing)
--- Runs every 5 minutes
+-- Runs every minute (updated to match 1-minute TTL for quotes)
 -- CRITICAL: Uses active_subscriptions_v2 table (updated by Job 5) for performance
 -- CRITICAL: Symbol-by-Symbol pattern prevents temp table thundering herd
 -- CRITICAL: Quota-aware (prevents quota rebound catastrophe)
 SELECT cron.schedule(
   'check-stale-data-v2',
-  '*/5 * * * *', -- Every 5 minutes
+  '* * * * *', -- Every minute (matches 1-minute TTL for quotes)
   $$
   SELECT check_and_queue_stale_data_from_presence_v2();
   $$
@@ -59,14 +59,13 @@ SELECT cron.schedule(
 );
 
 -- Job 5: Analytics Refresh (Heavy operation moved from Job 1)
--- Runs every 15 minutes
--- CRITICAL: Heavy TRUNCATE...INSERT operation (300k rows at scale)
--- CRITICAL: Moved to separate cron job to prevent Job 1 from exceeding 5-minute window
+-- Runs every minute (matches minimum TTL of 1 minute for quotes)
+-- CRITICAL: Must run at least as frequently as minimum TTL so staleness checker has accurate data
 -- CRITICAL: Updates active_subscriptions_v2 table (used by Job 1)
--- TODO: Implement actual Presence fetch logic when pg_net is enabled
+-- CRITICAL: Uses Edge Function to query Realtime Presence and update analytics table
 SELECT cron.schedule(
   'refresh-analytics-v2',
-  '*/15 * * * *', -- Every 15 minutes
+  '* * * * *', -- Every minute (matches 1-minute TTL for quotes)
   $$
   SELECT refresh_analytics_from_presence_v2();
   $$

@@ -156,17 +156,18 @@ Phase 0 complete. Feature flags, health check, and baseline capture are in place
   - [x] Advisory lock (ID 43)
 
 **Edge Functions:**
-- [x] Create `track-subscription-v2` Edge Function
-  - [x] Single batch RPC call
-  - [x] Silent failure handling
-  - [ ] Rate limiting configured (TODO: Supabase dashboard config)
+- [x] Create `refresh-analytics-from-presence-v2` Edge Function
+  - [x] Queries Realtime Presence via REST API
+  - [x] Updates `active_subscriptions_v2` table
+  - [x] Removes stale subscriptions
+  - [x] Runs every minute (matches minimum TTL)
 
 **Cron Jobs:**
-- [x] Create cron job 1: `check_and_queue_stale_data_from_presence_v2()` every 5 minutes
+- [x] Create cron job 1: `check_and_queue_stale_data_from_presence_v2()` every minute (updated to match 1-minute TTL for quotes)
 - [x] Create cron job 2: `queue_scheduled_refreshes_v2()` every minute (throttled)
 - [x] Create cron job 3: `invoke_processor_loop_v2()` every minute
 - [x] Create cron job 4: `maintain_queue_partitions_v2()` weekly
-- [x] Create cron job 5: `refresh_analytics_from_presence_v2()` every 15 minutes
+- [x] Create cron job 5: `refresh_analytics_from_presence_v2()` every minute (matches minimum TTL)
 - [x] Create helper functions: `list_queue_system_cron_jobs_v2()`, `unschedule_all_queue_system_cron_jobs_v2()`
 - [x] Create Edge Function invoker: `invoke_edge_function_v2()` (uses pg_net)
 
@@ -177,7 +178,7 @@ Phase 0 complete. Feature flags, health check, and baseline capture are in place
 
 **Deliverables:**
 - [x] Staleness system SQL functions complete
-- [x] track-subscription-v2 Edge Function created
+- [x] refresh-analytics-from-presence-v2 Edge Function created (autonomous discovery)
 - [x] Feature flags: All still disabled
 
 ---
@@ -204,7 +205,7 @@ Phase 0 complete. Feature flags, health check, and baseline capture are in place
 - [x] Create frontend hook: `useTrackSubscription`
   - [x] Realtime Presence integration
   - [x] Feature flag check
-  - [x] Edge Function invocation
+  - [x] No Edge Function calls (fully autonomous backend discovery)
   - [x] Cleanup on unmount
 - [x] Create `card-data-type-mapping.ts` helper
   - [x] Maps card types to data types
@@ -334,5 +335,19 @@ SELECT * FROM api_call_queue_v2 ORDER BY created_at DESC LIMIT 10;
 - Phase 0, 1, 2 complete
 - Phase 3 in progress (60% - SQL functions done, cron jobs pending)
 - All SQL functions created and tested
-- Edge Functions created (skeleton for processor, complete for track-subscription)
+- Edge Functions created (processor, refresh-analytics-from-presence-v2)
 - Infrastructure setup (pg_net, cron jobs) pending
+
+**2025-11-17 (Evening):**
+- Phase 3 complete (100%)
+- Phase 4 complete (80%)
+- Phase 5 in progress (90%)
+- **Architecture Changes Documented:**
+  - Background staleness checker frequency updated from every 5 minutes to every minute
+    - **Rationale:** Data types with 1-minute TTLs (quotes) require more frequent checks
+    - **Impact:** Prevents stale data windows (data could be stale for up to 4 minutes with 5-minute schedule)
+  - Removed `track-subscription-v2` Edge Function - now fully autonomous
+    - **Rationale:** Client only tracks presence, backend discovers subscriptions automatically
+    - **Impact:** Simpler architecture, no client-side Edge Function calls, no rate limiting needed
+    - **Status:** `refresh-analytics-from-presence-v2` runs every minute to update analytics table
+  - **System Status:** Working correctly - quote data refreshing automatically every minute

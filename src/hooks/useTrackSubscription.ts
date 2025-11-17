@@ -20,8 +20,12 @@ interface UseTrackSubscriptionOptions {
  * This hook:
  * 1. Joins a Realtime channel with Presence config
  * 2. Tracks presence with metadata (symbol, dataTypes, userId)
- * 3. Calls track-subscription-v2 Edge Function to trigger staleness check
- * 4. Automatically cleans up on unmount
+ * 3. Automatically cleans up on unmount
+ *
+ * CRITICAL: Backend autonomously discovers subscriptions from Presence
+ * - Analytics table updated every minute via refresh-analytics-from-presence-v2
+ * - Background staleness checker runs every minute to refresh stale data
+ * - No client-side requests needed - fully autonomous backend discovery
  *
  * CRITICAL: This runs in parallel with existing postgres_changes subscriptions
  * It does NOT replace them - it adds Presence tracking for backend refresh system
@@ -33,7 +37,6 @@ export function useTrackSubscription({
 }: UseTrackSubscriptionOptions): void {
   const { supabase, user } = useAuth();
   const channelRef = useRef<RealtimeChannel | null>(null);
-  const hasTrackedRef = useRef<boolean>(false);
   const [featureEnabled, setFeatureEnabled] = useState<boolean>(false);
 
   // Check feature flag on mount
@@ -83,61 +86,28 @@ export function useTrackSubscription({
           console.log(`[useTrackSubscription] Presence synced for ${symbol}:`, state);
         }
       })
-      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`[useTrackSubscription] User ${key} joined ${symbol}`);
-        }
-      })
-      .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`[useTrackSubscription] User ${key} left ${symbol}`);
-        }
-      })
+          .on('presence', { event: 'join' }, ({ key }) => {
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`[useTrackSubscription] User ${key} joined ${symbol}`);
+            }
+          })
+          .on('presence', { event: 'leave' }, ({ key }) => {
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`[useTrackSubscription] User ${key} left ${symbol}`);
+            }
+          })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
           // CRITICAL: Track presence with metadata
           // This makes the subscription visible to backend via Realtime Presence API
+          // Backend autonomously discovers subscriptions and updates analytics table
+          // Background staleness checker runs every minute to refresh stale data
           await channel.track({
             symbol,
             dataTypes, // Array of data types this user is viewing
             userId: user.id,
             subscribedAt: new Date().toISOString(),
           });
-
-          // CRITICAL: Call track-subscription-v2 Edge Function
-          // This triggers immediate staleness check (event-driven)
-          // Only call once per subscription (not on every re-subscribe)
-          if (!hasTrackedRef.current) {
-            hasTrackedRef.current = true;
-
-            try {
-              const { error } = await supabase.functions.invoke('track-subscription-v2', {
-                body: {
-                  symbol,
-                  dataTypes,
-                  priority: 0, // P0 = on-demand (user is actively viewing)
-                },
-              });
-
-              if (error) {
-                // CRITICAL: Silent failure (as per design trade-off)
-                // Log error but don't throw - allow subscription to proceed
-                // Background checker will catch stale data later
-                console.warn(
-                  `[useTrackSubscription] Failed to call track-subscription-v2 for ${symbol}:`,
-                  error
-                );
-              } else if (process.env.NODE_ENV === 'development') {
-                console.log(`[useTrackSubscription] Staleness check triggered for ${symbol}`);
-              }
-            } catch (error) {
-              // Network errors, etc. - log but don't break subscription
-              console.warn(
-                `[useTrackSubscription] Error calling track-subscription-v2 for ${symbol}:`,
-                error
-              );
-            }
-          }
         } else if (status === 'CHANNEL_ERROR') {
           console.error(`[useTrackSubscription] Channel error for ${symbol}:`, status);
         }
@@ -159,9 +129,8 @@ export function useTrackSubscription({
           });
 
         channelRef.current = null;
-        hasTrackedRef.current = false;
       }
     };
-  }, [symbol, supabase, user?.id, enabled, featureEnabled, dataTypes.join(',')]); // Include featureEnabled in deps
+  }, [symbol, supabase, user?.id, enabled, featureEnabled, dataTypes]); // Include featureEnabled and dataTypes in deps
 }
 

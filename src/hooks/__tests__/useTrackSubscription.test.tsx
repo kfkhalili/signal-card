@@ -10,7 +10,7 @@ import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 
 // Skip these tests if the module can't be resolved
 // This allows the test suite to run even if mocking isn't fully set up
-const canTestHook = true; // Set to false to skip these tests
+// Note: Tests are currently skipped (it.skip) until mocking is fully configured
 
 describe('useTrackSubscription', () => {
   beforeEach(() => {
@@ -35,7 +35,7 @@ describe('useTrackSubscription', () => {
       expect(true).toBe(true);
     });
 
-    it.skip('should call track-subscription-v2 Edge Function on subscribe', async () => {
+    it.skip('should track presence on subscribe (autonomous backend discovery)', async () => {
       // TODO: Implement when mocking is fully configured
       expect(true).toBe(true);
     });

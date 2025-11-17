@@ -164,10 +164,10 @@ For manual testing (when feature flag is enabled):
    - [ ] Add a card to workspace
    - [ ] Verify Realtime Presence channel is created
    - [ ] Check browser console for subscription logs
-   - [ ] Verify `track-subscription-v2` Edge Function is called
+   - [ ] Verify `active_subscriptions_v2` table is updated (via `refresh-analytics-from-presence-v2`)
 
 3. **Staleness Check**
-   - [ ] Verify staleness check is triggered on subscribe
+   - [ ] Verify background staleness checker runs every minute
    - [ ] Check `api_call_queue_v2` table for queued jobs
    - [ ] Verify jobs are processed by `queue-processor-v2`
 

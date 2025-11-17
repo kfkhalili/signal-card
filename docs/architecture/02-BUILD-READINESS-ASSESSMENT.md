@@ -195,8 +195,8 @@ INSERT INTO feature_flags VALUES
 **Tasks:**
 1. Create `check_and_queue_stale_batch_v2` function
 2. Create `check_and_queue_stale_data_from_presence_v2` function
-3. Create `track-subscription-v2` Edge Function
-4. **DO NOT** call from frontend yet
+3. Create `refresh-analytics-from-presence-v2` Edge Function
+4. **DO NOT** enable feature flag yet
 5. Test manually with test symbols
 
 **Success Criteria:**
@@ -209,7 +209,7 @@ INSERT INTO feature_flags VALUES
 
 **Tasks:**
 1. Add Presence to Realtime channels (alongside existing subscriptions)
-2. Call `track-subscription-v2` (feature-flagged)
+2. Track presence with metadata (no Edge Function calls)
 3. Keep existing Realtime subscriptions active
 4. Monitor both systems
 

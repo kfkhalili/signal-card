@@ -19,7 +19,7 @@ I will build **the entire backend-controlled refresh system** as specified in `M
 - ✅ All cron jobs (5 generic jobs replacing 11+ individual jobs)
 
 ### Backend Layer
-- ✅ `track-subscription-v2` Edge Function (event-driven staleness check)
+- ✅ `refresh-analytics-from-presence-v2` Edge Function (autonomous discovery from Presence)
 - ✅ `queue-processor-v2` Edge Function (monofunction architecture)
 - ✅ `health-check` Edge Function (pg_cron monitoring)
 - ✅ All worker functions in `/lib/` directory (fetch-fmp-* logic)
@@ -27,8 +27,8 @@ I will build **the entire backend-controlled refresh system** as specified in `M
 
 ### Frontend Layer
 - ✅ Realtime Presence integration
-- ✅ Update `RealtimeStockManager` to use Presence
-- ✅ Call `track-subscription-v2` on channel join
+- ✅ Update frontend to track presence (no Edge Function calls)
+- ✅ Fully autonomous backend discovery
 - ✅ Remove frontend staleness checking logic
 
 ### Migration
@@ -163,10 +163,10 @@ I will build **the entire backend-controlled refresh system** as specified in `M
    - Advisory lock (ID 43)
 
 **Edge Functions:**
-1. Create `track-subscription-v2` Edge Function
-   - Rate limiting configured
-   - Single batch RPC call
-   - Silent failure handling
+1. Create `refresh-analytics-from-presence-v2` Edge Function
+   - Queries Realtime Presence via REST API
+   - Updates `active_subscriptions_v2` table
+   - Runs every minute (matches minimum TTL)
 
 **Testing:**
 - Manual test: Staleness checks work
@@ -187,10 +187,9 @@ I will build **the entire backend-controlled refresh system** as specified in `M
    - Join channels with Presence config
    - Track presence with metadata (symbol, dataTypes, userId)
    - Keep existing Realtime subscriptions (parallel)
-2. Call `track-subscription-v2` on channel join
-   - Feature-flagged
-   - Error handling (silent failure)
-3. Call `untrack-subscription-v2` on channel leave (optional)
+2. No Edge Function calls needed
+   - Fully autonomous backend discovery
+   - Client only tracks presence
 
 **Testing:**
 - Test: Presence tracking works

@@ -10,7 +10,7 @@ export interface QueueJob {
   max_retries: number;
   created_at: string;
   estimated_data_size_bytes: number;
-  job_metadata: Record<string, any>;
+  job_metadata: Record<string, unknown>;
 }
 
 export interface ProcessJobResult {

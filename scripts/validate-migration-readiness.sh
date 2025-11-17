@@ -112,10 +112,11 @@ else
   ((ERRORS++))
 fi
 
-if [ -f "supabase/functions/track-subscription-v2/index.ts" ]; then
-  echo -e "${GREEN}✓ track-subscription-v2 exists${NC}"
+# track-subscription-v2 removed - now using autonomous discovery via refresh-analytics-from-presence-v2
+if [ -f "supabase/functions/refresh-analytics-from-presence-v2/index.ts" ]; then
+  echo -e "${GREEN}✓ refresh-analytics-from-presence-v2 exists${NC}"
 else
-  echo -e "${RED}✗ track-subscription-v2 not found${NC}"
+  echo -e "${RED}✗ refresh-analytics-from-presence-v2 not found${NC}"
   ((ERRORS++))
 fi
 echo ""

@@ -4,8 +4,14 @@
 
 import { describe, it, expect, beforeEach } from '@jest/globals';
 
+// Type for job run data
+interface JobRun {
+  jobname: string;
+  last_run: string | null;
+}
+
 // Mock Supabase client
-const createMockSupabaseClient = (jobRuns: any[] = []) => {
+const createMockSupabaseClient = (jobRuns: JobRun[] = []) => {
   return {
     rpc: jest.fn().mockResolvedValue({
       data: jobRuns,
@@ -33,7 +39,7 @@ describe('Health Check Edge Function', () => {
       ];
 
       const supabase = createMockSupabaseClient(mockJobRuns);
-      const { data, error } = await (supabase as any).rpc('check_cron_job_health', {
+      const { data, error } = await (supabase as ReturnType<typeof createMockSupabaseClient>).rpc('check_cron_job_health', {
         critical_jobs: ['process-queue-batch', 'check-stale-data'],
       });
 
@@ -89,7 +95,7 @@ describe('Health Check Edge Function', () => {
         }),
       };
 
-      const { error } = await (supabase as any).rpc('check_cron_job_health', {
+      const { error } = await (supabase as ReturnType<typeof createMockSupabaseClient>).rpc('check_cron_job_health', {
         critical_jobs: [],
       });
 

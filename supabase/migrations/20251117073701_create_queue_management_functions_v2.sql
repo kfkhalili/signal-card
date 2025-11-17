@@ -23,7 +23,7 @@ RETURNS TABLE(
   job_metadata JSONB
 ) AS $$
 DECLARE
-  batch_ids UUID[];
+  v_batch_ids UUID[];
   quota_limit_bytes BIGINT;
   current_usage_bytes BIGINT;
   buffered_quota_bytes BIGINT;
@@ -43,12 +43,15 @@ BEGIN
 
   -- CRITICAL: Predictive quota check - estimate batch size BEFORE selecting
   -- This prevents selecting a batch that would exceed quota
-  SELECT COALESCE(SUM(estimated_data_size_bytes), 0) INTO estimated_batch_size_bytes
-  FROM public.api_call_queue_v2
-  WHERE status = 'pending'
-    AND priority <= p_max_priority
-  ORDER BY priority DESC, created_at ASC
-  LIMIT p_batch_size;
+  SELECT COALESCE(SUM(batch_estimate.estimated_data_size_bytes), 0) INTO estimated_batch_size_bytes
+  FROM (
+    SELECT q.estimated_data_size_bytes
+    FROM public.api_call_queue_v2 q
+    WHERE q.status = 'pending'
+      AND q.priority <= p_max_priority
+    ORDER BY q.priority DESC, q.created_at ASC
+    LIMIT p_batch_size
+  ) batch_estimate;
 
   -- If estimated batch would exceed quota, return empty
   IF current_usage_bytes + estimated_batch_size_bytes >= buffered_quota_bytes THEN
@@ -69,13 +72,17 @@ BEGIN
     ORDER BY priority DESC, created_at ASC
     LIMIT p_batch_size
     FOR UPDATE SKIP LOCKED
+  ),
+  updated_jobs AS (
+    UPDATE public.api_call_queue_v2
+    SET status = 'processing',
+        processed_at = NOW()
+    FROM selected_jobs
+    WHERE api_call_queue_v2.id = selected_jobs.id
+    RETURNING api_call_queue_v2.id
   )
-  UPDATE public.api_call_queue_v2
-  SET status = 'processing',
-      processed_at = NOW()
-  FROM selected_jobs
-  WHERE api_call_queue_v2.id = selected_jobs.id
-  RETURNING api_call_queue_v2.id INTO batch_ids;
+  SELECT array_agg(updated_jobs.id) INTO v_batch_ids
+  FROM updated_jobs;
 
   -- Return full job data for selected jobs
   RETURN QUERY
@@ -91,12 +98,12 @@ BEGIN
     q.estimated_data_size_bytes,
     q.job_metadata
   FROM public.api_call_queue_v2 q
-  WHERE q.id = ANY(batch_ids)
+  WHERE q.id = ANY(COALESCE(v_batch_ids, ARRAY[]::UUID[]))
   ORDER BY q.priority DESC, q.created_at ASC;
 END;
 $$ LANGUAGE plpgsql;
 
-COMMENT ON FUNCTION public.get_queue_batch_v2 IS 'Atomically claims a batch of jobs from the queue. Includes predictive quota check and uses FOR UPDATE SKIP LOCKED to prevent race conditions.';
+COMMENT ON FUNCTION public.get_queue_batch_v2 IS 'Atomically claims a batch of jobs from the queue. Includes predictive quota check and uses FOR UPDATE SKIP LOCKED to prevent race conditions. Fixed array handling bug - uses array_agg in CTE to properly collect multiple IDs.';
 
 -- Function to complete a queue job
 -- CRITICAL: Auto-corrects estimated_data_size_bytes in registry (statistical sampling)

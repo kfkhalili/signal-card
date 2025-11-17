@@ -39,7 +39,7 @@ export async function checkFeatureFlag(flagName: string): Promise<boolean> {
  * This requires a context/provider to cache flags
  * For now, returns false (disabled) - can be enhanced later
  */
-export function isFeatureEnabled(flagName: string): boolean {
+export function isFeatureEnabled(_flagName: string): boolean {
   // TODO: Implement caching via React Context if needed
   // For now, always return false (disabled) to be safe
   // The async checkFeatureFlag should be used in useEffect

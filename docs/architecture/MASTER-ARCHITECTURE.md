@@ -6,7 +6,7 @@
 
 > **Performance Optimizations (v2.1):**
 > - ✅ Realtime Presence replaces heartbeat system (zero database load)
-> - ✅ Event-driven staleness check on subscribe (eliminates thundering herd)
+> - ✅ Fully autonomous staleness checking (background checker only, no event-driven check)
 > - ✅ Queue throttling prevents bloat (protects high-priority inserts)
 > - ✅ Fixed priority calculation (priority = viewer count)
 > - ✅ Reduced to 2 cron jobs (from 3)
@@ -14,7 +14,7 @@
 > **Hardening Fixes (v2.1.1):**
 > - ✅ Background checker uses Presence as source of truth (prevents ghost refreshes)
 > - ✅ Truly generic staleness query (100% metadata-driven, zero hardcoded types)
-> - ✅ Idempotent event-driven queueing (prevents race condition duplicates)
+> - ✅ Idempotent queueing (prevents race condition duplicates)
 >
 > **Final Polish (v2.1.2):**
 > - ✅ Parallel on-subscribe checks (Promise.all for concurrent execution)
@@ -40,7 +40,7 @@
 > **Operational Hardening (v2.1.6):**
 > - ✅ Stuck job recovery mechanism (prevents poisoned batches from blocking queue)
 > - ✅ Priority levels documentation aligned with implementation (removed non-existent P1/P2)
-> - ✅ Design trade-off documented (silent failure in track-subscription for better UX)
+> - ✅ Fully autonomous backend discovery (no client-side Edge Function calls)
 >
 > **Red-Team Hardening (v2.1.7):**
 > - ✅ Queue completion lifecycle (complete_queue_job/fail_queue_job prevent infinite retry loops)
@@ -475,68 +475,38 @@ $$ LANGUAGE plpgsql STABLE;
 
 ---
 
-### 4. Event-Driven Staleness Check (Primary) + Background Checker (Secondary)
+### 4. Autonomous Staleness Checking (Background Checker Only)
 
-**Purpose:** Check staleness immediately on subscribe (event-driven) + background check for data that becomes stale while viewing.
+**Purpose:** Fully autonomous staleness checking via background cron job that reads from Realtime Presence.
 
-**Key Insight:** The primary staleness check happens **on subscribe** (event-driven), giving users immediate results. The background cron job only catches data that becomes stale while users are already viewing it.
+**Key Insight:** The system is **fully autonomous** - the client only tracks presence, and the backend discovers subscriptions and checks staleness automatically. No client-side Edge Function calls needed.
 
-#### 4a. Event-Driven Check (Primary - On Subscribe)
+#### 4a. Autonomous Discovery (No Event-Driven Check)
 
-**When user subscribes, immediately check and queue if stale:**
+**How it works:**
 
-**Security Requirement: Rate Limiting**
+1. **Client tracks presence** - Client calls `channel.track()` with metadata (symbol, dataTypes, userId)
+2. **Backend discovers subscriptions** - `refresh-analytics-from-presence-v2` Edge Function runs every minute:
+   - Queries Realtime Presence via REST API
+   - Parses Presence data and un-nests dataTypes array
+   - Updates `active_subscriptions_v2` table with `last_seen_at = NOW()`
+   - Removes subscriptions no longer in Presence
+3. **Background staleness checker** - Runs every minute using `active_subscriptions_v2` table:
+   - Checks all active subscriptions for stale data
+   - Queues refreshes as needed
+   - Frequency matches minimum TTL (1 minute for quotes)
 
-This function is public-facing and performs database work. **Rate limiting is mandatory** to prevent DoS attacks. A malicious user could call this function thousands of times per second, overwhelming the database with staleness checks even though queue deduplication prevents duplicate entries.
+**Benefits:**
+- ✅ **Fully autonomous** - No client-side requests needed
+- ✅ **Simpler architecture** - Client only tracks presence
+- ✅ **No rate limiting needed** - No public-facing Edge Function
+- ✅ **Automatic cleanup** - Presence removes entries on disconnect
+- ✅ **No DoS vector** - Analytics updates are batch operations, not hot-path writes
 
-**Implementation:**
-- Apply rate limiting at the Supabase Edge Function level (per-IP or per-user)
-- Recommended: 10-20 calls per minute per user/IP
-- This ensures a single client cannot exhaust database resources
-
-```typescript
-// track-subscription edge function
-export async function trackSubscription(symbol: string, dataTypes: string[]) {
-  // SECURITY: Rate limiting must be applied at function level (Supabase config)
-  // This prevents DoS attacks - even with idempotent queueing,
-  // 10,000 calls = 10,000 staleness checks = database overload
-
-  // CRITICAL: Analytics removed from hot-path to prevent DoS vector
-  // Analytics are now handled as a batch operation in the cron job (Section 4b)
-  // This eliminates the "non-critical" write from the hottest code path
-
-  // 1. Immediately proceed to critical work
-  const viewerCount = await getActiveViewerCountFromPresence(symbol);
-
-  // 2. Single batch RPC call - eliminates 10-15 separate database round-trips
-  // This turns a "chatty" implementation into one efficient call
-  const { error } = await supabase.rpc('check_and_queue_stale_batch', {
-    p_symbol: symbol,
-    p_data_types: dataTypes,
-    p_priority: viewerCount,
-  });
-
-  if (error) {
-    console.error('[track-subscription] Batch staleness check failed:', error);
-    // Don't throw - allow subscription to proceed even if staleness check fails
-    // Background checker will catch stale data later
-  }
-}
-```
-
-**Design Note: Silent Failure Trade-off**
-
-The `track-subscription` function intentionally fails silently (logs to console) if the `check_and_queue_stale_batch` RPC fails. This ensures the user's subscription to Realtime is not blocked by a staleness-check error. This is a deliberate trade-off:
-
-- **Benefit:** User subscription succeeds immediately, allowing real-time updates to flow
-- **Trade-off:** User may see stale data for up to 5 minutes if the staleness check fails
-- **Fallback:** The background staleness checker (Section 4b) runs every 5 minutes and will act as a fallback, queueing the refresh even if the on-subscribe check failed
-
-This design prioritizes user experience (immediate subscription) over perfect data freshness (immediate staleness check).
-
-**Analytics Architecture (Moved to Batch Operation):**
-
-Analytics (`active_subscriptions` table) are **not** written in the hot-path. They are handled as a **batch operation** in the `check_and_queue_stale_data_from_presence` cron job (Section 4b), which already builds a perfect `temp_active_subscriptions` table from Realtime Presence. This eliminates the DoS vector from the analytics write-path.
+**Trade-off:**
+- **Latency:** Stale data may take up to 1 minute to refresh (vs immediate with event-driven)
+- **Acceptable:** Background checker runs every minute, matching minimum TTL, so worst case is 1-minute delay
+- **Benefit:** Simpler, more reliable, fully autonomous system
 
 // Idempotent queue function (prevents race conditions)
 async function queueRefreshIdempotent(
@@ -662,7 +632,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER; -- CRITICAL: Execute with creator's (admin
 **Benefits:**
 - ✅ **Immediate response** - User gets fresh data right away
 - ✅ **No thundering herd** - Only checks one symbol at a time
-- ✅ **Event-driven** - Only runs when needed
+- ✅ **Autonomous** - Backend discovers subscriptions automatically
 - ✅ **High priority** - User is actively viewing, so prioritize
 - ✅ **Idempotent** - Prevents duplicate queue entries (race condition fixed)
 - ✅ **Single RPC call** - Eliminates 10-15 database round-trips (was "chatty")
@@ -671,9 +641,9 @@ $$ LANGUAGE plpgsql SECURITY DEFINER; -- CRITICAL: Execute with creator's (admin
 - ✅ **Rate limited** - Protected against DoS attacks
 - ✅ **Non-blocking analytics** - Fire-and-forget upsert doesn't delay critical work
 
-#### 4b. Background Staleness Checker (Secondary - Catches Data That Becomes Stale)
+#### 4b. Background Staleness Checker (Primary - Only Staleness Check)
 
-**Purpose:** Only catches data that becomes stale while users are already viewing it.
+**Purpose:** Primary staleness check that runs every minute. Discovers active subscriptions from analytics table and checks for stale data.
 
 **Critical Fixes:**
 1. **Uses Presence as source of truth** (not `active_subscriptions` table) - prevents "ghost refreshes"
@@ -1012,7 +982,7 @@ $$ LANGUAGE plpgsql;
 ```
 
 **Performance Optimization:**
-- ✅ **Runs less frequently** - Every 5 minutes (not every minute) since primary check is event-driven
+- ✅ **Frequency matches minimum TTL** - Runs every minute to match 1-minute TTL for quotes (prevents stale data windows)
 - ✅ **Type-by-type loop** - Fast because it loops over metadata (10-50 types), not data (10,000+ symbols)
 - ✅ **Uses Presence** - Source of truth, no ghost refreshes
 - ✅ **Single RPC call** - Consolidated to one database call (or all in Postgres with pg_net/http)
@@ -1026,7 +996,7 @@ $$ LANGUAGE plpgsql;
 - ✅ **Perfectly generic** - Add 50 new data types, function never needs changes
 - ✅ **No hardcoded logic** - Zero CASE statements, zero UNION ALL blocks
 - ✅ **Automatically scales** - Works for any future data type without code changes
-- ✅ **Event-driven primary** - Eliminates thundering herd
+- ✅ **Fully autonomous** - Backend discovers and checks automatically
 - ✅ **No ghost refreshes** - Uses Presence as source of truth
 - ✅ **High performance** - Type-by-type loop over metadata (fast), not row-by-row over data (slow)
 
@@ -1882,14 +1852,16 @@ $$ LANGUAGE plpgsql;
 **Only 5 generic cron jobs total** (not 11+ individual jobs):
 
 ```sql
--- Job 1: Background staleness check (runs every 5 minutes)
--- Only catches data that becomes stale while users are viewing
--- Primary check is event-driven (on subscribe)
+-- Job 1: Background staleness check (runs every minute)
+-- PRIMARY staleness check - this is the only staleness check (no event-driven check)
+-- CRITICAL: Frequency must match minimum TTL across all data types
+-- For data types with 1-minute TTLs (e.g., quotes), running every 5 minutes would allow
+-- data to be stale for up to 4 minutes, which is unacceptable
 -- CRITICAL: Slimmed down - analytics update moved to Job 4 to prevent "God Function" bloat
 -- Uses active_subscriptions table (updated by Job 4) instead of building temp table
 SELECT cron.schedule(
   'check-stale-data',
-  '*/5 * * * *', -- Every 5 minutes (less frequent since primary is event-driven)
+  '* * * * *', -- Every minute (matches minimum TTL of 1 minute for quotes)
   $$ SELECT check_and_queue_stale_data_from_presence(); $$
 );
 
@@ -1991,7 +1963,7 @@ BEGIN
       SELECT 1 FROM api_call_queue q
       WHERE q.symbol = s.symbol
         AND q.data_type = reg.data_type
-        AND q.status IN ('pending', 'processing') -- Same robust deduplication as event-driven and background checkers
+        AND q.status IN ('pending', 'processing') -- Same robust deduplication as background checker
     )
   LIMIT num_to_add
   ON CONFLICT DO NOTHING;
@@ -2014,9 +1986,9 @@ $$ LANGUAGE plpgsql;
 - ✅ Generic - handles all data types
 - ✅ Self-organizing
 - ✅ **Queue throttling** - Prevents queue bloat from slowing high-priority inserts
-- ✅ **Consistent deduplication** - Same robust logic as event-driven and background checkers
+- ✅ **Consistent deduplication** - Same robust logic as background checker
 - ✅ **Set-based query** - Single query, no loop (avoids multiple full table scans)
-- ✅ **Event-driven primary check** - Eliminates thundering herd
+- ✅ **Fully autonomous** - Backend discovers and checks automatically
 - ✅ **No cleanup job needed** - Realtime Presence handles disconnects automatically
 
 ---
@@ -2028,24 +2000,21 @@ $$ LANGUAGE plpgsql;
 1. **User subscribes to symbol:**
    - Frontend joins Realtime channel with Presence: `channel('symbol:AAPL')`
    - Frontend tracks presence with metadata (symbol, dataTypes, userId)
-   - Frontend calls `track-subscription` edge function
-   - **Event-driven staleness check:** `track-subscription` immediately checks if data is stale
-   - If stale, queues refresh with high priority (user is actively viewing)
-   - User gets fresh data immediately
+   - **No Edge Function calls** - fully autonomous backend discovery
 
-2. **Realtime Presence tracking:**
-   - Supabase Realtime automatically tracks who's subscribed
-   - Backend can query presence via `supabase.realtime.list()`
-   - Zero database load, perfectly accurate, real-time
-   - Automatically removes on disconnect (no cleanup job needed)
+2. **Analytics refresh runs (every minute):**
+   - `refresh-analytics-from-presence-v2` Edge Function queries Realtime Presence
+   - Updates `active_subscriptions_v2` table with `last_seen_at = NOW()`
+   - Removes subscriptions no longer in Presence
+   - **CRITICAL:** Frequency matches minimum TTL (1 minute for quotes) so staleness checker has accurate data
 
-3. **Background staleness checker runs (every 5 minutes):**
-   - Gets active subscriptions from **Realtime Presence** (source of truth)
-   - Calls `check_and_queue_stale_data_from_presence()` with Presence data
+3. **Background staleness checker runs (every minute):**
+   - Gets active subscriptions from `active_subscriptions_v2` table (updated by analytics refresh)
+   - Calls `check_and_queue_stale_data_from_presence_v2()` with subscription data
    - Single set-based query (not row-by-row loop) checks all data types at once
-   - Only checks symbols that ALREADY have active subscriptions (from presence)
-   - Catches data that becomes stale while users are viewing
-   - Less critical since primary check is event-driven
+   - Only checks symbols that ALREADY have active subscriptions
+   - **CRITICAL:** Frequency matches minimum TTL (1 minute for quotes) to prevent stale data windows
+   - **PRIMARY staleness check** - this is the only staleness check (no event-driven check)
 
 4. **Queue processor runs:**
    - Edge function calls `get_queue_batch()`
@@ -2062,7 +2031,7 @@ $$ LANGUAGE plpgsql;
 6. **User unsubscribes (normal flow):**
    - Frontend leaves Realtime channel
    - Presence automatically removed
-   - Frontend calls `untrack-subscription` edge function (optional, for analytics)
+   - Analytics table updated on next refresh (removes entry)
 
 7. **User disconnects (abnormal flow):**
    - Realtime Presence automatically detects disconnect
@@ -2119,8 +2088,9 @@ INSERT INTO data_type_registry VALUES (
 
 ### ✅ Minimal Scheduled Jobs
 - Only 5 cron jobs total (not 11+)
-- Event-driven primary staleness check (on subscribe)
-- Background check runs every 5 minutes (not every minute)
+- Fully autonomous staleness checking (background checker only)
+- Background check runs every minute (matches minimum TTL of 1 minute for quotes)
+- Analytics refresh runs every minute (matches minimum TTL so staleness checker has accurate data)
 - Queue throttling prevents bloat
 - Generic - handles all data types
 - Self-organizing
@@ -2149,12 +2119,11 @@ INSERT INTO data_type_registry VALUES (
 5. Create `is_data_stale()` functions
    - **CRITICAL:** Remove DEFAULT values from TTL parameters (prevents split-brain TTL bugs)
    - **CRITICAL:** Force explicit TTL from registry (ensures metadata-driven principle)
-6. Create subscription tracking edge functions:
-   - `track-subscription` - Records subscription + **immediately checks staleness** (event-driven)
-     - **CRITICAL:** Configure rate limiting (10-20 calls/minute per user/IP)
-     - Implement fire-and-forget analytics upsert
-     - Use single batch RPC call (`check_and_queue_stale_batch`)
-   - `untrack-subscription` - Removes subscription (optional, for analytics)
+6. Create analytics refresh Edge Function:
+   - `refresh-analytics-from-presence-v2` - Queries Realtime Presence and updates `active_subscriptions_v2`
+     - Runs every minute (matches minimum TTL)
+     - Fully autonomous - no client-side calls needed
+     - Updates `last_seen_at = NOW()` for all active subscriptions
 7. Create `check_and_queue_stale_batch()` function (batch staleness checker)
    - **CRITICAL:** Add fault tolerance (exception handling per data type)
 8. Create `queue_refresh_if_not_exists()` function (idempotent queueing)
@@ -2207,20 +2176,20 @@ INSERT INTO data_type_registry VALUES (
 
 ### Phase 3: Scheduled Jobs (Week 2)
 1. Create 5 generic cron jobs:
-   - Background staleness checker (every 5 minutes) - Slimmed down, uses active_subscriptions table
+   - Background staleness checker (every minute) - Frequency matches minimum TTL (1 minute for quotes), uses active_subscriptions_v2 table
    - Scheduled refreshes (every minute, with throttling)
    - **Queue processor invoker (every minute)** - Looping invoker (SQL loop, stateless Edge Function)
-   - **Analytics table refresh (every 15 minutes)** - Heavy TRUNCATE...INSERT moved from Job 1
+   - **Analytics table refresh (every minute)** - CRITICAL: Must match minimum TTL so staleness checker has accurate data. Queries Realtime Presence and updates active_subscriptions_v2
    - **Partition maintenance (weekly)** - Truncates completed/failed partitions to prevent bloat
 2. Remove all individual cron jobs (11+)
 3. Test generic system and Realtime Presence integration
 
 ### Phase 4: Frontend Integration (Week 3)
-1. Update `RealtimeStockManager` to:
+1. Update frontend to:
    - Join Realtime channels with Presence when adding symbol
    - Track presence with metadata (symbol, dataTypes, userId)
-   - Call `track-subscription` when joining (triggers event-driven staleness check)
-   - Leave channel and call `untrack-subscription` when removing symbol
+   - **No Edge Function calls** - fully autonomous backend discovery
+   - Leave channel when removing symbol (Presence automatically cleaned up)
 2. Remove frontend staleness checking logic
 3. Test end-to-end flow including disconnect scenarios
 4. Verify Realtime Presence automatically handles disconnects
@@ -2326,7 +2295,7 @@ The system uses two priority tiers:
      // Check if any critical job is stale (hasn't run in expected interval)
      const staleJobs = jobRuns.filter(job => {
        const expectedInterval = job.jobname === 'process-queue-batch' ? 2 : // 2 minutes (runs every 1 min, allow 1 min buffer)
-                                job.jobname === 'check-stale-data' ? 10 : // 10 minutes (runs every 5 min, allow 5 min buffer)
+                                job.jobname === 'check-stale-data' ? 3 : // 3 minutes (runs every 1 min, allow 2 min buffer)
                                 job.jobname === 'scheduled-refreshes' ? 5 : // 5 minutes (runs every 1 min, allow 4 min buffer)
                                 job.jobname === 'refresh-analytics-table' ? 20 : // 20 minutes (runs every 15 min, allow 5 min buffer)
                                 10; // Default 10 minutes
@@ -3137,8 +3106,8 @@ These components are **architecturally critical**. Changing them will introduce 
 **Why:** Prevents DoS vector from "non-critical" analytics writes on the hottest code path.
 
 **What NOT to do:**
-- ❌ Add analytics writes back to `track-subscription` function
-- ❌ Make analytics "fire-and-forget" in hot-path
+- ❌ Add analytics writes to hot-path functions
+- ❌ Make analytics "fire-and-forget" in client-side code
 
 **What to do instead:**
 - ✅ If you need analytics, use batch operations (cron jobs)
@@ -3354,11 +3323,11 @@ These components are **architecturally critical**. Changing them will introduce 
 **Contract:** The `check_and_queue_stale_batch` function must use `SECURITY DEFINER` to execute with admin permissions.
 
 **Why:**
-- Function is called by authenticated users (via `track-subscription` Edge Function)
+- Function is called by cron jobs (via `check_and_queue_stale_data_from_presence_v2`)
 - Function needs to SELECT from data tables (e.g., `profiles`) and INSERT into `api_call_queue`
-- Users do NOT have these permissions (RLS policies restrict access)
+- Cron job role needs these permissions (RLS policies restrict access)
 - Without `SECURITY DEFINER`, function will fail with `42501` (permission denied)
-- This breaks the primary event-driven staleness check (cornerstone of "immediate response")
+- This breaks the background staleness checker (primary staleness check)
 
 **What NOT to do:**
 - ❌ Create function without `SECURITY DEFINER` (will fail with permission denied)
