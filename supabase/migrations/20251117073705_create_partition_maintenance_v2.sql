@@ -11,7 +11,7 @@ BEGIN
   -- CRITICAL: Set short lock timeout (1 second)
   -- This prevents "stop-the-world" deadlocks with active processors
   SET LOCAL lock_timeout = '1s';
-  
+
   BEGIN
     -- Truncate completed partition (polite - will fail gracefully if locked)
     TRUNCATE TABLE public.api_call_queue_v2_completed;
@@ -22,7 +22,7 @@ BEGIN
     WHEN OTHERS THEN
       RAISE WARNING 'Error truncating completed partition: %', SQLERRM;
   END;
-  
+
   BEGIN
     -- Truncate failed partition (polite - will fail gracefully if locked)
     TRUNCATE TABLE public.api_call_queue_v2_failed;

@@ -22,7 +22,7 @@ BEGIN
     priority,
     estimated_data_size_bytes
   )
-  SELECT 
+  SELECT
     p_symbol,
     p_data_type,
     'pending',
@@ -35,7 +35,7 @@ BEGIN
       AND status IN ('pending', 'processing')
   )
   RETURNING id INTO job_id;
-  
+
   RETURN job_id;
 END;
 $$ LANGUAGE plpgsql;

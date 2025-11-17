@@ -27,13 +27,13 @@ BEGIN
   FROM stuck_jobs
   WHERE api_call_queue_v2.id = stuck_jobs.id
   RETURNING id INTO stuck_job_count;
-  
+
   GET DIAGNOSTICS recovered_count = ROW_COUNT;
-  
+
   IF recovered_count > 0 THEN
     RAISE NOTICE 'Recovered % stuck jobs', recovered_count;
   END IF;
-  
+
   RETURN recovered_count;
 END;
 $$ LANGUAGE plpgsql;

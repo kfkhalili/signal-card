@@ -1,9 +1,9 @@
 /**
  * Queue Processor Edge Function (Monofunction Architecture)
- * 
+ *
  * CRITICAL: This is a "monofunction" that imports all fetch-fmp-* logic directly.
  * This prevents connection pool exhaustion from FaaS-to-FaaS invocations.
- * 
+ *
  * Architecture:
  * - Processes ONE batch and exits (stateless)
  * - Loop is in SQL invoker (invoke_processor_loop_v2), not here
@@ -118,7 +118,7 @@ Deno.serve(async (req: Request) => {
           error.message?.includes('40P01')
         )) {
           console.warn(`[queue-processor-v2] Deadlock detected for job ${job.id}, resetting immediately`);
-          
+
           // Reset job immediately (doesn't increment retry_count)
           const { error: resetError } = await supabase.rpc('reset_job_immediate_v2', {
             p_job_id: job.id,
@@ -199,10 +199,10 @@ async function processJob(
 
   // Placeholder implementation
   console.log(`[queue-processor-v2] Processing job ${job.id} for ${job.symbol} (${job.data_type})`);
-  
+
   // Simulate processing
   await new Promise(resolve => setTimeout(resolve, 100));
-  
+
   return {
     success: true,
     dataSizeBytes: job.estimated_data_size_bytes || 0,

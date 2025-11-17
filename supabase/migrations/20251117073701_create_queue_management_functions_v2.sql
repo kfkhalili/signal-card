@@ -32,15 +32,15 @@ BEGIN
   -- CRITICAL: Check quota BEFORE selecting batch
   -- Get quota limit
   quota_limit_bytes := (current_setting('app.settings.quota_limit_bytes', true))::BIGINT;
-  
+
   -- Get current usage (rolling 30-day window)
   SELECT COALESCE(SUM(data_size_bytes), 0) INTO current_usage_bytes
   FROM public.api_data_usage_v2
   WHERE recorded_at >= NOW() - INTERVAL '30 days';
-  
+
   -- Calculate buffered quota (95% safety buffer)
   buffered_quota_bytes := (quota_limit_bytes * 0.95)::BIGINT;
-  
+
   -- CRITICAL: Predictive quota check - estimate batch size BEFORE selecting
   -- This prevents selecting a batch that would exceed quota
   SELECT COALESCE(SUM(estimated_data_size_bytes), 0) INTO estimated_batch_size_bytes
@@ -49,14 +49,14 @@ BEGIN
     AND priority <= p_max_priority
   ORDER BY priority DESC, created_at ASC
   LIMIT p_batch_size;
-  
+
   -- If estimated batch would exceed quota, return empty
   IF current_usage_bytes + estimated_batch_size_bytes >= buffered_quota_bytes THEN
     RAISE NOTICE 'Quota would be exceeded by batch. Current: %, Batch: %, Limit: %',
       current_usage_bytes, estimated_batch_size_bytes, buffered_quota_bytes;
     RETURN;
   END IF;
-  
+
   -- CRITICAL: Atomic batch claiming
   -- 1. SELECT jobs with FOR UPDATE SKIP LOCKED (prevents race conditions)
   -- 2. UPDATE status to 'processing' in same transaction
@@ -76,10 +76,10 @@ BEGIN
   FROM selected_jobs
   WHERE api_call_queue_v2.id = selected_jobs.id
   RETURNING api_call_queue_v2.id INTO batch_ids;
-  
+
   -- Return full job data for selected jobs
   RETURN QUERY
-  SELECT 
+  SELECT
     q.id,
     q.symbol,
     q.data_type,
