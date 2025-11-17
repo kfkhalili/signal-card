@@ -59,67 +59,6 @@ $$ LANGUAGE plpgsql;
 
 COMMENT ON FUNCTION invoke_edge_function_v2 IS 'Invokes a Supabase Edge Function from SQL context using pg_net extension. Requires pg_net to be enabled.';
 
--- Update invoke_processor_if_healthy_v2 to use the invoker function
-CREATE OR REPLACE FUNCTION public.invoke_processor_if_healthy_v2()
-RETURNS void AS $$
-DECLARE
-  recent_failures INTEGER;
-  lock_acquired BOOLEAN;
-  invocation_result JSONB;
-BEGIN
-  -- CRITICAL: Prevent cron job self-contention
-  SELECT pg_try_advisory_lock(44) INTO lock_acquired;
-  
-  IF NOT lock_acquired THEN
-    RAISE NOTICE 'invoke_processor_if_healthy_v2 is already running. Exiting.';
-    RETURN;
-  END IF;
-  
-  BEGIN
-    -- CRITICAL: Proactive self-healing - recover stuck jobs FIRST
-    -- This runs every minute (as part of processor invoker) instead of every 5 minutes
-    PERFORM recover_stuck_jobs_v2();
-    
-    -- CRITICAL: Circuit breaker - check for recent failures
-    -- Monitor retry_count > 0 (not just status = 'failed')
-    -- This correctly trips on temporary API outages
-    SELECT COUNT(*) INTO recent_failures
-    FROM public.api_call_queue_v2
-    WHERE retry_count > 0
-      AND created_at >= NOW() - INTERVAL '10 minutes';
-    
-    -- If too many recent failures, trip circuit breaker
-    IF recent_failures > 50 THEN
-      RAISE EXCEPTION 'Circuit breaker tripped: % recent failures in last 10 minutes', recent_failures;
-    END IF;
-    
-    -- Invoke processor Edge Function
-    -- CRITICAL: Wrap in exception handler to prevent silent invoker failure
-    BEGIN
-      -- Use the invoker function to call the Edge Function
-      SELECT invoke_edge_function_v2(
-        'queue-processor-v2',
-        '{}'::jsonb,
-        300000 -- 5 minute timeout
-      ) INTO invocation_result;
-      
-      RAISE NOTICE 'Processor invoked successfully: %', invocation_result;
-    EXCEPTION
-      WHEN OTHERS THEN
-        -- CRITICAL: Raise WARNING (not EXCEPTION) to alert via observability
-        -- This prevents the cron job from failing silently
-        RAISE WARNING 'Failed to invoke processor: %', SQLERRM;
-    END;
-    
-  EXCEPTION
-    WHEN OTHERS THEN
-      RAISE WARNING 'invoke_processor_if_healthy_v2 failed: %', SQLERRM;
-  END;
-  
-  -- Always release lock
-  PERFORM pg_advisory_unlock(44);
-END;
-$$ LANGUAGE plpgsql;
-
-COMMENT ON FUNCTION public.invoke_processor_if_healthy_v2 IS 'Invokes processor with circuit breaker. Runs recover_stuck_jobs proactively. Uses advisory lock to prevent cron pile-ups.';
+-- Note: invoke_processor_if_healthy_v2 is updated in 20251117073704_create_processor_invoker_v2.sql
+-- This migration creates the helper function that it uses
 

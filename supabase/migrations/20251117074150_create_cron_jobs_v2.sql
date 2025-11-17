@@ -110,7 +110,7 @@ BEGIN
   PERFORM cron.unschedule('invoke-processor-v2');
   PERFORM cron.unschedule('maintain-queue-partitions-v2');
   PERFORM cron.unschedule('refresh-analytics-v2');
-  
+
   RAISE NOTICE 'All queue system cron jobs unscheduled';
 END;
 $$ LANGUAGE plpgsql;

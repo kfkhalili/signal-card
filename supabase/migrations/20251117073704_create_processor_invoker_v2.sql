@@ -41,26 +41,18 @@ BEGIN
 
     -- Invoke processor Edge Function
     -- CRITICAL: Wrap in exception handler to prevent silent invoker failure
-    -- CRITICAL: Use pg_net/http extension to invoke Edge Function via HTTP
-    -- Alternative: Use Supabase client library if available in SQL context
+    -- Uses invoke_edge_function_v2 helper (which uses pg_net extension)
     BEGIN
-      -- TODO: Implement actual Edge Function invocation
-      -- Option 1: Use pg_net/http extension (if available)
-      -- SELECT * INTO invocation_result FROM http_post(
-      --   url := current_setting('app.settings.supabase_url', true) || '/functions/v1/queue-processor-v2',
-      --   headers := jsonb_build_object(
-      --     'Authorization', 'Bearer ' || current_setting('app.settings.supabase_service_role_key', true),
-      --     'Content-Type', 'application/json'
-      --   ),
-      --   body := '{}'::jsonb,
-      --   timeout_milliseconds := 10000
-      -- );
+      -- Use the invoker function to call the Edge Function
+      -- This will be available after invoke_edge_function_v2 migration runs
+      -- Note: Migration order ensures invoke_edge_function_v2 exists before this is called
+      SELECT invoke_edge_function_v2(
+        'queue-processor-v2',
+        '{}'::jsonb,
+        300000 -- 5 minute timeout
+      ) INTO invocation_result;
       
-      -- Option 2: Use Supabase client (if available in SQL context)
-      -- PERFORM supabase.invoke_edge_function('queue-processor-v2');
-      
-      -- For now, log that invocation would happen
-      RAISE NOTICE 'Processor invocation placeholder - Edge Function invocation to be implemented';
+      RAISE NOTICE 'Processor invoked successfully';
     EXCEPTION
       WHEN OTHERS THEN
         -- CRITICAL: Raise WARNING (not EXCEPTION) to alert via observability
