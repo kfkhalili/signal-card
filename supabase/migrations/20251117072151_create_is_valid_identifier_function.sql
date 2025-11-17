@@ -12,7 +12,7 @@ BEGIN
   IF p_identifier IS NULL OR p_identifier = '' THEN
     RETURN false;
   END IF;
-  
+
   -- Allow only alphanumeric and underscore characters
   -- This matches PostgreSQL identifier rules
   RETURN p_identifier ~ '^[a-zA-Z0-9_]+$';

@@ -41,12 +41,12 @@ GRANT SELECT ON public.data_type_registry_v2 TO authenticated, anon;
 -- This is a non-negotiable security boundary
 
 -- Indexes for common queries
-CREATE INDEX IF NOT EXISTS idx_data_type_registry_v2_refresh_strategy 
-  ON public.data_type_registry_v2(refresh_strategy) 
+CREATE INDEX IF NOT EXISTS idx_data_type_registry_v2_refresh_strategy
+  ON public.data_type_registry_v2(refresh_strategy)
   WHERE refresh_strategy = 'on-demand';
 
-CREATE INDEX IF NOT EXISTS idx_data_type_registry_v2_refresh_strategy_scheduled 
-  ON public.data_type_registry_v2(refresh_strategy) 
+CREATE INDEX IF NOT EXISTS idx_data_type_registry_v2_refresh_strategy_scheduled
+  ON public.data_type_registry_v2(refresh_strategy)
   WHERE refresh_strategy = 'scheduled';
 
 -- Auto-update updated_at timestamp
