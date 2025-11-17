@@ -51,7 +51,7 @@ BEGIN
         '{}'::jsonb,
         300000 -- 5 minute timeout
       ) INTO invocation_result;
-      
+
       RAISE NOTICE 'Processor invoked successfully';
     EXCEPTION
       WHEN OTHERS THEN
