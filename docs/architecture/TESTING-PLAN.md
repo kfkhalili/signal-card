@@ -47,8 +47,8 @@
 
 Enable feature flags:
 ```sql
-UPDATE feature_flags 
-SET enabled = true 
+UPDATE feature_flags
+SET enabled = true
 WHERE flag_name IN ('use_queue_system', 'use_presence_tracking');
 ```
 
@@ -92,29 +92,29 @@ WHERE flag_name IN ('use_queue_system', 'use_presence_tracking');
 
 ```sql
 -- Check subscriptions
-SELECT symbol, data_type, COUNT(*) as user_count 
-FROM active_subscriptions_v2 
-GROUP BY symbol, data_type 
+SELECT symbol, data_type, COUNT(*) as user_count
+FROM active_subscriptions_v2
+GROUP BY symbol, data_type
 ORDER BY user_count DESC;
 
 -- Check queue status
-SELECT 
-  status, 
+SELECT
+  status,
   COUNT(*) as count,
   AVG(priority) as avg_priority
-FROM api_call_queue_v2 
+FROM api_call_queue_v2
 GROUP BY status;
 
 -- Check recent jobs
-SELECT 
-  symbol, 
-  data_type, 
-  status, 
-  priority, 
-  created_at, 
+SELECT
+  symbol,
+  data_type,
+  status,
+  priority,
+  created_at,
   processed_at
-FROM api_call_queue_v2 
-ORDER BY created_at DESC 
+FROM api_call_queue_v2
+ORDER BY created_at DESC
 LIMIT 20;
 
 -- Check quota usage
@@ -206,8 +206,8 @@ SELECT * FROM get_quota_usage_v2();
 If issues found:
 1. Disable feature flags:
    ```sql
-   UPDATE feature_flags 
-   SET enabled = false 
+   UPDATE feature_flags
+   SET enabled = false
    WHERE flag_name IN ('use_queue_system', 'use_presence_tracking');
    ```
 2. Old system resumes immediately
