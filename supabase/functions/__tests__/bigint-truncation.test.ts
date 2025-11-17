@@ -1,11 +1,12 @@
 /**
  * Tests for bigint truncation in FMP data processing functions
- * 
+ *
  * CRITICAL: FMP API sometimes returns decimal numbers for volume and market_cap
  * (e.g., "3955124346827.0005"), but PostgreSQL bigint columns only accept integers.
  * These tests verify that decimal values are properly truncated before database insertion.
  */
 
+// This is a Jest test file that runs in Node.js, not Deno
 import { describe, it, expect } from '@jest/globals';
 
 describe('Bigint Truncation', () => {
