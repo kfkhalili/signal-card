@@ -225,7 +225,7 @@ Phase 0 complete. Feature flags, health check, and baseline capture are in place
 
 ## Phase 5: Migration (One Type)
 
-**Status:** 🟡 In Progress (70%)
+**Status:** 🟡 In Progress (90%)
 **Target:** Week 4-5
 **Started:** 2025-11-17
 
@@ -249,12 +249,16 @@ Phase 0 complete. Feature flags, health check, and baseline capture are in place
 - [x] Verify registry entry is correct
 - [x] Test basic functions (staleness check, queue function)
 - [x] Apply Phase 2-3 migrations (queue system, staleness system)
-  - [x] Quota functions
-  - [x] Queue management functions (get_batch, complete, fail)
-  - [x] Recovery functions
+  - [x] Quota functions (fixed integer overflow)
+  - [x] Queue management functions (get_batch, complete, fail - fixed column ambiguity)
+  - [x] Recovery functions (fixed column ambiguity)
   - [x] Partition maintenance
   - [x] Event-driven staleness check
-- [ ] Apply remaining Phase 3 migrations (background checker, scheduled refreshes, analytics)
+  - [x] Background staleness checker
+  - [x] Scheduled refreshes (fixed syntax error)
+  - [x] Analytics refresh
+  - [x] Edge function invoker
+  - [x] Cron jobs (5 jobs scheduled)
 - [ ] Test end-to-end flow (with feature flag still disabled)
 - [ ] Enable feature flag: `use_queue_system = true` (when ready)
 - [ ] Monitor for 24-48 hours
