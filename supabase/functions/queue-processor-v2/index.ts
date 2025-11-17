@@ -23,8 +23,8 @@ const CORS_HEADERS = {
 // Import worker functions from /lib/ directory (monofunction architecture)
 import { fetchProfileLogic } from '../lib/fetch-fmp-profile.ts';
 import { fetchQuoteLogic } from '../lib/fetch-fmp-quote.ts';
+import { fetchFinancialStatementsLogic } from '../lib/fetch-fmp-financial-statements.ts';
 // TODO: Import other worker functions as they are migrated
-// import { fetchFinancialStatementsLogic } from './lib/fetch-fmp-financial-statements.ts';
 // ... etc for all data types
 
 interface QueueJob {
@@ -241,9 +241,9 @@ async function processJob(
       return await fetchProfileLogic(job, supabase);
     case 'quote':
       return await fetchQuoteLogic(job, supabase);
+    case 'financial-statements':
+      return await fetchFinancialStatementsLogic(job, supabase);
     // TODO: Add other data types as they are migrated to /lib/
-    // case 'financial-statements':
-    //   return await fetchFinancialStatementsLogic(job, supabase);
     // ... etc
     default:
       return {
