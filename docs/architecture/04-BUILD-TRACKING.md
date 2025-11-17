@@ -225,7 +225,7 @@ Phase 0 complete. Feature flags, health check, and baseline capture are in place
 
 ## Phase 5: Migration (One Type)
 
-**Status:** 🟡 In Progress (60%)
+**Status:** 🟡 In Progress (70%)
 **Target:** Week 4-5
 **Started:** 2025-11-17
 
