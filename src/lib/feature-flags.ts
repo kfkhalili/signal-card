@@ -18,7 +18,7 @@ export async function checkFeatureFlag(flagName: string): Promise<boolean> {
   try {
     const { data, error } = await supabase
       .from('feature_flags')
-      .select('is_enabled')
+      .select('enabled')
       .eq('flag_name', flagName)
       .maybeSingle();
 
@@ -27,7 +27,7 @@ export async function checkFeatureFlag(flagName: string): Promise<boolean> {
       return false; // Default to disabled on error
     }
 
-    return data?.is_enabled ?? false;
+    return data?.enabled ?? false;
   } catch (error) {
     console.warn(`[feature-flags] Exception checking flag ${flagName}:`, error);
     return false; // Default to disabled on exception
