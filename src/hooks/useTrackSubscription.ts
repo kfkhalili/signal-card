@@ -3,7 +3,7 @@
 // CRITICAL: This enables backend-controlled refresh system
 // Runs in parallel with existing postgres_changes subscriptions (non-breaking)
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from '@/contexts/AuthContext';
 import { checkFeatureFlag } from '@/lib/feature-flags';
@@ -39,6 +39,25 @@ export function useTrackSubscription({
   const channelRef = useRef<RealtimeChannel | null>(null);
   const [featureEnabled, setFeatureEnabled] = useState<boolean>(false);
 
+  // CRITICAL: Memoize dataTypes to prevent unnecessary re-renders
+  // Arrays are compared by reference, so we need to stabilize it
+  const stableDataTypes = useMemo(() => dataTypes, [dataTypes.join(',')]);
+
+  // CRITICAL: Store current values in refs for cleanup function
+  // This ensures cleanup has access to the correct values even if component unmounts
+  const dataTypesRef = useRef<string[]>(stableDataTypes);
+  const symbolRef = useRef<string>(symbol);
+  const userIdRef = useRef<string | undefined>(user?.id);
+  const supabaseRef = useRef(supabase);
+
+  // Update refs when values change
+  useEffect(() => {
+    dataTypesRef.current = stableDataTypes;
+    symbolRef.current = symbol;
+    userIdRef.current = user?.id;
+    supabaseRef.current = supabase;
+  }, [stableDataTypes, symbol, user?.id, supabase]);
+
   // Check feature flag on mount
   useEffect(() => {
     checkFeatureFlag('use_queue_system').then(setFeatureEnabled);
@@ -61,7 +80,7 @@ export function useTrackSubscription({
     }
 
     // Require valid symbol and data types
-    if (!symbol || !dataTypes || dataTypes.length === 0) {
+    if (!symbol || !stableDataTypes || stableDataTypes.length === 0) {
       return;
     }
 
@@ -104,10 +123,28 @@ export function useTrackSubscription({
           // Background staleness checker runs every minute to refresh stale data
           await channel.track({
             symbol,
-            dataTypes, // Array of data types this user is viewing
+            dataTypes: stableDataTypes, // Array of data types this user is viewing
             userId: user.id,
             subscribedAt: new Date().toISOString(),
           });
+
+          // CRITICAL: Also update active_subscriptions_v2 table directly
+          // This is needed because Realtime Presence can't be queried via REST API
+          // We update the table directly so the backend can discover subscriptions
+          for (const dataType of stableDataTypes) {
+            const { error: upsertError } = await supabase.rpc('upsert_active_subscription_v2', {
+              p_user_id: user.id,
+              p_symbol: symbol,
+              p_data_type: dataType,
+            });
+
+            if (upsertError) {
+              console.error(
+                `[useTrackSubscription] Failed to upsert subscription for ${symbol}/${dataType}:`,
+                upsertError
+              );
+            }
+          }
         } else if (status === 'CHANNEL_ERROR') {
           console.error(`[useTrackSubscription] Channel error for ${symbol}:`, status);
         }
@@ -115,22 +152,76 @@ export function useTrackSubscription({
 
     // Cleanup on unmount
     return () => {
-      if (channelRef.current) {
-        // Stop tracking presence
-        channelRef.current.untrack().catch((error) => {
-          console.warn(`[useTrackSubscription] Error untracking presence for ${symbol}:`, error);
-        });
+      try {
+        const currentChannel = channelRef.current;
+        const currentDataTypes = dataTypesRef.current;
+        const currentSymbol = symbolRef.current;
+        const currentUserId = userIdRef.current;
+        const currentSupabase = supabaseRef.current;
 
-        // Leave channel (presence automatically removed)
-        supabase
-          .removeChannel(channelRef.current)
-          .catch((error) => {
-            console.warn(`[useTrackSubscription] Error removing channel for ${symbol}:`, error);
+        // CRITICAL: Defensive checks - ensure all values are valid before cleanup
+        if (!currentChannel || !currentSupabase || !currentUserId || !currentSymbol) {
+          channelRef.current = null;
+          return;
+        }
+
+        // Only delete subscriptions if we have valid data types
+        if (currentDataTypes && Array.isArray(currentDataTypes) && currentDataTypes.length > 0) {
+          // CRITICAL: Remove subscriptions from active_subscriptions_v2 table
+          // This is needed because Realtime Presence can't be queried via REST API
+          // Use stored refs to ensure we have the correct values even after unmount
+          for (const dataType of currentDataTypes) {
+            if (!dataType || typeof dataType !== 'string') {
+              continue; // Skip invalid data types
+            }
+
+            // CRITICAL: Execute the query and handle errors properly
+            // Supabase query builder needs to be executed (via .then() or await)
+            currentSupabase
+              .from('active_subscriptions_v2')
+              .delete()
+              .eq('user_id', currentUserId)
+              .eq('symbol', currentSymbol)
+              .eq('data_type', dataType)
+              .then(() => {
+                // Success - subscription removed
+              })
+              .catch((error) => {
+                console.warn(
+                  `[useTrackSubscription] Error removing subscription for ${currentSymbol}/${dataType}:`,
+                  error
+                );
+              });
+          }
+        }
+
+        // Stop tracking presence (fire and forget - don't wait)
+        try {
+          currentChannel.untrack().catch((error) => {
+            console.warn(`[useTrackSubscription] Error untracking presence for ${currentSymbol}:`, error);
           });
+        } catch (error) {
+          console.warn(`[useTrackSubscription] Exception untracking presence for ${currentSymbol}:`, error);
+        }
 
+        // Leave channel (presence automatically removed) - fire and forget
+        try {
+          currentSupabase
+            .removeChannel(currentChannel)
+            .catch((error) => {
+              console.warn(`[useTrackSubscription] Error removing channel for ${currentSymbol}:`, error);
+            });
+        } catch (error) {
+          console.warn(`[useTrackSubscription] Exception removing channel for ${currentSymbol}:`, error);
+        }
+      } catch (error) {
+        // CRITICAL: Catch any unexpected errors in cleanup to prevent crashes
+        console.error('[useTrackSubscription] Unexpected error in cleanup:', error);
+      } finally {
+        // Always clear the ref, even if cleanup fails
         channelRef.current = null;
       }
     };
-  }, [symbol, supabase, user?.id, enabled, featureEnabled, dataTypes]); // Include featureEnabled and dataTypes in deps
+  }, [symbol, supabase, user?.id, enabled, featureEnabled, stableDataTypes]); // Use stableDataTypes instead of dataTypes
 }
 
