@@ -225,7 +225,7 @@ Phase 0 complete. Feature flags, health check, and baseline capture are in place
 
 ## Phase 5: Migration (One Type)
 
-**Status:** 🟡 In Progress (20%)
+**Status:** 🟡 In Progress (60%)
 **Target:** Week 4-5
 **Started:** 2025-11-17
 
@@ -235,7 +235,20 @@ Phase 0 complete. Feature flags, health check, and baseline capture are in place
 - [x] Populate `data_type_registry_v2` for selected type
   - [x] Created migration: `20251117075000_populate_data_type_registry_profile.sql`
   - [x] Configured: table_name='profiles', timestamp_column='modified_at', TTL=1440 minutes
-- [ ] Verify registry entry is correct
+- [x] Apply Phase 0-1 migrations (foundation tables and functions)
+  - [x] Feature flags table
+  - [x] Health check function
+  - [x] Baseline metrics table
+  - [x] Data type registry table
+  - [x] Identifier validation function
+  - [x] Active subscriptions table
+  - [x] API call queue table (partitioned)
+  - [x] API data usage table
+  - [x] Staleness functions
+  - [x] Queue helper functions
+- [x] Verify registry entry is correct
+- [x] Test basic functions (staleness check, queue function)
+- [ ] Apply Phase 2-3 migrations (queue system, staleness system)
 - [ ] Test end-to-end flow (with feature flag still disabled)
 - [ ] Enable feature flag: `use_queue_system = true` (when ready)
 - [ ] Monitor for 24-48 hours
@@ -244,6 +257,8 @@ Phase 0 complete. Feature flags, health check, and baseline capture are in place
 
 **Deliverables:**
 - [x] Registry populated with `profile` data type
+- [x] Foundation tables and functions created
+- [x] Basic functions tested and working
 - [ ] End-to-end test successful
 - [ ] One data type migrated successfully
 - [ ] Monitoring shows healthy system
