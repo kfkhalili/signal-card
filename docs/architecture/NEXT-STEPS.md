@@ -25,8 +25,8 @@
 Enable the new system for testing:
 
 ```sql
-UPDATE feature_flags 
-SET enabled = true 
+UPDATE feature_flags
+SET enabled = true
 WHERE flag_name IN ('use_queue_system', 'use_presence_tracking');
 ```
 
@@ -45,7 +45,7 @@ WHERE flag_name IN ('use_queue_system', 'use_presence_tracking');
 
 2. **Verify Subscription Created:**
    ```sql
-   SELECT * FROM active_subscriptions_v2 
+   SELECT * FROM active_subscriptions_v2
    WHERE symbol = 'AAPL' AND data_type = 'profile';
    ```
    - Should see a subscription record
@@ -53,7 +53,7 @@ WHERE flag_name IN ('use_queue_system', 'use_presence_tracking');
 
 3. **Check Queue:**
    ```sql
-   SELECT * FROM api_call_queue_v2 
+   SELECT * FROM api_call_queue_v2
    WHERE symbol = 'AAPL' AND data_type = 'profile'
    ORDER BY created_at DESC;
    ```
@@ -68,17 +68,17 @@ WHERE flag_name IN ('use_queue_system', 'use_presence_tracking');
 
 2. **Check Queue Status:**
    ```sql
-   SELECT 
-     status, 
+   SELECT
+     status,
      COUNT(*) as count,
      AVG(priority) as avg_priority
-   FROM api_call_queue_v2 
+   FROM api_call_queue_v2
    GROUP BY status;
    ```
 
 3. **Verify Job Completed:**
    ```sql
-   SELECT 
+   SELECT
      symbol,
      data_type,
      status,
@@ -86,9 +86,9 @@ WHERE flag_name IN ('use_queue_system', 'use_presence_tracking');
      created_at,
      processed_at,
      actual_data_size_bytes
-   FROM api_call_queue_v2 
+   FROM api_call_queue_v2
    WHERE symbol = 'AAPL' AND data_type = 'profile'
-   ORDER BY created_at DESC 
+   ORDER BY created_at DESC
    LIMIT 5;
    ```
    - Job should be `'completed'`
@@ -97,11 +97,11 @@ WHERE flag_name IN ('use_queue_system', 'use_presence_tracking');
 
 4. **Verify Data Updated:**
    ```sql
-   SELECT 
+   SELECT
      symbol,
      fetched_at,
      NOW() - fetched_at as age
-   FROM profiles 
+   FROM profiles
    WHERE symbol = 'AAPL';
    ```
    - `fetched_at` should be recent (within last few minutes)
@@ -115,23 +115,23 @@ WHERE flag_name IN ('use_queue_system', 'use_presence_tracking');
 
 2. **Verify All Subscriptions:**
    ```sql
-   SELECT 
-     symbol, 
-     data_type, 
+   SELECT
+     symbol,
+     data_type,
      COUNT(DISTINCT user_id) as users
-   FROM active_subscriptions_v2 
+   FROM active_subscriptions_v2
    GROUP BY symbol, data_type
    ORDER BY users DESC;
    ```
 
 3. **Verify All Jobs Queued:**
    ```sql
-   SELECT 
+   SELECT
      symbol,
      data_type,
      status,
      priority
-   FROM api_call_queue_v2 
+   FROM api_call_queue_v2
    WHERE symbol IN ('AAPL', 'MSFT', 'TSLA')
    ORDER BY priority DESC, created_at ASC;
    ```
@@ -157,34 +157,34 @@ WHERE flag_name IN ('use_queue_system', 'use_presence_tracking');
 
 ```sql
 -- Check queue health
-SELECT 
-  status, 
+SELECT
+  status,
   COUNT(*) as count,
   MIN(created_at) as oldest,
   MAX(created_at) as newest
-FROM api_call_queue_v2 
+FROM api_call_queue_v2
 GROUP BY status;
 
 -- Check for stuck jobs
 SELECT COUNT(*) as stuck_jobs
-FROM api_call_queue_v2 
-WHERE status = 'processing' 
+FROM api_call_queue_v2
+WHERE status = 'processing'
   AND processed_at < NOW() - INTERVAL '5 minutes';
 
 -- Check quota usage
 SELECT * FROM get_quota_usage_v2();
 
 -- Check recent activity
-SELECT 
+SELECT
   symbol,
   data_type,
   status,
   priority,
   created_at,
   processed_at
-FROM api_call_queue_v2 
+FROM api_call_queue_v2
 WHERE created_at > NOW() - INTERVAL '10 minutes'
-ORDER BY created_at DESC 
+ORDER BY created_at DESC
 LIMIT 20;
 ```
 
@@ -194,8 +194,8 @@ LIMIT 20;
 
 **Rollback (if needed):**
 ```sql
-UPDATE feature_flags 
-SET enabled = false 
+UPDATE feature_flags
+SET enabled = false
 WHERE flag_name IN ('use_queue_system', 'use_presence_tracking');
 ```
 
@@ -246,19 +246,19 @@ Once Phase 2 testing is successful:
 
 **Enable Feature Flags:**
 ```sql
-UPDATE feature_flags SET enabled = true 
+UPDATE feature_flags SET enabled = true
 WHERE flag_name IN ('use_queue_system', 'use_presence_tracking');
 ```
 
 **Disable Feature Flags (Rollback):**
 ```sql
-UPDATE feature_flags SET enabled = false 
+UPDATE feature_flags SET enabled = false
 WHERE flag_name IN ('use_queue_system', 'use_presence_tracking');
 ```
 
 **Check System Status:**
 ```sql
-SELECT 
+SELECT
   (SELECT COUNT(*) FROM active_subscriptions_v2) as subscriptions,
   (SELECT COUNT(*) FROM api_call_queue_v2 WHERE status = 'pending') as pending,
   (SELECT COUNT(*) FROM api_call_queue_v2 WHERE status = 'processing') as processing,
