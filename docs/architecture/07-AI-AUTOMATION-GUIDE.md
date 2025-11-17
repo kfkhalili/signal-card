@@ -38,17 +38,17 @@ SELECT status, COUNT(*) FROM api_call_queue_v2 GROUP BY status;
 
 ### 4. Check Quota
 ```sql
-SELECT date, total_bytes, is_quota_exceeded_v2() as quota_exceeded 
-FROM api_data_usage_v2 
+SELECT date, total_bytes, is_quota_exceeded_v2() as quota_exceeded
+FROM api_data_usage_v2
 ORDER BY date DESC LIMIT 7;
 ```
 
 ### 5. Check Recent Activity
 ```sql
-SELECT symbol, data_type, status, created_at 
-FROM api_call_queue_v2 
+SELECT symbol, data_type, status, created_at
+FROM api_call_queue_v2
 WHERE created_at > NOW() - INTERVAL '1 hour'
-ORDER BY created_at DESC 
+ORDER BY created_at DESC
 LIMIT 10;
 ```
 

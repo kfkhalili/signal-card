@@ -10,7 +10,7 @@
 
 const queries = {
   checkRegistry: `
-    SELECT 
+    SELECT
       data_type,
       table_name,
       timestamp_column,
@@ -20,15 +20,15 @@ const queries = {
     FROM data_type_registry_v2
     WHERE data_type = 'profile';
   `,
-  
+
   checkFeatureFlags: `
-    SELECT flag_name, is_enabled 
-    FROM feature_flags 
+    SELECT flag_name, is_enabled
+    FROM feature_flags
     WHERE flag_name IN ('use_queue_system', 'use_presence_tracking', 'migrate_profile_type');
   `,
-  
+
   checkQueueStatus: `
-    SELECT 
+    SELECT
       status,
       COUNT(*) as count,
       COUNT(*) FILTER (WHERE data_type = 'profile') as profile_count
@@ -36,9 +36,9 @@ const queries = {
     GROUP BY status
     ORDER BY status;
   `,
-  
+
   checkQuota: `
-    SELECT 
+    SELECT
       date,
       total_bytes,
       is_quota_exceeded_v2() as quota_exceeded
@@ -46,9 +46,9 @@ const queries = {
     ORDER BY date DESC
     LIMIT 7;
   `,
-  
+
   checkRecentActivity: `
-    SELECT 
+    SELECT
       symbol,
       data_type,
       status,
@@ -60,9 +60,9 @@ const queries = {
     ORDER BY created_at DESC
     LIMIT 10;
   `,
-  
+
   checkCronJobs: `
-    SELECT 
+    SELECT
       jobname,
       schedule,
       active,
