@@ -2,12 +2,12 @@
  * Tests for health-check Edge Function
  */
 
-import { describe, it, expect, beforeEach, vi } from '@jest/globals';
+import { describe, it, expect, beforeEach } from '@jest/globals';
 
 // Mock Supabase client
 const createMockSupabaseClient = (jobRuns: any[] = []) => {
   return {
-    rpc: vi.fn().mockResolvedValue({
+    rpc: jest.fn().mockResolvedValue({
       data: jobRuns,
       error: null,
     }),
@@ -16,7 +16,7 @@ const createMockSupabaseClient = (jobRuns: any[] = []) => {
 
 describe('Health Check Edge Function', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
   });
 
   describe('Healthy State', () => {
@@ -83,7 +83,7 @@ describe('Health Check Edge Function', () => {
   describe('Error Handling', () => {
     it('should handle RPC errors gracefully', async () => {
       const supabase = {
-        rpc: vi.fn().mockResolvedValue({
+        rpc: jest.fn().mockResolvedValue({
           data: null,
           error: { message: 'Database connection failed' },
         }),

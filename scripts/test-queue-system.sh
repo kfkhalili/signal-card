@@ -22,7 +22,7 @@ TESTS_FAILED=0
 run_test_suite() {
   local suite_name=$1
   local test_command=$2
-  
+
   echo -e "${YELLOW}Running: ${suite_name}${NC}"
   if eval "$test_command"; then
     echo -e "${GREEN}✓ ${suite_name} passed${NC}"
