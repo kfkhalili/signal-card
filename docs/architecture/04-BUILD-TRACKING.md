@@ -225,20 +225,26 @@ Phase 0 complete. Feature flags, health check, and baseline capture are in place
 
 ## Phase 5: Migration (One Type)
 
-**Status:** 🔴 Not Started
+**Status:** 🟡 In Progress (20%)
 **Target:** Week 4-5
-**Blockers:** Phase 4 must be complete
+**Started:** 2025-11-17
 
 ### Tasks
 
-- [ ] Select one data type for migration (e.g., `profile`)
-- [ ] Populate `data_type_registry_v2` for selected type
-- [ ] Enable feature flag: `use_queue_system = true`
-- [ ] Monitor for 1 week
+- [x] Select one data type for migration (`profile` - simpler than quote, good for testing)
+- [x] Populate `data_type_registry_v2` for selected type
+  - [x] Created migration: `20251117075000_populate_data_type_registry_profile.sql`
+  - [x] Configured: table_name='profiles', timestamp_column='modified_at', TTL=1440 minutes
+- [ ] Verify registry entry is correct
+- [ ] Test end-to-end flow (with feature flag still disabled)
+- [ ] Enable feature flag: `use_queue_system = true` (when ready)
+- [ ] Monitor for 24-48 hours
 - [ ] Verify no regressions
 - [ ] Document learnings
 
 **Deliverables:**
+- [x] Registry populated with `profile` data type
+- [ ] End-to-end test successful
 - [ ] One data type migrated successfully
 - [ ] Monitoring shows healthy system
 - [ ] Ready for full migration
