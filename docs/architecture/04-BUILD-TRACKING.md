@@ -10,7 +10,7 @@ Phase 0: Safety Infrastructure        [██████████] 100%
 Phase 1: Foundation (Parallel)        [██████████] 100%
 Phase 2: Queue System (Parallel)      [██████████] 100%
 Phase 3: Staleness System (Parallel)  [██████████] 100%
-Phase 4: Frontend Integration         [░░░░░░░░░░] 0%
+Phase 4: Frontend Integration         [██░░░░░░░░] 20%
 Phase 5: Migration (One Type)         [░░░░░░░░░░] 0%
 Phase 6: Full Migration               [░░░░░░░░░░] 0%
 ```
@@ -184,22 +184,23 @@ Phase 0 complete. Feature flags, health check, and baseline capture are in place
 
 ## Phase 4: Frontend Integration
 
-**Status:** 🔴 Not Started
+**Status:** 🟡 In Progress (20%)
 **Target:** Week 3-4
-**Blockers:** Phase 3 must be complete
+**Started:** 2025-11-17
 
 ### Tasks
 
-- [ ] Create `supabase/functions/lib/` directory
-- [ ] Move all `fetch-fmp-*` logic to `/lib/` as exportable functions
-- [ ] Update `queue-processor-v2` to import from `/lib/`
-- [ ] Add all validations to worker functions:
-  - [ ] Data type validation
-  - [ ] Shape validation (Zod)
-  - [ ] Sanity checks
-  - [ ] Source timestamp checks
-  - [ ] Content-Length tracking
-  - [ ] Aggressive timeouts (10s)
+- [x] Create `supabase/functions/lib/` directory
+- [x] Create first library function: `fetch-fmp-profile.ts` (example/template)
+- [x] Update `queue-processor-v2` to import from `/lib/`
+- [x] Add all validations to `fetch-fmp-profile.ts`:
+  - [x] Data type validation
+  - [x] Shape validation (Zod)
+  - [x] Sanity checks (price > 0, price < 100000)
+  - [ ] Source timestamp checks (TODO: when registry has source_timestamp_column)
+  - [x] Content-Length tracking
+  - [x] Aggressive timeouts (10s)
+- [ ] Migrate other `fetch-fmp-*` functions to `/lib/` (as needed)
 - [ ] Create frontend hook: `useTrackSubscription`
 - [ ] Integrate `track-subscription-v2` into card components
 - [ ] Test end-to-end flow
