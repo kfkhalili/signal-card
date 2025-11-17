@@ -35,7 +35,7 @@ BEGIN
     WHERE status = 'pending';
 
     IF queue_depth >= max_queue_depth THEN
-      RAISE NOTICE 'Queue depth (%%) exceeds threshold (%%). Skipping scheduled refreshes.', 
+      RAISE NOTICE 'Queue depth (%%) exceeds threshold (%%). Skipping scheduled refreshes.',
         queue_depth, max_queue_depth;
       PERFORM pg_advisory_unlock(43);
       RETURN 0;

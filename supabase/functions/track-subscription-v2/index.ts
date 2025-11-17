@@ -1,9 +1,9 @@
 /**
  * Track Subscription Edge Function
- * 
+ *
  * Purpose: Event-driven staleness check when user subscribes to a symbol
  * This is the PRIMARY staleness check - runs immediately on subscribe
- * 
+ *
  * CRITICAL SECURITY: Rate limiting is mandatory (10-20 calls/minute per user/IP)
  * This prevents DoS attacks - even with idempotent queueing,
  * 10,000 calls = 10,000 staleness checks = database overload

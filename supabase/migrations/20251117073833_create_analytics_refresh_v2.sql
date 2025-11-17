@@ -20,7 +20,7 @@ BEGIN
     -- CRITICAL: This is a heavy operation (TRUNCATE + INSERT of potentially 300k rows)
     -- Moved to separate cron job to prevent Job 1 from exceeding its 5-minute window
     -- The active_subscriptions_v2 table is slightly stale (updated every 15 minutes), which is acceptable
-    
+
     -- Truncate analytics table
     TRUNCATE TABLE public.active_subscriptions_v2;
 
