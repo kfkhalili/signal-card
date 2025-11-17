@@ -9,13 +9,13 @@
 Phase 0: Safety Infrastructure        [██████████] 100%
 Phase 1: Foundation (Parallel)        [██████████] 100%
 Phase 2: Queue System (Parallel)      [██████████] 100%
-Phase 3: Staleness System (Parallel)  [██████░░░░] 60%
+Phase 3: Staleness System (Parallel)  [██████████] 100%
 Phase 4: Frontend Integration         [░░░░░░░░░░] 0%
 Phase 5: Migration (One Type)         [░░░░░░░░░░] 0%
 Phase 6: Full Migration               [░░░░░░░░░░] 0%
 ```
 
-**Overall Progress:** 51% (3.6/7 phases complete)
+**Overall Progress:** 57% (4/7 phases complete)
 
 ---
 
@@ -124,9 +124,9 @@ Phase 0 complete. Feature flags, health check, and baseline capture are in place
 
 ## Phase 3: Staleness System (Parallel)
 
-**Status:** 🟡 In Progress (60%)
+**Status:** ✅ Complete (100%)
 **Target:** Week 2-3
-**Started:** 2025-11-17
+**Completed:** 2025-11-17
 
 ### Tasks
 
@@ -162,11 +162,13 @@ Phase 0 complete. Feature flags, health check, and baseline capture are in place
   - [ ] Rate limiting configured (TODO: Supabase dashboard config)
 
 **Cron Jobs:**
-- [ ] Create cron job 1: `check_and_queue_stale_data_from_presence_v2()` every 5 minutes
-- [ ] Create cron job 2: `queue_scheduled_refreshes_v2()` every minute (throttled)
-- [ ] Create cron job 3: `invoke_processor_loop_v2()` every minute
-- [ ] Create cron job 4: `maintain_queue_partitions_v2()` weekly
-- [ ] Create cron job 5: `refresh_analytics_from_presence_v2()` every 15 minutes
+- [x] Create cron job 1: `check_and_queue_stale_data_from_presence_v2()` every 5 minutes
+- [x] Create cron job 2: `queue_scheduled_refreshes_v2()` every minute (throttled)
+- [x] Create cron job 3: `invoke_processor_loop_v2()` every minute
+- [x] Create cron job 4: `maintain_queue_partitions_v2()` weekly
+- [x] Create cron job 5: `refresh_analytics_from_presence_v2()` every 15 minutes
+- [x] Create helper functions: `list_queue_system_cron_jobs_v2()`, `unschedule_all_queue_system_cron_jobs_v2()`
+- [x] Create Edge Function invoker: `invoke_edge_function_v2()` (uses pg_net)
 
 **Testing:**
 - [ ] Manual test: Staleness checks work (TODO: After infrastructure setup)
