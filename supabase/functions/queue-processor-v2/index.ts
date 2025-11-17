@@ -19,9 +19,10 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// TODO: Import worker functions from /lib/ directory
-// import { fetchProfileLogic } from '../lib/fetch-fmp-profile';
-// import { fetchQuoteLogic } from '../lib/fetch-fmp-quote';
+// Import worker functions from /lib/ directory (monofunction architecture)
+import { fetchProfileLogic } from '../lib/fetch-fmp-profile.ts';
+// TODO: Import other worker functions as they are migrated
+// import { fetchQuoteLogic } from '../lib/fetch-fmp-quote.ts';
 // ... etc for all data types
 
 interface QueueJob {
@@ -180,32 +181,30 @@ Deno.serve(async (req: Request) => {
 /**
  * Process a single job
  * CRITICAL: This is where we route to the correct handler based on data_type
- * TODO: Import actual worker functions from /lib/ and use switch statement
+ * Uses switch statement to route to library functions (monofunction architecture)
  */
 async function processJob(
   job: QueueJob,
   supabase: any
-): Promise<{ success: boolean; dataSizeBytes?: number; error?: string }> {
-  // TODO: Replace with actual switch statement routing
-  // switch (job.data_type) {
-  //   case 'quote':
-  //     return await fetchQuoteLogic(job, supabase);
-  //   case 'profile':
-  //     return await fetchProfileLogic(job, supabase);
-  //   ...
-  //   default:
-  //     throw new Error(`Unknown data type: ${job.data_type}`);
-  // }
-
-  // Placeholder implementation
-  console.log(`[queue-processor-v2] Processing job ${job.id} for ${job.symbol} (${job.data_type})`);
-
-  // Simulate processing
-  await new Promise(resolve => setTimeout(resolve, 100));
-
-  return {
-    success: true,
-    dataSizeBytes: job.estimated_data_size_bytes || 0,
-  };
+): Promise<{ success: boolean; dataSizeBytes: number; error?: string }> {
+  // CRITICAL: Route to correct handler based on data_type
+  // This replaces FaaS-to-FaaS invocations with direct function calls
+  // Prevents connection pool exhaustion (50 concurrent invocations = 50 connections)
+  switch (job.data_type) {
+    case 'profile':
+      return await fetchProfileLogic(job, supabase);
+    // TODO: Add other data types as they are migrated to /lib/
+    // case 'quote':
+    //   return await fetchQuoteLogic(job, supabase);
+    // case 'financial-statements':
+    //   return await fetchFinancialStatementsLogic(job, supabase);
+    // ... etc
+    default:
+      return {
+        success: false,
+        dataSizeBytes: 0,
+        error: `Unknown or unsupported data type: ${job.data_type}. This data type has not been migrated to the queue system yet.`,
+      };
+  }
 }
 
