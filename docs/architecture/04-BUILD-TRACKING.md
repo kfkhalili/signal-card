@@ -157,8 +157,9 @@ Phase 0 complete. Feature flags, health check, and baseline capture are in place
 
 **Edge Functions:**
 - [x] Create `refresh-analytics-from-presence-v2` Edge Function
-  - [x] Queries Realtime Presence via REST API
-  - [x] Updates `active_subscriptions_v2` table
+  - [x] Cleans up stale subscriptions (> 5 minutes old)
+  - [x] **CRITICAL:** Does NOT update `last_seen_at` - only client heartbeats update it
+  - [x] Client manages subscriptions directly (adds on mount, removes on unmount)
   - [x] Removes stale subscriptions
   - [x] Runs every minute (matches minimum TTL)
 
@@ -346,8 +347,8 @@ SELECT * FROM api_call_queue_v2 ORDER BY created_at DESC LIMIT 10;
   - Background staleness checker frequency updated from every 5 minutes to every minute
     - **Rationale:** Data types with 1-minute TTLs (quotes) require more frequent checks
     - **Impact:** Prevents stale data windows (data could be stale for up to 4 minutes with 5-minute schedule)
-  - Removed `track-subscription-v2` Edge Function - now fully autonomous
-    - **Rationale:** Client only tracks presence, backend discovers subscriptions automatically
-    - **Impact:** Simpler architecture, no client-side Edge Function calls, no rate limiting needed
-    - **Status:** `refresh-analytics-from-presence-v2` runs every minute to update analytics table
+  - Removed `track-subscription-v2` Edge Function - now client-driven with heartbeat system
+    - **Rationale:** Client manages subscriptions directly (adds on mount, removes on unmount) and sends periodic heartbeats
+    - **Impact:** Simpler architecture, client-driven subscription management, backend only cleans up stale entries
+    - **Status:** `refresh-analytics-from-presence-v2` runs every minute to clean up stale subscriptions (> 5 minutes old)
   - **System Status:** Working correctly - quote data refreshing automatically every minute

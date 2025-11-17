@@ -1,11 +1,20 @@
 /**
  * Refresh Analytics Edge Function
  *
- * Purpose: Updates last_seen_at for existing entries in active_subscriptions_v2 table
- * This is called by a cron job every minute to keep last_seen_at current
+ * Purpose: Cleans up stale subscriptions from active_subscriptions_v2 table
+ * This is called by a cron job every minute to remove subscriptions that are no longer active
  *
- * CRITICAL: The client now directly manages active_subscriptions_v2 (adds/removes entries)
- * This function only updates last_seen_at for existing entries to track activity
+ * CRITICAL: Heartbeat-based subscription management
+ * - Client adds subscription on mount and sends periodic heartbeats (every 1 minute)
+ * - Client removes subscription on unmount (normal cleanup)
+ * - This function removes subscriptions with last_seen_at > 5 minutes (abrupt browser closures)
+ *
+ * Heartbeat Pattern:
+ * - Client sends heartbeat every 1 minute via upsert_active_subscription_v2
+ * - Heartbeat updates last_seen_at to indicate user is actively viewing
+ * - If heartbeat stops (browser closed, component unmounted), last_seen_at stops updating
+ * - Background cleanup (this function) removes subscriptions > 5 minutes old
+ * - This ensures heartbeat stops before cleanup (1 min interval < 5 min timeout)
  */
 
 import "@supabase/functions-js/edge-runtime.d.ts";
@@ -39,64 +48,58 @@ Deno.serve(async (req: Request) => {
       },
     });
 
-    // CRITICAL: Client now directly manages active_subscriptions_v2 (adds/removes entries)
-    // This function only updates last_seen_at for existing entries to track activity
-    // This is simpler and more reliable than trying to query Presence via REST API (which doesn't exist)
+    // CRITICAL: Only update last_seen_at for subscriptions that are actually in Presence
+    // If we can't query Presence, we should NOT update last_seen_at - let cleanup handle stale entries
+    // This prevents updating subscriptions that are no longer active
 
-    // Get all existing subscriptions from the database
-    const { data: existingSubscriptions, error: fetchError } = await supabase
+    // CRITICAL: Clean up stale subscriptions (subscriptions that haven't been seen in 5+ minutes)
+    // This handles cases where browser closed abruptly and client-side cleanup didn't run
+    // We do this BEFORE checking Presence to avoid updating subscriptions that are about to be removed
+    const { data: staleSubscriptions, error: staleError } = await supabase
       .from('active_subscriptions_v2')
-      .select('id, user_id, symbol, data_type');
+      .select('id, user_id, symbol, data_type, last_seen_at')
+      .lt('last_seen_at', new Date(Date.now() - 5 * 60 * 1000).toISOString()); // 5 minutes ago
 
-    if (fetchError) {
-      throw new Error(`Failed to fetch existing subscriptions: ${fetchError.message}`);
-    }
+    let removedCount = 0;
+    if (!staleError && staleSubscriptions && staleSubscriptions.length > 0) {
+      const staleIds = staleSubscriptions.map(s => s.id);
+      const { error: deleteError } = await supabase
+        .from('active_subscriptions_v2')
+        .delete()
+        .in('id', staleIds);
 
-    if (!existingSubscriptions || existingSubscriptions.length === 0) {
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: 'No active subscriptions found',
-          subscriptionsCount: 0,
-          updatedCount: 0,
-        }),
-        {
-          status: 200,
-          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
-    // Update last_seen_at for all existing subscriptions
-    // This tracks that users are still active (even if they're not actively interacting)
-    let successCount = 0;
-    let errorCount = 0;
-
-    for (const subscription of existingSubscriptions) {
-      const { error: upsertError } = await supabase.rpc('upsert_active_subscription_v2', {
-        p_user_id: subscription.user_id,
-        p_symbol: subscription.symbol,
-        p_data_type: subscription.data_type,
-      });
-
-      if (upsertError) {
-        console.error(
-          `[refresh-analytics-from-presence-v2] Failed to update ${subscription.symbol}/${subscription.data_type}:`,
-          upsertError
-        );
-        errorCount++;
+      if (deleteError) {
+        console.error('[refresh-analytics-from-presence-v2] Failed to remove stale subscriptions:', deleteError);
       } else {
-        successCount++;
+        removedCount = staleSubscriptions.length;
+        console.log(`[refresh-analytics-from-presence-v2] Removed ${removedCount} stale subscriptions`);
       }
     }
+
+    // CRITICAL: Do NOT update last_seen_at for all subscriptions
+    // The client manages active_subscriptions_v2 directly (adds/removes entries)
+    // This function should only clean up stale entries, not update last_seen_at
+    // Updating last_seen_at for non-existent subscriptions creates false positives
+    //
+    // If we need to update last_seen_at, we should query Presence first to see which subscriptions
+    // are actually active. Since Presence can't be queried via REST API, we rely on:
+    // 1. Client-side cleanup (on unmount)
+    // 2. Stale subscription cleanup (this function, 5+ minutes old)
+
+    const successCount = 0; // No updates performed
+    const errorCount = 0;
+
+    // Get count of remaining subscriptions for reporting
+    const { count: remainingCount, error: countError } = await supabase
+      .from('active_subscriptions_v2')
+      .select('*', { count: 'exact', head: true });
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: 'Analytics table refreshed - last_seen_at updated for existing subscriptions',
-        subscriptionsCount: existingSubscriptions.length,
-        updatedCount: successCount,
-        errorCount,
+        message: 'Stale subscriptions cleaned up. Client manages active_subscriptions_v2 directly.',
+        removedCount,
+        remainingCount,
       }),
       {
         status: 200,

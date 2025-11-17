@@ -5,14 +5,14 @@
 **Status:** Approved Architecture
 
 > **Performance Optimizations (v2.1):**
-> - ✅ Realtime Presence replaces heartbeat system (zero database load)
+> - ✅ Heartbeat-based subscription management (client-driven with backend cleanup)
 > - ✅ Fully autonomous staleness checking (background checker only, no event-driven check)
 > - ✅ Queue throttling prevents bloat (protects high-priority inserts)
 > - ✅ Fixed priority calculation (priority = viewer count)
 > - ✅ Reduced to 2 cron jobs (from 3)
 >
 > **Hardening Fixes (v2.1.1):**
-> - ✅ Background checker uses Presence as source of truth (prevents ghost refreshes)
+> - ✅ Background checker uses active_subscriptions_v2 table (updated by client heartbeats)
 > - ✅ Truly generic staleness query (100% metadata-driven, zero hardcoded types)
 > - ✅ Idempotent queueing (prevents race condition duplicates)
 >
@@ -40,7 +40,7 @@
 > **Operational Hardening (v2.1.6):**
 > - ✅ Stuck job recovery mechanism (prevents poisoned batches from blocking queue)
 > - ✅ Priority levels documentation aligned with implementation (removed non-existent P1/P2)
-> - ✅ Fully autonomous backend discovery (no client-side Edge Function calls)
+> - ✅ Client-driven subscription management with heartbeat system (client adds/removes subscriptions directly)
 >
 > **Red-Team Hardening (v2.1.7):**
 > - ✅ Queue completion lifecycle (complete_queue_job/fail_queue_job prevent infinite retry loops)
@@ -174,7 +174,7 @@ This document defines the **canonical architecture** for Tickered's API calling 
 │  - check_and_queue_stale_data_from_     │
 │    presence() (runs inside Postgres)    │
 │  - Uses data_type_registry (Metadata)  │
-│  - Queries Presence directly via pg_net │
+│  - Cleans up stale subscriptions (> 5 minutes old) │
 │  - queue_scheduled_refreshes()          │
 │  - recover_stuck_jobs()                 │
 └──────────────┬──────────────────────────┘
@@ -340,97 +340,94 @@ More complex staleness checks requiring multiple columns or different signatures
 
 ---
 
-### 2. Active Subscriptions Tracking (Realtime Presence)
+### 2. Active Subscriptions Tracking (Heartbeat-Based System)
 
-**Purpose:** Backend tracks who's viewing what symbols using Supabase Realtime Presence.
+**Purpose:** Client-driven subscription management with periodic heartbeats and backend cleanup.
 
-**Key Insight:** Instead of a "poor man's presence" with heartbeats and cleanup jobs, we use Supabase's built-in Realtime Presence feature, which provides perfectly accurate, real-time subscription tracking with zero database load.
+**Key Insight:** Client manages subscriptions directly (adds on mount, removes on unmount) and sends periodic heartbeats to indicate active viewing. Backend cleanup removes stale subscriptions (> 5 minutes old) to handle abrupt browser closures.
 
 ```sql
--- Optional: Keep a lightweight table for analytics/reporting only
--- Presence is the source of truth, not this table
-CREATE TABLE active_subscriptions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+-- Analytics table for tracking active subscriptions
+-- Client is the source of truth (adds/removes entries directly)
+CREATE TABLE active_subscriptions_v2 (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID NOT NULL,
   symbol TEXT NOT NULL,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  data_types TEXT[] NOT NULL, -- ['quote', 'profile', ...]
-  subscribed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(symbol, user_id, data_types)
+  data_type TEXT NOT NULL,
+  subscribed_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  last_seen_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  UNIQUE(user_id, symbol, data_type)
 );
 ```
 
 **How it works:**
 
-1. **Frontend: Join Realtime Channel with Presence**
+1. **Frontend: Client manages subscriptions directly**
    ```typescript
-   // When subscribing to a symbol
-   const channel = supabase.channel(`symbol:${symbol}`, {
-     config: {
-       presence: {
-         key: user.id, // User ID as presence key
-       },
-     },
+   // When subscribing to a symbol (on component mount)
+   // Client adds subscription via RPC call
+   await supabase.rpc('upsert_active_subscription_v2', {
+     p_user_id: user.id,
+     p_symbol: symbol,
+     p_data_type: dataType,
    });
 
-   // Track presence when joining
-   channel
-     .on('presence', { event: 'sync' }, () => {
-       const state = channel.presenceState();
-       // Backend can query this via supabase.realtime.list()
-     })
-     .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-       // User joined
-     })
-     .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-       // User left (automatic on disconnect)
-     })
-     .subscribe(async (status) => {
-       if (status === 'SUBSCRIBED') {
-         // Track presence with metadata
-         await channel.track({
-           symbol,
-           dataTypes: ['quote', 'profile'],
-           userId: user.id,
-           subscribedAt: new Date().toISOString(),
-         });
-       }
+   // Client sends heartbeat every 1 minute
+   setInterval(() => {
+     await supabase.rpc('upsert_active_subscription_v2', {
+       p_user_id: user.id,
+       p_symbol: symbol,
+       p_data_type: dataType,
      });
+   }, 60 * 1000); // 1 minute
+
+   // When unsubscribing (on component unmount)
+   // Client removes subscription directly
+   await supabase
+     .from('active_subscriptions_v2')
+     .delete()
+     .eq('user_id', user.id)
+     .eq('symbol', symbol)
+     .eq('data_type', dataType);
    ```
 
-2. **Backend: Query Presence State**
+2. **Backend: Cleanup stale subscriptions**
    ```typescript
-   // Edge function or backend service
-   const { data: channels } = await supabase.realtime.list();
+   // refresh-analytics-from-presence-v2 Edge Function runs every minute
+   // CRITICAL: Only cleans up stale subscriptions, does NOT update last_seen_at
+   const { data: staleSubscriptions } = await supabase
+     .from('active_subscriptions_v2')
+     .select('id, user_id, symbol, data_type, last_seen_at')
+     .lt('last_seen_at', new Date(Date.now() - 5 * 60 * 1000).toISOString());
 
-   // Get all active subscriptions from presence
-   // CRITICAL: dataTypes is an ARRAY, must un-nest it (flatMap)
-   const activeSubscriptions = channels
-     .filter(ch => ch.topic.startsWith('symbol:'))
-     .flatMap(ch => {
-       const symbol = ch.topic.replace('symbol:', '');
-       const presence = ch.presence || {};
-       // Correctly un-nest the dataTypes array
-       return Object.values(presence).flatMap((presenceData: any) =>
-         (presenceData.dataTypes || []).map((dataType: string) => ({
-           symbol,
-           userId: presenceData.userId,
-           dataType, // Now un-nested (not an array)
-         }))
-       );
-     });
+   // Remove subscriptions older than 5 minutes
+   if (staleSubscriptions && staleSubscriptions.length > 0) {
+     const staleIds = staleSubscriptions.map(s => s.id);
+     await supabase
+       .from('active_subscriptions_v2')
+       .delete()
+       .in('id', staleIds);
+   }
    ```
+
+**Heartbeat Pattern:**
+- **Client adds subscription** on mount (via `upsert_active_subscription_v2`)
+- **Client sends heartbeat** every 1 minute (updates `last_seen_at`)
+- **Client removes subscription** on unmount (normal cleanup)
+- **Backend cleanup** removes subscriptions with `last_seen_at > 5 minutes` (abrupt browser closures)
 
 **Benefits:**
-- ✅ **Zero database load** - No UPDATE queries, no WAL churn
-- ✅ **Perfectly accurate** - Real-time, no 60-second delay
-- ✅ **Automatic cleanup** - Presence automatically removes on disconnect
-- ✅ **Scales infinitely** - No function invocations, no database writes
-- ✅ **Eliminates 2 cron jobs** - No heartbeat function, no cleanup job
-- ✅ **More reliable** - Handles crashes, network drops, browser closes automatically
+- ✅ **Client-driven** - Client has full control over subscriptions
+- ✅ **Reliable cleanup** - Backend handles abrupt browser closures
+- ✅ **Simple architecture** - No Presence REST API queries needed
+- ✅ **Accurate tracking** - Heartbeats indicate active viewing
+- ✅ **Automatic cleanup** - Stale subscriptions removed after 5 minutes
 
-**Why This is Better:**
-- **Heartbeat approach:** 1,000 users × 2 symbols = 2,000 function invocations every 30 seconds = 4,000/minute
-- **Presence approach:** 0 function invocations, 0 database writes, perfectly accurate
+**Why This Approach:**
+- **Heartbeat interval:** 1 minute (client sends periodic updates)
+- **Cleanup timeout:** 5 minutes (ensures heartbeat stops before cleanup)
+- **Client control:** Client adds/removes subscriptions directly
+- **Backend safety:** Backend only cleans up stale entries, never updates `last_seen_at`
 
 ---
 
@@ -477,36 +474,38 @@ $$ LANGUAGE plpgsql STABLE;
 
 ### 4. Autonomous Staleness Checking (Background Checker Only)
 
-**Purpose:** Fully autonomous staleness checking via background cron job that reads from Realtime Presence.
+**Purpose:** Fully autonomous staleness checking via background cron job that reads from active_subscriptions_v2 table.
 
-**Key Insight:** The system is **fully autonomous** - the client only tracks presence, and the backend discovers subscriptions and checks staleness automatically. No client-side Edge Function calls needed.
+**Key Insight:** The system is **client-driven** - the client manages subscriptions directly (adds on mount, removes on unmount) and sends periodic heartbeats. The backend discovers subscriptions from the table and checks staleness automatically.
 
-#### 4a. Autonomous Discovery (No Event-Driven Check)
+#### 4a. Heartbeat-Based Subscription Management
 
 **How it works:**
 
-1. **Client tracks presence** - Client calls `channel.track()` with metadata (symbol, dataTypes, userId)
-2. **Backend discovers subscriptions** - `refresh-analytics-from-presence-v2` Edge Function runs every minute:
-   - Queries Realtime Presence via REST API
-   - Parses Presence data and un-nests dataTypes array
-   - Updates `active_subscriptions_v2` table with `last_seen_at = NOW()`
-   - Removes subscriptions no longer in Presence
+1. **Client manages subscriptions** - Client adds subscription on mount and sends periodic heartbeats:
+   - Client calls `upsert_active_subscription_v2` on mount (creates subscription)
+   - Client sends heartbeat every 1 minute via `upsert_active_subscription_v2` (updates `last_seen_at`)
+   - Client removes subscription on unmount (normal cleanup)
+2. **Backend cleanup** - `refresh-analytics-from-presence-v2` Edge Function runs every minute:
+   - **CRITICAL:** Only cleans up stale subscriptions (> 5 minutes old)
+   - **CRITICAL:** Does NOT update `last_seen_at` - only client heartbeats update it
+   - Removes subscriptions with `last_seen_at` older than 5 minutes
 3. **Background staleness checker** - Runs every minute using `active_subscriptions_v2` table:
    - Checks all active subscriptions for stale data
    - Queues refreshes as needed
    - Frequency matches minimum TTL (1 minute for quotes)
 
 **Benefits:**
-- ✅ **Fully autonomous** - No client-side requests needed
-- ✅ **Simpler architecture** - Client only tracks presence
-- ✅ **No rate limiting needed** - No public-facing Edge Function
-- ✅ **Automatic cleanup** - Presence removes entries on disconnect
-- ✅ **No DoS vector** - Analytics updates are batch operations, not hot-path writes
+- ✅ **Client-driven** - Client has full control over subscriptions
+- ✅ **Reliable cleanup** - Backend handles abrupt browser closures
+- ✅ **Simple architecture** - No Presence REST API queries needed
+- ✅ **Accurate tracking** - Heartbeats indicate active viewing
+- ✅ **No DoS vector** - Analytics cleanup is batch operation, not hot-path writes
 
 **Trade-off:**
 - **Latency:** Stale data may take up to 1 minute to refresh (vs immediate with event-driven)
 - **Acceptable:** Background checker runs every minute, matching minimum TTL, so worst case is 1-minute delay
-- **Benefit:** Simpler, more reliable, fully autonomous system
+- **Benefit:** Simpler, more reliable, client-driven system with backend safety net
 
 // Idempotent queue function (prevents race conditions)
 async function queueRefreshIdempotent(
@@ -646,7 +645,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER; -- CRITICAL: Execute with creator's (admin
 **Purpose:** Primary staleness check that runs every minute. Discovers active subscriptions from analytics table and checks for stale data.
 
 **Critical Fixes:**
-1. **Uses Presence as source of truth** (not `active_subscriptions` table) - prevents "ghost refreshes"
+1. **Uses active_subscriptions_v2 table** (updated by client heartbeats) - prevents "ghost refreshes"
 2. **Truly generic** - Loops over `data_type_registry` metadata, uses dynamic SQL (zero hardcoded types)
 3. **Type-by-type loop** - Fast because it loops over 10-50 data types (metadata), not 10,000 symbols (data)
 
@@ -997,7 +996,7 @@ $$ LANGUAGE plpgsql;
 - ✅ **No hardcoded logic** - Zero CASE statements, zero UNION ALL blocks
 - ✅ **Automatically scales** - Works for any future data type without code changes
 - ✅ **Fully autonomous** - Backend discovers and checks automatically
-- ✅ **No ghost refreshes** - Uses Presence as source of truth
+- ✅ **No ghost refreshes** - Uses active_subscriptions_v2 table (updated by client heartbeats)
 - ✅ **High performance** - Type-by-type loop over metadata (fast), not row-by-row over data (slow)
 
 ---
@@ -1998,18 +1997,18 @@ $$ LANGUAGE plpgsql;
 ### On-Demand Refresh Flow
 
 1. **User subscribes to symbol:**
-   - Frontend joins Realtime channel with Presence: `channel('symbol:AAPL')`
-   - Frontend tracks presence with metadata (symbol, dataTypes, userId)
-   - **No Edge Function calls** - fully autonomous backend discovery
+   - Frontend calls `upsert_active_subscription_v2` on mount (creates subscription)
+   - Frontend sends heartbeat every 1 minute via `upsert_active_subscription_v2` (updates `last_seen_at`)
+   - Frontend also tracks Realtime Presence for real-time updates
 
-2. **Analytics refresh runs (every minute):**
-   - `refresh-analytics-from-presence-v2` Edge Function queries Realtime Presence
-   - Updates `active_subscriptions_v2` table with `last_seen_at = NOW()`
-   - Removes subscriptions no longer in Presence
+2. **Analytics cleanup runs (every minute):**
+   - `refresh-analytics-from-presence-v2` Edge Function cleans up stale subscriptions
+   - **CRITICAL:** Only removes subscriptions with `last_seen_at > 5 minutes`
+   - **CRITICAL:** Does NOT update `last_seen_at` - only client heartbeats update it
    - **CRITICAL:** Frequency matches minimum TTL (1 minute for quotes) so staleness checker has accurate data
 
 3. **Background staleness checker runs (every minute):**
-   - Gets active subscriptions from `active_subscriptions_v2` table (updated by analytics refresh)
+   - Gets active subscriptions from `active_subscriptions_v2` table (updated by client heartbeats)
    - Calls `check_and_queue_stale_data_from_presence_v2()` with subscription data
    - Single set-based query (not row-by-row loop) checks all data types at once
    - Only checks symbols that ALREADY have active subscriptions
@@ -2029,14 +2028,14 @@ $$ LANGUAGE plpgsql;
    - Frontend receives update automatically
 
 6. **User unsubscribes (normal flow):**
+   - Frontend calls DELETE on `active_subscriptions_v2` (removes subscription)
    - Frontend leaves Realtime channel
-   - Presence automatically removed
-   - Analytics table updated on next refresh (removes entry)
+   - Subscription removed immediately (no delay)
 
 7. **User disconnects (abnormal flow):**
-   - Realtime Presence automatically detects disconnect
-   - Presence removed immediately (no delay, no cleanup job)
-   - Zero database writes, perfectly accurate
+   - Client heartbeat stops (no more `upsert_active_subscription_v2` calls)
+   - `last_seen_at` stops updating
+   - Backend cleanup removes subscription after 5 minutes (handles abrupt browser closures)
 
 ---
 
@@ -2119,11 +2118,12 @@ INSERT INTO data_type_registry VALUES (
 5. Create `is_data_stale()` functions
    - **CRITICAL:** Remove DEFAULT values from TTL parameters (prevents split-brain TTL bugs)
    - **CRITICAL:** Force explicit TTL from registry (ensures metadata-driven principle)
-6. Create analytics refresh Edge Function:
-   - `refresh-analytics-from-presence-v2` - Queries Realtime Presence and updates `active_subscriptions_v2`
+6. Create analytics cleanup Edge Function:
+   - `refresh-analytics-from-presence-v2` - Cleans up stale subscriptions from `active_subscriptions_v2`
      - Runs every minute (matches minimum TTL)
-     - Fully autonomous - no client-side calls needed
-     - Updates `last_seen_at = NOW()` for all active subscriptions
+     - **CRITICAL:** Only removes subscriptions with `last_seen_at > 5 minutes`
+     - **CRITICAL:** Does NOT update `last_seen_at` - only client heartbeats update it
+     - Client manages subscriptions directly (adds on mount, removes on unmount)
 7. Create `check_and_queue_stale_batch()` function (batch staleness checker)
    - **CRITICAL:** Add fault tolerance (exception handling per data type)
 8. Create `queue_refresh_if_not_exists()` function (idempotent queueing)
@@ -2179,7 +2179,7 @@ INSERT INTO data_type_registry VALUES (
    - Background staleness checker (every minute) - Frequency matches minimum TTL (1 minute for quotes), uses active_subscriptions_v2 table
    - Scheduled refreshes (every minute, with throttling)
    - **Queue processor invoker (every minute)** - Looping invoker (SQL loop, stateless Edge Function)
-   - **Analytics table refresh (every minute)** - CRITICAL: Must match minimum TTL so staleness checker has accurate data. Queries Realtime Presence and updates active_subscriptions_v2
+   - **Analytics cleanup (every minute)** - CRITICAL: Must match minimum TTL so staleness checker has accurate data. Cleans up stale subscriptions (> 5 minutes old) from active_subscriptions_v2. Does NOT update last_seen_at - only client heartbeats update it.
    - **Partition maintenance (weekly)** - Truncates completed/failed partitions to prevent bloat
 2. Remove all individual cron jobs (11+)
 3. Test generic system and Realtime Presence integration

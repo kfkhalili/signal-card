@@ -164,8 +164,9 @@ I will build **the entire backend-controlled refresh system** as specified in `M
 
 **Edge Functions:**
 1. Create `refresh-analytics-from-presence-v2` Edge Function
-   - Queries Realtime Presence via REST API
-   - Updates `active_subscriptions_v2` table
+   - Cleans up stale subscriptions (> 5 minutes old)
+   - **CRITICAL:** Does NOT update `last_seen_at` - only client heartbeats update it
+   - Client manages subscriptions directly (adds on mount, removes on unmount)
    - Runs every minute (matches minimum TTL)
 
 **Testing:**

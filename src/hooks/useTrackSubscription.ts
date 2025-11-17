@@ -20,12 +20,15 @@ interface UseTrackSubscriptionOptions {
  * This hook:
  * 1. Joins a Realtime channel with Presence config
  * 2. Tracks presence with metadata (symbol, dataTypes, userId)
- * 3. Automatically cleans up on unmount
+ * 3. Adds subscription to active_subscriptions_v2 on mount
+ * 4. Sends periodic heartbeats (every 1 minute) to update last_seen_at
+ * 5. Removes subscription on unmount
  *
- * CRITICAL: Backend autonomously discovers subscriptions from Presence
- * - Analytics table updated every minute via refresh-analytics-from-presence-v2
- * - Background staleness checker runs every minute to refresh stale data
- * - No client-side requests needed - fully autonomous backend discovery
+ * CRITICAL: Heartbeat-based subscription management
+ * - Heartbeat runs every 1 minute to indicate user is actively viewing
+ * - Background cleanup removes subscriptions with last_seen_at > 5 minutes
+ * - This ensures heartbeat stops before cleanup (1 min < 5 min timeout)
+ * - Handles both normal disconnects (unmount cleanup) and abrupt closures (timeout cleanup)
  *
  * CRITICAL: This runs in parallel with existing postgres_changes subscriptions
  * It does NOT replace them - it adds Presence tracking for backend refresh system
@@ -37,6 +40,8 @@ export function useTrackSubscription({
 }: UseTrackSubscriptionOptions): void {
   const { supabase, user } = useAuth();
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef<boolean>(true);
   const [featureEnabled, setFeatureEnabled] = useState<boolean>(false);
 
   // CRITICAL: Memoize dataTypes to prevent unnecessary re-renders
@@ -64,6 +69,9 @@ export function useTrackSubscription({
   }, []);
 
   useEffect(() => {
+    // CRITICAL: Mark as mounted when effect runs
+    isMountedRef.current = true;
+
     // Feature flag check
     if (!featureEnabled) {
       return; // System disabled, don't track
@@ -95,6 +103,60 @@ export function useTrackSubscription({
     });
 
     channelRef.current = channel;
+
+    // Helper function to send heartbeat (updates last_seen_at)
+    // CRITICAL: Check isMountedRef to prevent heartbeats after unmount
+    const sendHeartbeat = async () => {
+      // CRITICAL: Don't send heartbeat if component is unmounted
+      if (!isMountedRef.current) {
+        console.warn(`[useTrackSubscription] HEARTBEAT BLOCKED - component unmounted for ${symbol}`);
+        return;
+      }
+
+      // Use refs to get current values (may be stale in closure)
+      const currentSupabase = supabaseRef.current;
+      const currentUserId = userIdRef.current;
+      const currentSymbol = symbolRef.current;
+      const currentDataTypes = dataTypesRef.current;
+
+      if (!currentSupabase || !currentUserId || !currentSymbol || !currentDataTypes || currentDataTypes.length === 0) {
+        console.warn(`[useTrackSubscription] HEARTBEAT BLOCKED - missing values for ${symbol}`, {
+          hasSupabase: !!currentSupabase,
+          hasUserId: !!currentUserId,
+          hasSymbol: !!currentSymbol,
+          hasDataTypes: !!currentDataTypes,
+        });
+        return;
+      }
+
+      console.log(`[useTrackSubscription] Sending heartbeat for ${currentSymbol}`, {
+        dataTypes: currentDataTypes,
+        isMounted: isMountedRef.current,
+      });
+
+      for (const dataType of currentDataTypes) {
+        // CRITICAL: Check again if still mounted before each RPC call
+        if (!isMountedRef.current) {
+          console.warn(`[useTrackSubscription] HEARTBEAT STOPPED - component unmounted during loop for ${currentSymbol}/${dataType}`);
+          return;
+        }
+
+        const { error: upsertError } = await currentSupabase.rpc('upsert_active_subscription_v2', {
+          p_user_id: currentUserId,
+          p_symbol: currentSymbol,
+          p_data_type: dataType,
+        });
+
+        if (upsertError) {
+          console.error(
+            `[useTrackSubscription] Failed to send heartbeat for ${currentSymbol}/${dataType}:`,
+            upsertError
+          );
+        } else {
+          console.log(`[useTrackSubscription] Heartbeat sent successfully for ${currentSymbol}/${dataType}`);
+        }
+      }
+    };
 
     // Set up presence tracking
     channel
@@ -128,76 +190,121 @@ export function useTrackSubscription({
             subscribedAt: new Date().toISOString(),
           });
 
-          // CRITICAL: Also update active_subscriptions_v2 table directly
-          // This is needed because Realtime Presence can't be queried via REST API
-          // We update the table directly so the backend can discover subscriptions
-          for (const dataType of stableDataTypes) {
-            const { error: upsertError } = await supabase.rpc('upsert_active_subscription_v2', {
-              p_user_id: user.id,
-              p_symbol: symbol,
-              p_data_type: dataType,
-            });
-
-            if (upsertError) {
-              console.error(
-                `[useTrackSubscription] Failed to upsert subscription for ${symbol}/${dataType}:`,
-                upsertError
-              );
-            }
-          }
+          // CRITICAL: Add subscription to active_subscriptions_v2 table (initial insert)
+          // This creates the subscription record
+          await sendHeartbeat();
         } else if (status === 'CHANNEL_ERROR') {
           console.error(`[useTrackSubscription] Channel error for ${symbol}:`, status);
         }
       });
 
+    // CRITICAL: Set up heartbeat interval (sends periodic updates to last_seen_at)
+    // Heartbeat runs every 1 minute to indicate user is actively viewing
+    // Background cleanup removes subscriptions with last_seen_at > 5 minutes
+    // This ensures heartbeat stops before cleanup (1 min < 5 min timeout)
+    heartbeatIntervalRef.current = setInterval(() => {
+      sendHeartbeat();
+    }, 60 * 1000); // 1 minute
+
+    // Send initial heartbeat immediately (don't wait 1 minute)
+    sendHeartbeat();
+
     // Cleanup on unmount
     return () => {
+      console.log(`[useTrackSubscription] CLEANUP STARTED for ${symbol}`, {
+        symbol,
+        dataTypes: stableDataTypes,
+        hasInterval: !!heartbeatIntervalRef.current,
+        isMounted: isMountedRef.current,
+      });
+
       try {
+        // CRITICAL: Mark as unmounted FIRST to prevent any pending heartbeats
+        isMountedRef.current = false;
+        console.log(`[useTrackSubscription] Marked as unmounted for ${symbol}`);
+
+        // CRITICAL: Clear heartbeat interval FIRST (stop sending heartbeats)
+        if (heartbeatIntervalRef.current) {
+          clearInterval(heartbeatIntervalRef.current);
+          heartbeatIntervalRef.current = null;
+          console.log(`[useTrackSubscription] Cleared heartbeat interval for ${symbol}`);
+        } else {
+          console.warn(`[useTrackSubscription] No heartbeat interval to clear for ${symbol}`);
+        }
+
         const currentChannel = channelRef.current;
         const currentDataTypes = dataTypesRef.current;
         const currentSymbol = symbolRef.current;
         const currentUserId = userIdRef.current;
         const currentSupabase = supabaseRef.current;
 
-        // CRITICAL: Defensive checks - ensure all values are valid before cleanup
-        if (!currentChannel || !currentSupabase || !currentUserId || !currentSymbol) {
-          channelRef.current = null;
-          return;
-        }
+        console.log(`[useTrackSubscription] Cleanup values for ${symbol}:`, {
+          hasChannel: !!currentChannel,
+          hasSupabase: !!currentSupabase,
+          hasUserId: !!currentUserId,
+          hasSymbol: !!currentSymbol,
+          hasDataTypes: !!currentDataTypes && Array.isArray(currentDataTypes),
+          dataTypesCount: currentDataTypes?.length ?? 0,
+        });
 
-        // Only delete subscriptions if we have valid data types
-        if (currentDataTypes && Array.isArray(currentDataTypes) && currentDataTypes.length > 0) {
-          // CRITICAL: Remove subscriptions from active_subscriptions_v2 table
-          // This is needed because Realtime Presence can't be queried via REST API
-          // Use stored refs to ensure we have the correct values even after unmount
+        // CRITICAL: Always try to delete subscription, even if some checks fail
+        // This ensures cleanup happens even if channel or other refs are null
+        if (currentSupabase && currentUserId && currentSymbol && currentDataTypes && Array.isArray(currentDataTypes) && currentDataTypes.length > 0) {
+          console.log(`[useTrackSubscription] Attempting to delete subscriptions for ${currentSymbol}`, {
+            dataTypes: currentDataTypes,
+          });
+
+          // Delete subscriptions for all data types
           for (const dataType of currentDataTypes) {
             if (!dataType || typeof dataType !== 'string') {
+              console.warn(`[useTrackSubscription] Skipping invalid data type:`, dataType);
               continue; // Skip invalid data types
             }
 
+            console.log(`[useTrackSubscription] Deleting subscription: ${currentSymbol}/${dataType}`);
+
             // CRITICAL: Execute the query and handle errors properly
-            // Supabase query builder needs to be executed (via .then() or await)
-            currentSupabase
-              .from('active_subscriptions_v2')
-              .delete()
-              .eq('user_id', currentUserId)
-              .eq('symbol', currentSymbol)
-              .eq('data_type', dataType)
-              .then(() => {
-                // Success - subscription removed
+            // Convert PromiseLike to Promise to ensure .catch() is available
+            Promise.resolve(
+              currentSupabase
+                .from('active_subscriptions_v2')
+                .delete()
+                .eq('user_id', currentUserId)
+                .eq('symbol', currentSymbol)
+                .eq('data_type', dataType)
+            )
+              .then((result) => {
+                console.log(`[useTrackSubscription] DELETE SUCCESS for ${currentSymbol}/${dataType}`, result);
               })
-              .catch((error) => {
-                console.warn(
-                  `[useTrackSubscription] Error removing subscription for ${currentSymbol}/${dataType}:`,
+              .catch((error: unknown) => {
+                console.error(
+                  `[useTrackSubscription] DELETE ERROR for ${currentSymbol}/${dataType}:`,
                   error
                 );
               });
           }
+        } else {
+          console.error(`[useTrackSubscription] Cannot delete subscription for ${symbol} - missing required values:`, {
+            hasSupabase: !!currentSupabase,
+            hasUserId: !!currentUserId,
+            hasSymbol: !!currentSymbol,
+            hasDataTypes: !!currentDataTypes,
+            isArray: Array.isArray(currentDataTypes),
+            length: currentDataTypes?.length ?? 0,
+          });
+        }
+
+        // CRITICAL: Defensive checks for channel cleanup
+        // Note: Subscription deletion already happened above, so we can safely return here
+        if (!currentChannel || !currentSupabase) {
+          console.warn(`[useTrackSubscription] Channel cleanup skipped for ${symbol} - missing channel or supabase`);
+          channelRef.current = null;
+          return;
         }
 
         // Stop tracking presence (fire and forget - don't wait)
         try {
-          currentChannel.untrack().catch((error) => {
+          void currentChannel.untrack().catch((error: unknown) => {
             console.warn(`[useTrackSubscription] Error untracking presence for ${currentSymbol}:`, error);
           });
         } catch (error) {
@@ -206,9 +313,9 @@ export function useTrackSubscription({
 
         // Leave channel (presence automatically removed) - fire and forget
         try {
-          currentSupabase
+          void currentSupabase
             .removeChannel(currentChannel)
-            .catch((error) => {
+            .catch((error: unknown) => {
               console.warn(`[useTrackSubscription] Error removing channel for ${currentSymbol}:`, error);
             });
         } catch (error) {
