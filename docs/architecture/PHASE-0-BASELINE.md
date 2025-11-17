@@ -58,9 +58,9 @@ The baseline captures:
 SELECT * FROM migration_baseline ORDER BY recorded_at DESC;
 
 -- View specific metric
-SELECT metric_value FROM migration_baseline 
-WHERE metric_name = 'profiles_row_count' 
-ORDER BY recorded_at DESC 
+SELECT metric_value FROM migration_baseline
+WHERE metric_name = 'profiles_row_count'
+ORDER BY recorded_at DESC
 LIMIT 1;
 ```
 
@@ -70,11 +70,11 @@ During migration, compare new system metrics against baseline:
 
 ```sql
 -- Compare row counts
-SELECT 
+SELECT
   'profiles' AS table_name,
-  (SELECT (metric_value->>'count')::BIGINT 
-   FROM migration_baseline 
-   WHERE metric_name = 'profiles_row_count' 
+  (SELECT (metric_value->>'count')::BIGINT
+   FROM migration_baseline
+   WHERE metric_name = 'profiles_row_count'
    ORDER BY recorded_at DESC LIMIT 1) AS baseline_count,
   (SELECT COUNT(*) FROM profiles) AS current_count;
 ```

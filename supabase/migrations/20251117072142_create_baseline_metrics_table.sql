@@ -32,7 +32,7 @@ BEGIN
   INSERT INTO public.migration_baseline (metric_name, metric_value, notes)
   VALUES (p_metric_name, p_metric_value, p_notes)
   RETURNING id INTO metric_id;
-  
+
   RETURN metric_id;
 END;
 $$ LANGUAGE plpgsql;
@@ -46,7 +46,7 @@ BEGIN
   RETURN QUERY
   WITH metrics AS (
     -- Count rows in each data table
-    SELECT 'profiles_row_count'::TEXT AS name, 
+    SELECT 'profiles_row_count'::TEXT AS name,
            jsonb_build_object('count', COUNT(*), 'table', 'profiles') AS value
     FROM public.profiles
     UNION ALL

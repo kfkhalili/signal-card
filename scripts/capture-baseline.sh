@@ -30,12 +30,12 @@ BEGIN
       'Baseline captured before migration - ' || NOW()::TEXT
     );
   END LOOP;
-  
+
   RAISE NOTICE 'Baseline metrics captured successfully';
 END \$\$;
 
 -- Display captured metrics
-SELECT 
+SELECT
   metric_name,
   metric_value,
   recorded_at
