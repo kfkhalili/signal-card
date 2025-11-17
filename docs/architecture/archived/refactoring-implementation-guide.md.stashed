@@ -1,5 +1,8 @@
 # Refactoring Implementation Guide
 
+> **Note:** This document focuses on **code quality and refactoring**, separate from the API calling strategy.
+> **For API architecture:** See `MASTER-ARCHITECTURE.md` for the canonical API calling strategy.
+
 This guide provides step-by-step instructions for implementing the architectural improvements identified in the analysis.
 
 ---
