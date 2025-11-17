@@ -21,13 +21,13 @@ COMMENT ON COLUMN public.active_subscriptions_v2.subscribed_at IS 'When the user
 COMMENT ON COLUMN public.active_subscriptions_v2.last_seen_at IS 'Last time this subscription was seen in Presence';
 
 -- Indexes for common queries
-CREATE INDEX IF NOT EXISTS idx_active_subscriptions_v2_symbol_data_type 
+CREATE INDEX IF NOT EXISTS idx_active_subscriptions_v2_symbol_data_type
   ON public.active_subscriptions_v2(symbol, data_type);
 
-CREATE INDEX IF NOT EXISTS idx_active_subscriptions_v2_user_id 
+CREATE INDEX IF NOT EXISTS idx_active_subscriptions_v2_user_id
   ON public.active_subscriptions_v2(user_id);
 
-CREATE INDEX IF NOT EXISTS idx_active_subscriptions_v2_last_seen_at 
+CREATE INDEX IF NOT EXISTS idx_active_subscriptions_v2_last_seen_at
   ON public.active_subscriptions_v2(last_seen_at DESC);
 
 -- RLS: Users can read their own subscriptions

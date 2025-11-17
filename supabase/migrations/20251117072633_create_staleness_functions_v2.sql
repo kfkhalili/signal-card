@@ -14,7 +14,7 @@ BEGIN
   IF p_ttl_minutes IS NULL OR p_ttl_minutes <= 0 THEN
     RAISE EXCEPTION 'TTL must be positive. Got: %', p_ttl_minutes;
   END IF;
-  
+
   -- Check if data is stale
   RETURN p_fetched_at IS NULL OR p_fetched_at < NOW() - (p_ttl_minutes || ' minutes')::INTERVAL;
 END;
@@ -33,7 +33,7 @@ BEGIN
   IF p_ttl_minutes IS NULL OR p_ttl_minutes <= 0 THEN
     RAISE EXCEPTION 'TTL must be positive. Got: %', p_ttl_minutes;
   END IF;
-  
+
   -- Check if profile is stale
   RETURN p_modified_at IS NULL OR p_modified_at < NOW() - (p_ttl_minutes || ' minutes')::INTERVAL;
 END;

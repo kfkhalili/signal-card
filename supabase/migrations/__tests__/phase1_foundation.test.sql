@@ -5,8 +5,8 @@
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM information_schema.tables 
-    WHERE table_schema = 'public' 
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public'
     AND table_name = 'data_type_registry_v2'
   ) THEN
     RAISE EXCEPTION 'data_type_registry_v2 table does not exist';
@@ -20,15 +20,15 @@ BEGIN
   IF NOT is_valid_identifier('valid_identifier_123') THEN
     RAISE EXCEPTION 'is_valid_identifier should return true for valid identifier';
   END IF;
-  
+
   IF is_valid_identifier('invalid-identifier') THEN
     RAISE EXCEPTION 'is_valid_identifier should return false for invalid identifier';
   END IF;
-  
+
   IF is_valid_identifier(NULL) THEN
     RAISE EXCEPTION 'is_valid_identifier should return false for NULL';
   END IF;
-  
+
   RAISE NOTICE 'Test 2 PASSED: is_valid_identifier function works';
 END $$;
 
@@ -36,8 +36,8 @@ END $$;
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM information_schema.tables 
-    WHERE table_schema = 'public' 
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public'
     AND table_name = 'active_subscriptions_v2'
   ) THEN
     RAISE EXCEPTION 'active_subscriptions_v2 table does not exist';
@@ -51,22 +51,22 @@ DECLARE
   partition_count INTEGER;
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM information_schema.tables 
-    WHERE table_schema = 'public' 
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public'
     AND table_name = 'api_call_queue_v2'
   ) THEN
     RAISE EXCEPTION 'api_call_queue_v2 table does not exist';
   END IF;
-  
+
   -- Check partitions exist
   SELECT COUNT(*) INTO partition_count
   FROM pg_inherits
   WHERE inhparent = 'public.api_call_queue_v2'::regclass;
-  
+
   IF partition_count < 4 THEN
     RAISE EXCEPTION 'api_call_queue_v2 should have 4 partitions, found %', partition_count;
   END IF;
-  
+
   RAISE NOTICE 'Test 4 PASSED: api_call_queue_v2 table exists and is partitioned (partitions: %)', partition_count;
 END $$;
 
@@ -74,8 +74,8 @@ END $$;
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM information_schema.tables 
-    WHERE table_schema = 'public' 
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public'
     AND table_name = 'api_data_usage_v2'
   ) THEN
     RAISE EXCEPTION 'api_data_usage_v2 table does not exist';
@@ -90,11 +90,11 @@ BEGIN
   IF NOT is_data_stale_v2(NOW() - INTERVAL '10 minutes', 5) THEN
     RAISE EXCEPTION 'is_data_stale_v2 should return true for stale data';
   END IF;
-  
+
   IF is_data_stale_v2(NOW(), 5) THEN
     RAISE EXCEPTION 'is_data_stale_v2 should return false for fresh data';
   END IF;
-  
+
   -- Test that NULL TTL raises exception
   BEGIN
     PERFORM is_data_stale_v2(NOW(), NULL);
@@ -112,11 +112,11 @@ BEGIN
   IF NOT is_profile_stale_v2(NOW() - INTERVAL '10 minutes', 5) THEN
     RAISE EXCEPTION 'is_profile_stale_v2 should return true for stale profile';
   END IF;
-  
+
   IF is_profile_stale_v2(NOW(), 5) THEN
     RAISE EXCEPTION 'is_profile_stale_v2 should return false for fresh profile';
   END IF;
-  
+
   -- Test that negative TTL raises exception
   BEGIN
     PERFORM is_profile_stale_v2(NOW(), -1);

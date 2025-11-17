@@ -15,11 +15,11 @@ COMMENT ON COLUMN public.api_data_usage_v2.job_id IS 'Reference to api_call_queu
 COMMENT ON COLUMN public.api_data_usage_v2.recorded_at IS 'When this usage was recorded';
 
 -- Index for rolling 30-day queries
-CREATE INDEX IF NOT EXISTS idx_api_data_usage_v2_recorded_at 
+CREATE INDEX IF NOT EXISTS idx_api_data_usage_v2_recorded_at
   ON public.api_data_usage_v2(recorded_at DESC);
 
 -- Index for job tracking
-CREATE INDEX IF NOT EXISTS idx_api_data_usage_v2_job_id 
+CREATE INDEX IF NOT EXISTS idx_api_data_usage_v2_job_id
   ON public.api_data_usage_v2(job_id)
   WHERE job_id IS NOT NULL;
 

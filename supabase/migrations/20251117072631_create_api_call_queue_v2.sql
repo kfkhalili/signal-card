@@ -33,47 +33,47 @@ COMMENT ON COLUMN public.api_call_queue_v2.error_message IS 'Error message if jo
 COMMENT ON COLUMN public.api_call_queue_v2.job_metadata IS 'Additional metadata for the job';
 
 -- Create partitions
-CREATE TABLE IF NOT EXISTS public.api_call_queue_v2_pending 
+CREATE TABLE IF NOT EXISTS public.api_call_queue_v2_pending
   PARTITION OF public.api_call_queue_v2
   FOR VALUES IN ('pending')
   WITH (FILLFACTOR = 70);
 
-CREATE TABLE IF NOT EXISTS public.api_call_queue_v2_processing 
+CREATE TABLE IF NOT EXISTS public.api_call_queue_v2_processing
   PARTITION OF public.api_call_queue_v2
   FOR VALUES IN ('processing')
   WITH (FILLFACTOR = 70);
 
-CREATE TABLE IF NOT EXISTS public.api_call_queue_v2_completed 
+CREATE TABLE IF NOT EXISTS public.api_call_queue_v2_completed
   PARTITION OF public.api_call_queue_v2
   FOR VALUES IN ('completed')
   WITH (FILLFACTOR = 70);
 
-CREATE TABLE IF NOT EXISTS public.api_call_queue_v2_failed 
+CREATE TABLE IF NOT EXISTS public.api_call_queue_v2_failed
   PARTITION OF public.api_call_queue_v2
   FOR VALUES IN ('failed')
   WITH (FILLFACTOR = 70);
 
 -- Indexes on each partition for common queries
 -- Pending partition: Priority-based selection
-CREATE INDEX IF NOT EXISTS idx_api_call_queue_v2_pending_priority 
+CREATE INDEX IF NOT EXISTS idx_api_call_queue_v2_pending_priority
   ON public.api_call_queue_v2_pending(priority DESC, created_at ASC)
   WHERE status = 'pending';
 
-CREATE INDEX IF NOT EXISTS idx_api_call_queue_v2_pending_symbol_data_type 
+CREATE INDEX IF NOT EXISTS idx_api_call_queue_v2_pending_symbol_data_type
   ON public.api_call_queue_v2_pending(symbol, data_type)
   WHERE status = 'pending';
 
 -- Processing partition: Recovery queries
-CREATE INDEX IF NOT EXISTS idx_api_call_queue_v2_processing_processed_at 
+CREATE INDEX IF NOT EXISTS idx_api_call_queue_v2_processing_processed_at
   ON public.api_call_queue_v2_processing(processed_at)
   WHERE status = 'processing';
 
 -- Completed partition: Analytics (may be truncated weekly)
-CREATE INDEX IF NOT EXISTS idx_api_call_queue_v2_completed_processed_at 
+CREATE INDEX IF NOT EXISTS idx_api_call_queue_v2_completed_processed_at
   ON public.api_call_queue_v2_completed(processed_at DESC);
 
 -- Failed partition: Analytics
-CREATE INDEX IF NOT EXISTS idx_api_call_queue_v2_failed_processed_at 
+CREATE INDEX IF NOT EXISTS idx_api_call_queue_v2_failed_processed_at
   ON public.api_call_queue_v2_failed(processed_at DESC);
 
 -- RLS: Queue is read-only for authenticated users (for monitoring)
