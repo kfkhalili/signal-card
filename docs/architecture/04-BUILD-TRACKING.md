@@ -10,12 +10,12 @@ Phase 0: Safety Infrastructure        [██████████] 100%
 Phase 1: Foundation (Parallel)        [██████████] 100%
 Phase 2: Queue System (Parallel)      [██████████] 100%
 Phase 3: Staleness System (Parallel)  [██████████] 100%
-Phase 4: Frontend Integration         [██░░░░░░░░] 20%
+Phase 4: Frontend Integration         [████████░░] 80%
 Phase 5: Migration (One Type)         [░░░░░░░░░░] 0%
 Phase 6: Full Migration               [░░░░░░░░░░] 0%
 ```
 
-**Overall Progress:** 60% (4.2/7 phases complete)
+**Overall Progress:** 71% (5.0/7 phases complete)
 
 ---
 
@@ -184,7 +184,7 @@ Phase 0 complete. Feature flags, health check, and baseline capture are in place
 
 ## Phase 4: Frontend Integration
 
-**Status:** 🟡 In Progress (20%)
+**Status:** 🟡 In Progress (80%)
 **Target:** Week 3-4
 **Started:** 2025-11-17
 
@@ -201,14 +201,25 @@ Phase 0 complete. Feature flags, health check, and baseline capture are in place
   - [x] Content-Length tracking
   - [x] Aggressive timeouts (10s)
 - [ ] Migrate other `fetch-fmp-*` functions to `/lib/` (as needed)
-- [ ] Create frontend hook: `useTrackSubscription`
-- [ ] Integrate `track-subscription-v2` into card components
-- [ ] Test end-to-end flow
+- [x] Create frontend hook: `useTrackSubscription`
+  - [x] Realtime Presence integration
+  - [x] Feature flag check
+  - [x] Edge Function invocation
+  - [x] Cleanup on unmount
+- [x] Create `card-data-type-mapping.ts` helper
+  - [x] Maps card types to data types
+  - [x] Matches `data_type_registry_v2` values
+- [x] Create `feature-flags.ts` helper
+  - [x] Async `checkFeatureFlag()` function
+- [x] Integrate `useTrackSubscription` into `GameCard` component
+  - [x] Automatic subscription tracking per card
+  - [x] Runs in parallel with existing subscriptions
+- [ ] Test end-to-end flow (feature flag disabled by default)
 
 **Deliverables:**
-- [ ] Frontend can trigger staleness checks
-- [ ] Processor can handle all data types
-- [ ] Feature flag: `use_queue_system = false` (still disabled)
+- [x] Frontend can trigger staleness checks (via `useTrackSubscription` hook)
+- [ ] Processor can handle all data types (only `profile` implemented so far)
+- [x] Feature flag: `use_queue_system = false` (still disabled)
 
 ---
 
