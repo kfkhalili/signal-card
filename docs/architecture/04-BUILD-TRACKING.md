@@ -15,7 +15,7 @@ Phase 5: Migration (One Type)         [░░░░░░░░░░] 0%
 Phase 6: Full Migration               [░░░░░░░░░░] 0%
 ```
 
-**Overall Progress:** 57% (4/7 phases complete)
+**Overall Progress:** 60% (4.2/7 phases complete)
 
 ---
 
