@@ -1,7 +1,7 @@
 /**
  * Unit tests for refresh-analytics-from-presence-v2 Edge Function
  * Tests the logic for cleaning up stale subscriptions from active_subscriptions_v2 table
- * 
+ *
  * CRITICAL: This function only cleans up stale subscriptions (> 5 minutes old)
  * It does NOT update last_seen_at - only client heartbeats update it
  */
@@ -104,7 +104,7 @@ describe('refresh-analytics-from-presence-v2', () => {
       // This test documents the critical behavior:
       // The function should NOT update last_seen_at for any subscriptions
       // Only client heartbeats update last_seen_at
-      
+
       const now = Date.now();
       const sixMinutesAgo = new Date(now - 6 * 60 * 1000).toISOString();
       const oneMinuteAgo = new Date(now - 1 * 60 * 1000).toISOString();
@@ -122,7 +122,7 @@ describe('refresh-analytics-from-presence-v2', () => {
 
       // Should identify 1 stale subscription
       expect(staleSubscriptions).toHaveLength(1);
-      
+
       // Should NOT update last_seen_at for the non-stale subscription
       // (This is verified by the fact that we're only filtering, not updating)
       const activeSubscriptions = subscriptions.filter(

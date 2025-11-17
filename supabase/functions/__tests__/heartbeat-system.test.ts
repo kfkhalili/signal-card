@@ -1,7 +1,7 @@
 /**
  * Unit tests for heartbeat-based subscription management system
  * Tests the logic for upsert_active_subscription_v2 function behavior
- * 
+ *
  * CRITICAL: This function updates last_seen_at on both INSERT and UPDATE (conflict)
  * - INSERT: New subscription - sets both subscribed_at and last_seen_at
  * - UPDATE: Heartbeat - updates last_seen_at to indicate user is still actively viewing
@@ -22,7 +22,7 @@ describe('Heartbeat System', () => {
     it('should set both subscribed_at and last_seen_at on INSERT (new subscription)', () => {
       // On first call (INSERT), both timestamps should be set
       const now = new Date().toISOString();
-      
+
       // Simulated INSERT behavior
       const newSubscription = {
         user_id: 'user-123',
@@ -59,7 +59,7 @@ describe('Heartbeat System', () => {
     it('should handle heartbeat interval correctly (1 minute)', () => {
       // Heartbeat should be sent every 1 minute (60,000 ms)
       const heartbeatInterval = 60 * 1000; // 1 minute in milliseconds
-      
+
       expect(heartbeatInterval).toBe(60000);
       expect(heartbeatInterval).toBeGreaterThan(0);
     });
@@ -68,7 +68,7 @@ describe('Heartbeat System', () => {
       // Cleanup timeout (5 minutes) should be longer than heartbeat interval (1 minute)
       const heartbeatInterval = 60 * 1000; // 1 minute
       const cleanupTimeout = 5 * 60 * 1000; // 5 minutes
-      
+
       expect(cleanupTimeout).toBeGreaterThan(heartbeatInterval);
       expect(cleanupTimeout / heartbeatInterval).toBe(5); // 5x longer
     });
@@ -96,13 +96,13 @@ describe('Heartbeat System', () => {
       // When browser closes, heartbeat stops, last_seen_at stops updating
       const now = Date.now();
       const lastHeartbeat = new Date(now - 6 * 60 * 1000); // 6 minutes ago
-      
+
       // No new heartbeats after browser closed
       const currentLastSeenAt = lastHeartbeat; // Unchanged
-      
+
       // After 5 minutes, subscription becomes stale
       const isStale = currentLastSeenAt < new Date(now - 5 * 60 * 1000);
-      
+
       expect(isStale).toBe(true);
     });
   });
@@ -112,7 +112,7 @@ describe('Heartbeat System', () => {
       // Client should send heartbeat every 60 seconds
       const heartbeatInterval = 60 * 1000;
       const expectedCallsPerHour = 60; // 60 minutes in an hour
-      
+
       expect(heartbeatInterval).toBe(60000);
       expect(expectedCallsPerHour).toBe(60);
     });
@@ -120,7 +120,7 @@ describe('Heartbeat System', () => {
     it('should prevent heartbeats after component unmounts', () => {
       // isMountedRef should block heartbeats after unmount
       let isMounted = true;
-      
+
       const shouldSendHeartbeat = () => {
         if (!isMounted) {
           return false; // Blocked
@@ -129,10 +129,10 @@ describe('Heartbeat System', () => {
       };
 
       expect(shouldSendHeartbeat()).toBe(true);
-      
+
       // Simulate unmount
       isMounted = false;
-      
+
       expect(shouldSendHeartbeat()).toBe(false);
     });
 
@@ -165,7 +165,7 @@ describe('Heartbeat System', () => {
     it('should only remove stale subscriptions, not update last_seen_at', () => {
       // Backend cleanup should NOT update last_seen_at
       // Only client heartbeats update last_seen_at
-      
+
       const now = Date.now();
       const oneMinuteAgo = new Date(now - 1 * 60 * 1000);
       const sixMinutesAgo = new Date(now - 6 * 60 * 1000);
@@ -183,7 +183,7 @@ describe('Heartbeat System', () => {
 
       // Should identify 1 stale subscription
       expect(staleSubscriptions).toHaveLength(1);
-      
+
       // Should NOT update last_seen_at for active subscription
       const activeSubscription = subscriptions.find(
         sub => sub.last_seen_at >= staleThreshold
