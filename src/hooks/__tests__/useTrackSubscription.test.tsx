@@ -1,7 +1,7 @@
 /**
  * Unit tests for useTrackSubscription hook
  * Tests React hook behavior with mocked dependencies
- * 
+ *
  * NOTE: These tests require proper Jest path alias resolution and React Testing Library setup.
  * If dependencies can't be resolved, these tests will be skipped.
  */

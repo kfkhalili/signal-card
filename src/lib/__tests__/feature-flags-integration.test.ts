@@ -1,7 +1,7 @@
 /**
  * Integration tests for feature-flags helper
  * Tests the actual checkFeatureFlag function with mocked Supabase client
- * 
+ *
  * NOTE: These tests require proper Jest path alias resolution.
  * If path aliases aren't working, these tests will be skipped.
  */
