@@ -16,13 +16,13 @@ interface UseTrackSubscriptionOptions {
 
 /**
  * Hook to track symbol subscriptions with Realtime Presence
- * 
+ *
  * This hook:
  * 1. Joins a Realtime channel with Presence config
  * 2. Tracks presence with metadata (symbol, dataTypes, userId)
  * 3. Calls track-subscription-v2 Edge Function to trigger staleness check
  * 4. Automatically cleans up on unmount
- * 
+ *
  * CRITICAL: This runs in parallel with existing postgres_changes subscriptions
  * It does NOT replace them - it adds Presence tracking for backend refresh system
  */

@@ -5,7 +5,7 @@ import { createSupabaseBrowserClient } from './supabase/client';
 
 /**
  * Check if a feature flag is enabled
- * 
+ *
  * @param flagName - The name of the feature flag
  * @returns Promise<boolean> - true if enabled, false if disabled or error
  */
