@@ -24,8 +24,12 @@ const CORS_HEADERS = {
 import { fetchProfileLogic } from '../lib/fetch-fmp-profile.ts';
 import { fetchQuoteLogic } from '../lib/fetch-fmp-quote.ts';
 import { fetchFinancialStatementsLogic } from '../lib/fetch-fmp-financial-statements.ts';
-// TODO: Import other worker functions as they are migrated
-// ... etc for all data types
+import { fetchRatiosTtmLogic } from '../lib/fetch-fmp-ratios-ttm.ts';
+import { fetchDividendHistoryLogic } from '../lib/fetch-fmp-dividend-history.ts';
+import { fetchRevenueProductSegmentationLogic } from '../lib/fetch-fmp-revenue-product-segmentation.ts';
+import { fetchGradesHistoricalLogic } from '../lib/fetch-fmp-grades-historical.ts';
+import { fetchExchangeVariantsLogic } from '../lib/fetch-fmp-exchange-variants.ts';
+// All card data types have been migrated to the queue system
 
 interface QueueJob {
   id: string;
@@ -243,13 +247,21 @@ async function processJob(
       return await fetchQuoteLogic(job, supabase);
     case 'financial-statements':
       return await fetchFinancialStatementsLogic(job, supabase);
-    // TODO: Add other data types as they are migrated to /lib/
-    // ... etc
+    case 'ratios-ttm':
+      return await fetchRatiosTtmLogic(job, supabase);
+    case 'dividend-history':
+      return await fetchDividendHistoryLogic(job, supabase);
+    case 'revenue-product-segmentation':
+      return await fetchRevenueProductSegmentationLogic(job, supabase);
+    case 'grades-historical':
+      return await fetchGradesHistoricalLogic(job, supabase);
+    case 'exchange-variants':
+      return await fetchExchangeVariantsLogic(job, supabase);
     default:
       return {
         success: false,
         dataSizeBytes: 0,
-        error: `Unknown or unsupported data type: ${job.data_type}. This data type has not been migrated to the queue system yet.`,
+        error: `Unknown or unsupported data type: ${job.data_type}. This data type is not registered in the queue system.`,
       };
   }
 }
