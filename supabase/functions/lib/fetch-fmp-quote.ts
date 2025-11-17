@@ -184,15 +184,17 @@ export async function fetchQuoteLogic(
     }
 
     // Prepare record for upsert
+    // CRITICAL: Truncate bigint values (volume, market_cap) to integers
+    // FMP API sometimes returns decimals like "3955124346827.0005" which breaks bigint columns
     const recordToUpsert = {
       symbol: quote.symbol,
       current_price: quote.price,
       change_percentage: quote.changesPercentage ?? quote.changePercentage ?? null,
       day_change: quote.change ?? null,
-      volume: quote.volume ?? null,
+      volume: quote.volume ? Math.trunc(quote.volume) : null,
       day_low: quote.dayLow ?? null,
       day_high: quote.dayHigh ?? null,
-      market_cap: quote.marketCap ?? null,
+      market_cap: quote.marketCap ? Math.trunc(quote.marketCap) : null,
       day_open: quote.open ?? null,
       previous_close: quote.previousClose ?? null,
       api_timestamp: quote.timestamp,

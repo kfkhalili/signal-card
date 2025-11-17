@@ -167,12 +167,14 @@ export async function fetchProfileLogic(
     }
 
     // Prepare record for upsert
+    // CRITICAL: Truncate bigint values (volume, market_cap, average_volume) to integers
+    // FMP API sometimes returns decimals like "3955124346827.0005" which breaks bigint columns
     const recordToUpsert = {
       symbol: profile.symbol,
       price: profile.price,
       beta: profile.beta ?? null,
       average_volume: profile.averageVolume ? Math.trunc(profile.averageVolume) : null,
-      market_cap: profile.marketCap ?? null,
+      market_cap: profile.marketCap ? Math.trunc(profile.marketCap) : null,
       last_dividend: profile.lastDividend ?? null,
       range: profile.range ?? null,
       change: profile.change ?? null,
@@ -203,7 +205,7 @@ export async function fetchProfileLogic(
       is_actively_trading: profile.isActivelyTrading ?? true,
       is_adr: profile.isAdr ?? false,
       is_fund: profile.isFund ?? false,
-      volume: profile.volume ?? null,
+      volume: profile.volume ? Math.trunc(profile.volume) : null,
     };
 
     // Upsert to database using RPC function

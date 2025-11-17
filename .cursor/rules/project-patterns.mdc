@@ -324,6 +324,22 @@ useEffect(() => {
 }, [symbol, supabase]);
 ```
 
+### Supabase Operations
+
+#### Always Use MCP for Supabase
+- **ALWAYS use MCP tools** for all Supabase operations (deployments, SQL queries, migrations, etc.)
+- **NEVER use CLI commands** like `supabase functions deploy` or `supabase db push`
+- **NEVER use direct API calls** when MCP tools are available
+- MCP tools provide better error handling, logging, and integration with the codebase
+
+**Examples:**
+- ✅ Use `mcp_supabase-tickered_deploy_edge_function` for Edge Function deployments
+- ✅ Use `mcp_supabase-tickered_execute_sql` for SQL queries
+- ✅ Use `mcp_supabase-tickered_apply_migration` for database migrations
+- ✅ Use `mcp_supabase-tickered_get_logs` for viewing logs
+- ❌ Don't use `supabase functions deploy` CLI command
+- ❌ Don't use `supabase db push` CLI command
+
 ### Edge Function Patterns
 
 #### Standard Structure
