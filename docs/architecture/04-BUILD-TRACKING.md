@@ -248,7 +248,13 @@ Phase 0 complete. Feature flags, health check, and baseline capture are in place
   - [x] Queue helper functions
 - [x] Verify registry entry is correct
 - [x] Test basic functions (staleness check, queue function)
-- [ ] Apply Phase 2-3 migrations (queue system, staleness system)
+- [x] Apply Phase 2-3 migrations (queue system, staleness system)
+  - [x] Quota functions
+  - [x] Queue management functions (get_batch, complete, fail)
+  - [x] Recovery functions
+  - [x] Partition maintenance
+  - [x] Event-driven staleness check
+- [ ] Apply remaining Phase 3 migrations (background checker, scheduled refreshes, analytics)
 - [ ] Test end-to-end flow (with feature flag still disabled)
 - [ ] Enable feature flag: `use_queue_system = true` (when ready)
 - [ ] Monitor for 24-48 hours
