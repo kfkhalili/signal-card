@@ -201,9 +201,11 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
                 }}>
                 <div className="flex justify-between w-full items-center">
                   <span className="font-semibold">{suggestion.value}</span>
-                  <span className="text-muted-foreground text-xs truncate ml-4">
-                    {suggestion.companyName}
-                  </span>
+                  {suggestion.companyName && (
+                    <span className="text-muted-foreground text-xs truncate ml-4">
+                      {suggestion.companyName}
+                    </span>
+                  )}
                 </div>
               </CommandItem>
             ))}

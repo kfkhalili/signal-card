@@ -205,7 +205,7 @@ export function useWorkspaceManager() {
           .map((s) => ({
             value: s,
             label: s,
-            companyName: "Name not available",
+            companyName: "",
           }))
           .sort((a, b) => a.value.localeCompare(b.value));
         setSupportedSymbols(symbolOnlySuggestions);
@@ -221,11 +221,11 @@ export function useWorkspaceManager() {
 
       const suggestions: SymbolSuggestion[] = symbolStrings
         .map((symbol) => {
-          const companyName = companyNamesMap.get(symbol) ?? "Unknown Company";
+          const companyName = companyNamesMap.get(symbol) ?? "";
           return {
             value: symbol,
             companyName,
-            label: `${symbol} ${companyName}`,
+            label: companyName ? `${symbol} ${companyName}` : symbol,
           };
         })
         .sort((a, b) => a.value.localeCompare(b.value));
