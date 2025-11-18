@@ -98,7 +98,15 @@ export class RealtimeStockManager extends EventEmitter {
           filter: `symbol=in.(${symbols.join(",")})`,
         },
         (payload) => {
-          this.emit("quote", payload.new);
+          if (process.env.NODE_ENV === "development") {
+            console.log(
+              `[RealtimeStockManager] Received quote update for ${payload.new?.symbol}`,
+              payload
+            );
+          }
+          if (payload.new) {
+            this.emit("quote", payload.new);
+          }
         }
       )
       .subscribe((status, err) => {

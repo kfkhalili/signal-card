@@ -578,9 +578,16 @@ export function useWorkspaceManager() {
   );
 
   const handleLiveQuoteUpdate = useCallback(
-    (leanQuoteData: LiveQuoteIndicatorDBRow) => {
+    (leanQuoteData: LiveQuoteIndicatorDBRow, source?: "fetch" | "realtime") => {
       const updateContext: CardUpdateContext = { toast };
       const eventType: CardUpdateEventType = "LIVE_QUOTE_UPDATE";
+
+      // Log for debugging
+      if (process.env.NODE_ENV === "development") {
+        console.log(
+          `[handleLiveQuoteUpdate] Received quote update for ${leanQuoteData.symbol} from ${source || "unknown"}`
+        );
+      }
 
       setActiveCards((prevActiveCards) => {
         let overallChanged = false;
@@ -600,7 +607,18 @@ export function useWorkspaceManager() {
                 JSON.stringify(concreteCardDataForHandler)
               ) {
                 overallChanged = true;
+                if (process.env.NODE_ENV === "development") {
+                  console.log(
+                    `[handleLiveQuoteUpdate] Card ${card.type} for ${card.symbol} updated`
+                  );
+                }
                 return { ...card, ...updatedConcreteData };
+              }
+            } else {
+              if (process.env.NODE_ENV === "development") {
+                console.warn(
+                  `[handleLiveQuoteUpdate] No handler found for card type ${card.type}`
+                );
               }
             }
           }
