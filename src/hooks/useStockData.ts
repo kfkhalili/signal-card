@@ -255,6 +255,51 @@ export function useStockData({
     };
   }, [symbol, supabaseClient, onProfileUpdate]);
 
+  // New effect for financial statement updates via Realtime
+  // Only subscribe if callback is provided
+  useEffect(() => {
+    if (!supabaseClient || !symbol || !onFinancialStatementUpdate) return;
+
+    const unsubscribe = subscribeToFinancialStatementUpdates(
+      symbol,
+      (payload: FinancialStatementPayload) => {
+        if (process.env.NODE_ENV === "development") {
+          console.log(
+            `[useStockData ${symbol}] Received financial statement update`,
+            payload
+          );
+        }
+        if (payload.new && isMountedRef.current && onFinancialStatementUpdate) {
+          const updatedStatement = payload.new as FinancialStatementDBRow;
+          if (process.env.NODE_ENV === "development") {
+            console.log(
+              `[useStockData ${symbol}] Calling onFinancialStatementUpdate callback`
+            );
+          }
+          onFinancialStatementUpdate(updatedStatement);
+        }
+      },
+      (status, err) => {
+        if (status === "CHANNEL_ERROR" && err) {
+          console.error(
+            `[useStockData ${symbol}] Financial Statement Realtime subscription error:`,
+            err
+          );
+        } else if (status === "SUBSCRIBED") {
+          if (process.env.NODE_ENV === "development") {
+            console.log(
+              `[useStockData ${symbol}] Subscribed to financial statement updates`
+            );
+          }
+        }
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, [symbol, supabaseClient, onFinancialStatementUpdate]);
+
   // New effect for ratios TTM updates via Realtime
   // Only subscribe if callback is provided
   useEffect(() => {
