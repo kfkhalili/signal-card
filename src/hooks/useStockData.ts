@@ -12,6 +12,8 @@ import {
   subscribeToRatiosTTMUpdates,
   type RatiosTtmPayload,
   type RatiosTtmDBRow,
+  subscribeToFinancialStatementUpdates,
+  type FinancialStatementPayload,
 } from "@/lib/supabase/realtime-service";
 
 export type ProfileDBRow = Database["public"]["Tables"]["profiles"]["Row"];

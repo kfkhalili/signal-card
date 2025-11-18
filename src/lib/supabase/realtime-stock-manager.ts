@@ -103,7 +103,7 @@ export class RealtimeStockManager extends EventEmitter {
         },
         (payload) => {
           const quoteSymbol = payload.new?.symbol;
-          
+
           // Filter client-side: only emit if symbol is in our subscribed list
           if (!quoteSymbol || !symbolsSet.has(quoteSymbol)) {
             if (process.env.NODE_ENV === "development") {
