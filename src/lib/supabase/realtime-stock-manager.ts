@@ -82,6 +82,7 @@ export class RealtimeStockManager extends EventEmitter {
     if (this.subscribedSymbols.size === 0) return;
 
     const symbols = Array.from(this.subscribedSymbols);
+    const symbolsSet = new Set(symbols); // For fast lookup
     const channelName = `live-quotes-for-workspace`;
 
     this.quoteChannel = this.supabase.channel(channelName, {
@@ -89,7 +90,8 @@ export class RealtimeStockManager extends EventEmitter {
     });
 
     // Subscribe to both INSERT and UPDATE events
-    // New records might be inserted, existing ones updated
+    // Note: Supabase Realtime doesn't support 'in' filter syntax,
+    // so we subscribe to all updates and filter client-side
     this.quoteChannel
       .on<LiveQuote>(
         "postgres_changes",
@@ -97,12 +99,24 @@ export class RealtimeStockManager extends EventEmitter {
           event: "*", // Listen to both INSERT and UPDATE
           schema: "public",
           table: "live_quote_indicators",
-          filter: `symbol=in.(${symbols.join(",")})`,
+          // No filter - we'll filter client-side since 'in' syntax isn't supported
         },
         (payload) => {
+          const quoteSymbol = payload.new?.symbol;
+          
+          // Filter client-side: only emit if symbol is in our subscribed list
+          if (!quoteSymbol || !symbolsSet.has(quoteSymbol)) {
+            if (process.env.NODE_ENV === "development") {
+              console.log(
+                `[RealtimeStockManager] Ignoring quote update for ${quoteSymbol} (not subscribed)`
+              );
+            }
+            return;
+          }
+
           if (process.env.NODE_ENV === "development") {
             console.log(
-              `[RealtimeStockManager] Received quote ${payload.eventType} for ${payload.new?.symbol}`,
+              `[RealtimeStockManager] Received quote ${payload.eventType} for ${quoteSymbol}`,
               payload
             );
           }
