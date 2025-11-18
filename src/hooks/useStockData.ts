@@ -268,6 +268,7 @@ export function useStockData({
 
     const fetchedProfile = profileResult.match(
       (data) => {
+        // data can be null - that's a valid empty state, not an error
         if (data) {
           setProfileData(data);
           if (onProfileUpdate) onProfileUpdate(data);
@@ -275,15 +276,12 @@ export function useStockData({
         return data;
       },
       (error) => {
-        // Only log if it's not a "not found" error (PGRST116) or RLS error (406)
-        // Missing data is expected in self-healing architecture - backend will populate it
-        const errorMessage = (error as Error).message || String(error);
-        if (!errorMessage.includes("PGRST116") && !errorMessage.includes("406")) {
-          console.error(
-            `[useStockData ${symbol}] Exception fetching initial profile:`,
-            error
-          );
-        }
+        // This branch is only for actual errors (network, auth, etc.)
+        // With maybeSingle(), "no data" returns ok(null), not an error
+        console.error(
+          `[useStockData ${symbol}] Error fetching initial profile:`,
+          error
+        );
         return null;
       }
     );
@@ -294,22 +292,19 @@ export function useStockData({
 
     quoteResult.match(
       (data) => {
+        // data can be null - that's a valid empty state, not an error
         if (data) {
           setLatestQuote(data);
           if (onLiveQuoteUpdate) onLiveQuoteUpdate(data, "fetch");
         }
-        // If data is null, that's expected in self-healing architecture - backend will populate it
       },
       (error) => {
-        // Only log if it's not a "not found" error (PGRST116) or RLS error (406)
-        // Missing data is expected in self-healing architecture
-        const errorMessage = (error as Error).message || String(error);
-        if (!errorMessage.includes("PGRST116") && !errorMessage.includes("406")) {
-          console.error(
-            `[useStockData ${symbol}] Exception fetching initial quote:`,
-            error
-          );
-        }
+        // This branch is only for actual errors (network, auth, etc.)
+        // With maybeSingle(), "no data" returns ok(null), not an error
+        console.error(
+          `[useStockData ${symbol}] Error fetching initial quote:`,
+          error
+        );
       }
     );
 
@@ -322,22 +317,19 @@ export function useStockData({
       if (!isMountedRef.current) return;
       statusResult.match(
         (data) => {
+          // data can be null - that's a valid empty state, not an error
           if (data) {
             setExchangeStatus(data);
             if (onExchangeStatusUpdate) onExchangeStatusUpdate(data);
           }
-          // If data is null, that's expected in self-healing architecture - backend will populate it
         },
         (error) => {
-          // Only log if it's not a "not found" error (PGRST116) or RLS error (406)
-          // Missing data is expected in self-healing architecture
-          const errorMessage = (error as Error).message || String(error);
-          if (!errorMessage.includes("PGRST116") && !errorMessage.includes("406")) {
-            console.error(
-              `[useStockData ${symbol}] Exception fetching initial exchange status:`,
-              error
-            );
-          }
+          // This branch is only for actual errors (network, auth, etc.)
+          // With maybeSingle(), "no data" returns ok(null), not an error
+          console.error(
+            `[useStockData ${symbol}] Error fetching initial exchange status:`,
+            error
+          );
         }
       );
     }
@@ -353,19 +345,18 @@ export function useStockData({
       if (!isMountedRef.current) return;
       statementResult.match(
         (data) => {
+          // data can be null - that's a valid empty state, not an error
           if (data && onFinancialStatementUpdate) {
             onFinancialStatementUpdate(data);
           }
         },
         (error) => {
-          // Only log if it's not a "not found" error (PGRST116) or RLS error (406)
-          const errorMessage = (error as Error).message || String(error);
-          if (!errorMessage.includes("PGRST116") && !errorMessage.includes("406")) {
-            console.error(
-              `[useStockData ${symbol}] Exception fetching initial financial statement:`,
-              error
-            );
-          }
+          // This branch is only for actual errors (network, auth, etc.)
+          // With maybeSingle(), "no data" returns ok(null), not an error
+          console.error(
+            `[useStockData ${symbol}] Error fetching initial financial statement:`,
+            error
+          );
         }
       );
     }
