@@ -1,9 +1,6 @@
--- Phase 3: Staleness System
--- Create background staleness checker (uses active_subscriptions table, not Presence)
--- CRITICAL: Symbol-by-Symbol query pattern (prevents temp table thundering herd)
--- CRITICAL: Uses active_subscriptions table (updated by separate cron job) for performance
--- CRITICAL: Advisory lock prevents cron pile-ups
--- CRITICAL: Quota check prevents quota rebound catastrophe
+-- Fix background staleness checker to handle missing data
+-- CRITICAL: Use LEFT JOIN instead of INNER JOIN to detect when data doesn't exist
+-- When data doesn't exist (t.symbol_column IS NULL), treat as stale and create job
 
 CREATE OR REPLACE FUNCTION public.check_and_queue_stale_data_from_presence_v2()
 RETURNS void AS $$
@@ -126,5 +123,5 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-COMMENT ON FUNCTION public.check_and_queue_stale_data_from_presence_v2 IS 'Background staleness checker. Runs every 5 minutes. Uses Symbol-by-Symbol pattern for scalability. Quota-aware.';
+COMMENT ON FUNCTION public.check_and_queue_stale_data_from_presence_v2 IS 'Background staleness checker. Runs every minute. Uses LEFT JOIN to handle missing data (treats missing as stale). Quota-aware.';
 

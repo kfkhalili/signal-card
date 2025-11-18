@@ -279,7 +279,7 @@ async function initializeProfileCard({
     // Create empty state card instead of returning error
     // This allows subscription to be created and card to update when data arrives
     const emptyCard = createEmptyProfileCard(symbol);
-    
+
     if (toast) {
       toast({
         title: "Profile Card Added (Empty State)",
@@ -287,7 +287,7 @@ async function initializeProfileCard({
         variant: "default",
       });
     }
-    
+
     return ok(emptyCard);
   }
 

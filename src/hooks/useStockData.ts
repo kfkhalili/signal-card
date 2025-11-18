@@ -264,24 +264,32 @@ export function useStockData({
       );
     }
 
-    // Fetch Financial Statement
-    const statementResult = await fetchInitialFinancialStatement(
-      supabaseClient,
-      symbol
-    );
-    if (!isMountedRef.current) return;
-    statementResult.match(
-      (data) => {
-        if (data && onFinancialStatementUpdate) {
-          onFinancialStatementUpdate(data);
+    // Fetch Financial Statement (only if profile exists - financial statements require profile context)
+    // Skip if profile doesn't exist to avoid unnecessary errors
+    if (fetchedProfile) {
+      const statementResult = await fetchInitialFinancialStatement(
+        supabaseClient,
+        symbol
+      );
+      if (!isMountedRef.current) return;
+      statementResult.match(
+        (data) => {
+          if (data && onFinancialStatementUpdate) {
+            onFinancialStatementUpdate(data);
+          }
+        },
+        (error) => {
+          // Only log if it's not a "not found" error (PGRST116) or RLS error (406)
+          const errorMessage = (error as Error).message || String(error);
+          if (!errorMessage.includes("PGRST116") && !errorMessage.includes("406")) {
+            console.error(
+              `[useStockData ${symbol}] Exception fetching initial financial statement:`,
+              error
+            );
+          }
         }
-      },
-      (error) =>
-        console.error(
-          `[useStockData ${symbol}] Exception fetching initial financial statement:`,
-          error
-        )
-    );
+      );
+    }
   }, [
     symbol,
     supabaseClient,
