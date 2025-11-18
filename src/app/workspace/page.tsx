@@ -239,10 +239,15 @@ export default function WorkspacePage() {
         if (!stockDataCallbacks) {
           return null;
         }
+        // Get card types for this symbol
+        const cardTypesForSymbol = activeCards
+          .filter((card) => card.symbol === s)
+          .map((card) => card.type);
         return (
           <StockDataHandler
             key={`handler-${s}`}
             symbol={s}
+            activeCardTypes={cardTypesForSymbol}
             onQuoteReceived={stockDataCallbacks.onLiveQuoteUpdate}
             onStaticProfileUpdate={stockDataCallbacks.onProfileUpdate}
             onMarketStatusChange={handleMarketStatusChange}

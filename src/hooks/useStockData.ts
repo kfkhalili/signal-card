@@ -294,9 +294,10 @@ export function useStockData({
       );
     }
 
-    // Fetch Financial Statement (only if profile exists - financial statements require profile context)
-    // Skip if profile doesn't exist to avoid unnecessary errors
-    if (fetchedProfile) {
+    // Fetch Financial Statement (only if callback is provided AND profile exists)
+    // The callback is only provided when there are cards that need financial statements
+    // This prevents unnecessary fetches when only viewing profile/price cards
+    if (fetchedProfile && onFinancialStatementUpdate) {
       const statementResult = await fetchInitialFinancialStatement(
         supabaseClient,
         symbol
