@@ -75,8 +75,9 @@ BEGIN
                 AND asub.data_type = %L
                 AND (
                   -- Data doesn't exist (t.%I IS NULL) OR data is stale
+                  -- CRITICAL: Check NULL first, only call staleness function if data exists
                   t.%I IS NULL
-                  OR %I(t.%I, %L::INTEGER) = true
+                  OR (t.%I IS NOT NULL AND %I(t.%I, %L) = true)
                 )
                 AND NOT EXISTS (
                   SELECT 1 FROM api_call_queue_v2 q
