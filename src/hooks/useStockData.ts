@@ -111,13 +111,11 @@ async function fetchInitialFinancialStatement(
       .eq("symbol", symbol)
       .order("date", { ascending: false })
       .limit(1)
-      .single(),
+      .maybeSingle(),
     (e) => e as Error
   );
 
-  if (result.isErr() && result.error.message.includes("PGRST116")) {
-    return ok(null);
-  }
+  // maybeSingle() returns null when no rows found, so we just need to map the result
   return result.map((response) => response.data);
 }
 
