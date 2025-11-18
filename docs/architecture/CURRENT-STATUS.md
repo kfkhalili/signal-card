@@ -1,6 +1,6 @@
 # Current Implementation Status
 
-**Last Updated:** 2025-11-18  
+**Last Updated:** 2025-11-18
 **Overall Progress:** ~85% Complete
 
 ---
@@ -10,8 +10,7 @@
 We've successfully implemented a **metadata-driven, backend-controlled refresh system** with:
 
 ✅ **8 data types registered** in `data_type_registry_v2`  
-✅ **6 data types fully migrated** to monofunction architecture  
-🟡 **2 data types** need registry update (library functions exist, but `edge_function_name` is incorrect)  
+✅ **8 data types fully migrated** to monofunction architecture  
 ✅ **Centralized subscription manager** with reference counting  
 ✅ **Infinite job creation bug fixed** (fetched_at properly updated)  
 ✅ **Subscription deletion bug fixed** (multiple cards share subscriptions correctly)
@@ -28,12 +27,8 @@ We've successfully implemented a **metadata-driven, backend-controlled refresh s
 | `revenue-product-segmentation` | ✅ Complete | `queue-processor-v2` | ✅ `fetch-fmp-revenue-product-segmentation.ts` | Fully migrated |
 | `grades-historical` | ✅ Complete | `queue-processor-v2` | ✅ `fetch-fmp-grades-historical.ts` | Fully migrated |
 | `exchange-variants` | ✅ Complete | `queue-processor-v2` | ✅ `fetch-fmp-exchange-variants.ts` | Fully migrated |
-| `financial-statements` | 🟡 Needs Fix | `fetch-fmp-financial-statements` ❌ | ✅ `fetch-fmp-financial-statements.ts` | **Registry needs update** |
-| `ratios-ttm` | 🟡 Needs Fix | `fetch-fmp-ratios-ttm` ❌ | ✅ `fetch-fmp-ratios-ttm.ts` | **Registry needs update** |
-
-**Action Required:** Update `edge_function_name` in `data_type_registry_v2` for:
-- `financial-statements` → should be `queue-processor-v2`
-- `ratios-ttm` → should be `queue-processor-v2`
+| `financial-statements` | ✅ Complete | `queue-processor-v2` | ✅ `fetch-fmp-financial-statements.ts` | Fully migrated |
+| `ratios-ttm` | ✅ Complete | `queue-processor-v2` | ✅ `fetch-fmp-ratios-ttm.ts` | Fully migrated |
 
 ---
 
@@ -81,9 +76,9 @@ We've successfully implemented a **metadata-driven, backend-controlled refresh s
 ## Remaining Tasks
 
 ### High Priority
-1. **Fix registry edge_function_name** (2 data types)
-   - Create migration to update `financial-statements` and `ratios-ttm`
-   - Change `edge_function_name` from old function names to `queue-processor-v2`
+1. ✅ **Fix registry edge_function_name** (2 data types) - **COMPLETE**
+   - ✅ Created migration to update `financial-statements` and `ratios-ttm`
+   - ✅ Changed `edge_function_name` from old function names to `queue-processor-v2`
 
 ### Medium Priority
 2. **Monitor system health** (24-48 hours)
@@ -125,10 +120,10 @@ We've successfully implemented a **metadata-driven, backend-controlled refresh s
 
 ## Testing Status
 
-✅ **Unit Tests:** 55 tests passing  
-✅ **Build:** Successful  
-✅ **Linting:** All errors fixed  
-✅ **Type Safety:** All type assertions correct  
+✅ **Unit Tests:** 55 tests passing
+✅ **Build:** Successful
+✅ **Linting:** All errors fixed
+✅ **Type Safety:** All type assertions correct
 
 ---
 

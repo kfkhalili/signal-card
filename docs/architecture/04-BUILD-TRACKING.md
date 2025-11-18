@@ -302,10 +302,10 @@ Phase 0 complete. Feature flags, health check, and baseline capture are in place
 
 ### Tasks
 
-- [x] Migrate most data types to monofunction architecture (6/8 complete)
-- [ ] Fix edge_function_name in registry for:
-  - [ ] `financial-statements` (currently: fetch-fmp-financial-statements, should be: queue-processor-v2)
-  - [ ] `ratios-ttm` (currently: fetch-fmp-ratios-ttm, should be: queue-processor-v2)
+- [x] Migrate all data types to monofunction architecture (8/8 complete)
+- [x] Fix edge_function_name in registry:
+  - [x] `financial-statements` → queue-processor-v2
+  - [x] `ratios-ttm` → queue-processor-v2
 - [ ] Disable old cron jobs (when all types migrated)
 - [ ] Remove old code paths (when all types migrated)
 - [ ] Final monitoring and validation
@@ -317,14 +317,14 @@ Phase 0 complete. Feature flags, health check, and baseline capture are in place
 - ✅ `revenue-product-segmentation` → queue-processor-v2
 - ✅ `grades-historical` → queue-processor-v2
 - ✅ `exchange-variants` → queue-processor-v2
-- 🟡 `financial-statements` → queue-processor-v2 (library function exists, registry needs update)
-- 🟡 `ratios-ttm` → queue-processor-v2 (library function exists, registry needs update)
+- ✅ `financial-statements` → queue-processor-v2
+- ✅ `ratios-ttm` → queue-processor-v2
 
 **Deliverables:**
-- [x] 6/8 data types fully migrated
-- [ ] All data types migrated (2 remaining need registry update)
-- [ ] Old system removed
-- [ ] System fully operational
+- [x] 8/8 data types fully migrated to monofunction architecture
+- [x] All data types using queue-processor-v2
+- [ ] Old system removed (when monitoring confirms stability)
+- [x] System fully operational
 
 ---
 
