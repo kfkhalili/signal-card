@@ -578,7 +578,7 @@ export function useWorkspaceManager() {
   );
 
   const handleLiveQuoteUpdate = useCallback(
-    (leanQuoteData: LiveQuoteIndicatorDBRow, source?: "fetch" | "realtime") => {
+    (leanQuoteData: LiveQuoteIndicatorDBRow) => {
       // Don't pass toast to update handlers - they're called too frequently
       // and calling toast during setState causes React errors
       const updateContext: CardUpdateContext = { toast: undefined };

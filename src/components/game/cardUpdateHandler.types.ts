@@ -22,7 +22,7 @@ export type CardUpdateEventType =
  * Context provided to card update handler functions.
  */
 export interface CardUpdateContext {
-  toast: ToastFunctionType;
+  toast: ToastFunctionType | undefined;
 }
 
 /**
