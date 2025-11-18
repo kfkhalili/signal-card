@@ -584,10 +584,6 @@ export function useWorkspaceManager() {
       const updateContext: CardUpdateContext = { toast: undefined };
       const eventType: CardUpdateEventType = "LIVE_QUOTE_UPDATE";
 
-      // Log for debugging
-      if (process.env.NODE_ENV === "development") {
-      }
-
       // Use setTimeout to defer state update and avoid "setState during render" error
       setTimeout(() => {
         setActiveCards((prevActiveCards) => {

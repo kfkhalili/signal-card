@@ -122,10 +122,6 @@ export function useTrackSubscription({
         return;
       }
 
-      console.log(`[useTrackSubscription] Sending heartbeat for ${currentSymbol}`, {
-        dataTypes: currentDataTypes,
-        isMounted: isMountedRef.current,
-      });
 
       for (const dataType of currentDataTypes) {
         // CRITICAL: Check again if still mounted before each RPC call
