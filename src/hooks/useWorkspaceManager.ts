@@ -637,38 +637,42 @@ export function useWorkspaceManager() {
 
   const handleStaticProfileUpdate = useCallback(
     (updatedProfileDBRow: ProfileDBRow) => {
-      const updateContext: CardUpdateContext = { toast };
+      // Don't pass toast to update handlers - they're called too frequently
+      const updateContext: CardUpdateContext = { toast: undefined };
       const eventType: CardUpdateEventType = "STATIC_PROFILE_UPDATE";
 
-      setActiveCards((prevActiveCards) => {
-        let overallChanged = false;
-        const updatedCards = prevActiveCards.map((card) => {
-          if (card.symbol === updatedProfileDBRow.symbol) {
-            const handler = getCardUpdateHandler(card.type, eventType);
-            if (handler) {
-              const concreteCardDataForHandler = getConcreteCardData(card);
-              const updatedConcreteData = handler(
-                concreteCardDataForHandler,
-                updatedProfileDBRow,
-                card,
-                updateContext
-              );
+      // Use setTimeout to defer state update and avoid "setState during render" error
+      setTimeout(() => {
+        setActiveCards((prevActiveCards) => {
+          let overallChanged = false;
+          const updatedCards = prevActiveCards.map((card) => {
+            if (card.symbol === updatedProfileDBRow.symbol) {
+              const handler = getCardUpdateHandler(card.type, eventType);
+              if (handler) {
+                const concreteCardDataForHandler = getConcreteCardData(card);
+                const updatedConcreteData = handler(
+                  concreteCardDataForHandler,
+                  updatedProfileDBRow,
+                  card,
+                  updateContext
+                );
 
-              if (
-                JSON.stringify(updatedConcreteData) !==
-                JSON.stringify(concreteCardDataForHandler)
-              ) {
-                overallChanged = true;
-                return { ...card, ...updatedConcreteData };
+                if (
+                  JSON.stringify(updatedConcreteData) !==
+                  JSON.stringify(concreteCardDataForHandler)
+                ) {
+                  overallChanged = true;
+                  return { ...card, ...updatedConcreteData };
+                }
               }
             }
-          }
-          return card;
+            return card;
+          });
+          return overallChanged ? updatedCards : prevActiveCards;
         });
-        return overallChanged ? updatedCards : prevActiveCards;
-      });
+      }, 0);
     },
-    [toast]
+    []
   );
 
   const handleFinancialStatementUpdate = useCallback(
