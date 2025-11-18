@@ -44,7 +44,10 @@ import { useWorkspaceManager } from "@/hooks/useWorkspaceManager";
 import type { SortConfig } from "@/hooks/useWorkspaceManager";
 import ActiveCardsSection from "@/components/game/ActiveCardsSection";
 import type { MarketStatusUpdate } from "@/hooks/useStockData";
-import type { FinancialStatementDBRow } from "@/lib/supabase/realtime-service";
+import type {
+  FinancialStatementDBRow,
+  RatiosTtmDBRow,
+} from "@/lib/supabase/realtime-service";
 
 type MarketStatus = Record<string, MarketStatusUpdate>;
 
@@ -254,6 +257,11 @@ export default function WorkspacePage() {
             onFinancialStatementUpdate={
               stockDataCallbacks.onFinancialStatementUpdate as (
                 statement: FinancialStatementDBRow
+              ) => void
+            }
+            onRatiosTTMUpdate={
+              stockDataCallbacks.onRatiosTTMUpdate as (
+                ratios: RatiosTtmDBRow
               ) => void
             }
           />

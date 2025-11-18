@@ -43,9 +43,16 @@ export type ProfilePayload = RealtimePostgresChangesPayload<ProfileDBRow>;
 
 type ProfileUpdateCallback = (payload: ProfilePayload) => void;
 
+export type RatiosTtmDBRow = Database["public"]["Tables"]["ratios_ttm"]["Row"];
+
+export type RatiosTtmPayload = RealtimePostgresChangesPayload<RatiosTtmDBRow>;
+
+type RatiosTtmUpdateCallback = (payload: RatiosTtmPayload) => void;
+
 const LIVE_QUOTE_TABLE_NAME = "live_quote_indicators";
 const FINANCIAL_STATEMENTS_TABLE_NAME = "financial_statements";
 const PROFILES_TABLE_NAME = "profiles";
+const RATIOS_TTM_TABLE_NAME = "ratios_ttm";
 
 let supabaseClientInstance: SupabaseClient<Database> | null = null;
 let clientInitialized = false; // Flag to ensure createSupabaseBrowserClient is called only once if needed initially
@@ -257,6 +264,72 @@ export function subscribeToProfileUpdates(
         .catch((error) =>
           console.error(
             `[realtime-service] (${symbol}): Error removing Profile channel ${channel.topic}:`,
+            (error as Error).message
+          )
+        );
+    }
+  };
+}
+
+export function subscribeToRatiosTTMUpdates(
+  symbol: string,
+  onData: RatiosTtmUpdateCallback,
+  onStatusChange: SubscriptionStatusCallback
+): () => void {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    console.warn(
+      `[realtime-service (${symbol})] Supabase client not available for ratios TTM updates.`
+    );
+    if (typeof onStatusChange === "function") {
+      onStatusChange(
+        "CLIENT_UNAVAILABLE",
+        new Error("Supabase client not initialized.")
+      );
+    }
+    return noOpUnsubscribe;
+  }
+
+  const channelName = `ratios-ttm-${symbol
+    .toLowerCase()
+    .replace(/[^a-z0-9_.-]/gi, "-")}-${Math.random()
+    .toString(36)
+    .substring(2, 7)}`;
+  const topicFilter = `symbol=eq.${symbol}`;
+
+  const channel: RealtimeChannel = supabase.channel(channelName, {
+    config: { broadcast: { ack: true } },
+  });
+
+  channel
+    .on<RatiosTtmDBRow>(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: RATIOS_TTM_TABLE_NAME,
+        filter: topicFilter,
+      },
+      (payload) => {
+        if (typeof onData === "function") {
+          onData(payload as RatiosTtmPayload);
+        }
+      }
+    )
+    .subscribe((status, err) => {
+      const castedStatus = status as SubscriptionStatus;
+      if (typeof onStatusChange === "function") {
+        onStatusChange(castedStatus, err);
+      }
+    });
+
+  return () => {
+    if (supabase) {
+      supabase
+        .removeChannel(channel)
+        .catch((error) =>
+          console.error(
+            `[realtime-service] (${symbol}): Error removing Ratios TTM channel ${channel.topic}:`,
             (error as Error).message
           )
         );

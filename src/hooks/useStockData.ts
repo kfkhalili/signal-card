@@ -8,6 +8,9 @@ import { useRealtimeStock } from "@/contexts/RealtimeStockContext";
 import {
   subscribeToProfileUpdates,
   type ProfilePayload,
+  subscribeToRatiosTTMUpdates,
+  type RatiosTtmPayload,
+  type RatiosTtmDBRow,
 } from "@/lib/supabase/realtime-service";
 
 export type ProfileDBRow = Database["public"]["Tables"]["profiles"]["Row"];
@@ -48,6 +51,7 @@ interface UseStockDataProps {
   ) => void;
   onExchangeStatusUpdate?: (status: ExchangeMarketStatusRecord) => void;
   onFinancialStatementUpdate?: (statement: FinancialStatementDBRow) => void;
+  onRatiosTTMUpdate?: (ratios: RatiosTtmDBRow) => void;
 }
 
 async function fetchInitialProfile(
@@ -328,6 +332,7 @@ export function useStockData({
     onLiveQuoteUpdate,
     onExchangeStatusUpdate,
     onFinancialStatementUpdate,
+    onRatiosTTMUpdate,
   ]);
 
   useEffect(() => {

@@ -28,6 +28,7 @@ import type { ProfileDBRow } from "@/hooks/useStockData";
 import type {
   LiveQuoteIndicatorDBRow,
   FinancialStatementDBRow,
+  RatiosTtmDBRow,
 } from "@/lib/supabase/realtime-service";
 import type { Database } from "@/lib/supabase/database.types";
 import {
@@ -692,6 +693,41 @@ export function useWorkspaceManager() {
     []
   );
 
+  const handleRatiosTTMUpdate = useCallback(
+    (updatedRatiosDBRow: RatiosTtmDBRow) => {
+      const updateContext: CardUpdateContext = { toast };
+      const eventType: CardUpdateEventType = "RATIOS_TTM_UPDATE";
+
+      setActiveCards((prevActiveCards) => {
+        let overallChanged = false;
+        const updatedCards = prevActiveCards.map((card) => {
+          if (card.symbol === updatedRatiosDBRow.symbol) {
+            const handler = getCardUpdateHandler(card.type, eventType);
+            if (handler) {
+              const concreteCardDataForHandler = getConcreteCardData(card);
+              const updatedConcreteData = handler(
+                concreteCardDataForHandler,
+                updatedRatiosDBRow,
+                card,
+                updateContext
+              );
+              if (
+                JSON.stringify(updatedConcreteData) !==
+                JSON.stringify(concreteCardDataForHandler)
+              ) {
+                overallChanged = true;
+                return { ...card, ...updatedConcreteData };
+              }
+            }
+          }
+          return card;
+        });
+        return overallChanged ? updatedCards : prevActiveCards;
+      });
+    },
+    [toast]
+  );
+
   const clearWorkspace = useCallback(() => {
     setActiveCards(INITIAL_ACTIVE_CARDS);
     setTimeout(
@@ -710,12 +746,14 @@ export function useWorkspaceManager() {
       onLiveQuoteUpdate: handleLiveQuoteUpdate,
       onExchangeStatusUpdate: handleExchangeStatusUpdate,
       onFinancialStatementUpdate: handleFinancialStatementUpdate,
+      onRatiosTTMUpdate: handleRatiosTTMUpdate,
     }),
     [
       handleStaticProfileUpdate,
       handleLiveQuoteUpdate,
       handleExchangeStatusUpdate,
       handleFinancialStatementUpdate,
+      handleRatiosTTMUpdate,
     ]
   );
 
