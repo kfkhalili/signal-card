@@ -608,8 +608,6 @@ export function useWorkspaceManager() {
                   JSON.stringify(concreteCardDataForHandler)
                 ) {
                   overallChanged = true;
-                  if (process.env.NODE_ENV === "development") {
-                  }
                   return { ...card, ...updatedConcreteData };
                 }
               } else {

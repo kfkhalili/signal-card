@@ -119,12 +119,6 @@ export function useTrackSubscription({
       const currentDataTypes = dataTypesRef.current;
 
       if (!currentSupabase || !currentUserId || !currentSymbol || !currentDataTypes || currentDataTypes.length === 0) {
-        console.warn(`[useTrackSubscription] HEARTBEAT BLOCKED - missing values for ${symbol}`, {
-          hasSupabase: !!currentSupabase,
-          hasUserId: !!currentUserId,
-          hasSymbol: !!currentSymbol,
-          hasDataTypes: !!currentDataTypes,
-        });
         return;
       }
 
@@ -229,21 +223,10 @@ export function useTrackSubscription({
         const currentUserId = userIdRef.current;
         const currentSupabase = supabaseRef.current;
 
-        console.log(`[useTrackSubscription] Cleanup values for ${symbol}:`, {
-          hasChannel: !!currentChannel,
-          hasSupabase: !!currentSupabase,
-          hasUserId: !!currentUserId,
-          hasSymbol: !!currentSymbol,
-          hasDataTypes: !!currentDataTypes && Array.isArray(currentDataTypes),
-          dataTypesCount: currentDataTypes?.length ?? 0,
-        });
 
         // CRITICAL: Always try to delete subscription, even if some checks fail
         // This ensures cleanup happens even if channel or other refs are null
         if (currentSupabase && currentUserId && currentSymbol && currentDataTypes && Array.isArray(currentDataTypes) && currentDataTypes.length > 0) {
-          console.log(`[useTrackSubscription] Attempting to delete subscriptions for ${currentSymbol}`, {
-            dataTypes: currentDataTypes,
-          });
 
           // Delete subscriptions for all data types
           for (const dataType of currentDataTypes) {
