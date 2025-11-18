@@ -1,6 +1,7 @@
 // src/hooks/useStockData.ts
 import { useState, useEffect, useCallback, useRef } from "react";
-import { fromPromise, Result, ok } from "neverthrow";
+import { fromPromise, Result } from "neverthrow";
+import { Option } from "effect";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Database } from "@/lib/supabase/database.types";
@@ -57,18 +58,20 @@ interface UseStockDataProps {
 async function fetchInitialProfile(
   supabase: SupabaseClient<Database>,
   symbol: string
-): Promise<Result<ProfileDBRow | null, Error>> {
+): Promise<Result<Option.Option<ProfileDBRow>, Error>> {
   const result = await fromPromise(
     supabase.from("profiles").select("*").eq("symbol", symbol).maybeSingle(),
     (e) => e as Error
   );
-  return result.map((response) => response.data);
+  return result.map((response) => 
+    response.data ? Option.some(response.data) : Option.none()
+  );
 }
 
 async function fetchInitialQuote(
   supabase: SupabaseClient<Database>,
   symbol: string
-): Promise<Result<LiveQuoteIndicatorDBRow | null, Error>> {
+): Promise<Result<Option.Option<LiveQuoteIndicatorDBRow>, Error>> {
   const result = await fromPromise(
     supabase
       .from("live_quote_indicators")
@@ -76,34 +79,35 @@ async function fetchInitialQuote(
       .eq("symbol", symbol)
       .order("fetched_at", { ascending: false })
       .limit(1)
-      .maybeSingle(), // Use maybeSingle() to avoid 406 errors when data doesn't exist
+      .maybeSingle(),
     (e) => e as Error
   );
-
-  // maybeSingle() returns null when no rows found, so we just need to map the result
-  return result.map((response) => response.data);
+  return result.map((response) => 
+    response.data ? Option.some(response.data) : Option.none()
+  );
 }
 
 async function fetchExchangeStatus(
   supabase: SupabaseClient<Database>,
   exchangeCode: string
-): Promise<Result<ExchangeMarketStatusRecord | null, Error>> {
+): Promise<Result<Option.Option<ExchangeMarketStatusRecord>, Error>> {
   const result = await fromPromise(
     supabase
       .from("exchange_market_status")
       .select("*")
       .eq("exchange_code", exchangeCode)
-      .maybeSingle(), // Use maybeSingle() to avoid 406 errors when data doesn't exist
+      .maybeSingle(),
     (e) => e as Error
   );
-  // maybeSingle() returns null when no rows found, so we just need to map the result
-  return result.map((response) => response.data);
+  return result.map((response) => 
+    response.data ? Option.some(response.data) : Option.none()
+  );
 }
 
 async function fetchInitialFinancialStatement(
   supabase: SupabaseClient<Database>,
   symbol: string
-): Promise<Result<FinancialStatementDBRow | null, Error>> {
+): Promise<Result<Option.Option<FinancialStatementDBRow>, Error>> {
   const result = await fromPromise(
     supabase
       .from("financial_statements")
@@ -114,9 +118,9 @@ async function fetchInitialFinancialStatement(
       .maybeSingle(),
     (e) => e as Error
   );
-
-  // maybeSingle() returns null when no rows found, so we just need to map the result
-  return result.map((response) => response.data);
+  return result.map((response) => 
+    response.data ? Option.some(response.data) : Option.none()
+  );
 }
 
 export function useStockData({
@@ -127,11 +131,9 @@ export function useStockData({
   onFinancialStatementUpdate,
   onRatiosTTMUpdate,
 }: UseStockDataProps): MarketStatusUpdate {
-  const [profileData, setProfileData] = useState<ProfileDBRow | null>(null);
-  const [latestQuote, setLatestQuote] =
-    useState<LiveQuoteIndicatorDBRow | null>(null);
-  const [exchangeStatus, setExchangeStatus] =
-    useState<ExchangeMarketStatusRecord | null>(null);
+  const [profileData, setProfileData] = useState<Option.Option<ProfileDBRow>>(Option.none());
+  const [latestQuote, setLatestQuote] = useState<Option.Option<LiveQuoteIndicatorDBRow>>(Option.none());
+  const [exchangeStatus, setExchangeStatus] = useState<Option.Option<ExchangeMarketStatusRecord>>(Option.none());
   const [derivedMarketStatus, setDerivedMarketStatus] =
     useState<DerivedMarketStatus>("Fetching");
   const [marketStatusMessage, setMarketStatusMessage] = useState<string | null>(
@@ -161,7 +163,7 @@ export function useStockData({
     const handleQuoteUpdate = (quote: LiveQuoteIndicatorDBRow) => {
       if (quote.symbol === symbol) {
         if (isMountedRef.current) {
-          setLatestQuote(quote);
+          setLatestQuote(Option.some(quote));
           if (onLiveQuoteUpdate) onLiveQuoteUpdate(quote, "realtime");
         }
       }
@@ -179,15 +181,16 @@ export function useStockData({
 
   // New effect for exchange status handling via RealtimeStockManager
   useEffect(() => {
-    if (!realtimeManager || !profileData?.exchange) return;
+    if (!realtimeManager || !Option.isSome(profileData)) return;
 
-    const exchangeCode = profileData.exchange;
+    const exchangeCode = profileData.value.exchange;
+    if (!exchangeCode) return;
     realtimeManager.addExchange(exchangeCode);
 
     const handleStatusUpdate = (status: ExchangeMarketStatusRecord) => {
       if (status.exchange_code === exchangeCode) {
         if (isMountedRef.current) {
-          setExchangeStatus(status);
+          setExchangeStatus(Option.some(status));
           if (onExchangeStatusUpdate) onExchangeStatusUpdate(status);
         }
       }
@@ -201,7 +204,7 @@ export function useStockData({
         realtimeManager.removeExchange(exchangeCode);
       }
     };
-  }, [profileData?.exchange, realtimeManager, onExchangeStatusUpdate]);
+  }, [profileData, realtimeManager, onExchangeStatusUpdate]);
 
   // New effect for profile updates via Realtime
   useEffect(() => {
@@ -212,7 +215,7 @@ export function useStockData({
       (payload: ProfilePayload) => {
         if (payload.new && isMountedRef.current) {
           const updatedProfile = payload.new as ProfileDBRow;
-          setProfileData(updatedProfile);
+          setProfileData(Option.some(updatedProfile));
           if (onProfileUpdate) onProfileUpdate(updatedProfile);
         }
       },
@@ -267,22 +270,21 @@ export function useStockData({
     if (!isMountedRef.current) return;
 
     const fetchedProfile = profileResult.match(
-      (data) => {
-        // data can be null - that's a valid empty state, not an error
-        if (data) {
-          setProfileData(data);
-          if (onProfileUpdate) onProfileUpdate(data);
+      (profileOption) => {
+        // Option<ProfileDBRow> - Some(data) or None
+        setProfileData(profileOption);
+        if (Option.isSome(profileOption)) {
+          if (onProfileUpdate) onProfileUpdate(profileOption.value);
         }
-        return data;
+        return profileOption;
       },
       (error) => {
         // This branch is only for actual errors (network, auth, etc.)
-        // With maybeSingle(), "no data" returns ok(null), not an error
         console.error(
           `[useStockData ${symbol}] Error fetching initial profile:`,
           error
         );
-        return null;
+        return Option.none();
       }
     );
 
@@ -291,16 +293,15 @@ export function useStockData({
     if (!isMountedRef.current) return;
 
     quoteResult.match(
-      (data) => {
-        // data can be null - that's a valid empty state, not an error
-        if (data) {
-          setLatestQuote(data);
-          if (onLiveQuoteUpdate) onLiveQuoteUpdate(data, "fetch");
+      (quoteOption) => {
+        // Option<LiveQuoteIndicatorDBRow> - Some(data) or None
+        setLatestQuote(quoteOption);
+        if (Option.isSome(quoteOption)) {
+          if (onLiveQuoteUpdate) onLiveQuoteUpdate(quoteOption.value, "fetch");
         }
       },
       (error) => {
         // This branch is only for actual errors (network, auth, etc.)
-        // With maybeSingle(), "no data" returns ok(null), not an error
         console.error(
           `[useStockData ${symbol}] Error fetching initial quote:`,
           error
@@ -309,23 +310,22 @@ export function useStockData({
     );
 
     // Fetch Exchange Status
-    if (fetchedProfile?.exchange) {
+    if (Option.isSome(fetchedProfile) && fetchedProfile.value.exchange) {
       const statusResult = await fetchExchangeStatus(
         supabaseClient,
-        fetchedProfile.exchange
+        fetchedProfile.value.exchange
       );
       if (!isMountedRef.current) return;
       statusResult.match(
-        (data) => {
-          // data can be null - that's a valid empty state, not an error
-          if (data) {
-            setExchangeStatus(data);
-            if (onExchangeStatusUpdate) onExchangeStatusUpdate(data);
+        (statusOption) => {
+          // Option<ExchangeMarketStatusRecord> - Some(data) or None
+          setExchangeStatus(statusOption);
+          if (Option.isSome(statusOption)) {
+            if (onExchangeStatusUpdate) onExchangeStatusUpdate(statusOption.value);
           }
         },
         (error) => {
           // This branch is only for actual errors (network, auth, etc.)
-          // With maybeSingle(), "no data" returns ok(null), not an error
           console.error(
             `[useStockData ${symbol}] Error fetching initial exchange status:`,
             error
@@ -337,22 +337,21 @@ export function useStockData({
     // Fetch Financial Statement (only if callback is provided AND profile exists)
     // The callback is only provided when there are cards that need financial statements
     // This prevents unnecessary fetches when only viewing profile/price cards
-    if (fetchedProfile && onFinancialStatementUpdate) {
+    if (Option.isSome(fetchedProfile) && onFinancialStatementUpdate) {
       const statementResult = await fetchInitialFinancialStatement(
         supabaseClient,
         symbol
       );
       if (!isMountedRef.current) return;
       statementResult.match(
-        (data) => {
-          // data can be null - that's a valid empty state, not an error
-          if (data && onFinancialStatementUpdate) {
-            onFinancialStatementUpdate(data);
+        (statementOption) => {
+          // Option<FinancialStatementDBRow> - Some(data) or None
+          if (Option.isSome(statementOption) && onFinancialStatementUpdate) {
+            onFinancialStatementUpdate(statementOption.value);
           }
         },
         (error) => {
           // This branch is only for actual errors (network, auth, etc.)
-          // With maybeSingle(), "no data" returns ok(null), not an error
           console.error(
             `[useStockData ${symbol}] Error fetching initial financial statement:`,
             error
@@ -381,20 +380,25 @@ export function useStockData({
   }, [symbol, supabaseClient, fetchInitialData]);
 
   useEffect(() => {
-    const relevantExchangeCode = profileData?.exchange || latestQuote?.exchange;
+    const relevantExchangeCode = 
+      (Option.isSome(profileData) && profileData.value.exchange) ||
+      (Option.isSome(latestQuote) && latestQuote.value.exchange) ||
+      null;
 
     if (!relevantExchangeCode) return;
-    if (exchangeStatus) {
-      setOpeningTime(exchangeStatus.opening_time_local);
-      setClosingTime(exchangeStatus.closing_time_local);
-      setTimezone(exchangeStatus.timezone);
+    
+    if (Option.isSome(exchangeStatus)) {
+      const status = exchangeStatus.value;
+      setOpeningTime(status.opening_time_local);
+      setClosingTime(status.closing_time_local);
+      setTimezone(status.timezone);
     } else {
       setOpeningTime(null);
       setClosingTime(null);
       setTimezone(null);
     }
 
-    if (!exchangeStatus) {
+    if (Option.isNone(exchangeStatus)) {
       setDerivedMarketStatus("Connecting");
       setMarketStatusMessage(
         `Connecting to market status for ${relevantExchangeCode}...`
@@ -402,31 +406,32 @@ export function useStockData({
       return;
     }
 
+    const status = exchangeStatus.value;
     let newStatus: DerivedMarketStatus;
     let newMessage: string | null;
 
-    if (exchangeStatus.current_day_is_holiday) {
+    if (status.current_day_is_holiday) {
       newStatus = "Holiday";
       newMessage =
-        exchangeStatus.status_message ||
+        status.status_message ||
         `Market Closed (Holiday: ${
-          exchangeStatus.current_holiday_name || "Official Holiday"
+          status.current_holiday_name || "Official Holiday"
         })`;
-    } else if (exchangeStatus.is_market_open) {
-      if (latestQuote?.api_timestamp) {
+    } else if (status.is_market_open) {
+      if (Option.isSome(latestQuote) && latestQuote.value.api_timestamp) {
         const diffMinutes =
-          (Date.now() - latestQuote.api_timestamp * 1000) / 60000;
+          (Date.now() - latestQuote.value.api_timestamp * 1000) / 60000;
         newStatus = diffMinutes > 15 ? "Delayed" : "Open";
         newMessage =
-          exchangeStatus.status_message ||
+          status.status_message ||
           (newStatus === "Delayed" ? "Live data is delayed." : null);
       } else {
         newStatus = "Open";
-        newMessage = exchangeStatus.status_message || "Awaiting first quote";
+        newMessage = status.status_message || "Awaiting first quote";
       }
     } else {
       newStatus = "Closed";
-      newMessage = exchangeStatus.status_message || null;
+      newMessage = status.status_message || null;
     }
 
     setDerivedMarketStatus((prevStatus) =>
@@ -443,7 +448,7 @@ export function useStockData({
     openingTime,
     closingTime,
     timezone,
-    exchangeName: exchangeStatus?.name || null,
-    exchangeCode: exchangeStatus?.exchange_code || null,
+    exchangeName: Option.isSome(exchangeStatus) ? exchangeStatus.value.name : null,
+    exchangeCode: Option.isSome(exchangeStatus) ? exchangeStatus.value.exchange_code : null,
   };
 }
