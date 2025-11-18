@@ -37,8 +37,15 @@ type FinancialStatementUpdateCallback = (
   payload: FinancialStatementPayload
 ) => void;
 
+export type ProfileDBRow = Database["public"]["Tables"]["profiles"]["Row"];
+
+export type ProfilePayload = RealtimePostgresChangesPayload<ProfileDBRow>;
+
+type ProfileUpdateCallback = (payload: ProfilePayload) => void;
+
 const LIVE_QUOTE_TABLE_NAME = "live_quote_indicators";
 const FINANCIAL_STATEMENTS_TABLE_NAME = "financial_statements";
+const PROFILES_TABLE_NAME = "profiles";
 
 let supabaseClientInstance: SupabaseClient<Database> | null = null;
 let clientInitialized = false; // Flag to ensure createSupabaseBrowserClient is called only once if needed initially
@@ -184,6 +191,72 @@ export function subscribeToFinancialStatementUpdates(
         .catch((error) =>
           console.error(
             `[realtime-service] (${symbol}): Error removing Financial Statement channel ${channel.topic}:`,
+            (error as Error).message
+          )
+        );
+    }
+  };
+}
+
+export function subscribeToProfileUpdates(
+  symbol: string,
+  onData: ProfileUpdateCallback,
+  onStatusChange: SubscriptionStatusCallback
+): () => void {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    console.warn(
+      `[realtime-service (${symbol})] Supabase client not available for profile updates.`
+    );
+    if (typeof onStatusChange === "function") {
+      onStatusChange(
+        "CLIENT_UNAVAILABLE",
+        new Error("Supabase client not initialized.")
+      );
+    }
+    return noOpUnsubscribe;
+  }
+
+  const channelName = `profile-${symbol
+    .toLowerCase()
+    .replace(/[^a-z0-9_.-]/gi, "-")}-${Math.random()
+    .toString(36)
+    .substring(2, 7)}`;
+  const topicFilter = `symbol=eq.${symbol}`;
+
+  const channel: RealtimeChannel = supabase.channel(channelName, {
+    config: { broadcast: { ack: true } },
+  });
+
+  channel
+    .on<ProfileDBRow>(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: PROFILES_TABLE_NAME,
+        filter: topicFilter,
+      },
+      (payload) => {
+        if (typeof onData === "function") {
+          onData(payload as ProfilePayload);
+        }
+      }
+    )
+    .subscribe((status, err) => {
+      const castedStatus = status as SubscriptionStatus;
+      if (typeof onStatusChange === "function") {
+        onStatusChange(castedStatus, err);
+      }
+    });
+
+  return () => {
+    if (supabase) {
+      supabase
+        .removeChannel(channel)
+        .catch((error) =>
+          console.error(
+            `[realtime-service] (${symbol}): Error removing Profile channel ${channel.topic}:`,
             (error as Error).message
           )
         );

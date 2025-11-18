@@ -5,6 +5,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Database } from "@/lib/supabase/database.types";
 import { useRealtimeStock } from "@/contexts/RealtimeStockContext";
+import {
+  subscribeToProfileUpdates,
+  type ProfilePayload,
+} from "@/lib/supabase/realtime-service";
 
 export type ProfileDBRow = Database["public"]["Tables"]["profiles"]["Row"];
 type LiveQuoteIndicatorDBRow =
@@ -199,6 +203,34 @@ export function useStockData({
       }
     };
   }, [profileData?.exchange, realtimeManager, onExchangeStatusUpdate]);
+
+  // New effect for profile updates via Realtime
+  useEffect(() => {
+    if (!supabaseClient || !symbol) return;
+
+    const unsubscribe = subscribeToProfileUpdates(
+      symbol,
+      (payload: ProfilePayload) => {
+        if (payload.new && isMountedRef.current) {
+          const updatedProfile = payload.new as ProfileDBRow;
+          setProfileData(updatedProfile);
+          if (onProfileUpdate) onProfileUpdate(updatedProfile);
+        }
+      },
+      (status, err) => {
+        if (status === "CHANNEL_ERROR" && err) {
+          console.error(
+            `[useStockData ${symbol}] Profile Realtime subscription error:`,
+            err
+          );
+        }
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, [symbol, supabaseClient, onProfileUpdate]);
 
   const fetchInitialData = useCallback(async () => {
     if (!isMountedRef.current || !supabaseClient || !symbol) return;
