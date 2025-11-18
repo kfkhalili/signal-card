@@ -189,6 +189,70 @@ function createDisplayableProfileCardFromDB(
   };
 }
 
+function createEmptyProfileCard(
+  symbol: string,
+  existingCardId?: string,
+  existingCreatedAt?: number
+): ProfileCardData & Pick<DisplayableCardState, "isFlipped"> {
+  const emptyStaticData: ProfileCardStaticData = {
+    db_id: `empty-${symbol}-${Date.now()}`,
+    sector: null,
+    industry: null,
+    country: null,
+    exchange: null,
+    exchange_full_name: null,
+    website: null,
+    description: null,
+    ceo: null,
+    full_address: null,
+    phone: null,
+    profile_last_updated: null,
+    currency: null,
+    formatted_ipo_date: null,
+    formatted_full_time_employees: null,
+    is_etf: null,
+    is_adr: null,
+    is_fund: null,
+    last_dividend: null,
+    beta: null,
+    average_volume: null,
+    isin: null,
+  };
+
+  const emptyLiveData: ProfileCardLiveData = {
+    price: null,
+    marketCap: null,
+    revenue: null,
+    eps: null,
+    financialsCurrency: null,
+    priceToEarningsRatioTTM: null,
+    priceToBookRatioTTM: null,
+  };
+
+  const cardTypeDescription = `Provides an overview of ${symbol}'s company profile, including sector, industry, and key operational highlights.`;
+  const cardBackData: BaseCardBackData = {
+    description: cardTypeDescription,
+  };
+
+  const concreteCardData: ProfileCardData = {
+    id: existingCardId || `profile-${symbol}-${Date.now()}`,
+    type: "profile",
+    symbol: symbol,
+    companyName: null,
+    displayCompanyName: null,
+    logoUrl: null,
+    createdAt: existingCreatedAt ?? Date.now(),
+    staticData: emptyStaticData,
+    liveData: emptyLiveData,
+    backData: cardBackData,
+    websiteUrl: null,
+  };
+  return {
+    ...concreteCardData,
+    isFlipped: false,
+  };
+}
+
 async function initializeProfileCard({
   symbol,
   supabase,
@@ -212,13 +276,19 @@ async function initializeProfileCard({
   const profileData = profileResult.value.data as ProfileDBRow | null;
 
   if (!profileData) {
+    // Create empty state card instead of returning error
+    // This allows subscription to be created and card to update when data arrives
+    const emptyCard = createEmptyProfileCard(symbol);
+    
     if (toast) {
       toast({
-        title: "Profile Not Found",
-        description: `No profile data for ${symbol}.`,
+        title: "Profile Card Added (Empty State)",
+        description: `Awaiting profile data for ${symbol}.`,
+        variant: "default",
       });
     }
-    return err(new ProfileCardError(`Profile not found for ${symbol}`));
+    
+    return ok(emptyCard);
   }
 
   // The rest of the data is supplemental, so we don't fail the whole operation if they're missing.
