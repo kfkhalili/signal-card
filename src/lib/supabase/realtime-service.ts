@@ -49,10 +49,48 @@ export type RatiosTtmPayload = RealtimePostgresChangesPayload<RatiosTtmDBRow>;
 
 type RatiosTtmUpdateCallback = (payload: RatiosTtmPayload) => void;
 
+export type DividendHistoryDBRow =
+  Database["public"]["Tables"]["dividend_history"]["Row"];
+
+export type DividendHistoryPayload =
+  RealtimePostgresChangesPayload<DividendHistoryDBRow>;
+
+type DividendHistoryUpdateCallback = (payload: DividendHistoryPayload) => void;
+
+export type RevenueProductSegmentationDBRow =
+  Database["public"]["Tables"]["revenue_product_segmentation"]["Row"];
+
+export type RevenueProductSegmentationPayload =
+  RealtimePostgresChangesPayload<RevenueProductSegmentationDBRow>;
+
+type RevenueProductSegmentationUpdateCallback = (
+  payload: RevenueProductSegmentationPayload
+) => void;
+
+export type GradesHistoricalDBRow =
+  Database["public"]["Tables"]["grades_historical"]["Row"];
+
+export type GradesHistoricalPayload =
+  RealtimePostgresChangesPayload<GradesHistoricalDBRow>;
+
+type GradesHistoricalUpdateCallback = (payload: GradesHistoricalPayload) => void;
+
+export type ExchangeVariantsDBRow =
+  Database["public"]["Tables"]["exchange_variants"]["Row"];
+
+export type ExchangeVariantsPayload =
+  RealtimePostgresChangesPayload<ExchangeVariantsDBRow>;
+
+type ExchangeVariantsUpdateCallback = (payload: ExchangeVariantsPayload) => void;
+
 const LIVE_QUOTE_TABLE_NAME = "live_quote_indicators";
 const FINANCIAL_STATEMENTS_TABLE_NAME = "financial_statements";
 const PROFILES_TABLE_NAME = "profiles";
 const RATIOS_TTM_TABLE_NAME = "ratios_ttm";
+const DIVIDEND_HISTORY_TABLE_NAME = "dividend_history";
+const REVENUE_PRODUCT_SEGMENTATION_TABLE_NAME = "revenue_product_segmentation";
+const GRADES_HISTORICAL_TABLE_NAME = "grades_historical";
+const EXCHANGE_VARIANTS_TABLE_NAME = "exchange_variants";
 
 let supabaseClientInstance: SupabaseClient<Database> | null = null;
 let clientInitialized = false; // Flag to ensure createSupabaseBrowserClient is called only once if needed initially
@@ -330,6 +368,270 @@ export function subscribeToRatiosTTMUpdates(
         .catch((error) =>
           console.error(
             `[realtime-service] (${symbol}): Error removing Ratios TTM channel ${channel.topic}:`,
+            (error as Error).message
+          )
+        );
+    }
+  };
+}
+
+export function subscribeToDividendHistoryUpdates(
+  symbol: string,
+  onData: DividendHistoryUpdateCallback,
+  onStatusChange: SubscriptionStatusCallback
+): () => void {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    console.warn(
+      `[realtime-service (${symbol})] Supabase client not available for dividend history updates.`
+    );
+    if (typeof onStatusChange === "function") {
+      onStatusChange(
+        "CLIENT_UNAVAILABLE",
+        new Error("Supabase client not initialized.")
+      );
+    }
+    return noOpUnsubscribe;
+  }
+
+  const channelName = `dividend-history-${symbol
+    .toLowerCase()
+    .replace(/[^a-z0-9_.-]/gi, "-")}-${Math.random()
+    .toString(36)
+    .substring(2, 7)}`;
+  const topicFilter = `symbol=eq.${symbol}`;
+
+  const channel: RealtimeChannel = supabase.channel(channelName, {
+    config: { broadcast: { ack: true } },
+  });
+
+  channel
+    .on<DividendHistoryDBRow>(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: DIVIDEND_HISTORY_TABLE_NAME,
+        filter: topicFilter,
+      },
+      (payload) => {
+        if (typeof onData === "function") {
+          onData(payload as DividendHistoryPayload);
+        }
+      }
+    )
+    .subscribe((status, err) => {
+      const castedStatus = status as SubscriptionStatus;
+      if (typeof onStatusChange === "function") {
+        onStatusChange(castedStatus, err);
+      }
+    });
+
+  return () => {
+    if (supabase) {
+      supabase
+        .removeChannel(channel)
+        .catch((error) =>
+          console.error(
+            `[realtime-service] (${symbol}): Error removing Dividend History channel ${channel.topic}:`,
+            (error as Error).message
+          )
+        );
+    }
+  };
+}
+
+export function subscribeToRevenueProductSegmentationUpdates(
+  symbol: string,
+  onData: RevenueProductSegmentationUpdateCallback,
+  onStatusChange: SubscriptionStatusCallback
+): () => void {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    console.warn(
+      `[realtime-service (${symbol})] Supabase client not available for revenue product segmentation updates.`
+    );
+    if (typeof onStatusChange === "function") {
+      onStatusChange(
+        "CLIENT_UNAVAILABLE",
+        new Error("Supabase client not initialized.")
+      );
+    }
+    return noOpUnsubscribe;
+  }
+
+  const channelName = `revenue-segmentation-${symbol
+    .toLowerCase()
+    .replace(/[^a-z0-9_.-]/gi, "-")}-${Math.random()
+    .toString(36)
+    .substring(2, 7)}`;
+  const topicFilter = `symbol=eq.${symbol}`;
+
+  const channel: RealtimeChannel = supabase.channel(channelName, {
+    config: { broadcast: { ack: true } },
+  });
+
+  channel
+    .on<RevenueProductSegmentationDBRow>(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: REVENUE_PRODUCT_SEGMENTATION_TABLE_NAME,
+        filter: topicFilter,
+      },
+      (payload) => {
+        if (typeof onData === "function") {
+          onData(payload as RevenueProductSegmentationPayload);
+        }
+      }
+    )
+    .subscribe((status, err) => {
+      const castedStatus = status as SubscriptionStatus;
+      if (typeof onStatusChange === "function") {
+        onStatusChange(castedStatus, err);
+      }
+    });
+
+  return () => {
+    if (supabase) {
+      supabase
+        .removeChannel(channel)
+        .catch((error) =>
+          console.error(
+            `[realtime-service] (${symbol}): Error removing Revenue Product Segmentation channel ${channel.topic}:`,
+            (error as Error).message
+          )
+        );
+    }
+  };
+}
+
+export function subscribeToGradesHistoricalUpdates(
+  symbol: string,
+  onData: GradesHistoricalUpdateCallback,
+  onStatusChange: SubscriptionStatusCallback
+): () => void {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    console.warn(
+      `[realtime-service (${symbol})] Supabase client not available for grades historical updates.`
+    );
+    if (typeof onStatusChange === "function") {
+      onStatusChange(
+        "CLIENT_UNAVAILABLE",
+        new Error("Supabase client not initialized.")
+      );
+    }
+    return noOpUnsubscribe;
+  }
+
+  const channelName = `grades-historical-${symbol
+    .toLowerCase()
+    .replace(/[^a-z0-9_.-]/gi, "-")}-${Math.random()
+    .toString(36)
+    .substring(2, 7)}`;
+  const topicFilter = `symbol=eq.${symbol}`;
+
+  const channel: RealtimeChannel = supabase.channel(channelName, {
+    config: { broadcast: { ack: true } },
+  });
+
+  channel
+    .on<GradesHistoricalDBRow>(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: GRADES_HISTORICAL_TABLE_NAME,
+        filter: topicFilter,
+      },
+      (payload) => {
+        if (typeof onData === "function") {
+          onData(payload as GradesHistoricalPayload);
+        }
+      }
+    )
+    .subscribe((status, err) => {
+      const castedStatus = status as SubscriptionStatus;
+      if (typeof onStatusChange === "function") {
+        onStatusChange(castedStatus, err);
+      }
+    });
+
+  return () => {
+    if (supabase) {
+      supabase
+        .removeChannel(channel)
+        .catch((error) =>
+          console.error(
+            `[realtime-service] (${symbol}): Error removing Grades Historical channel ${channel.topic}:`,
+            (error as Error).message
+          )
+        );
+    }
+  };
+}
+
+export function subscribeToExchangeVariantsUpdates(
+  baseSymbol: string,
+  onData: ExchangeVariantsUpdateCallback,
+  onStatusChange: SubscriptionStatusCallback
+): () => void {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    console.warn(
+      `[realtime-service (${baseSymbol})] Supabase client not available for exchange variants updates.`
+    );
+    if (typeof onStatusChange === "function") {
+      onStatusChange(
+        "CLIENT_UNAVAILABLE",
+        new Error("Supabase client not initialized.")
+      );
+    }
+    return noOpUnsubscribe;
+  }
+
+  const channelName = `exchange-variants-${baseSymbol
+    .toLowerCase()
+    .replace(/[^a-z0-9_.-]/gi, "-")}-${Math.random()
+    .toString(36)
+    .substring(2, 7)}`;
+  const topicFilter = `base_symbol=eq.${baseSymbol}`;
+
+  const channel: RealtimeChannel = supabase.channel(channelName, {
+    config: { broadcast: { ack: true } },
+  });
+
+  channel
+    .on<ExchangeVariantsDBRow>(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: EXCHANGE_VARIANTS_TABLE_NAME,
+        filter: topicFilter,
+      },
+      (payload) => {
+        if (typeof onData === "function") {
+          onData(payload as ExchangeVariantsPayload);
+        }
+      }
+    )
+    .subscribe((status, err) => {
+      const castedStatus = status as SubscriptionStatus;
+      if (typeof onStatusChange === "function") {
+        onStatusChange(castedStatus, err);
+      }
+    });
+
+  return () => {
+    if (supabase) {
+      supabase
+        .removeChannel(channel)
+        .catch((error) =>
+          console.error(
+            `[realtime-service] (${baseSymbol}): Error removing Exchange Variants channel ${channel.topic}:`,
             (error as Error).message
           )
         );

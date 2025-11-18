@@ -4,21 +4,84 @@ import type {
   ExchangeVariantsCardData,
   ExchangeVariant,
   ExchangeInfo,
+  ExchangeVariantsCardStaticData,
+  ExchangeVariantsCardLiveData,
 } from "./exchange-variants-card.types";
 import type {
   DisplayableCard,
   DisplayableCardState,
 } from "@/components/game/types";
+import type { BaseCardBackData } from "../base-card/base-card.types";
 import {
   registerCardInitializer,
   type CardInitializationContext,
 } from "@/components/game/cardInitializer.types";
+import {
+  registerCardUpdateHandler,
+  type CardUpdateHandler,
+} from "@/components/game/cardUpdateHandler.types";
+import type { Database } from "@/lib/supabase/database.types";
+
+type ExchangeVariantsDBRow =
+  Database["public"]["Tables"]["exchange_variants"]["Row"];
 
 class ExchangeVariantsCardError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "ExchangeVariantsCardError";
   }
+}
+
+function createEmptyExchangeVariantsCard(
+  symbol: string,
+  profileData?: {
+    company_name?: string | null;
+    display_company_name?: string | null;
+    image?: string | null;
+    website?: string | null;
+    exchange?: string | null;
+  } | null,
+  existingCardId?: string,
+  existingCreatedAt?: number
+): ExchangeVariantsCardData & Pick<DisplayableCardState, "isFlipped"> {
+  const emptyBaseExchangeInfo: ExchangeInfo = {
+    exchangeShortName: profileData?.exchange ?? null,
+    countryCode: null,
+    countryName: null,
+    averageVolume: null,
+  };
+
+  const emptyStaticData: ExchangeVariantsCardStaticData = {
+    lastUpdated: null,
+    baseExchangeInfo: emptyBaseExchangeInfo,
+  };
+
+  const emptyLiveData: ExchangeVariantsCardLiveData = {
+    variants: [],
+  };
+
+  const cardBackData: BaseCardBackData = {
+    description: `A list of international exchanges where ${symbol} is traded.`,
+  };
+
+  const concreteCardData: ExchangeVariantsCardData = {
+    id: existingCardId || `exchangevariants-${symbol}-${Date.now()}`,
+    type: "exchangevariants",
+    symbol: symbol,
+    companyName: profileData?.company_name ?? null,
+    displayCompanyName: profileData?.display_company_name ?? profileData?.company_name ?? null,
+    logoUrl: profileData?.image ?? null,
+    websiteUrl: profileData?.website ?? null,
+    createdAt: existingCreatedAt ?? Date.now(),
+    staticData: emptyStaticData,
+    liveData: emptyLiveData,
+    backData: cardBackData,
+  };
+
+  return {
+    ...concreteCardData,
+    isFlipped: false,
+  };
 }
 
 async function initializeExchangeVariantsCard({
@@ -44,24 +107,32 @@ async function initializeExchangeVariantsCard({
     return err(profileResult.error);
   }
   if (!profileResult.value.data) {
-    return err(
-      new ExchangeVariantsCardError(`No profile found for ${symbol}.`)
-    );
+    // No profile found - return empty state card
+    const emptyCard = createEmptyExchangeVariantsCard(symbol);
+    if (toast) {
+      toast({
+        title: "Exchange Variants Card Added (Empty State)",
+        description: `Awaiting profile and exchange variants data for ${symbol}.`,
+        variant: "default",
+      });
+    }
+    return ok(emptyCard);
   }
 
   const profileData = profileResult.value.data;
   const baseExchange = profileData.exchange;
 
   if (!baseExchange) {
-    const errorMessage = `Could not determine the primary exchange for ${symbol}.`;
+    // No base exchange found - return empty state card
+    const emptyCard = createEmptyExchangeVariantsCard(symbol, profileData);
     if (toast) {
       toast({
-        title: "Primary Exchange Unknown",
-        description: errorMessage,
-        variant: "destructive",
+        title: "Exchange Variants Card Added (Empty State)",
+        description: `Awaiting exchange information for ${symbol}.`,
+        variant: "default",
       });
     }
-    return err(new ExchangeVariantsCardError(errorMessage));
+    return ok(emptyCard);
   }
 
   const variantsResult = await fromPromise(
@@ -88,15 +159,16 @@ async function initializeExchangeVariantsCard({
   );
 
   if (filteredVariantsData.length === 0) {
-    const errorMessage = `No variants found for ${symbol} on other exchanges.`;
+    // No variants found - return empty state card
+    const emptyCard = createEmptyExchangeVariantsCard(symbol, profileData);
     if (toast) {
       toast({
-        title: "No Other Variants",
-        description: errorMessage,
+        title: "Exchange Variants Card Added (Empty State)",
+        description: `Awaiting exchange variants data for ${symbol}.`,
         variant: "default",
       });
     }
-    return err(new ExchangeVariantsCardError(errorMessage));
+    return ok(emptyCard);
   }
 
   const allExchangesResult = await fromPromise(
@@ -179,3 +251,94 @@ async function initializeExchangeVariantsCard({
 }
 
 registerCardInitializer("exchangevariants", initializeExchangeVariantsCard);
+
+const handleExchangeVariantsUpdate: CardUpdateHandler<
+  ExchangeVariantsCardData,
+  ExchangeVariantsDBRow
+> = (
+  currentCardData,
+  updatedRow
+): ExchangeVariantsCardData => {
+  // If card is in empty state (no variants), always add the first variant
+  if (
+    currentCardData.liveData.variants.length === 0 &&
+    updatedRow.is_actively_trading &&
+    updatedRow.variant_symbol !== currentCardData.symbol
+  ) {
+    const updatedVariant: ExchangeVariant = {
+      variantSymbol: updatedRow.variant_symbol,
+      exchangeShortName: updatedRow.exchange_short_name,
+      averageVolume: updatedRow.vol_avg,
+      countryName: null, // Would need to fetch from available_exchanges
+      countryCode: null, // Would need to fetch from available_exchanges
+    };
+    return {
+      ...currentCardData,
+      liveData: {
+        variants: [updatedVariant],
+      },
+      staticData: {
+        ...currentCardData.staticData,
+        lastUpdated: updatedRow.updated_at || updatedRow.fetched_at || new Date().toISOString(),
+      },
+    };
+  }
+
+  // Check if this variant is already in the list
+  const existingVariantIndex = currentCardData.liveData.variants.findIndex(
+    (v) => v.variantSymbol === updatedRow.variant_symbol
+  );
+
+  // Only update if the variant is actively trading and not the base symbol
+  if (
+    updatedRow.is_actively_trading &&
+    updatedRow.variant_symbol !== currentCardData.symbol
+  ) {
+    const updatedVariant: ExchangeVariant = {
+      variantSymbol: updatedRow.variant_symbol,
+      exchangeShortName: updatedRow.exchange_short_name,
+      averageVolume: updatedRow.vol_avg,
+      countryName: null, // Would need to fetch from available_exchanges
+      countryCode: null, // Would need to fetch from available_exchanges
+    };
+
+    const updatedVariants = [...currentCardData.liveData.variants];
+    if (existingVariantIndex >= 0) {
+      // Update existing variant
+      updatedVariants[existingVariantIndex] = updatedVariant;
+    } else {
+      // Add new variant
+      updatedVariants.push(updatedVariant);
+    }
+
+    return {
+      ...currentCardData,
+      liveData: {
+        variants: updatedVariants,
+      },
+      staticData: {
+        ...currentCardData.staticData,
+        lastUpdated: updatedRow.updated_at || updatedRow.fetched_at || new Date().toISOString(),
+      },
+    };
+  } else if (existingVariantIndex >= 0 && !updatedRow.is_actively_trading) {
+    // Remove variant if it's no longer actively trading
+    const updatedVariants = currentCardData.liveData.variants.filter(
+      (_, index) => index !== existingVariantIndex
+    );
+    return {
+      ...currentCardData,
+      liveData: {
+        variants: updatedVariants,
+      },
+    };
+  }
+
+  return currentCardData; // No change needed
+};
+
+registerCardUpdateHandler(
+  "exchangevariants",
+  "EXCHANGE_VARIANTS_UPDATE",
+  handleExchangeVariantsUpdate
+);

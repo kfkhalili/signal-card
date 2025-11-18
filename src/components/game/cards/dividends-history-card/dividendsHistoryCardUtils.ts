@@ -216,6 +216,47 @@ async function fetchAndProcessDividendsData(
   });
 }
 
+function createEmptyDividendsHistoryCard(
+  symbol: string,
+  existingCardId?: string,
+  existingCreatedAt?: number
+): DividendsHistoryCardData & Pick<DisplayableCardState, "isFlipped"> {
+  const emptyStaticData: DividendsHistoryCardStaticData = {
+    reportedCurrency: null,
+    typicalFrequency: null,
+  };
+
+  const emptyLiveData: DividendsHistoryCardLiveData = {
+    latestDividend: null,
+    annualDividendFigures: [],
+    lastFullYearDividendGrowthYoY: null,
+    lastUpdated: null,
+  };
+
+  const cardBackData: BaseCardBackData = {
+    description: `Dividend history and distribution information for ${symbol}.`,
+  };
+
+  const concreteCardData: DividendsHistoryCardData = {
+    id: existingCardId || `dividendshistory-${symbol}-${Date.now()}`,
+    type: "dividendshistory",
+    symbol: symbol,
+    companyName: null,
+    displayCompanyName: null,
+    logoUrl: null,
+    createdAt: existingCreatedAt ?? Date.now(),
+    staticData: emptyStaticData,
+    liveData: emptyLiveData,
+    backData: cardBackData,
+    websiteUrl: null,
+  };
+
+  return {
+    ...concreteCardData,
+    isFlipped: false,
+  };
+}
+
 function constructDividendsHistoryCardData(
   symbol: string,
   profileInfo: {
@@ -288,9 +329,9 @@ function constructDividendsHistoryCardData(
     id: idOverride || `dividendshistory-${symbol}-${Date.now()}`,
     type: "dividendshistory",
     symbol,
-    companyName: profileInfo.companyName ?? symbol,
+    companyName: profileInfo.companyName ?? null,
     displayCompanyName:
-      profileInfo.displayCompanyName ?? profileInfo.companyName ?? symbol,
+      profileInfo.displayCompanyName ?? profileInfo.companyName ?? null,
     logoUrl: profileInfo.logoUrl ?? null,
     websiteUrl: profileInfo.websiteUrl ?? null,
     createdAt: existingCreatedAt ?? Date.now(),
@@ -327,15 +368,16 @@ async function initializeDividendsHistoryCard({
     fetchDataResult.value;
 
   if (!latestDividendRow && historicalRows.length === 0) {
-    if (toast)
+    // No data found - return empty state card
+    const emptyCard = createEmptyDividendsHistoryCard(symbol);
+    if (toast) {
       toast({
-        title: "No Dividend Data",
-        description: `No dividend history found for ${symbol}.`,
+        title: "Dividends History Card Added (Empty State)",
+        description: `Awaiting dividend history data for ${symbol}.`,
         variant: "default",
       });
-    return err(
-      new DividendsHistoryError(`No dividend data found for ${symbol}.`)
-    );
+    }
+    return ok(emptyCard);
   }
 
   const cardData = constructDividendsHistoryCardData(
@@ -361,6 +403,42 @@ const handleSingleDividendRowUpdate: CardUpdateHandler<
   _currentDisplayableCard,
   context
 ): DividendsHistoryCardData => {
+  // If card is in empty state (latestDividend is null), always update
+  if (!currentCardData.liveData.latestDividend && newDividendRow.date) {
+    const newLatestDividendInfo: LatestDividendInfo = {
+      amount: newDividendRow.dividend,
+      adjAmount: newDividendRow.adj_dividend,
+      exDividendDate: newDividendRow.date,
+      paymentDate: newDividendRow.payment_date,
+      declarationDate: newDividendRow.declaration_date,
+      yieldAtDistribution: newDividendRow.yield,
+      frequency: newDividendRow.frequency,
+    };
+    const currentUtcYear = new Date().getUTCFullYear();
+    const nextYearEstimateValue = calculateNextYearEstimate(newLatestDividendInfo);
+    const annualDividendFigures: AnnualDividendTotal[] = [];
+    if (nextYearEstimateValue !== null) {
+      annualDividendFigures.push({
+        year: currentUtcYear + 1,
+        totalDividend: nextYearEstimateValue,
+        isEstimate: true,
+      });
+    }
+    return {
+      ...currentCardData,
+      liveData: {
+        latestDividend: newLatestDividendInfo,
+        annualDividendFigures,
+        lastFullYearDividendGrowthYoY: null,
+        lastUpdated: newDividendRow.updated_at || newDividendRow.fetched_at || new Date().toISOString(),
+      },
+      staticData: {
+        ...currentCardData.staticData,
+        typicalFrequency: newDividendRow.frequency || currentCardData.staticData.typicalFrequency,
+      },
+    };
+  }
+
   const updatedLiveData = { ...currentCardData.liveData };
   let hasChanged = false;
   const currentUtcYear = new Date().getUTCFullYear();

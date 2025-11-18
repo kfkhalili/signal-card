@@ -26,6 +26,7 @@
 | **dividendshistory** | `dividend-history` | `dividend_history` | `symbol` | `fetched_at` | 129600 (90d) | Historical dividends |
 | | | `profiles` | `symbol` | `modified_at` | 1440 (24h) | Company name/logo (optional) |
 | **revenuebreakdown** | `revenue-product-segmentation` | `revenue_product_segmentation` | `symbol` | `fetched_at` | 525600 (365d) | Revenue by segment |
+| | `financial-statements` | `financial_statements` | `symbol` | `fetched_at` | 43200 (30d) | Total revenue (for consistency with revenue card) |
 | | | `profiles` | `symbol` | `modified_at` | 1440 (24h) | Company name/logo (optional) |
 | **analystgrades** | `grades-historical` | `grades_historical` | `symbol` | `fetched_at` | 43200 (30d) | Analyst ratings |
 | | | `profiles` | `symbol` | `modified_at` | 1440 (24h) | Company name/logo (optional) |
@@ -55,10 +56,11 @@
    - Updates: Every minute
 
 3. **`financial_statements`** - Financial statement data
-   - Used by: `profile`, `revenue`, `solvency`, `cashuse` cards
+   - Used by: `profile`, `revenue`, `solvency`, `cashuse`, `revenuebreakdown` cards
    - Symbol column: `symbol`
    - Timestamp: `fetched_at`
    - Contains: Income statements, balance sheets, cash flow statements
+   - Note: `revenuebreakdown` uses this for total revenue display (consistent with revenue card)
 
 4. **`ratios_ttm`** - Trailing twelve months ratios
    - Used by: `profile`, `keyratios` cards
@@ -74,6 +76,7 @@
    - Used by: `revenuebreakdown` card
    - Symbol column: `symbol`
    - Timestamp: `fetched_at`
+   - Note: Used for segment-level breakdown data. Total revenue comes from `financial_statements` for consistency.
 
 7. **`grades_historical`** - Historical analyst grades
    - Used by: `analystgrades` card
@@ -143,10 +146,11 @@
 ## Special Cases
 
 ### 1. Multiple Cards Share Same Data Type
-- **revenue**, **solvency**, **cashuse** all use `financial-statements`
+- **revenue**, **solvency**, **cashuse**, **revenuebreakdown** all use `financial-statements`
 - Adding any of these cards tracks the same data type
 - Only one subscription needed per symbol for `financial-statements`
-- All three cards benefit from the same refresh
+- All four cards benefit from the same refresh
+- **revenuebreakdown** uses `financial-statements` for total revenue (consistent with revenue card), while segment breakdown comes from `revenue-product-segmentation`
 
 ### 2. Exchange Variants Special Case
 - Uses `base_symbol` column (not `symbol`)

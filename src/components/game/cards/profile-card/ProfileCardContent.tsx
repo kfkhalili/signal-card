@@ -94,11 +94,13 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                     label="Sector"
                     value={truncateText(staticData.sector, 30)}
                     onClick={() => {
-                      handleInteraction("FILTER_WORKSPACE_DATA", {
-                        filterField: "sector",
-                        filterValue: staticData.sector!,
-                        originatingElement: "sectorLink",
-                      } as Omit<FilterWorkspaceDataInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                      if (staticData.sector) {
+                        handleInteraction("FILTER_WORKSPACE_DATA", {
+                          filterField: "sector",
+                          filterValue: staticData.sector,
+                          originatingElement: "sectorLink",
+                        } as Omit<FilterWorkspaceDataInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                      }
                     }}
                     title={`Sector: ${staticData.sector}`}
                     labelClassName="text-sm font-medium text-muted-foreground"
@@ -110,15 +112,17 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                     isSelected={selectedDataItems.some(
                       (item) => item.id === `${id}-sector`
                     )}
-                    onSelect={() =>
-                      onToggleItemSelection({
-                        id: `${id}-sector`,
-                        sourceCardId: id,
-                        sourceCardSymbol: symbol,
-                        label: "Sector",
-                        value: staticData.sector!,
-                      })
-                    }
+                    onSelect={() => {
+                      if (staticData.sector) {
+                        onToggleItemSelection({
+                          id: `${id}-sector`,
+                          sourceCardId: id,
+                          sourceCardSymbol: symbol,
+                          label: "Sector",
+                          value: staticData.sector,
+                        });
+                      }
+                    }}
                   />
                 )}
 

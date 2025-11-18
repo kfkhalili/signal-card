@@ -116,6 +116,52 @@ function processFinancialRecords<
   };
 }
 
+function createEmptyCashUseCard(
+  symbol: string,
+  existingCardId?: string,
+  existingCreatedAt?: number
+): CashUseCardData & Pick<DisplayableCardState, "isFlipped"> {
+  const emptyStaticData: CashUseCardStaticData = {
+    reportedCurrency: null,
+    latestStatementDate: null,
+    latestStatementPeriod: null,
+  };
+
+  const emptyLiveData: CashUseCardLiveData = {
+    weightedAverageShsOut: null,
+    outstandingShares_annual_data: [],
+    currentTotalDebt: null,
+    totalDebt_annual_data: [],
+    currentFreeCashFlow: null,
+    freeCashFlow_annual_data: [],
+    currentNetDividendsPaid: null,
+    netDividendsPaid_annual_data: [],
+  };
+
+  const cardBackData: BaseCardBackData = {
+    description: `Cash use analysis for ${symbol}. Shows how the company allocates its free cash flow.`,
+  };
+
+  const concreteCardData: CashUseCardData = {
+    id: existingCardId || `cashuse-${symbol}-${Date.now()}`,
+    type: "cashuse",
+    symbol: symbol,
+    companyName: null,
+    displayCompanyName: null,
+    logoUrl: null,
+    createdAt: existingCreatedAt ?? Date.now(),
+    staticData: emptyStaticData,
+    liveData: emptyLiveData,
+    backData: cardBackData,
+    websiteUrl: null,
+  };
+
+  return {
+    ...concreteCardData,
+    isFlipped: false,
+  };
+}
+
 function constructCashUseCardData(
   symbol: string,
   profileInfo: {
@@ -165,9 +211,9 @@ function constructCashUseCardData(
     id: idOverride || `cashuse-${symbol}-${Date.now()}`,
     type: "cashuse",
     symbol,
-    companyName: profileInfo.companyName ?? symbol,
+    companyName: profileInfo.companyName ?? null,
     displayCompanyName:
-      profileInfo.displayCompanyName ?? profileInfo.companyName ?? symbol,
+      profileInfo.displayCompanyName ?? profileInfo.companyName ?? null,
     logoUrl: profileInfo.logoUrl ?? null,
     websiteUrl: profileInfo.websiteUrl ?? null,
     createdAt: existingCreatedAt ?? Date.now(),
@@ -311,6 +357,7 @@ async function fetchAndProcessCashUseData(
     freeCashFlowData.latest === null &&
     netDividendsPaidData.latest === null
   ) {
+    // No data found - return error that will be handled by caller
     return err(new CashUseCardError("No financial data found."));
   }
 
@@ -340,6 +387,23 @@ async function initializeCashUseCard({
     supabase,
     activeCards
   );
+
+  if (result.isErr()) {
+    const error = result.error;
+    if (error.message === "No financial data found.") {
+      // No data found - return empty state card
+      const emptyCard = createEmptyCashUseCard(symbol);
+      if (toast) {
+        toast({
+          title: "Cash Use Card Added (Empty State)",
+          description: `Awaiting financial statements data for ${symbol}.`,
+          variant: "default",
+        });
+      }
+      return ok(emptyCard);
+    }
+    return err(error);
+  }
 
   return result
     .andThen((cardData) => {
@@ -398,6 +462,49 @@ const handleCashUseCardFinancialStatementUpdate: CardUpdateHandler<
   const newDate = newFinancialStatementRow.date;
   const newPeriod = newFinancialStatementRow.period;
   const newReportedCurrency = newFinancialStatementRow.reported_currency;
+
+  // If card is in empty state (latestStatementDate is null), always update
+  if (!currentCashUseCardData.staticData.latestStatementDate && newDate) {
+    // Reconstruct the card from the financial statement
+    // Create a single-record structure to process
+    const singleRecord = {
+      date: newDate,
+      period: newPeriod ?? undefined,
+      fiscal_year: newFinancialStatementRow.fiscal_year ?? undefined,
+      weightedAverageShsOut_value: newWeightedAverageShsOut,
+      totalDebt_value: newTotalDebt,
+      freeCashFlow_value: newFreeCashFlow,
+      netDividendsPaid_value: newNetDividendsPaid,
+    };
+
+    const sharesData = processFinancialRecords([singleRecord], "weightedAverageShsOut_value");
+    const totalDebtData = processFinancialRecords([singleRecord], "totalDebt_value");
+    const freeCashFlowData = processFinancialRecords([singleRecord], "freeCashFlow_value");
+    const netDividendsPaidData = processFinancialRecords([singleRecord], "netDividendsPaid_value");
+
+    const latestFinancialStatementInfo = {
+      reportedCurrency: newReportedCurrency,
+      statementDate: newDate,
+      statementPeriod: newPeriod,
+    };
+
+    return constructCashUseCardData(
+      currentCashUseCardData.symbol,
+      {
+        companyName: currentCashUseCardData.companyName,
+        displayCompanyName: currentCashUseCardData.displayCompanyName,
+        logoUrl: currentCashUseCardData.logoUrl,
+        websiteUrl: currentCashUseCardData.websiteUrl,
+      },
+      sharesData,
+      totalDebtData,
+      freeCashFlowData,
+      netDividendsPaidData,
+      latestFinancialStatementInfo,
+      currentCashUseCardData.id,
+      currentCashUseCardData.createdAt
+    );
+  }
 
   let hasChanged = false;
   const updatedLiveData = { ...currentCashUseCardData.liveData };

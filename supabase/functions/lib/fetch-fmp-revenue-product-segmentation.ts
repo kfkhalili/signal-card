@@ -88,7 +88,41 @@ export async function fetchRevenueProductSegmentationLogic(
         Object.keys(fmpSegmentationResult).length === 0
       ) {
         // No segmentation data found - this is a valid response
-        console.log(`[fetchRevenueProductSegmentationLogic] No revenue segmentation data found for ${job.symbol} (empty object returned by FMP).`);
+        // CRITICAL: Update fetched_at for existing records to prevent infinite job creation
+        // If no records exist, create a sentinel record to mark that we checked
+        const { error: updateError } = await supabase
+          .from('revenue_product_segmentation')
+          .upsert(
+            {
+              symbol: job.symbol,
+              fiscal_year: 1900, // Sentinel year (before any real data)
+              period: 'FY',
+              date: '1900-01-01', // Sentinel date
+              fetched_at: new Date().toISOString(),
+            },
+            {
+              onConflict: 'symbol,fiscal_year,period,date',
+              ignoreDuplicates: false,
+            }
+          );
+
+        if (updateError) {
+          // If sentinel record fails, try to update any existing records
+          const { error: updateExistingError } = await supabase
+            .from('revenue_product_segmentation')
+            .update({ fetched_at: new Date().toISOString() })
+            .eq('symbol', job.symbol);
+
+          if (updateExistingError) {
+            console.warn(
+              `[fetchRevenueProductSegmentationLogic] Failed to update fetched_at for ${job.symbol}:`,
+              updateExistingError.message
+            );
+          }
+        }
+
+        console.log(`[fetchRevenueProductSegmentationLogic] No revenue segmentation data found for ${job.symbol} (empty object returned by FMP). Updated fetched_at to prevent infinite job creation.`);
+
         return {
           success: true,
           dataSizeBytes: actualSizeBytes,
@@ -99,7 +133,41 @@ export async function fetchRevenueProductSegmentationLogic(
 
     if (fmpSegmentationResult.length === 0) {
       // Empty array - no segmentation found
-      console.log(`[fetchRevenueProductSegmentationLogic] No revenue segmentation entries found for ${job.symbol}.`);
+      // CRITICAL: Update fetched_at for existing records to prevent infinite job creation
+      // If no records exist, create a sentinel record to mark that we checked
+      const { error: updateError } = await supabase
+        .from('revenue_product_segmentation')
+        .upsert(
+          {
+            symbol: job.symbol,
+            fiscal_year: 1900, // Sentinel year (before any real data)
+            period: 'FY',
+            date: '1900-01-01', // Sentinel date
+            fetched_at: new Date().toISOString(),
+          },
+          {
+            onConflict: 'symbol,fiscal_year,period,date',
+            ignoreDuplicates: false,
+          }
+        );
+
+      if (updateError) {
+        // If sentinel record fails, try to update any existing records
+        const { error: updateExistingError } = await supabase
+          .from('revenue_product_segmentation')
+          .update({ fetched_at: new Date().toISOString() })
+          .eq('symbol', job.symbol);
+
+        if (updateExistingError) {
+          console.warn(
+            `[fetchRevenueProductSegmentationLogic] Failed to update fetched_at for ${job.symbol}:`,
+            updateExistingError.message
+          );
+        }
+      }
+
+      console.log(`[fetchRevenueProductSegmentationLogic] No revenue segmentation entries found for ${job.symbol}. Updated fetched_at to prevent infinite job creation.`);
+
       return {
         success: true,
         dataSizeBytes: actualSizeBytes,

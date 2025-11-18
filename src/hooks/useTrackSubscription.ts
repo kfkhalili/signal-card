@@ -140,7 +140,6 @@ export function useTrackSubscription({
             `[useTrackSubscription] Failed to send heartbeat for ${currentSymbol}/${dataType}:`,
             upsertError
           );
-        } else {
         }
       }
     };
@@ -236,8 +235,6 @@ export function useTrackSubscription({
                 .eq('symbol', currentSymbol)
                 .eq('data_type', dataType)
             )
-              .then((result) => {
-              })
               .catch((error: unknown) => {
                 console.error(
                   `[useTrackSubscription] DELETE ERROR for ${currentSymbol}/${dataType}:`,
@@ -265,18 +262,22 @@ export function useTrackSubscription({
 
         // Stop tracking presence (fire and forget - don't wait)
         try {
-          void currentChannel.untrack().catch((error: unknown) => {
+          void currentChannel.untrack().catch(() => {
+            // Ignore errors during untrack
           });
-        } catch (error) {
+        } catch {
+          // Ignore errors during untrack
         }
 
         // Leave channel (presence automatically removed) - fire and forget
         try {
           void currentSupabase
             .removeChannel(currentChannel)
-            .catch((error: unknown) => {
+            .catch(() => {
+              // Ignore errors during channel removal
             });
-        } catch (error) {
+        } catch {
+          // Ignore errors during channel removal
         }
       } catch (error) {
         // CRITICAL: Catch any unexpected errors in cleanup to prevent crashes

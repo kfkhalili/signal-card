@@ -29,6 +29,10 @@ import type {
   LiveQuoteIndicatorDBRow,
   FinancialStatementDBRow,
   RatiosTtmDBRow,
+  DividendHistoryDBRow,
+  RevenueProductSegmentationDBRow,
+  GradesHistoricalDBRow,
+  ExchangeVariantsDBRow,
 } from "@/lib/supabase/realtime-service";
 import type { Database } from "@/lib/supabase/database.types";
 import {
@@ -672,6 +676,48 @@ export function useWorkspaceManager() {
       // Use setTimeout to defer state update and avoid "setState during render" error
       setTimeout(() => {
         setActiveCards((prevActiveCards) => {
+          // First, check if any card needs full re-initialization
+          const cardsNeedingReinit = prevActiveCards.filter((card) => {
+            if (card.symbol === updatedStatementDBRow.symbol) {
+              const concreteCardDataForHandler = getConcreteCardData(card);
+              // For cash-use, solvency, and revenue cards, check if latestStatementDate is null
+              if (card.type === "cashuse" || card.type === "solvency" || card.type === "revenue") {
+                const cardStaticData = (concreteCardDataForHandler as { staticData?: { latestStatementDate?: string | null } }).staticData;
+                return cardStaticData?.latestStatementDate === null;
+              }
+            }
+            return false;
+          });
+
+          // If cards need re-initialization, do it asynchronously
+          if (cardsNeedingReinit.length > 0 && supabase) {
+            cardsNeedingReinit.forEach(async (card) => {
+              const initializer = getCardInitializer(card.type);
+              if (initializer) {
+                try {
+                      const initResult = await initializer({
+                        symbol: card.symbol,
+                        supabase,
+                        toast: toast || undefined,
+                        activeCards: prevActiveCards,
+                      });
+                  if (initResult.isOk()) {
+                    setActiveCards((currentCards) => {
+                      return currentCards.map((c) =>
+                        c.id === card.id ? initResult.value : c
+                      );
+                    });
+                  }
+                } catch (error) {
+                  console.error(`Failed to re-initialize ${card.type} card:`, error);
+                }
+              }
+            });
+            // Return early - the async re-init will update the cards
+            return prevActiveCards;
+          }
+
+          // Otherwise, do normal update
           let overallChanged = false;
           const updatedCards = prevActiveCards.map((card) => {
             if (card.symbol === updatedStatementDBRow.symbol) {
@@ -699,7 +745,7 @@ export function useWorkspaceManager() {
         });
       }, 0);
     },
-    []
+    [supabase]
   );
 
   const handleExchangeStatusUpdate = useCallback(
@@ -763,6 +809,155 @@ export function useWorkspaceManager() {
     );
   }, [toast]);
 
+  const handleDividendHistoryUpdate = useCallback(
+    (updatedDividendDBRow: DividendHistoryDBRow) => {
+      const updateContext: CardUpdateContext = { toast: undefined };
+      const eventType: CardUpdateEventType = "DIVIDEND_ROW_UPDATE";
+
+      setTimeout(() => {
+        setActiveCards((prevActiveCards) => {
+          let overallChanged = false;
+          const updatedCards = prevActiveCards.map((card) => {
+            if (card.symbol === updatedDividendDBRow.symbol) {
+              const handler = getCardUpdateHandler(card.type, eventType);
+              if (handler) {
+                const concreteCardDataForHandler = getConcreteCardData(card);
+                const updatedConcreteData = handler(
+                  concreteCardDataForHandler,
+                  updatedDividendDBRow,
+                  card,
+                  updateContext
+                );
+                if (
+                  JSON.stringify(updatedConcreteData) !==
+                  JSON.stringify(concreteCardDataForHandler)
+                ) {
+                  overallChanged = true;
+                  return { ...card, ...updatedConcreteData };
+                }
+              }
+            }
+            return card;
+          });
+          return overallChanged ? updatedCards : prevActiveCards;
+        });
+      }, 0);
+    },
+    []
+  );
+
+  const handleRevenueSegmentationUpdate = useCallback(
+    (updatedSegmentationDBRow: RevenueProductSegmentationDBRow) => {
+      const updateContext: CardUpdateContext = { toast: undefined };
+      const eventType: CardUpdateEventType = "REVENUE_SEGMENTATION_UPDATE";
+
+      setTimeout(() => {
+        setActiveCards((prevActiveCards) => {
+          let overallChanged = false;
+          const updatedCards = prevActiveCards.map((card) => {
+            if (card.symbol === updatedSegmentationDBRow.symbol) {
+              const handler = getCardUpdateHandler(card.type, eventType);
+              if (handler) {
+                const concreteCardDataForHandler = getConcreteCardData(card);
+                const updatedConcreteData = handler(
+                  concreteCardDataForHandler,
+                  updatedSegmentationDBRow,
+                  card,
+                  updateContext
+                );
+                if (
+                  JSON.stringify(updatedConcreteData) !==
+                  JSON.stringify(concreteCardDataForHandler)
+                ) {
+                  overallChanged = true;
+                  return { ...card, ...updatedConcreteData };
+                }
+              }
+            }
+            return card;
+          });
+          return overallChanged ? updatedCards : prevActiveCards;
+        });
+      }, 0);
+    },
+    []
+  );
+
+  const handleGradesHistoricalUpdate = useCallback(
+    (updatedGradesDBRow: GradesHistoricalDBRow) => {
+      const updateContext: CardUpdateContext = { toast: undefined };
+      const eventType: CardUpdateEventType = "GRADES_HISTORICAL_UPDATE";
+
+      setTimeout(() => {
+        setActiveCards((prevActiveCards) => {
+          let overallChanged = false;
+          const updatedCards = prevActiveCards.map((card) => {
+            if (card.symbol === updatedGradesDBRow.symbol) {
+              const handler = getCardUpdateHandler(card.type, eventType);
+              if (handler) {
+                const concreteCardDataForHandler = getConcreteCardData(card);
+                const updatedConcreteData = handler(
+                  concreteCardDataForHandler,
+                  updatedGradesDBRow,
+                  card,
+                  updateContext
+                );
+                if (
+                  JSON.stringify(updatedConcreteData) !==
+                  JSON.stringify(concreteCardDataForHandler)
+                ) {
+                  overallChanged = true;
+                  return { ...card, ...updatedConcreteData };
+                }
+              }
+            }
+            return card;
+          });
+          return overallChanged ? updatedCards : prevActiveCards;
+        });
+      }, 0);
+    },
+    []
+  );
+
+  const handleExchangeVariantsUpdate = useCallback(
+    (updatedVariantDBRow: ExchangeVariantsDBRow) => {
+      const updateContext: CardUpdateContext = { toast: undefined };
+      const eventType: CardUpdateEventType = "EXCHANGE_VARIANTS_UPDATE";
+
+      setTimeout(() => {
+        setActiveCards((prevActiveCards) => {
+          let overallChanged = false;
+          const updatedCards = prevActiveCards.map((card) => {
+            // Exchange variants use base_symbol, not symbol
+            if (card.symbol === updatedVariantDBRow.base_symbol) {
+              const handler = getCardUpdateHandler(card.type, eventType);
+              if (handler) {
+                const concreteCardDataForHandler = getConcreteCardData(card);
+                const updatedConcreteData = handler(
+                  concreteCardDataForHandler,
+                  updatedVariantDBRow,
+                  card,
+                  updateContext
+                );
+                if (
+                  JSON.stringify(updatedConcreteData) !==
+                  JSON.stringify(concreteCardDataForHandler)
+                ) {
+                  overallChanged = true;
+                  return { ...card, ...updatedConcreteData };
+                }
+              }
+            }
+            return card;
+          });
+          return overallChanged ? updatedCards : prevActiveCards;
+        });
+      }, 0);
+    },
+    []
+  );
+
   const stockDataCallbacks = useMemo(
     () => ({
       onProfileUpdate: handleStaticProfileUpdate,
@@ -770,6 +965,10 @@ export function useWorkspaceManager() {
       onExchangeStatusUpdate: handleExchangeStatusUpdate,
       onFinancialStatementUpdate: handleFinancialStatementUpdate,
       onRatiosTTMUpdate: handleRatiosTTMUpdate,
+      onDividendHistoryUpdate: handleDividendHistoryUpdate,
+      onRevenueSegmentationUpdate: handleRevenueSegmentationUpdate,
+      onGradesHistoricalUpdate: handleGradesHistoricalUpdate,
+      onExchangeVariantsUpdate: handleExchangeVariantsUpdate,
     }),
     [
       handleStaticProfileUpdate,
@@ -777,6 +976,10 @@ export function useWorkspaceManager() {
       handleExchangeStatusUpdate,
       handleFinancialStatementUpdate,
       handleRatiosTTMUpdate,
+      handleDividendHistoryUpdate,
+      handleRevenueSegmentationUpdate,
+      handleGradesHistoricalUpdate,
+      handleExchangeVariantsUpdate,
     ]
   );
 

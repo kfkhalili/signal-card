@@ -98,31 +98,33 @@ export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
                     })
                   }
                 />
-                <DataRow
-                  label="Currency:"
-                  value={staticData.reportedCurrency || "N/A"}
-                  isInteractive={
-                    isSelectionMode || !!staticData.reportedCurrency
-                  }
-                  onClick={() =>
-                    handleInteraction("TRIGGER_CARD_ACTION", {
-                      actionName: "viewCurrencyDetails",
-                      actionData: { currency: staticData.reportedCurrency },
-                    } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-                  }
-                  labelClassName="text-xs font-medium text-muted-foreground"
-                  valueClassName="text-xs font-semibold text-foreground"
-                  isSelectionMode={isSelectionMode}
-                  isSelected={isSelected(`${id}-currency`)}
-                  onSelect={() =>
-                    onSelect({
-                      sourceCardId: id,
-                      sourceCardSymbol: symbol,
-                      label: "Currency",
-                      value: staticData.reportedCurrency || "N/A",
-                    })
-                  }
-                />
+                {staticData.reportedCurrency && (
+                  <DataRow
+                    label="Currency:"
+                    value={staticData.reportedCurrency}
+                    isInteractive={
+                      isSelectionMode || !!staticData.reportedCurrency
+                    }
+                    onClick={() =>
+                      handleInteraction("TRIGGER_CARD_ACTION", {
+                        actionName: "viewCurrencyDetails",
+                        actionData: { currency: staticData.reportedCurrency },
+                      } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                    }
+                    labelClassName="text-xs font-medium text-muted-foreground"
+                    valueClassName="text-xs font-semibold text-foreground"
+                    isSelectionMode={isSelectionMode}
+                    isSelected={isSelected(`${id}-currency`)}
+                    onSelect={() =>
+                      onSelect({
+                        sourceCardId: id,
+                        sourceCardSymbol: symbol,
+                        label: "Currency",
+                        value: staticData.reportedCurrency,
+                      })
+                    }
+                  />
+                )}
                 {staticData.statementDate && (
                   <DataRow
                     label="Statement Date:"
@@ -210,209 +212,221 @@ export const SolvencyCardContent: React.FC<SolvencyCardContentProps> =
             className="pointer-events-auto flex flex-col h-full justify-between">
             <ShadCardContent className={cn("p-0 flex-grow flex flex-col")}>
               <div className="space-y-1.5">
-                <DataRow
-                  label="Total Assets"
-                  value={formatFinancialValue(
-                    liveData.totalAssets,
-                    currencyCode,
-                    2,
-                    exchangeRates
-                  )}
-                  className="mb-0.5"
-                  labelClassName="text-sm font-medium text-muted-foreground"
-                  valueClassName="text-xl font-bold sm:text-2xl text-foreground"
-                  data-testid="total-assets-value-front"
-                  isInteractive={true}
-                  onClick={() =>
-                    handleInteraction("TRIGGER_CARD_ACTION", {
-                      actionName: "viewAssetBreakdown",
-                      actionData: {
-                        metric: "totalAssets",
+                {liveData.totalAssets != null && (
+                  <DataRow
+                    label="Total Assets"
+                    value={formatFinancialValue(
+                      liveData.totalAssets,
+                      currencyCode,
+                      2,
+                      exchangeRates
+                    )}
+                    className="mb-0.5"
+                    labelClassName="text-sm font-medium text-muted-foreground"
+                    valueClassName="text-xl font-bold sm:text-2xl text-foreground"
+                    data-testid="total-assets-value-front"
+                    isInteractive={true}
+                    onClick={() =>
+                      handleInteraction("TRIGGER_CARD_ACTION", {
+                        actionName: "viewAssetBreakdown",
+                        actionData: {
+                          metric: "totalAssets",
+                          value: liveData.totalAssets,
+                        },
+                      } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                    }
+                    isSelectionMode={isSelectionMode}
+                    isSelected={isSelected(`${id}-total-assets`)}
+                    onSelect={() =>
+                      onSelect({
+                        sourceCardId: id,
+                        sourceCardSymbol: symbol,
+                        label: "Total Assets",
                         value: liveData.totalAssets,
-                      },
-                    } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-                  }
-                  isSelectionMode={isSelectionMode}
-                  isSelected={isSelected(`${id}-total-assets`)}
-                  onSelect={() =>
-                    onSelect({
-                      sourceCardId: id,
-                      sourceCardSymbol: symbol,
-                      label: "Total Assets",
-                      value: liveData.totalAssets,
-                      isMonetary: true,
-                      currency: currencyCode,
-                    })
-                  }
-                />
-                <DataRow
-                  label="Cash"
-                  value={formatFinancialValue(
-                    liveData.cashAndShortTermInvestments,
-                    currencyCode,
-                    2,
-                    exchangeRates
-                  )}
-                  tooltip="includes short-term investments"
-                  labelClassName="text-sm font-medium text-muted-foreground"
-                  valueClassName="text-sm font-semibold text-foreground"
-                  data-testid="cash-value-front"
-                  isInteractive={true}
-                  onClick={() =>
-                    handleInteraction("TRIGGER_CARD_ACTION", {
-                      actionName: "viewCashPositionDetails",
-                      actionData: {
-                        metric: "cashAndShortTermInvestments",
+                        isMonetary: true,
+                        currency: currencyCode,
+                      })
+                    }
+                  />
+                )}
+                {liveData.cashAndShortTermInvestments != null && (
+                  <DataRow
+                    label="Cash"
+                    value={formatFinancialValue(
+                      liveData.cashAndShortTermInvestments,
+                      currencyCode,
+                      2,
+                      exchangeRates
+                    )}
+                    tooltip="includes short-term investments"
+                    labelClassName="text-sm font-medium text-muted-foreground"
+                    valueClassName="text-sm font-semibold text-foreground"
+                    data-testid="cash-value-front"
+                    isInteractive={true}
+                    onClick={() =>
+                      handleInteraction("TRIGGER_CARD_ACTION", {
+                        actionName: "viewCashPositionDetails",
+                        actionData: {
+                          metric: "cashAndShortTermInvestments",
+                          value: liveData.cashAndShortTermInvestments,
+                        },
+                      } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                    }
+                    isSelectionMode={isSelectionMode}
+                    isSelected={isSelected(`${id}-cash`)}
+                    onSelect={() =>
+                      onSelect({
+                        sourceCardId: id,
+                        sourceCardSymbol: symbol,
+                        label: "Cash",
                         value: liveData.cashAndShortTermInvestments,
-                      },
-                    } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-                  }
-                  isSelectionMode={isSelectionMode}
-                  isSelected={isSelected(`${id}-cash`)}
-                  onSelect={() =>
-                    onSelect({
-                      sourceCardId: id,
-                      sourceCardSymbol: symbol,
-                      label: "Cash",
-                      value: liveData.cashAndShortTermInvestments,
-                      isMonetary: true,
-                      currency: currencyCode,
-                    })
-                  }
-                />
-                <DataRow
-                  label="Liabilities"
-                  value={formatFinancialValue(
-                    liveData.totalCurrentLiabilities,
-                    currencyCode,
-                    2,
-                    exchangeRates
-                  )}
-                  labelClassName="text-sm font-medium text-muted-foreground"
-                  valueClassName="text-sm font-semibold text-foreground"
-                  data-testid="current-liabilities-value-front"
-                  isInteractive={true}
-                  onClick={() =>
-                    handleInteraction("TRIGGER_CARD_ACTION", {
-                      actionName: "viewLiabilityBreakdown",
-                      actionData: {
-                        metric: "totalCurrentLiabilities",
+                        isMonetary: true,
+                        currency: currencyCode,
+                      })
+                    }
+                  />
+                )}
+                {liveData.totalCurrentLiabilities != null && (
+                  <DataRow
+                    label="Liabilities"
+                    value={formatFinancialValue(
+                      liveData.totalCurrentLiabilities,
+                      currencyCode,
+                      2,
+                      exchangeRates
+                    )}
+                    labelClassName="text-sm font-medium text-muted-foreground"
+                    valueClassName="text-sm font-semibold text-foreground"
+                    data-testid="current-liabilities-value-front"
+                    isInteractive={true}
+                    onClick={() =>
+                      handleInteraction("TRIGGER_CARD_ACTION", {
+                        actionName: "viewLiabilityBreakdown",
+                        actionData: {
+                          metric: "totalCurrentLiabilities",
+                          value: liveData.totalCurrentLiabilities,
+                        },
+                      } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                    }
+                    isSelectionMode={isSelectionMode}
+                    isSelected={isSelected(`${id}-liabilities`)}
+                    onSelect={() =>
+                      onSelect({
+                        sourceCardId: id,
+                        sourceCardSymbol: symbol,
+                        label: "Liabilities",
                         value: liveData.totalCurrentLiabilities,
-                      },
-                    } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-                  }
-                  isSelectionMode={isSelectionMode}
-                  isSelected={isSelected(`${id}-liabilities`)}
-                  onSelect={() =>
-                    onSelect({
-                      sourceCardId: id,
-                      sourceCardSymbol: symbol,
-                      label: "Liabilities",
-                      value: liveData.totalCurrentLiabilities,
-                      isMonetary: true,
-                      currency: currencyCode,
-                    })
-                  }
-                />
-                <DataRow
-                  label="Short-Term Debt"
-                  value={formatFinancialValue(
-                    liveData.shortTermDebt,
-                    currencyCode,
-                    2,
-                    exchangeRates
-                  )}
-                  labelClassName="text-sm font-medium text-muted-foreground"
-                  valueClassName="text-sm font-semibold text-foreground"
-                  data-testid="short-term-debt-value-front"
-                  isInteractive={true}
-                  onClick={() =>
-                    handleInteraction("TRIGGER_CARD_ACTION", {
-                      actionName: "viewDebtDetails",
-                      actionData: {
-                        metric: "shortTermDebt",
+                        isMonetary: true,
+                        currency: currencyCode,
+                      })
+                    }
+                  />
+                )}
+                {liveData.shortTermDebt != null && (
+                  <DataRow
+                    label="Short-Term Debt"
+                    value={formatFinancialValue(
+                      liveData.shortTermDebt,
+                      currencyCode,
+                      2,
+                      exchangeRates
+                    )}
+                    labelClassName="text-sm font-medium text-muted-foreground"
+                    valueClassName="text-sm font-semibold text-foreground"
+                    data-testid="short-term-debt-value-front"
+                    isInteractive={true}
+                    onClick={() =>
+                      handleInteraction("TRIGGER_CARD_ACTION", {
+                        actionName: "viewDebtDetails",
+                        actionData: {
+                          metric: "shortTermDebt",
+                          value: liveData.shortTermDebt,
+                        },
+                      } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                    }
+                    isSelectionMode={isSelectionMode}
+                    isSelected={isSelected(`${id}-short-term-debt`)}
+                    onSelect={() =>
+                      onSelect({
+                        sourceCardId: id,
+                        sourceCardSymbol: symbol,
+                        label: "Short-Term Debt",
                         value: liveData.shortTermDebt,
-                      },
-                    } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-                  }
-                  isSelectionMode={isSelectionMode}
-                  isSelected={isSelected(`${id}-short-term-debt`)}
-                  onSelect={() =>
-                    onSelect({
-                      sourceCardId: id,
-                      sourceCardSymbol: symbol,
-                      label: "Short-Term Debt",
-                      value: liveData.shortTermDebt,
-                      isMonetary: true,
-                      currency: currencyCode,
-                    })
-                  }
-                />
-                <DataRow
-                  label="Long-Term Debt"
-                  value={formatFinancialValue(
-                    liveData.longTermDebt,
-                    currencyCode,
-                    2,
-                    exchangeRates
-                  )}
-                  labelClassName="text-sm font-medium text-muted-foreground"
-                  valueClassName="text-sm font-semibold text-foreground"
-                  data-testid="long-term-debt-value-front"
-                  isInteractive={true}
-                  onClick={() =>
-                    handleInteraction("TRIGGER_CARD_ACTION", {
-                      actionName: "viewDebtDetails",
-                      actionData: {
-                        metric: "longTermDebt",
+                        isMonetary: true,
+                        currency: currencyCode,
+                      })
+                    }
+                  />
+                )}
+                {liveData.longTermDebt != null && (
+                  <DataRow
+                    label="Long-Term Debt"
+                    value={formatFinancialValue(
+                      liveData.longTermDebt,
+                      currencyCode,
+                      2,
+                      exchangeRates
+                    )}
+                    labelClassName="text-sm font-medium text-muted-foreground"
+                    valueClassName="text-sm font-semibold text-foreground"
+                    data-testid="long-term-debt-value-front"
+                    isInteractive={true}
+                    onClick={() =>
+                      handleInteraction("TRIGGER_CARD_ACTION", {
+                        actionName: "viewDebtDetails",
+                        actionData: {
+                          metric: "longTermDebt",
+                          value: liveData.longTermDebt,
+                        },
+                      } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                    }
+                    isSelectionMode={isSelectionMode}
+                    isSelected={isSelected(`${id}-long-term-debt`)}
+                    onSelect={() =>
+                      onSelect({
+                        sourceCardId: id,
+                        sourceCardSymbol: symbol,
+                        label: "Long-Term Debt",
                         value: liveData.longTermDebt,
-                      },
-                    } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-                  }
-                  isSelectionMode={isSelectionMode}
-                  isSelected={isSelected(`${id}-long-term-debt`)}
-                  onSelect={() =>
-                    onSelect({
-                      sourceCardId: id,
-                      sourceCardSymbol: symbol,
-                      label: "Long-Term Debt",
-                      value: liveData.longTermDebt,
-                      isMonetary: true,
-                      currency: currencyCode,
-                    })
-                  }
-                />
-                <DataRow
-                  label="Free Cash Flow"
-                  value={formatFinancialValue(
-                    liveData.freeCashFlow,
-                    currencyCode,
-                    2,
-                    exchangeRates
-                  )}
-                  labelClassName="text-sm font-medium text-muted-foreground"
-                  valueClassName="text-sm font-semibold text-foreground"
-                  data-testid="fcf-value-front"
-                  isInteractive={true}
-                  onClick={() =>
-                    handleInteraction("REQUEST_NEW_CARD", {
-                      targetCardType: "revenue",
-                      originatingElement: "fcfMetricSolvency",
-                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-                  }
-                  isSelectionMode={isSelectionMode}
-                  isSelected={isSelected(`${id}-free-cash-flow`)}
-                  onSelect={() =>
-                    onSelect({
-                      sourceCardId: id,
-                      sourceCardSymbol: symbol,
-                      label: "Free Cash Flow",
-                      value: liveData.freeCashFlow,
-                      isMonetary: true,
-                      currency: currencyCode,
-                    })
-                  }
-                />
+                        isMonetary: true,
+                        currency: currencyCode,
+                      })
+                    }
+                  />
+                )}
+                {liveData.freeCashFlow != null && (
+                  <DataRow
+                    label="Free Cash Flow"
+                    value={formatFinancialValue(
+                      liveData.freeCashFlow,
+                      currencyCode,
+                      2,
+                      exchangeRates
+                    )}
+                    labelClassName="text-sm font-medium text-muted-foreground"
+                    valueClassName="text-sm font-semibold text-foreground"
+                    data-testid="fcf-value-front"
+                    isInteractive={true}
+                    onClick={() =>
+                      handleInteraction("REQUEST_NEW_CARD", {
+                        targetCardType: "revenue",
+                        originatingElement: "fcfMetricSolvency",
+                      } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                    }
+                    isSelectionMode={isSelectionMode}
+                    isSelected={isSelected(`${id}-free-cash-flow`)}
+                    onSelect={() =>
+                      onSelect({
+                        sourceCardId: id,
+                        sourceCardSymbol: symbol,
+                        label: "Free Cash Flow",
+                        value: liveData.freeCashFlow,
+                        isMonetary: true,
+                        currency: currencyCode,
+                      })
+                    }
+                  />
+                )}
               </div>
             </ShadCardContent>
           </div>

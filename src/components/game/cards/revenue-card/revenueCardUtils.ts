@@ -36,6 +36,52 @@ class RevenueCardError extends Error {
   }
 }
 
+function createEmptyRevenueCard(
+  symbol: string,
+  existingCardId?: string,
+  existingCreatedAt?: number
+): RevenueCardData & Pick<DisplayableCardState, "isFlipped"> {
+  const emptyStaticData: RevenueCardStaticData = {
+    periodLabel: "N/A",
+    reportedCurrency: null,
+    filingDate: null,
+    acceptedDate: null,
+    statementDate: "N/A",
+    statementPeriod: "N/A",
+  };
+
+  const emptyLiveData: RevenueCardLiveData = {
+    revenue: null,
+    grossProfit: null,
+    operatingIncome: null,
+    netIncome: null,
+    freeCashFlow: null,
+  };
+
+  const cardBackData: BaseCardBackData = {
+    description: `Key financial metrics for ${symbol}. Includes revenue, profits, and free cash flow.`,
+  };
+
+  const concreteCardData: RevenueCardData = {
+    id: existingCardId || `revenue-${symbol}-${Date.now()}`,
+    type: "revenue",
+    symbol: symbol,
+    companyName: null,
+    displayCompanyName: null,
+    logoUrl: null,
+    createdAt: existingCreatedAt ?? Date.now(),
+    staticData: emptyStaticData,
+    liveData: emptyLiveData,
+    backData: cardBackData,
+    websiteUrl: null,
+  };
+
+  return {
+    ...concreteCardData,
+    isFlipped: false,
+  };
+}
+
 function constructRevenueCardData(
   dbRow: FinancialStatementDBRowFromSupabase,
   profileInfo: {
@@ -107,9 +153,9 @@ function constructRevenueCardData(
       `revenue-${dbRow.symbol}-${dbRow.date}-${dbRow.period}-${Date.now()}`,
     type: "revenue",
     symbol: dbRow.symbol,
-    companyName: profileInfo.companyName ?? dbRow.symbol,
+    companyName: profileInfo.companyName ?? null,
     displayCompanyName:
-      profileInfo.displayCompanyName ?? profileInfo.companyName ?? dbRow.symbol,
+      profileInfo.displayCompanyName ?? profileInfo.companyName ?? null,
     logoUrl: profileInfo.logoUrl ?? null,
     websiteUrl: profileInfo.websiteUrl ?? null,
     createdAt: existingCreatedAt ?? Date.now(),
@@ -204,16 +250,16 @@ async function initializeRevenueCard({
     return ok({ ...concreteCardData, ...cardState });
   }
 
+  // No data found - return empty state card
+  const emptyCard = createEmptyRevenueCard(symbol);
   if (toast) {
     toast({
-      title: "Statement Not Found",
-      description: `No financial statements currently available for ${symbol}.`,
+      title: "Revenue Card Added (Empty State)",
+      description: `Awaiting financial statements data for ${symbol}.`,
       variant: "default",
     });
   }
-  return err(
-    new RevenueCardError(`No financial statements found for ${symbol}.`)
-  );
+  return ok(emptyCard);
 }
 
 registerCardInitializer("revenue", initializeRevenueCard);
@@ -233,6 +279,24 @@ const handleRevenueCardStatementUpdate: CardUpdateHandler<
 
   if (!newStatementDateStr || !newFinancialStatementRow.period) {
     return currentRevenueCardData;
+  }
+
+  // If card is in empty state (N/A), always update
+  if (
+    currentStatementDateStr === "N/A" ||
+    currentRevenueCardData.staticData.statementPeriod === "N/A"
+  ) {
+    return constructRevenueCardData(
+      newFinancialStatementRow,
+      {
+        companyName: currentRevenueCardData.companyName,
+        displayCompanyName: currentRevenueCardData.displayCompanyName,
+        logoUrl: currentRevenueCardData.logoUrl,
+        websiteUrl: currentRevenueCardData.websiteUrl,
+      },
+      currentRevenueCardData.id,
+      currentRevenueCardData.createdAt
+    );
   }
 
   const currentStatementDate = new Date(currentStatementDateStr);

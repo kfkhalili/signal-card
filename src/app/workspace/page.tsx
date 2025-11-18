@@ -47,6 +47,10 @@ import type { MarketStatusUpdate } from "@/hooks/useStockData";
 import type {
   FinancialStatementDBRow,
   RatiosTtmDBRow,
+  DividendHistoryDBRow,
+  RevenueProductSegmentationDBRow,
+  GradesHistoricalDBRow,
+  ExchangeVariantsDBRow,
 } from "@/lib/supabase/realtime-service";
 
 type MarketStatus = Record<string, MarketStatusUpdate>;
@@ -262,6 +266,26 @@ export default function WorkspacePage() {
             onRatiosTTMUpdate={
               stockDataCallbacks.onRatiosTTMUpdate as (
                 ratios: RatiosTtmDBRow
+              ) => void
+            }
+            onDividendHistoryUpdate={
+              stockDataCallbacks.onDividendHistoryUpdate as (
+                dividend: DividendHistoryDBRow
+              ) => void
+            }
+            onRevenueSegmentationUpdate={
+              stockDataCallbacks.onRevenueSegmentationUpdate as (
+                segmentation: RevenueProductSegmentationDBRow
+              ) => void
+            }
+            onGradesHistoricalUpdate={
+              stockDataCallbacks.onGradesHistoricalUpdate as (
+                grades: GradesHistoricalDBRow
+              ) => void
+            }
+            onExchangeVariantsUpdate={
+              stockDataCallbacks.onExchangeVariantsUpdate as (
+                variant: ExchangeVariantsDBRow
               ) => void
             }
           />

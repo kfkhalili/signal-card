@@ -56,6 +56,62 @@ function mapDbRowToLiveData(dbRow: RatiosTtmDBRow): KeyRatiosCardLiveData {
   };
 }
 
+function createEmptyKeyRatiosCard(
+  symbol: string,
+  existingCardId?: string,
+  existingCreatedAt?: number
+): KeyRatiosCardData & Pick<DisplayableCardState, "isFlipped"> {
+  const emptyStaticData: KeyRatiosCardStaticData = {
+    lastUpdated: null,
+    reportedCurrency: null,
+  };
+
+  const emptyLiveData: KeyRatiosCardLiveData = {
+    priceToEarningsRatioTTM: null,
+    priceToSalesRatioTTM: null,
+    priceToBookRatioTTM: null,
+    priceToFreeCashFlowRatioTTM: null,
+    enterpriseValueMultipleTTM: null,
+    netProfitMarginTTM: null,
+    grossProfitMarginTTM: null,
+    ebitdaMarginTTM: null,
+    debtToEquityRatioTTM: null,
+    dividendYieldTTM: null,
+    dividendPayoutRatioTTM: null,
+    earningsPerShareTTM: null,
+    revenuePerShareTTM: null,
+    bookValuePerShareTTM: null,
+    freeCashFlowPerShareTTM: null,
+    effectiveTaxRateTTM: null,
+    currentRatioTTM: null,
+    quickRatioTTM: null,
+    assetTurnoverTTM: null,
+  };
+
+  const cardBackData: BaseCardBackData = {
+    description: `Key Trailing Twelve Months (TTM) financial ratios for ${symbol}.`,
+  };
+
+  const concreteCardData: KeyRatiosCardData = {
+    id: existingCardId || `keyratios-${symbol}-${Date.now()}`,
+    type: "keyratios",
+    symbol: symbol,
+    companyName: null,
+    displayCompanyName: null,
+    logoUrl: null,
+    createdAt: existingCreatedAt ?? Date.now(),
+    staticData: emptyStaticData,
+    liveData: emptyLiveData,
+    backData: cardBackData,
+    websiteUrl: null,
+  };
+
+  return {
+    ...concreteCardData,
+    isFlipped: false,
+  };
+}
+
 function constructKeyRatiosCardData(
   dbRow: RatiosTtmDBRow,
   profileInfo: {
@@ -88,9 +144,9 @@ function constructKeyRatiosCardData(
     id: idOverride || `keyratios-${dbRow.symbol}-${Date.now()}`,
     type: "keyratios",
     symbol: dbRow.symbol,
-    companyName: profileInfo.companyName ?? dbRow.symbol,
+    companyName: profileInfo.companyName ?? null,
     displayCompanyName:
-      profileInfo.displayCompanyName ?? profileInfo.companyName ?? dbRow.symbol,
+      profileInfo.displayCompanyName ?? profileInfo.companyName ?? null,
     logoUrl: profileInfo.logoUrl ?? null,
     websiteUrl: profileInfo.websiteUrl ?? null,
     createdAt: existingCreatedAt ?? Date.now(),
@@ -175,30 +231,41 @@ async function initializeKeyRatiosCard({
   }
 
   const ratiosResult = await fromPromise(
-    supabase.from("ratios_ttm").select("*").eq("symbol", symbol).single(),
+    supabase.from("ratios_ttm").select("*").eq("symbol", symbol).maybeSingle(),
     (e) => new KeyRatiosCardError((e as Error).message)
   );
 
   if (ratiosResult.isErr()) {
     const error = ratiosResult.error;
-    const description = error.message.includes("PGRST116")
-      ? `No TTM ratios currently available for ${symbol}.`
-      : `Could not fetch TTM ratios for ${symbol}: ${error.message}`;
-    if (toast) {
-      toast({ title: "Ratios Not Found", description, variant: "default" });
+    if (error.message.includes("PGRST116")) {
+      // No data found - return empty state card
+      const emptyCard = createEmptyKeyRatiosCard(symbol);
+      if (toast) {
+        toast({
+          title: "Key Ratios Card Added (Empty State)",
+          description: `Awaiting TTM ratios data for ${symbol}.`,
+          variant: "default",
+        });
+      }
+      return ok(emptyCard);
     }
-    return err(new KeyRatiosCardError(description));
+    // Other errors - return error
+    return err(new KeyRatiosCardError(error.message));
   }
 
   const ratiosData = ratiosResult.value.data;
 
   if (!ratiosData) {
-    // This case should theoretically be covered by the .single() error above, but as a safeguard:
-    return err(
-      new KeyRatiosCardError(
-        `TTM ratios data is unexpectedly missing for ${symbol}.`
-      )
-    );
+    // No data found - return empty state card
+    const emptyCard = createEmptyKeyRatiosCard(symbol);
+    if (toast) {
+      toast({
+        title: "Key Ratios Card Added (Empty State)",
+        description: `Awaiting TTM ratios data for ${symbol}.`,
+        variant: "default",
+      });
+    }
+    return ok(emptyCard);
   }
 
   const concreteCardData = constructKeyRatiosCardData(

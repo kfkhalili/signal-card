@@ -15,7 +15,7 @@ import type { CardType } from '@/components/game/cards/base-card/base-card.types
  * NOTE: This mapping is based on the database tables each card type uses:
  * - profile: profiles table (primary), live_quote_indicators (price/market cap),
  *   financial_statements (revenue), ratios_ttm (EPS, P/E, P/B)
- * - price: live_quote_indicators table
+ * - price: live_quote_indicators table (primary), profiles table (company name/logo/currency)
  * - revenue/solvency/cashuse: financial_statements table
  * - keyratios: ratios_ttm table
  * - dividendshistory: dividend_history table
@@ -26,15 +26,15 @@ import type { CardType } from '@/components/game/cards/base-card/base-card.types
 export function getDataTypesForCard(cardType: CardType): string[] {
   const mapping: Record<CardType, string[]> = {
     'profile': ['profile', 'quote', 'financial-statements', 'ratios-ttm'], // Profile card uses multiple tables
-    'price': ['quote'], // live_quote_indicators table
-    'revenue': ['financial-statements'],
-    'solvency': ['financial-statements'],
-    'cashuse': ['financial-statements'],
-    'keyratios': ['ratios-ttm'],
+    'price': ['quote', 'profile'], // live_quote_indicators table (primary), profiles table (company name/logo/currency)
+    'revenue': ['financial-statements', 'profile'],
+    'solvency': ['financial-statements', 'profile'],
+    'cashuse': ['financial-statements', 'profile'],
+    'keyratios': ['ratios-ttm', 'profile'],
     'dividendshistory': ['dividend-history'],
-    'revenuebreakdown': ['revenue-product-segmentation'],
-    'analystgrades': ['grades-historical'],
-    'exchangevariants': ['exchange-variants'],
+    'revenuebreakdown': ['revenue-product-segmentation', 'financial-statements', 'profile'],
+    'analystgrades': ['grades-historical', 'profile'],
+    'exchangevariants': ['exchange-variants', 'profile'],
     'custom': [], // Custom cards don't have specific data types
   };
 

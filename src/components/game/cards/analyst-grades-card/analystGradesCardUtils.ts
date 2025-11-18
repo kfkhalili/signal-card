@@ -124,6 +124,48 @@ function formatPeriodDate(dateString: string | null): string {
   }
 }
 
+function createEmptyAnalystGradesCard(
+  symbol: string,
+  existingCardId?: string,
+  existingCreatedAt?: number
+): AnalystGradesCardData & Pick<DisplayableCardState, "isFlipped"> {
+  const emptyStaticData: AnalystGradesCardStaticData = {
+    currentPeriodDate: null,
+    previousPeriodDate: null,
+  };
+
+  const emptyLiveData: AnalystGradesCardLiveData = {
+    ratingsDistribution: [],
+    totalAnalystsCurrent: 0,
+    totalAnalystsPrevious: null,
+    consensusLabelCurrent: null,
+    lastUpdated: null,
+  };
+
+  const cardBackData: BaseCardBackData = {
+    description: `Analyst rating distribution for ${symbol}.`,
+  };
+
+  const concreteCardData: AnalystGradesCardData = {
+    id: existingCardId || `analystgrades-${symbol}-${Date.now()}`,
+    type: "analystgrades",
+    symbol: symbol,
+    companyName: null,
+    displayCompanyName: null,
+    logoUrl: null,
+    createdAt: existingCreatedAt ?? Date.now(),
+    staticData: emptyStaticData,
+    liveData: emptyLiveData,
+    backData: cardBackData,
+    websiteUrl: null,
+  };
+
+  return {
+    ...concreteCardData,
+    isFlipped: false,
+  };
+}
+
 function constructAnalystGradesCardData(
   symbol: string,
   profileInfo: {
@@ -192,9 +234,9 @@ function constructAnalystGradesCardData(
     id: idOverride || `analystgrades-${symbol}-${Date.now()}`,
     type: "analystgrades",
     symbol,
-    companyName: profileInfo.companyName ?? symbol,
+    companyName: profileInfo.companyName ?? null,
     displayCompanyName:
-      profileInfo.displayCompanyName ?? profileInfo.companyName ?? symbol,
+      profileInfo.displayCompanyName ?? profileInfo.companyName ?? null,
     logoUrl: profileInfo.logoUrl ?? null,
     websiteUrl: profileInfo.websiteUrl ?? null,
     createdAt: existingCreatedAt ?? Date.now(),
@@ -299,14 +341,16 @@ async function initializeAnalystGradesCard({
   const { profileInfo, latestGrading, previousGrading } = fetchDataResult.value;
 
   if (!latestGrading) {
-    if (toast)
+    // No data found - return empty state card
+    const emptyCard = createEmptyAnalystGradesCard(symbol);
+    if (toast) {
       toast({
-        title: "No Analyst Grades Data",
-        description: `No analyst grades found for ${symbol}.`,
+        title: "Analyst Grades Card Added (Empty State)",
+        description: `Awaiting analyst grades data for ${symbol}.`,
+        variant: "default",
       });
-    return err(
-      new AnalystGradesCardError(`No analyst grades found for ${symbol}.`)
-    );
+    }
+    return ok(emptyCard);
   }
 
   const concreteCardData = constructAnalystGradesCardData(
@@ -346,4 +390,86 @@ registerCardUpdateHandler(
   "analystgrades",
   "STATIC_PROFILE_UPDATE",
   handleAnalystGradesProfileUpdate
+);
+
+const handleGradesHistoricalUpdate: CardUpdateHandler<
+  AnalystGradesCardData,
+  GradesHistoricalDBRow
+> = (
+  currentCardData,
+  updatedRow
+): AnalystGradesCardData => {
+  // Check if the updated row is for a newer or same period
+  const currentPeriodDate = currentCardData.staticData.currentPeriodDate;
+  const updatedPeriodDate = formatPeriodDate(updatedRow.date);
+
+  // Compare dates to see if this is a newer period
+  // For simplicity, if the date string is different or newer, update
+  if (
+    !currentPeriodDate ||
+    updatedPeriodDate !== currentPeriodDate ||
+    (updatedRow.date && updatedRow.updated_at) // If we have an update timestamp, treat as newer
+  ) {
+    // Reconstruct the card data with the updated row as the latest
+    // Use current data as previous
+    const currentCounts = mapDbRowToRatingCounts(updatedRow);
+    // For previous counts, we'll use the current values from the card
+    const previousCounts: Record<RatingCategory, number> = {
+      strongBuy: currentCardData.liveData.ratingsDistribution[0]?.currentValue ?? 0,
+      buy: currentCardData.liveData.ratingsDistribution[1]?.currentValue ?? 0,
+      hold: currentCardData.liveData.ratingsDistribution[2]?.currentValue ?? 0,
+      sell: currentCardData.liveData.ratingsDistribution[3]?.currentValue ?? 0,
+      strongSell: currentCardData.liveData.ratingsDistribution[4]?.currentValue ?? 0,
+    };
+
+    const ratingsDistribution: AnalystRatingDetail[] =
+      RATING_CATEGORIES_ORDERED.map(({ category, label, colorClass }) => {
+        const currentValue = currentCounts[category] ?? 0;
+        const previousValue = previousCounts[category] ?? null;
+        const change =
+          previousValue !== null ? currentValue - previousValue : null;
+        return {
+          category,
+          label,
+          currentValue,
+          previousValue,
+          change,
+          colorClass,
+        };
+      });
+
+    const totalAnalystsCurrent = calculateTotalAnalysts(currentCounts);
+    const totalAnalystsPrevious = currentCardData.liveData.totalAnalystsCurrent;
+    const consensusLabelCurrent = deriveConsensusLabel(
+      ratingsDistribution,
+      totalAnalystsCurrent
+    );
+
+    const updatedStaticData: AnalystGradesCardStaticData = {
+      currentPeriodDate: updatedPeriodDate,
+      previousPeriodDate: currentPeriodDate,
+    };
+
+    const updatedLiveData: AnalystGradesCardLiveData = {
+      ratingsDistribution,
+      totalAnalystsCurrent,
+      totalAnalystsPrevious,
+      consensusLabelCurrent,
+      lastUpdated: updatedRow.updated_at,
+    };
+
+    return {
+      ...currentCardData,
+      liveData: updatedLiveData,
+      staticData: updatedStaticData,
+    };
+  }
+
+  return currentCardData; // Update is for the same period, no change needed
+};
+
+registerCardUpdateHandler(
+  "analystgrades",
+  "GRADES_HISTORICAL_UPDATE",
+  handleGradesHistoricalUpdate
 );

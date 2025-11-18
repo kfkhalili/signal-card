@@ -105,11 +105,11 @@ function createDisplayablePriceCard(
     type: "price",
     symbol: leanQuote.symbol,
     createdAt: Date.now(),
-    companyName: profileContext?.company_name ?? leanQuote.symbol,
+    companyName: profileContext?.company_name ?? null,
     displayCompanyName:
       profileContext?.display_company_name ??
       profileContext?.company_name ??
-      leanQuote.symbol,
+      null,
     logoUrl: profileContext?.image ?? null,
     websiteUrl: profileContext?.website ?? null,
     staticData,

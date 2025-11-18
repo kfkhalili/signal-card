@@ -216,6 +216,21 @@ export const AnalystGradesCardContent: React.FC<AnalystGradesCardContentProps> =
       } = liveData;
       const barHeight = "h-5 sm:h-6";
 
+      // Don't render if there's no data
+      if (totalAnalystsCurrent === 0 || !staticData.currentPeriodDate || staticData.currentPeriodDate === "N/A") {
+        return (
+          <div
+            data-testid={`analystgrades-card-front-${symbol}`}
+            className="pointer-events-auto flex flex-col h-full">
+            <ShadCardContent className={cn("p-0 flex-grow flex flex-col")}>
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No analyst grades data available.
+              </p>
+            </ShadCardContent>
+          </div>
+        );
+      }
+
       return (
         <div
           data-testid={`analystgrades-card-front-${symbol}`}
@@ -239,15 +254,21 @@ export const AnalystGradesCardContent: React.FC<AnalystGradesCardContentProps> =
                         })
                     : undefined
                 }>
-                <p className="text-xs text-muted-foreground">
-                  {staticData.currentPeriodDate}
-                </p>
-                <p className="text-base font-semibold">
-                  {consensusLabelCurrent}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Based on {totalAnalystsCurrent} Analysts
-                </p>
+                {staticData.currentPeriodDate && staticData.currentPeriodDate !== "N/A" && (
+                  <p className="text-xs text-muted-foreground">
+                    {staticData.currentPeriodDate}
+                  </p>
+                )}
+                {consensusLabelCurrent && consensusLabelCurrent !== "N/A" && (
+                  <p className="text-base font-semibold">
+                    {consensusLabelCurrent}
+                  </p>
+                )}
+                {totalAnalystsCurrent > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Based on {totalAnalystsCurrent} Analysts
+                  </p>
+                )}
               </div>
               {totalAnalystsCurrent > 0 && (
                 <div
@@ -272,25 +293,27 @@ export const AnalystGradesCardContent: React.FC<AnalystGradesCardContentProps> =
                   })}
                 </div>
               )}
-              <div className="space-y-0.5 flex-grow overflow-y-auto">
-                {ratingsDistribution.map((detail) => (
-                  <RatingDetailRow
-                    key={detail.category}
-                    detail={detail}
-                    totalAnalysts={totalAnalystsCurrent}
-                    isSelectionMode={isSelectionMode}
-                    isSelected={isSelected(`${id}-${detail.label}`)}
-                    onSelect={() =>
-                      onSelect({
-                        sourceCardId: id,
-                        sourceCardSymbol: symbol,
-                        label: `${detail.label} Ratings`,
-                        value: detail.currentValue,
-                      })
-                    }
-                  />
-                ))}
-              </div>
+              {totalAnalystsCurrent > 0 && (
+                <div className="space-y-0.5 flex-grow overflow-y-auto">
+                  {ratingsDistribution.map((detail) => (
+                    <RatingDetailRow
+                      key={detail.category}
+                      detail={detail}
+                      totalAnalysts={totalAnalystsCurrent}
+                      isSelectionMode={isSelectionMode}
+                      isSelected={isSelected(`${id}-${detail.label}`)}
+                      onSelect={() =>
+                        onSelect({
+                          sourceCardId: id,
+                          sourceCardSymbol: symbol,
+                          label: `${detail.label} Ratings`,
+                          value: detail.currentValue,
+                        })
+                      }
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </ShadCardContent>
         </div>

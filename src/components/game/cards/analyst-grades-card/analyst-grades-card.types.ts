@@ -18,7 +18,7 @@ export interface AnalystRatingDetail {
 }
 
 export interface AnalystGradesCardStaticData {
-  readonly currentPeriodDate: string; // e.g., "May 2025"
+  readonly currentPeriodDate: string | null; // e.g., "May 2025" or null if no data
   readonly previousPeriodDate: string | null; // e.g., "April 2025"
 }
 
@@ -26,7 +26,7 @@ export interface AnalystGradesCardLiveData {
   readonly ratingsDistribution: readonly AnalystRatingDetail[];
   readonly totalAnalystsCurrent: number;
   readonly totalAnalystsPrevious: number | null;
-  readonly consensusLabelCurrent: string; // e.g., "Positive", "Neutral", "Buy"
+  readonly consensusLabelCurrent: string | null; // e.g., "Positive", "Neutral", "Buy" or null if no data
   // Optional: Could add consensus change if meaningful
   readonly lastUpdated: string | null;
 }

@@ -14,6 +14,18 @@ import {
   type RatiosTtmDBRow,
   subscribeToFinancialStatementUpdates,
   type FinancialStatementPayload,
+  subscribeToDividendHistoryUpdates,
+  type DividendHistoryPayload,
+  type DividendHistoryDBRow,
+  subscribeToRevenueProductSegmentationUpdates,
+  type RevenueProductSegmentationPayload,
+  type RevenueProductSegmentationDBRow,
+  subscribeToGradesHistoricalUpdates,
+  type GradesHistoricalPayload,
+  type GradesHistoricalDBRow,
+  subscribeToExchangeVariantsUpdates,
+  type ExchangeVariantsPayload,
+  type ExchangeVariantsDBRow,
 } from "@/lib/supabase/realtime-service";
 
 export type ProfileDBRow = Database["public"]["Tables"]["profiles"]["Row"];
@@ -55,6 +67,10 @@ interface UseStockDataProps {
   onExchangeStatusUpdate?: (status: ExchangeMarketStatusRecord) => void;
   onFinancialStatementUpdate?: (statement: FinancialStatementDBRow) => void;
   onRatiosTTMUpdate?: (ratios: RatiosTtmDBRow) => void;
+  onDividendHistoryUpdate?: (dividend: DividendHistoryDBRow) => void;
+  onRevenueSegmentationUpdate?: (segmentation: RevenueProductSegmentationDBRow) => void;
+  onGradesHistoricalUpdate?: (grades: GradesHistoricalDBRow) => void;
+  onExchangeVariantsUpdate?: (variant: ExchangeVariantsDBRow) => void;
 }
 
 async function fetchInitialProfile(
@@ -125,6 +141,98 @@ async function fetchInitialFinancialStatement(
   );
 }
 
+async function fetchInitialRatiosTTM(
+  supabase: SupabaseClient<Database>,
+  symbol: string
+): Promise<Result<Option.Option<RatiosTtmDBRow>, Error>> {
+  const result = await fromPromise(
+    supabase
+      .from("ratios_ttm")
+      .select("*")
+      .eq("symbol", symbol)
+      .maybeSingle(),
+    (e) => e as Error
+  );
+  return result.map((response) =>
+    response.data ? Option.some(response.data) : Option.none()
+  );
+}
+
+async function fetchInitialDividendHistory(
+  supabase: SupabaseClient<Database>,
+  symbol: string
+): Promise<Result<Option.Option<DividendHistoryDBRow>, Error>> {
+  const result = await fromPromise(
+    supabase
+      .from("dividend_history")
+      .select("*")
+      .eq("symbol", symbol)
+      .order("date", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    (e) => e as Error
+  );
+  return result.map((response) =>
+    response.data ? Option.some(response.data) : Option.none()
+  );
+}
+
+async function fetchInitialRevenueSegmentation(
+  supabase: SupabaseClient<Database>,
+  symbol: string
+): Promise<Result<Option.Option<RevenueProductSegmentationDBRow>, Error>> {
+  const result = await fromPromise(
+    supabase
+      .from("revenue_product_segmentation")
+      .select("*")
+      .eq("symbol", symbol)
+      .order("date", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    (e) => e as Error
+  );
+  return result.map((response) =>
+    response.data ? Option.some(response.data) : Option.none()
+  );
+}
+
+async function fetchInitialGradesHistorical(
+  supabase: SupabaseClient<Database>,
+  symbol: string
+): Promise<Result<Option.Option<GradesHistoricalDBRow>, Error>> {
+  const result = await fromPromise(
+    supabase
+      .from("grades_historical")
+      .select("*")
+      .eq("symbol", symbol)
+      .order("date", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    (e) => e as Error
+  );
+  return result.map((response) =>
+    response.data ? Option.some(response.data) : Option.none()
+  );
+}
+
+async function fetchInitialExchangeVariants(
+  supabase: SupabaseClient<Database>,
+  symbol: string
+): Promise<Result<Option.Option<ExchangeVariantsDBRow>, Error>> {
+  const result = await fromPromise(
+    supabase
+      .from("exchange_variants")
+      .select("*")
+      .eq("base_symbol", symbol)
+      .limit(1)
+      .maybeSingle(),
+    (e) => e as Error
+  );
+  return result.map((response) =>
+    response.data ? Option.some(response.data) : Option.none()
+  );
+}
+
 export function useStockData({
   symbol,
   onProfileUpdate,
@@ -132,6 +240,10 @@ export function useStockData({
   onExchangeStatusUpdate,
   onFinancialStatementUpdate,
   onRatiosTTMUpdate,
+  onDividendHistoryUpdate,
+  onRevenueSegmentationUpdate,
+  onGradesHistoricalUpdate,
+  onExchangeVariantsUpdate,
 }: UseStockDataProps): MarketStatusUpdate {
   const [profileData, setProfileData] = useState<Option.Option<ProfileDBRow>>(Option.none());
   const [latestQuote, setLatestQuote] = useState<Option.Option<LiveQuoteIndicatorDBRow>>(Option.none());
@@ -311,6 +423,114 @@ export function useStockData({
     };
   }, [symbol, supabaseClient, onRatiosTTMUpdate]);
 
+  // New effect for dividend history updates via Realtime
+  useEffect(() => {
+    if (!supabaseClient || !symbol || !onDividendHistoryUpdate) return;
+
+    const unsubscribe = subscribeToDividendHistoryUpdates(
+      symbol,
+      (payload: DividendHistoryPayload) => {
+        if (payload.new && isMountedRef.current && onDividendHistoryUpdate) {
+          const updatedDividend = payload.new as DividendHistoryDBRow;
+          onDividendHistoryUpdate(updatedDividend);
+        }
+      },
+      (status, err) => {
+        if (status === "CHANNEL_ERROR" && err) {
+          console.error(
+            `[useStockData ${symbol}] Dividend History Realtime subscription error:`,
+            err
+          );
+        }
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, [symbol, supabaseClient, onDividendHistoryUpdate]);
+
+  // New effect for revenue product segmentation updates via Realtime
+  useEffect(() => {
+    if (!supabaseClient || !symbol || !onRevenueSegmentationUpdate) return;
+
+    const unsubscribe = subscribeToRevenueProductSegmentationUpdates(
+      symbol,
+      (payload: RevenueProductSegmentationPayload) => {
+        if (payload.new && isMountedRef.current && onRevenueSegmentationUpdate) {
+          const updatedSegmentation = payload.new as RevenueProductSegmentationDBRow;
+          onRevenueSegmentationUpdate(updatedSegmentation);
+        }
+      },
+      (status, err) => {
+        if (status === "CHANNEL_ERROR" && err) {
+          console.error(
+            `[useStockData ${symbol}] Revenue Segmentation Realtime subscription error:`,
+            err
+          );
+        }
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, [symbol, supabaseClient, onRevenueSegmentationUpdate]);
+
+  // New effect for grades historical updates via Realtime
+  useEffect(() => {
+    if (!supabaseClient || !symbol || !onGradesHistoricalUpdate) return;
+
+    const unsubscribe = subscribeToGradesHistoricalUpdates(
+      symbol,
+      (payload: GradesHistoricalPayload) => {
+        if (payload.new && isMountedRef.current && onGradesHistoricalUpdate) {
+          const updatedGrades = payload.new as GradesHistoricalDBRow;
+          onGradesHistoricalUpdate(updatedGrades);
+        }
+      },
+      (status, err) => {
+        if (status === "CHANNEL_ERROR" && err) {
+          console.error(
+            `[useStockData ${symbol}] Grades Historical Realtime subscription error:`,
+            err
+          );
+        }
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, [symbol, supabaseClient, onGradesHistoricalUpdate]);
+
+  // New effect for exchange variants updates via Realtime
+  useEffect(() => {
+    if (!supabaseClient || !symbol || !onExchangeVariantsUpdate) return;
+
+    const unsubscribe = subscribeToExchangeVariantsUpdates(
+      symbol,
+      (payload: ExchangeVariantsPayload) => {
+        if (payload.new && isMountedRef.current && onExchangeVariantsUpdate) {
+          const updatedVariant = payload.new as ExchangeVariantsDBRow;
+          onExchangeVariantsUpdate(updatedVariant);
+        }
+      },
+      (status, err) => {
+        if (status === "CHANNEL_ERROR" && err) {
+          console.error(
+            `[useStockData ${symbol}] Exchange Variants Realtime subscription error:`,
+            err
+          );
+        }
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, [symbol, supabaseClient, onExchangeVariantsUpdate]);
+
   const fetchInitialData = useCallback(async () => {
     if (!isMountedRef.current || !supabaseClient || !symbol) return;
 
@@ -408,6 +628,116 @@ export function useStockData({
         }
       );
     }
+
+    // Fetch Ratios TTM (only if callback is provided)
+    if (onRatiosTTMUpdate) {
+      const ratiosResult = await fetchInitialRatiosTTM(
+        supabaseClient,
+        symbol
+      );
+      if (!isMountedRef.current) return;
+      ratiosResult.match(
+        (ratiosOption) => {
+          if (Option.isSome(ratiosOption) && onRatiosTTMUpdate) {
+            onRatiosTTMUpdate(ratiosOption.value);
+          }
+        },
+        (error) => {
+          console.error(
+            `[useStockData ${symbol}] Error fetching initial ratios TTM:`,
+            error
+          );
+        }
+      );
+    }
+
+    // Fetch Dividend History (only if callback is provided)
+    if (onDividendHistoryUpdate) {
+      const dividendResult = await fetchInitialDividendHistory(
+        supabaseClient,
+        symbol
+      );
+      if (!isMountedRef.current) return;
+      dividendResult.match(
+        (dividendOption) => {
+          if (Option.isSome(dividendOption) && onDividendHistoryUpdate) {
+            onDividendHistoryUpdate(dividendOption.value);
+          }
+        },
+        (error) => {
+          console.error(
+            `[useStockData ${symbol}] Error fetching initial dividend history:`,
+            error
+          );
+        }
+      );
+    }
+
+    // Fetch Revenue Segmentation (only if callback is provided)
+    if (onRevenueSegmentationUpdate) {
+      const segmentationResult = await fetchInitialRevenueSegmentation(
+        supabaseClient,
+        symbol
+      );
+      if (!isMountedRef.current) return;
+      segmentationResult.match(
+        (segmentationOption) => {
+          if (Option.isSome(segmentationOption) && onRevenueSegmentationUpdate) {
+            onRevenueSegmentationUpdate(segmentationOption.value);
+          }
+        },
+        (error) => {
+          console.error(
+            `[useStockData ${symbol}] Error fetching initial revenue segmentation:`,
+            error
+          );
+        }
+      );
+    }
+
+    // Fetch Grades Historical (only if callback is provided)
+    if (onGradesHistoricalUpdate) {
+      const gradesResult = await fetchInitialGradesHistorical(
+        supabaseClient,
+        symbol
+      );
+      if (!isMountedRef.current) return;
+      gradesResult.match(
+        (gradesOption) => {
+          if (Option.isSome(gradesOption) && onGradesHistoricalUpdate) {
+            onGradesHistoricalUpdate(gradesOption.value);
+          }
+        },
+        (error) => {
+          console.error(
+            `[useStockData ${symbol}] Error fetching initial grades historical:`,
+            error
+          );
+        }
+      );
+    }
+
+    // Fetch Exchange Variants (only if callback is provided)
+    if (onExchangeVariantsUpdate) {
+      const variantsResult = await fetchInitialExchangeVariants(
+        supabaseClient,
+        symbol
+      );
+      if (!isMountedRef.current) return;
+      variantsResult.match(
+        (variantsOption) => {
+          if (Option.isSome(variantsOption) && onExchangeVariantsUpdate) {
+            onExchangeVariantsUpdate(variantsOption.value);
+          }
+        },
+        (error) => {
+          console.error(
+            `[useStockData ${symbol}] Error fetching initial exchange variants:`,
+            error
+          );
+        }
+      );
+    }
   }, [
     symbol,
     supabaseClient,
@@ -415,8 +745,11 @@ export function useStockData({
     onLiveQuoteUpdate,
     onExchangeStatusUpdate,
     onFinancialStatementUpdate,
-    // Note: onRatiosTTMUpdate is not included because ratios TTM data
-    // is only received via realtime subscription, not initial fetch
+    onRatiosTTMUpdate,
+    onDividendHistoryUpdate,
+    onRevenueSegmentationUpdate,
+    onGradesHistoricalUpdate,
+    onExchangeVariantsUpdate,
   ]);
 
   useEffect(() => {

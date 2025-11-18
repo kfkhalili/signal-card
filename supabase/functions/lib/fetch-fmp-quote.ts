@@ -49,57 +49,6 @@ export async function fetchQuoteLogic(
     };
   }
 
-  // CRITICAL VALIDATION #2: Exchange Status Check (Prevents Fetching When Market is Closed)
-  // This is a safety check - the staleness checker should have already filtered these out,
-  // but we check here too in case exchange status changed between queueing and processing
-  try {
-    // Get exchange code from live_quote_indicators (preferred) or profiles (fallback)
-    const { data: quoteData } = await supabase
-      .from('live_quote_indicators')
-      .select('exchange')
-      .eq('symbol', job.symbol)
-      .single();
-
-    let exchangeCode: string | null = quoteData?.exchange ?? null;
-
-    // If not found in live_quote_indicators, try profiles table
-    if (!exchangeCode) {
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('exchange')
-        .eq('symbol', job.symbol)
-        .single();
-
-      exchangeCode = profileData?.exchange ?? null;
-    }
-
-    // If exchange code is known, check if market is open
-    if (exchangeCode) {
-      const { data: exchangeStatus } = await supabase
-        .from('exchange_market_status')
-        .select('is_market_open')
-        .eq('exchange_code', exchangeCode)
-        .single();
-
-      // If exchange status is known and market is closed, skip the fetch
-      if (exchangeStatus?.is_market_open === false) {
-        return {
-          success: false,
-          dataSizeBytes: 0,
-          error: `Exchange ${exchangeCode} is closed for symbol ${job.symbol}. Skipping quote fetch.`,
-        };
-      }
-    }
-    // If exchange code is unknown, we proceed (fail-safe: better to try than skip)
-  } catch (error) {
-    // If exchange check fails, log warning but proceed (fail-safe)
-    console.warn(
-      `[fetchQuoteLogic] Failed to check exchange status for ${job.symbol}:`,
-      error instanceof Error ? error.message : 'Unknown error'
-    );
-    // Continue with fetch (fail-safe behavior)
-  }
-
   try {
     // CRITICAL: Aggressive internal timeout (prevents "Slow API" throughput collapse)
     const controller = new AbortController();

@@ -167,14 +167,16 @@ export const RevenueBreakdownCardContent: React.FC<RevenueBreakdownCardContentPr
             className="pointer-events-auto flex flex-col h-full">
             <ShadCardContent className={cn("p-0 flex-grow text-xs")}>
               <div className="space-y-1 pt-1.5">
-                <div className="flex justify-between">
-                  <span className="font-medium text-muted-foreground">
-                    Latest Period:
-                  </span>
-                  <span className="font-semibold text-foreground">
-                    {staticData.latestPeriodLabel}
-                  </span>
-                </div>
+                {staticData.latestPeriodLabel && staticData.latestPeriodLabel !== "N/A" && (
+                  <div className="flex justify-between">
+                    <span className="font-medium text-muted-foreground">
+                      Latest Period:
+                    </span>
+                    <span className="font-semibold text-foreground">
+                      {staticData.latestPeriodLabel}
+                    </span>
+                  </div>
+                )}
                 {staticData.previousPeriodLabel && (
                   <div className="flex justify-between">
                     <span className="font-medium text-muted-foreground">
@@ -185,24 +187,16 @@ export const RevenueBreakdownCardContent: React.FC<RevenueBreakdownCardContentPr
                     </span>
                   </div>
                 )}
-                <div className="flex justify-between">
-                  <span className="font-medium text-muted-foreground">
-                    Currency:
-                  </span>
-                  <span className="font-semibold text-foreground">
-                    {staticData.currencySymbol}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium text-muted-foreground">
-                    Last Updated:
-                  </span>
-                  <span className="font-semibold text-foreground">
-                    {liveData.lastUpdated
-                      ? new Date(liveData.lastUpdated).toLocaleDateString()
-                      : "N/A"}
-                  </span>
-                </div>
+                {liveData.lastUpdated && (
+                  <div className="flex justify-between">
+                    <span className="font-medium text-muted-foreground">
+                      Last Updated:
+                    </span>
+                    <span className="font-semibold text-foreground">
+                      {new Date(liveData.lastUpdated).toLocaleDateString()}
+                    </span>
+                  </div>
+                )}
               </div>
             </ShadCardContent>
           </div>
@@ -282,17 +276,17 @@ export const RevenueBreakdownCardContent: React.FC<RevenueBreakdownCardContentPr
                 <span className="text-sm font-medium text-muted-foreground block">
                   Total Revenue
                 </span>
-                <div className="text-right">
-                  <span className="text-xl font-bold sm:text-2xl text-foreground">
-                    {staticData.currencySymbol}
-                    {liveData.totalRevenueLatestPeriod !== null
-                      ? formatNumberWithAbbreviations(
-                          liveData.totalRevenueLatestPeriod,
-                          2
-                        )
-                      : "N/A"}
-                  </span>
-                </div>
+                {liveData.totalRevenueLatestPeriod != null && (
+                  <div className="text-right">
+                    <span className="text-xl font-bold sm:text-2xl text-foreground">
+                      {staticData.currencySymbol}
+                      {formatNumberWithAbbreviations(
+                        liveData.totalRevenueLatestPeriod,
+                        2
+                      )}
+                    </span>
+                  </div>
+                )}
               </div>
               <div className="flex-grow space-y-0.5 overflow-y-auto pr-0.5">
                 {displayItems.length > 0 ? (

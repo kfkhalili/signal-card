@@ -16,7 +16,10 @@ export type CardUpdateEventType =
   | "FINANCIAL_STATEMENT_UPDATE"
   | "SHARES_FLOAT_UPDATE"
   | "RATIOS_TTM_UPDATE"
-  | "DIVIDEND_ROW_UPDATE";
+  | "DIVIDEND_ROW_UPDATE"
+  | "REVENUE_SEGMENTATION_UPDATE"
+  | "GRADES_HISTORICAL_UPDATE"
+  | "EXCHANGE_VARIANTS_UPDATE";
 
 /**
  * Context provided to card update handler functions.

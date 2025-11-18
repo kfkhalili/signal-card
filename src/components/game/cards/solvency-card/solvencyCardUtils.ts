@@ -36,6 +36,53 @@ class SolvencyCardError extends Error {
   }
 }
 
+function createEmptySolvencyCard(
+  symbol: string,
+  existingCardId?: string,
+  existingCreatedAt?: number
+): SolvencyCardData & Pick<DisplayableCardState, "isFlipped"> {
+  const emptyStaticData: SolvencyCardStaticData = {
+    periodLabel: "N/A",
+    reportedCurrency: null,
+    filingDate: null,
+    acceptedDate: null,
+    statementDate: "N/A",
+    statementPeriod: "N/A",
+  };
+
+  const emptyLiveData: SolvencyCardLiveData = {
+    totalAssets: null,
+    cashAndShortTermInvestments: null,
+    totalCurrentLiabilities: null,
+    shortTermDebt: null,
+    longTermDebt: null,
+    freeCashFlow: null,
+  };
+
+  const cardBackData: BaseCardBackData = {
+    description: `Key solvency metrics for ${symbol}. Includes assets, liabilities, debt, and cash flow.`,
+  };
+
+  const concreteCardData: SolvencyCardData = {
+    id: existingCardId || `solvency-${symbol}-${Date.now()}`,
+    type: "solvency",
+    symbol: symbol,
+    companyName: null,
+    displayCompanyName: null,
+    logoUrl: null,
+    createdAt: existingCreatedAt ?? Date.now(),
+    staticData: emptyStaticData,
+    liveData: emptyLiveData,
+    backData: cardBackData,
+    websiteUrl: null,
+  };
+
+  return {
+    ...concreteCardData,
+    isFlipped: false,
+  };
+}
+
 function constructSolvencyCardData(
   dbRow: FinancialStatementDBRowFromSupabase,
   profileInfo: {
@@ -110,9 +157,9 @@ function constructSolvencyCardData(
       `solvency-${dbRow.symbol}-${dbRow.date}-${dbRow.period}-${Date.now()}`,
     type: "solvency",
     symbol: dbRow.symbol,
-    companyName: profileInfo.companyName ?? dbRow.symbol,
+    companyName: profileInfo.companyName ?? null,
     displayCompanyName:
-      profileInfo.displayCompanyName ?? profileInfo.companyName ?? dbRow.symbol,
+      profileInfo.displayCompanyName ?? profileInfo.companyName ?? null,
     logoUrl: profileInfo.logoUrl ?? null,
     websiteUrl: profileInfo.websiteUrl ?? null,
     createdAt: existingCreatedAt ?? Date.now(),
@@ -209,16 +256,16 @@ async function initializeSolvencyCard({
     return ok({ ...concreteCardData, ...cardState });
   }
 
+  // No data found - return empty state card
+  const emptyCard = createEmptySolvencyCard(symbol);
   if (toast) {
     toast({
-      title: "Statement Not Found",
-      description: `No financial statements currently available for ${symbol} to create a Solvency Card.`,
+      title: "Solvency Card Added (Empty State)",
+      description: `Awaiting financial statements data for ${symbol}.`,
       variant: "default",
     });
   }
-  return err(
-    new SolvencyCardError(`No financial statements found for ${symbol}.`)
-  );
+  return ok(emptyCard);
 }
 
 registerCardInitializer("solvency", initializeSolvencyCard);
@@ -238,6 +285,24 @@ const handleSolvencyCardStatementUpdate: CardUpdateHandler<
 
   if (!newStatementDateStr || !newFinancialStatementRow.period) {
     return currentSolvencyCardData;
+  }
+
+  // If card is in empty state (N/A), always update
+  if (
+    currentStatementDateStr === "N/A" ||
+    currentSolvencyCardData.staticData.statementPeriod === "N/A"
+  ) {
+    return constructSolvencyCardData(
+      newFinancialStatementRow,
+      {
+        companyName: currentSolvencyCardData.companyName,
+        displayCompanyName: currentSolvencyCardData.displayCompanyName,
+        logoUrl: currentSolvencyCardData.logoUrl,
+        websiteUrl: currentSolvencyCardData.websiteUrl,
+      },
+      currentSolvencyCardData.id,
+      currentSolvencyCardData.createdAt
+    );
   }
 
   const currentStatementDate = new Date(currentStatementDateStr);

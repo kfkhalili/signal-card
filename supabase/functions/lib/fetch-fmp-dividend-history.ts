@@ -88,7 +88,38 @@ export async function fetchDividendHistoryLogic(
         Object.keys(fmpDividendResult).length === 0
       ) {
         // No dividend data found - this is a valid response
-        console.log(`[fetchDividendHistoryLogic] No dividend data found for ${job.symbol} (empty object returned by FMP).`);
+        // CRITICAL: Update fetched_at for existing records to prevent infinite job creation
+        // If no records exist, create a sentinel record to mark that we checked
+        const { error: updateError } = await supabase
+          .from('dividend_history')
+          .upsert(
+            {
+              symbol: job.symbol,
+              date: '1900-01-01', // Sentinel date (before any real dividend)
+              fetched_at: new Date().toISOString(),
+            },
+            {
+              onConflict: 'symbol,date',
+              ignoreDuplicates: false,
+            }
+          );
+
+        if (updateError) {
+          // If sentinel record fails, try to update any existing records
+          const { error: updateExistingError } = await supabase
+            .from('dividend_history')
+            .update({ fetched_at: new Date().toISOString() })
+            .eq('symbol', job.symbol);
+
+          if (updateExistingError) {
+            console.warn(
+              `[fetchDividendHistoryLogic] Failed to update fetched_at for ${job.symbol}:`,
+              updateExistingError.message
+            );
+          }
+        }
+
+        console.log(`[fetchDividendHistoryLogic] No dividend data found for ${job.symbol} (empty object returned by FMP). Updated fetched_at to prevent infinite job creation.`);
         return {
           success: true,
           dataSizeBytes: actualSizeBytes,
@@ -99,7 +130,38 @@ export async function fetchDividendHistoryLogic(
 
     if (fmpDividendResult.length === 0) {
       // Empty array - no dividends found
-      console.log(`[fetchDividendHistoryLogic] No dividend entries found for ${job.symbol}.`);
+      // CRITICAL: Update fetched_at for existing records to prevent infinite job creation
+      // If no records exist, create a sentinel record to mark that we checked
+      const { error: updateError } = await supabase
+        .from('dividend_history')
+        .upsert(
+          {
+            symbol: job.symbol,
+            date: '1900-01-01', // Sentinel date (before any real dividend)
+            fetched_at: new Date().toISOString(),
+          },
+          {
+            onConflict: 'symbol,date',
+            ignoreDuplicates: false,
+          }
+        );
+
+      if (updateError) {
+        // If sentinel record fails, try to update any existing records
+        const { error: updateExistingError } = await supabase
+          .from('dividend_history')
+          .update({ fetched_at: new Date().toISOString() })
+          .eq('symbol', job.symbol);
+
+        if (updateExistingError) {
+          console.warn(
+            `[fetchDividendHistoryLogic] Failed to update fetched_at for ${job.symbol}:`,
+            updateExistingError.message
+          );
+        }
+      }
+
+      console.log(`[fetchDividendHistoryLogic] No dividend entries found for ${job.symbol}. Updated fetched_at to prevent infinite job creation.`);
       return {
         success: true,
         dataSizeBytes: actualSizeBytes,
