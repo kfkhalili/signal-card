@@ -263,19 +263,8 @@ export function useStockData({
     const unsubscribe = subscribeToFinancialStatementUpdates(
       symbol,
       (payload: FinancialStatementPayload) => {
-        if (process.env.NODE_ENV === "development") {
-          console.log(
-            `[useStockData ${symbol}] Received financial statement update`,
-            payload
-          );
-        }
         if (payload.new && isMountedRef.current && onFinancialStatementUpdate) {
           const updatedStatement = payload.new as FinancialStatementDBRow;
-          if (process.env.NODE_ENV === "development") {
-            console.log(
-              `[useStockData ${symbol}] Calling onFinancialStatementUpdate callback`
-            );
-          }
           onFinancialStatementUpdate(updatedStatement);
         }
       },
@@ -285,12 +274,6 @@ export function useStockData({
             `[useStockData ${symbol}] Financial Statement Realtime subscription error:`,
             err
           );
-        } else if (status === "SUBSCRIBED") {
-          if (process.env.NODE_ENV === "development") {
-            console.log(
-              `[useStockData ${symbol}] Subscribed to financial statement updates`
-            );
-          }
         }
       }
     );

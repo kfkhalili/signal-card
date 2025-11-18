@@ -106,41 +106,23 @@ export class RealtimeStockManager extends EventEmitter {
 
           // Filter client-side: only emit if symbol is in our subscribed list
           if (!quoteSymbol || !symbolsSet.has(quoteSymbol)) {
-            if (process.env.NODE_ENV === "development") {
-              console.log(
-                `[RealtimeStockManager] Ignoring quote update for ${quoteSymbol} (not subscribed)`
-              );
-            }
             return;
           }
 
-          if (process.env.NODE_ENV === "development") {
-            console.log(
-              `[RealtimeStockManager] Received quote ${payload.eventType} for ${quoteSymbol}`,
-              payload
-            );
-          }
           // Use payload.new for both INSERT and UPDATE
           if (payload.new) {
             this.emit("quote", payload.new);
           } else if (payload.old && payload.eventType === "UPDATE") {
             // Fallback: if new is missing, try old (shouldn't happen but be safe)
             console.warn(
-              `[RealtimeStockManager] UPDATE event missing payload.new, using payload.old`,
-              payload
+              `[RealtimeStockManager] UPDATE event missing payload.new, using payload.old`
             );
           }
         }
       )
       .subscribe((status, err) => {
-        if (status === "SUBSCRIBED") {
-          console.log(
-            `[RealtimeStockManager] Subscribed to ${symbols.length} symbols: ${symbols.join(", ")}`
-          );
-        } else if (status === "CHANNEL_ERROR" && err) {
+        if (status === "CHANNEL_ERROR" && err) {
           console.error("[RealtimeStockManager] Channel error:", err);
-        } else {
-          console.log(`[RealtimeStockManager] Channel status: ${status}`, err || "");
         }
       });
   }
@@ -174,11 +156,7 @@ export class RealtimeStockManager extends EventEmitter {
         }
       )
       .subscribe((status, err) => {
-        if (status === "SUBSCRIBED") {
-          console.log(
-            `[RealtimeStockManager] Subscribed to ${exchanges.length} exchange statuses`
-          );
-        } else if (status === "CHANNEL_ERROR" && err) {
+        if (status === "CHANNEL_ERROR" && err) {
           console.error(
             "[RealtimeStockManager] Exchange status channel error:",
             err
@@ -218,6 +196,6 @@ export class RealtimeStockManager extends EventEmitter {
     this.subscribedSymbols.clear();
     this.subscribedExchanges.clear();
     RealtimeStockManager.instance = null;
-    console.log("[RealtimeStockManager] Destroyed.");
+    // Cleanup complete
   }
 }

@@ -586,9 +586,6 @@ export function useWorkspaceManager() {
 
       // Log for debugging
       if (process.env.NODE_ENV === "development") {
-        console.log(
-          `[handleLiveQuoteUpdate] Received quote update for ${leanQuoteData.symbol} from ${source || "unknown"}`
-        );
       }
 
       // Use setTimeout to defer state update and avoid "setState during render" error
@@ -612,9 +609,6 @@ export function useWorkspaceManager() {
                 ) {
                   overallChanged = true;
                   if (process.env.NODE_ENV === "development") {
-                    console.log(
-                      `[handleLiveQuoteUpdate] Card ${card.type} for ${card.symbol} updated`
-                    );
                   }
                   return { ...card, ...updatedConcreteData };
                 }

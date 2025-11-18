@@ -109,7 +109,6 @@ export function useTrackSubscription({
     const sendHeartbeat = async () => {
       // CRITICAL: Don't send heartbeat if component is unmounted
       if (!isMountedRef.current) {
-        console.warn(`[useTrackSubscription] HEARTBEAT BLOCKED - component unmounted for ${symbol}`);
         return;
       }
 
@@ -137,7 +136,6 @@ export function useTrackSubscription({
       for (const dataType of currentDataTypes) {
         // CRITICAL: Check again if still mounted before each RPC call
         if (!isMountedRef.current) {
-          console.warn(`[useTrackSubscription] HEARTBEAT STOPPED - component unmounted during loop for ${currentSymbol}/${dataType}`);
           return;
         }
 
@@ -153,7 +151,6 @@ export function useTrackSubscription({
             upsertError
           );
         } else {
-          console.log(`[useTrackSubscription] Heartbeat sent successfully for ${currentSymbol}/${dataType}`);
         }
       }
     };
@@ -164,17 +161,14 @@ export function useTrackSubscription({
         // Presence synced - backend can now see this subscription
         const state = channel.presenceState();
         if (process.env.NODE_ENV === 'development') {
-          console.log(`[useTrackSubscription] Presence synced for ${symbol}:`, state);
         }
       })
           .on('presence', { event: 'join' }, ({ key }) => {
             if (process.env.NODE_ENV === 'development') {
-              console.log(`[useTrackSubscription] User ${key} joined ${symbol}`);
             }
           })
           .on('presence', { event: 'leave' }, ({ key }) => {
             if (process.env.NODE_ENV === 'development') {
-              console.log(`[useTrackSubscription] User ${key} left ${symbol}`);
             }
           })
       .subscribe(async (status) => {
@@ -221,15 +215,12 @@ export function useTrackSubscription({
       try {
         // CRITICAL: Mark as unmounted FIRST to prevent any pending heartbeats
         isMountedRef.current = false;
-        console.log(`[useTrackSubscription] Marked as unmounted for ${symbol}`);
 
         // CRITICAL: Clear heartbeat interval FIRST (stop sending heartbeats)
         if (heartbeatIntervalRef.current) {
           clearInterval(heartbeatIntervalRef.current);
           heartbeatIntervalRef.current = null;
-          console.log(`[useTrackSubscription] Cleared heartbeat interval for ${symbol}`);
-        } else {
-          console.warn(`[useTrackSubscription] No heartbeat interval to clear for ${symbol}`);
+          // Heartbeat interval cleared
         }
 
         const currentChannel = channelRef.current;
@@ -257,11 +248,9 @@ export function useTrackSubscription({
           // Delete subscriptions for all data types
           for (const dataType of currentDataTypes) {
             if (!dataType || typeof dataType !== 'string') {
-              console.warn(`[useTrackSubscription] Skipping invalid data type:`, dataType);
               continue; // Skip invalid data types
             }
 
-            console.log(`[useTrackSubscription] Deleting subscription: ${currentSymbol}/${dataType}`);
 
             // CRITICAL: Execute the query and handle errors properly
             // Convert PromiseLike to Promise to ensure .catch() is available
@@ -274,7 +263,6 @@ export function useTrackSubscription({
                 .eq('data_type', dataType)
             )
               .then((result) => {
-                console.log(`[useTrackSubscription] DELETE SUCCESS for ${currentSymbol}/${dataType}`, result);
               })
               .catch((error: unknown) => {
                 console.error(
@@ -297,7 +285,6 @@ export function useTrackSubscription({
         // CRITICAL: Defensive checks for channel cleanup
         // Note: Subscription deletion already happened above, so we can safely return here
         if (!currentChannel || !currentSupabase) {
-          console.warn(`[useTrackSubscription] Channel cleanup skipped for ${symbol} - missing channel or supabase`);
           channelRef.current = null;
           return;
         }
@@ -305,10 +292,8 @@ export function useTrackSubscription({
         // Stop tracking presence (fire and forget - don't wait)
         try {
           void currentChannel.untrack().catch((error: unknown) => {
-            console.warn(`[useTrackSubscription] Error untracking presence for ${currentSymbol}:`, error);
           });
         } catch (error) {
-          console.warn(`[useTrackSubscription] Exception untracking presence for ${currentSymbol}:`, error);
         }
 
         // Leave channel (presence automatically removed) - fire and forget
@@ -316,10 +301,8 @@ export function useTrackSubscription({
           void currentSupabase
             .removeChannel(currentChannel)
             .catch((error: unknown) => {
-              console.warn(`[useTrackSubscription] Error removing channel for ${currentSymbol}:`, error);
             });
         } catch (error) {
-          console.warn(`[useTrackSubscription] Exception removing channel for ${currentSymbol}:`, error);
         }
       } catch (error) {
         // CRITICAL: Catch any unexpected errors in cleanup to prevent crashes

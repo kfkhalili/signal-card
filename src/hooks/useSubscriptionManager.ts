@@ -186,7 +186,6 @@ export function useSubscriptionManager(cards: DisplayableCard[]): void {
         for (const sub of currentSubscriptions || []) {
           const key = `${sub.symbol}:${sub.data_type}`;
           if (!neededSubscriptions.has(key)) {
-            console.log(`[useSubscriptionManager] Deleting unused subscription: ${sub.symbol}/${sub.data_type}`);
 
             const { error: deleteError } = await supabase
               .from('active_subscriptions_v2')
