@@ -96,7 +96,8 @@ BEGIN
             reg_row.symbol_column,
             symbol_row.symbol,
             reg_row.data_type,
-            reg_row.symbol_column,
+            reg_row.symbol_column,  -- For t.%I IS NULL check
+            reg_row.symbol_column,  -- For t.%I IS NOT NULL check
             reg_row.staleness_function,
             reg_row.timestamp_column,
             reg_row.default_ttl_minutes,
