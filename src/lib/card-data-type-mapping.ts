@@ -13,7 +13,8 @@ import type { CardType } from '@/components/game/cards/base-card/base-card.types
  * data_type_registry_v2 table.
  *
  * NOTE: This mapping is based on the database tables each card type uses:
- * - profile: profiles table
+ * - profile: profiles table (primary), live_quote_indicators (price/market cap),
+ *   financial_statements (revenue), ratios_ttm (EPS, P/E, P/B)
  * - price: live_quote_indicators table
  * - revenue/solvency/cashuse: financial_statements table
  * - keyratios: ratios_ttm table
@@ -24,7 +25,7 @@ import type { CardType } from '@/components/game/cards/base-card/base-card.types
  */
 export function getDataTypesForCard(cardType: CardType): string[] {
   const mapping: Record<CardType, string[]> = {
-    'profile': ['profile'],
+    'profile': ['profile', 'quote', 'financial-statements', 'ratios-ttm'], // Profile card uses multiple tables
     'price': ['quote'], // live_quote_indicators table
     'revenue': ['financial-statements'],
     'solvency': ['financial-statements'],
