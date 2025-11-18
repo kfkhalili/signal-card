@@ -42,6 +42,11 @@
 > - ✅ Priority levels documentation aligned with implementation (removed non-existent P1/P2)
 > - ✅ Client-driven subscription management with heartbeat system (client adds/removes subscriptions directly)
 >
+> **Subscription Management Hardening (v2.1.7):**
+> - ✅ Centralized subscription manager with reference counting (prevents deleting subscriptions when multiple cards share same data type)
+> - ✅ Fixed infinite job creation bug (fetched_at now properly updated on upsert for all multi-row tables)
+> - ✅ Fixed subscription deletion bug (revenue + solvency + cashuse cards now correctly share single financial-statements subscription)
+>
 > **Red-Team Hardening (v2.1.7):**
 > - ✅ Queue completion lifecycle (complete_queue_job/fail_queue_job prevent infinite retry loops)
 > - ✅ Cron job self-contention prevention (advisory locks prevent overlapping executions)

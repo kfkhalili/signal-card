@@ -24,26 +24,29 @@ There are **TWO separate paths** that can create jobs in the queue:
 
 ### Step 2: Card Component Mounts
 - Card component (e.g., `PriceCard`, `ProfileCard`) mounts
-- `useTrackSubscription` hook is called with:
-  - `symbol`: e.g., "AAPL"
-  - `dataTypes`: e.g., `["quote"]` (determined by card type)
+- **CRITICAL:** Cards no longer call `useTrackSubscription` directly
+- Subscription tracking is now handled centrally by `useSubscriptionManager` in `useWorkspaceManager`
 
-### Step 3: Subscription Tracking
-- `useTrackSubscription` hook:
-  1. Joins Realtime Presence channel
-  2. Calls `upsert_active_subscription_v2()` RPC function
-  3. Creates entry in `active_subscriptions_v2` table:
+### Step 3: Centralized Subscription Tracking
+- `useSubscriptionManager` hook (in `useWorkspaceManager`):
+  1. Aggregates data types per symbol across ALL cards
+     - Example: revenue + solvency + cashuse cards → `financial-statements` subscription
+  2. Creates ONE subscription per symbol/data_type combination
+  3. Calls `upsert_active_subscription_v2()` RPC function for each unique subscription
+  4. Creates entry in `active_subscriptions_v2` table:
      ```sql
      INSERT INTO active_subscriptions_v2 (user_id, symbol, data_type, subscribed_at, last_seen_at)
-     VALUES (user_id, 'AAPL', 'quote', NOW(), NOW())
+     VALUES (user_id, 'AAPL', 'financial-statements', NOW(), NOW())
      ON CONFLICT (user_id, symbol, data_type)
      DO UPDATE SET last_seen_at = NOW();
      ```
-  4. Sends heartbeat every 1 minute to update `last_seen_at`
+  5. Sends heartbeat every 1 minute to update `last_seen_at` for all subscriptions
+  6. **Reference Counting:** Only removes subscriptions when NO cards need them
+     - Prevents bug where deleting one card removes subscription that other cards still need
 
 ### Step 4: Staleness Check (User-Facing)
 - **NOTE:** Currently, the frontend does NOT call `check_and_queue_stale_batch_v2` when a card is added
-- The frontend only tracks subscriptions via `useTrackSubscription`
+- The frontend only tracks subscriptions via `useSubscriptionManager`
 - Job creation happens via **Path 2** (background staleness checker)
 
 ### Step 5: Job Creation (If Called)
