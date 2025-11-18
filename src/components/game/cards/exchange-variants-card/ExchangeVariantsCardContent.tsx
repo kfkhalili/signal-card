@@ -112,6 +112,7 @@ export const ExchangeVariantsCardContent: React.FC<ExchangeVariantsCardContentPr
 
       const allVariantsToDisplay = useMemo((): ExchangeVariant[] => {
         const { baseExchangeInfo } = staticData;
+        // Always include base exchange variant
         const baseVariant: ExchangeVariant = {
           variantSymbol: symbol,
           exchangeShortName: baseExchangeInfo.exchangeShortName,
@@ -198,9 +199,38 @@ export const ExchangeVariantsCardContent: React.FC<ExchangeVariantsCardContentPr
             onPointerDownCapture={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
-            <DynamicWorldMap markers={mapMarkers} className="absolute inset-0" />
+            <DynamicWorldMap
+              key={JSON.stringify(mapMarkers)}
+              markers={mapMarkers}
+              className="absolute inset-0"
+            />
           </div>
         </div>
+      );
+    },
+    (prevProps, nextProps) => {
+      // Return true if props are equal (skip re-render), false if different (re-render)
+      // Check if variants array changed
+      const prevVariantsKey = prevProps.cardData.liveData.variants.map(v => `${v.variantSymbol}-${v.exchangeShortName}-${v.averageVolume}-${v.countryCode}-${v.countryName}`).join(',');
+      const nextVariantsKey = nextProps.cardData.liveData.variants.map(v => `${v.variantSymbol}-${v.exchangeShortName}-${v.averageVolume}-${v.countryCode}-${v.countryName}`).join(',');
+
+      // Check if baseExchangeInfo changed (including country info)
+      const prevBaseExchangeInfo = prevProps.cardData.staticData.baseExchangeInfo;
+      const nextBaseExchangeInfo = nextProps.cardData.staticData.baseExchangeInfo;
+      const baseExchangeInfoChanged =
+        prevBaseExchangeInfo.exchangeShortName !== nextBaseExchangeInfo.exchangeShortName ||
+        prevBaseExchangeInfo.countryCode !== nextBaseExchangeInfo.countryCode ||
+        prevBaseExchangeInfo.countryName !== nextBaseExchangeInfo.countryName ||
+        prevBaseExchangeInfo.averageVolume !== nextBaseExchangeInfo.averageVolume;
+
+      return (
+        prevProps.cardData.id === nextProps.cardData.id &&
+        prevVariantsKey === nextVariantsKey &&
+        !baseExchangeInfoChanged &&
+        prevProps.cardData.staticData.lastUpdated === nextProps.cardData.staticData.lastUpdated &&
+        prevProps.isBackFace === nextProps.isBackFace &&
+        prevProps.isSelectionMode === nextProps.isSelectionMode &&
+        prevProps.selectedDataItems.length === nextProps.selectedDataItems.length
       );
     }
   );

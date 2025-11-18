@@ -21,7 +21,7 @@ import type { CardType } from '@/components/game/cards/base-card/base-card.types
  * - dividendshistory: dividend_history table
  * - revenuebreakdown: revenue_product_segmentation table
  * - analystgrades: grades_historical table
- * - exchangevariants: exchange_variants table
+ * - exchangevariants: exchange_variants table (only)
  */
 export function getDataTypesForCard(cardType: CardType): string[] {
   const mapping: Record<CardType, string[]> = {

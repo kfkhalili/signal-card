@@ -258,6 +258,14 @@ async function initializeSolvencyCard({
 
   // No data found - return empty state card
   const emptyCard = createEmptySolvencyCard(symbol);
+  // Apply profile info to empty card if available
+  const emptyCardWithProfile: SolvencyCardData & Pick<DisplayableCardState, "isFlipped"> = {
+    ...emptyCard,
+    companyName: fetchedProfileInfo.companyName ?? null,
+    displayCompanyName: fetchedProfileInfo.displayCompanyName ?? null,
+    logoUrl: fetchedProfileInfo.logoUrl ?? null,
+    websiteUrl: fetchedProfileInfo.websiteUrl ?? null,
+  };
   if (toast) {
     toast({
       title: "Solvency Card Added (Empty State)",
@@ -265,7 +273,7 @@ async function initializeSolvencyCard({
       variant: "default",
     });
   }
-  return ok(emptyCard);
+  return ok(emptyCardWithProfile);
 }
 
 registerCardInitializer("solvency", initializeSolvencyCard);

@@ -244,6 +244,7 @@ export function useWorkspaceManager() {
     setCardsInLocalStorage(activeCards as unknown as StoredCardRawArray);
   }, [activeCards, setCardsInLocalStorage]);
 
+
   const uniqueSymbolsInWorkspace = useMemo(() => {
     const symbols = new Set<string>();
     activeCards.forEach((card) => {
@@ -680,10 +681,16 @@ export function useWorkspaceManager() {
           const cardsNeedingReinit = prevActiveCards.filter((card) => {
             if (card.symbol === updatedStatementDBRow.symbol) {
               const concreteCardDataForHandler = getConcreteCardData(card);
-              // For cash-use, solvency, and revenue cards, check if latestStatementDate is null
-              if (card.type === "cashuse" || card.type === "solvency" || card.type === "revenue") {
+              // For cash-use, solvency, and revenue cards, check if they're in empty state
+              if (card.type === "cashuse") {
                 const cardStaticData = (concreteCardDataForHandler as { staticData?: { latestStatementDate?: string | null } }).staticData;
                 return cardStaticData?.latestStatementDate === null;
+              } else if (card.type === "solvency") {
+                const cardStaticData = (concreteCardDataForHandler as { staticData?: { statementDate?: string; statementPeriod?: string } }).staticData;
+                return cardStaticData?.statementDate === "N/A" || cardStaticData?.statementPeriod === "N/A";
+              } else if (card.type === "revenue") {
+                const cardStaticData = (concreteCardDataForHandler as { staticData?: { statementDate?: string; statementPeriod?: string } }).staticData;
+                return cardStaticData?.statementDate === "N/A" || cardStaticData?.statementPeriod === "N/A";
               }
             }
             return false;
@@ -745,7 +752,7 @@ export function useWorkspaceManager() {
         });
       }, 0);
     },
-    [supabase]
+    [supabase, toast]
   );
 
   const handleExchangeStatusUpdate = useCallback(
@@ -922,15 +929,65 @@ export function useWorkspaceManager() {
 
   const handleExchangeVariantsUpdate = useCallback(
     (updatedVariantDBRow: ExchangeVariantsDBRow) => {
+      console.log(`[useWorkspaceManager] handleExchangeVariantsUpdate called with:`, updatedVariantDBRow);
       const updateContext: CardUpdateContext = { toast: undefined };
       const eventType: CardUpdateEventType = "EXCHANGE_VARIANTS_UPDATE";
 
       setTimeout(() => {
         setActiveCards((prevActiveCards) => {
+          console.log(`[useWorkspaceManager] Processing exchange variants update for base_symbol: ${updatedVariantDBRow.base_symbol}`);
+          // First, check if any card needs full re-initialization (empty state)
+          const cardsNeedingReinit = prevActiveCards.filter((card) => {
+            if (card.symbol === updatedVariantDBRow.base_symbol && card.type === "exchangevariants") {
+              const concreteCardDataForHandler = getConcreteCardData(card);
+              const cardLiveData = (concreteCardDataForHandler as { liveData?: { variants?: unknown[] } }).liveData;
+              const isEmpty = cardLiveData?.variants?.length === 0;
+              console.log(`[useWorkspaceManager] Card ${card.id} (${card.symbol}) isEmpty: ${isEmpty}, variants.length: ${cardLiveData?.variants?.length}`);
+              return isEmpty;
+            }
+            return false;
+          });
+
+          // If cards need re-initialization, do it asynchronously
+          if (cardsNeedingReinit.length > 0 && supabase) {
+            console.log(`[useWorkspaceManager] ${cardsNeedingReinit.length} card(s) need re-initialization`);
+            cardsNeedingReinit.forEach(async (card) => {
+              console.log(`[useWorkspaceManager] Re-initializing card ${card.id} (${card.symbol})`);
+              const initializer = getCardInitializer(card.type);
+              if (initializer) {
+                try {
+                  const initResult = await initializer({
+                    symbol: card.symbol,
+                    supabase,
+                    toast: toast || undefined,
+                    activeCards: prevActiveCards,
+                  });
+                  if (initResult.isOk()) {
+                    console.log(`[useWorkspaceManager] Re-initialization successful for card ${card.id}`);
+                    setActiveCards((currentCards) => {
+                      return currentCards.map((c) =>
+                        c.id === card.id ? initResult.value : c
+                      );
+                    });
+                  } else {
+                    console.error(`[useWorkspaceManager] Re-initialization failed for card ${card.id}:`, initResult.error);
+                  }
+                } catch (error) {
+                  console.error(`Failed to re-initialize ${card.type} card:`, error);
+                }
+              }
+            });
+            // Return early - the async re-init will update the cards
+            return prevActiveCards;
+          }
+
+          // Otherwise, do normal update
+          console.log(`[useWorkspaceManager] Processing normal update (not empty state)`);
           let overallChanged = false;
           const updatedCards = prevActiveCards.map((card) => {
             // Exchange variants use base_symbol, not symbol
-            if (card.symbol === updatedVariantDBRow.base_symbol) {
+            if (card.symbol === updatedVariantDBRow.base_symbol && card.type === "exchangevariants") {
+              console.log(`[useWorkspaceManager] Updating card ${card.id} (${card.symbol})`);
               const handler = getCardUpdateHandler(card.type, eventType);
               if (handler) {
                 const concreteCardDataForHandler = getConcreteCardData(card);
@@ -940,22 +997,25 @@ export function useWorkspaceManager() {
                   card,
                   updateContext
                 );
-                if (
-                  JSON.stringify(updatedConcreteData) !==
-                  JSON.stringify(concreteCardDataForHandler)
-                ) {
+                const hasChanged = JSON.stringify(updatedConcreteData) !==
+                  JSON.stringify(concreteCardDataForHandler);
+                console.log(`[useWorkspaceManager] Card ${card.id} update changed: ${hasChanged}`);
+                if (hasChanged) {
                   overallChanged = true;
                   return { ...card, ...updatedConcreteData };
                 }
+              } else {
+                console.warn(`[useWorkspaceManager] No handler found for card type: ${card.type}, event: ${eventType}`);
               }
             }
             return card;
           });
+          console.log(`[useWorkspaceManager] Overall changed: ${overallChanged}`);
           return overallChanged ? updatedCards : prevActiveCards;
         });
       }, 0);
     },
-    []
+    [supabase, toast]
   );
 
   const stockDataCallbacks = useMemo(

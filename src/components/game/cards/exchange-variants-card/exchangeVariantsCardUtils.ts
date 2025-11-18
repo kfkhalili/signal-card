@@ -91,10 +91,11 @@ async function initializeExchangeVariantsCard({
 }: CardInitializationContext): Promise<
   Result<DisplayableCard, ExchangeVariantsCardError>
 > {
+  // Fetch profile data for company name, logo, website
   const profileResult = await fromPromise(
     supabase
       .from("profiles")
-      .select("exchange, company_name, display_company_name, image, website")
+      .select("company_name, display_company_name, image, website")
       .eq("symbol", symbol)
       .maybeSingle(),
     (e) =>
@@ -106,60 +107,23 @@ async function initializeExchangeVariantsCard({
   if (profileResult.isErr()) {
     return err(profileResult.error);
   }
-  if (!profileResult.value.data) {
-    // No profile found - return empty state card
-    const emptyCard = createEmptyExchangeVariantsCard(symbol);
-    if (toast) {
-      toast({
-        title: "Exchange Variants Card Added (Empty State)",
-        description: `Awaiting profile and exchange variants data for ${symbol}.`,
-        variant: "default",
-      });
-    }
-    return ok(emptyCard);
-  }
 
   const profileData = profileResult.value.data;
-  const baseExchange = profileData.exchange;
 
-  if (!baseExchange) {
-    // No base exchange found - return empty state card
-    const emptyCard = createEmptyExchangeVariantsCard(symbol, profileData);
-    if (toast) {
-      toast({
-        title: "Exchange Variants Card Added (Empty State)",
-        description: `Awaiting exchange information for ${symbol}.`,
-        variant: "default",
-      });
-    }
-    return ok(emptyCard);
-  }
-
+  // Fetch only actively trading variants for the base symbol
+  // The base variant (where variant_symbol === symbol) determines the base exchange
   const variantsResult = await fromPromise(
     supabase
       .from("exchange_variants")
-      .select("variant_symbol, exchange_short_name, vol_avg")
+      .select("variant_symbol, exchange_short_name, vol_avg, is_actively_trading")
       .eq("base_symbol", symbol)
       .eq("is_actively_trading", true),
     (e) => new ExchangeVariantsCardError((e as Error).message)
   );
 
   if (variantsResult.isErr()) {
-    return err(variantsResult.error);
-  }
-
-  const allVariantsData = variantsResult.value.data ?? [];
-  const baseVariantData = allVariantsData.find(
-    (v) => v.variant_symbol === symbol
-  );
-  const baseAverageVolume = baseVariantData?.vol_avg ?? null;
-
-  const filteredVariantsData = allVariantsData.filter(
-    (v) => v.exchange_short_name !== baseExchange
-  );
-
-  if (filteredVariantsData.length === 0) {
-    // No variants found - return empty state card
+    // If query fails, still return empty card but log the error
+    console.warn(`Failed to fetch exchange variants for ${symbol}:`, variantsResult.error);
     const emptyCard = createEmptyExchangeVariantsCard(symbol, profileData);
     if (toast) {
       toast({
@@ -171,6 +135,49 @@ async function initializeExchangeVariantsCard({
     return ok(emptyCard);
   }
 
+  const allVariantsData = variantsResult.value.data ?? [];
+
+  // If no variants found at all, return empty card
+  if (allVariantsData.length === 0) {
+    const emptyCard = createEmptyExchangeVariantsCard(symbol, profileData);
+    if (toast) {
+      toast({
+        title: "Exchange Variants Card Added (Empty State)",
+        description: `No exchange variants found for ${symbol}.`,
+        variant: "default",
+      });
+    }
+    return ok(emptyCard);
+  }
+
+  // Find the base variant (variant_symbol === symbol) - this determines the base exchange
+  const baseVariantData = allVariantsData.find(
+    (v) => v.variant_symbol === symbol
+  );
+
+  if (!baseVariantData) {
+    // No base variant found - return empty card
+    const emptyCard = createEmptyExchangeVariantsCard(symbol, profileData);
+    if (toast) {
+      toast({
+        title: "Exchange Variants Card Added (Empty State)",
+        description: `Base variant not found for ${symbol}.`,
+        variant: "default",
+      });
+    }
+    return ok(emptyCard);
+  }
+
+  const baseExchange = baseVariantData.exchange_short_name;
+  const baseAverageVolume = baseVariantData.vol_avg ?? null;
+
+  // Filter to show variants that are not on the base exchange (international variants)
+  // The base variant is always included via baseExchangeInfo in the card display
+  const filteredVariantsData = allVariantsData.filter(
+    (v) => v.exchange_short_name !== baseExchange
+  );
+
+  // Fetch exchange metadata (country info) from available_exchanges table
   const allExchangesResult = await fromPromise(
     supabase
       .from("available_exchanges")
@@ -197,6 +204,7 @@ async function initializeExchangeVariantsCard({
     });
   }
 
+  // Build variants list with country info from available_exchanges
   const variants: ExchangeVariant[] = filteredVariantsData.map((v) => {
     const exchangeInfo = exchangeInfoMap.get(v.exchange_short_name);
     return {
@@ -224,10 +232,10 @@ async function initializeExchangeVariantsCard({
     id: `exchangevariants-${symbol}-${Date.now()}`,
     type: "exchangevariants",
     symbol,
-    companyName: profileData.company_name,
-    displayCompanyName: profileData.display_company_name,
-    logoUrl: profileData.image,
-    websiteUrl: profileData.website,
+    companyName: profileData?.company_name ?? null,
+    displayCompanyName: profileData?.display_company_name ?? profileData?.company_name ?? null,
+    logoUrl: profileData?.image ?? null,
+    websiteUrl: profileData?.website ?? null,
     createdAt: Date.now(),
     staticData: {
       lastUpdated: new Date().toISOString(),
@@ -238,7 +246,7 @@ async function initializeExchangeVariantsCard({
     },
     backData: {
       description: `A list of international exchanges where ${
-        profileData.company_name || symbol
+        profileData?.company_name || symbol
       } is traded.`,
     },
   };
@@ -275,6 +283,7 @@ const handleExchangeVariantsUpdate: CardUpdateHandler<
     return {
       ...currentCardData,
       liveData: {
+        ...currentCardData.liveData,
         variants: [updatedVariant],
       },
       staticData: {
@@ -314,6 +323,7 @@ const handleExchangeVariantsUpdate: CardUpdateHandler<
     return {
       ...currentCardData,
       liveData: {
+        ...currentCardData.liveData,
         variants: updatedVariants,
       },
       staticData: {
@@ -329,6 +339,7 @@ const handleExchangeVariantsUpdate: CardUpdateHandler<
     return {
       ...currentCardData,
       liveData: {
+        ...currentCardData.liveData,
         variants: updatedVariants,
       },
     };

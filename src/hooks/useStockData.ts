@@ -508,15 +508,26 @@ export function useStockData({
   useEffect(() => {
     if (!supabaseClient || !symbol || !onExchangeVariantsUpdate) return;
 
+    console.log(`[useStockData ${symbol}] Setting up exchange variants realtime subscription`);
+
     const unsubscribe = subscribeToExchangeVariantsUpdates(
       symbol,
       (payload: ExchangeVariantsPayload) => {
+        console.log(`[useStockData ${symbol}] Exchange variants realtime update received:`, payload);
         if (payload.new && isMountedRef.current && onExchangeVariantsUpdate) {
           const updatedVariant = payload.new as ExchangeVariantsDBRow;
+          console.log(`[useStockData ${symbol}] Calling onExchangeVariantsUpdate with:`, updatedVariant);
           onExchangeVariantsUpdate(updatedVariant);
+        } else {
+          console.warn(`[useStockData ${symbol}] Exchange variants update skipped:`, {
+            hasNew: !!payload.new,
+            isMounted: isMountedRef.current,
+            hasCallback: !!onExchangeVariantsUpdate
+          });
         }
       },
       (status, err) => {
+        console.log(`[useStockData ${symbol}] Exchange variants subscription status:`, status);
         if (status === "CHANNEL_ERROR" && err) {
           console.error(
             `[useStockData ${symbol}] Exchange Variants Realtime subscription error:`,
@@ -527,6 +538,7 @@ export function useStockData({
     );
 
     return () => {
+      console.log(`[useStockData ${symbol}] Cleaning up exchange variants realtime subscription`);
       unsubscribe();
     };
   }, [symbol, supabaseClient, onExchangeVariantsUpdate]);
