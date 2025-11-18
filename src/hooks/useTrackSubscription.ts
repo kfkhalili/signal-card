@@ -153,13 +153,11 @@ export function useTrackSubscription({
         if (process.env.NODE_ENV === 'development') {
         }
       })
-          .on('presence', { event: 'join' }, ({ key }) => {
-            if (process.env.NODE_ENV === 'development') {
-            }
+          .on('presence', { event: 'join' }, () => {
+            // User joined
           })
-          .on('presence', { event: 'leave' }, ({ key }) => {
-            if (process.env.NODE_ENV === 'development') {
-            }
+          .on('presence', { event: 'leave' }, () => {
+            // User left
           })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
