@@ -110,7 +110,7 @@ async function fetchProfile(
     supabase.from("profiles").select("*").eq("symbol", symbol).maybeSingle(),
     (e) => e as Error
   );
-  return result.map((response) => 
+  return result.map((response) =>
     response.data ? some(response.data) : none()
   );
 }
@@ -257,7 +257,7 @@ async function fetchInitialData(
       .maybeSingle(),
     (e) => e as Error
   );
-  return result.map((response) => 
+  return result.map((response) =>
     response.data ? some(response.data) : none()
   );
 }

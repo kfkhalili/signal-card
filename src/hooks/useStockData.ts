@@ -63,7 +63,7 @@ async function fetchInitialProfile(
     supabase.from("profiles").select("*").eq("symbol", symbol).maybeSingle(),
     (e) => e as Error
   );
-  return result.map((response) => 
+  return result.map((response) =>
     response.data ? Option.some(response.data) : Option.none()
   );
 }
@@ -82,7 +82,7 @@ async function fetchInitialQuote(
       .maybeSingle(),
     (e) => e as Error
   );
-  return result.map((response) => 
+  return result.map((response) =>
     response.data ? Option.some(response.data) : Option.none()
   );
 }
@@ -99,7 +99,7 @@ async function fetchExchangeStatus(
       .maybeSingle(),
     (e) => e as Error
   );
-  return result.map((response) => 
+  return result.map((response) =>
     response.data ? Option.some(response.data) : Option.none()
   );
 }
@@ -118,7 +118,7 @@ async function fetchInitialFinancialStatement(
       .maybeSingle(),
     (e) => e as Error
   );
-  return result.map((response) => 
+  return result.map((response) =>
     response.data ? Option.some(response.data) : Option.none()
   );
 }
@@ -379,26 +379,30 @@ export function useStockData({
     );
   }, [symbol, supabaseClient, fetchInitialData]);
 
+  // Extract values for stable dependency comparison
+  // Option objects are compared by reference, so we need to extract values
+  // to prevent infinite re-renders
+  const profileExchange = Option.isSome(profileData) ? profileData.value.exchange : null;
+  const quoteExchange = Option.isSome(latestQuote) ? latestQuote.value.exchange : null;
+  const exchangeStatusValue = Option.isSome(exchangeStatus) ? exchangeStatus.value : null;
+  const latestQuoteValue = Option.isSome(latestQuote) ? latestQuote.value : null;
+
   useEffect(() => {
-    const relevantExchangeCode = 
-      (Option.isSome(profileData) && profileData.value.exchange) ||
-      (Option.isSome(latestQuote) && latestQuote.value.exchange) ||
-      null;
+    const relevantExchangeCode = profileExchange || quoteExchange || null;
 
     if (!relevantExchangeCode) return;
-    
-    if (Option.isSome(exchangeStatus)) {
-      const status = exchangeStatus.value;
-      setOpeningTime(status.opening_time_local);
-      setClosingTime(status.closing_time_local);
-      setTimezone(status.timezone);
+
+    if (exchangeStatusValue) {
+      setOpeningTime(exchangeStatusValue.opening_time_local);
+      setClosingTime(exchangeStatusValue.closing_time_local);
+      setTimezone(exchangeStatusValue.timezone);
     } else {
       setOpeningTime(null);
       setClosingTime(null);
       setTimezone(null);
     }
 
-    if (Option.isNone(exchangeStatus)) {
+    if (!exchangeStatusValue) {
       setDerivedMarketStatus("Connecting");
       setMarketStatusMessage(
         `Connecting to market status for ${relevantExchangeCode}...`
@@ -406,7 +410,7 @@ export function useStockData({
       return;
     }
 
-    const status = exchangeStatus.value;
+    const status = exchangeStatusValue;
     let newStatus: DerivedMarketStatus;
     let newMessage: string | null;
 
@@ -418,9 +422,9 @@ export function useStockData({
           status.current_holiday_name || "Official Holiday"
         })`;
     } else if (status.is_market_open) {
-      if (Option.isSome(latestQuote) && latestQuote.value.api_timestamp) {
+      if (latestQuoteValue?.api_timestamp) {
         const diffMinutes =
-          (Date.now() - latestQuote.value.api_timestamp * 1000) / 60000;
+          (Date.now() - latestQuoteValue.api_timestamp * 1000) / 60000;
         newStatus = diffMinutes > 15 ? "Delayed" : "Open";
         newMessage =
           status.status_message ||
@@ -440,7 +444,7 @@ export function useStockData({
     setMarketStatusMessage((prevMessage) =>
       prevMessage !== newMessage ? newMessage : prevMessage
     );
-  }, [profileData, latestQuote, exchangeStatus]);
+  }, [profileExchange, quoteExchange, exchangeStatusValue, latestQuoteValue]);
 
   return {
     status: derivedMarketStatus,
