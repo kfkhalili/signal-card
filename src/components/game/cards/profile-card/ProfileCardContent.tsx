@@ -47,7 +47,6 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
     onToggleItemSelection,
   }) => {
     const { staticData, liveData, symbol, id, type: cardType } = cardData;
-    console.log(liveData)
     const exchangeRates = useExchangeRate();
 
     const handleInteraction = (
