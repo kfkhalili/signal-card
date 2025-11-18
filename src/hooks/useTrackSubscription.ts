@@ -149,9 +149,6 @@ export function useTrackSubscription({
     channel
       .on('presence', { event: 'sync' }, () => {
         // Presence synced - backend can now see this subscription
-        const state = channel.presenceState();
-        if (process.env.NODE_ENV === 'development') {
-        }
       })
           .on('presence', { event: 'join' }, () => {
             // User joined
