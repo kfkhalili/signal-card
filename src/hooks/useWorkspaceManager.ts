@@ -42,6 +42,7 @@ import {
 } from "@/components/game/cardUpdateHandler.types";
 import "@/components/game/cards/updateHandlerInitializer";
 import type { CustomCardData } from "@/components/game/cards/custom-card/custom-card.types";
+import { useSubscriptionManager } from "@/hooks/useSubscriptionManager";
 
 type ExchangeMarketStatusRecord =
   Database["public"]["Tables"]["exchange_market_status"]["Row"];
@@ -717,6 +718,12 @@ export function useWorkspaceManager() {
       handleFinancialStatementUpdate,
     ]
   );
+
+  // CRITICAL: Centralized subscription manager with reference counting
+  // This prevents the bug where deleting one card removes a subscription
+  // that other cards still need (e.g., deleting revenue card removes
+  // financial-statements subscription even though solvency and cashuse cards still need it)
+  useSubscriptionManager(activeCards);
 
   return {
     activeCards: displayedCards,

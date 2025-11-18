@@ -88,7 +88,7 @@ const VariantRow: React.FC<{
         className="text-sm font-semibold text-foreground flex items-center"
         title={variant.countryName ?? undefined}>
         <span className="mr-1.5">{getFlagEmoji(variant.countryCode)}</span>
-        {variant.countryName}
+        {variant.countryCode ?? "—"}
       </span>
       <span className="text-xs text-muted-foreground">
         Avg Vol: {formatNumberWithAbbreviations(variant.averageVolume, 2)}
@@ -124,16 +124,18 @@ export const ExchangeVariantsCardContent: React.FC<ExchangeVariantsCardContentPr
 
       const mapMarkers = useMemo((): MapMarker[] => {
         const markers: MapMarker[] = [];
+        // Deduplicate by exchange only (geographical location)
+        // This ensures each unique exchange location is shown once on the map
+        // Multiple variants with same symbol on different exchanges (e.g., APC.F on FSX and XETRA)
+        // should both appear as separate geographical locations
         const seenExchanges = new Set<string>();
 
         allVariantsToDisplay.forEach((variant) => {
-          if (
-            variant.exchangeShortName &&
-            !seenExchanges.has(variant.exchangeShortName)
-          ) {
+          if (variant.exchangeShortName && !seenExchanges.has(variant.exchangeShortName)) {
             markers.push({
               countryCode: variant.countryCode ?? "",
               label: variant.exchangeShortName, // Use the exchange code as the label
+              countryName: variant.countryName ?? null, // Country name for tooltip
             });
             seenExchanges.add(variant.exchangeShortName);
           }
@@ -165,7 +167,7 @@ export const ExchangeVariantsCardContent: React.FC<ExchangeVariantsCardContentPr
               <div className="space-y-0">
                 {allVariantsToDisplay.map((variant, index) => (
                   <VariantRow
-                    key={variant.variantSymbol}
+                    key={`${variant.variantSymbol}-${variant.exchangeShortName}-${index}`}
                     variant={variant}
                     isSelectionMode={isSelectionMode}
                     isSelected={isSelected(`${id}-${variant.variantSymbol}`)}
@@ -191,7 +193,7 @@ export const ExchangeVariantsCardContent: React.FC<ExchangeVariantsCardContentPr
         <div
           data-testid={`exchangevariants-card-front-${symbol}`}
           className="pointer-events-auto flex flex-col h-full">
-          <div 
+          <div
             className="relative flex-grow w-full bg-muted/30"
             onPointerDownCapture={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}

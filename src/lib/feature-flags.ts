@@ -17,10 +17,10 @@ export async function checkFeatureFlag(flagName: string): Promise<boolean> {
 
   try {
     const { data, error } = await supabase
-      .from('feature_flags')
+      .from('feature_flags' as never)
       .select('enabled')
       .eq('flag_name', flagName)
-      .maybeSingle();
+      .maybeSingle() as { data: { enabled: boolean } | null; error: Error | null };
 
     if (error) {
       console.warn(`[feature-flags] Error checking flag ${flagName}:`, error);
@@ -39,10 +39,12 @@ export async function checkFeatureFlag(flagName: string): Promise<boolean> {
  * This requires a context/provider to cache flags
  * For now, returns false (disabled) - can be enhanced later
  */
-export function isFeatureEnabled(_flagName: string): boolean {
+export function isFeatureEnabled(flagName: string): boolean {
   // TODO: Implement caching via React Context if needed
   // For now, always return false (disabled) to be safe
   // The async checkFeatureFlag should be used in useEffect
+  // Parameter is kept for API consistency, even though not used yet
+  void flagName; // Explicitly mark as intentionally unused
   return false;
 }
 

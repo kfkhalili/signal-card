@@ -119,6 +119,7 @@ export async function fetchGradesHistoricalLogic(
         analyst_ratings_hold: typeof fmpEntry.analystRatingsHold === 'number' ? fmpEntry.analystRatingsHold : null,
         analyst_ratings_sell: typeof fmpEntry.analystRatingsSell === 'number' ? fmpEntry.analystRatingsSell : null,
         analyst_ratings_strong_sell: typeof fmpEntry.analystRatingsStrongSell === 'number' ? fmpEntry.analystRatingsStrongSell : null,
+        fetched_at: new Date().toISOString(), // CRITICAL: Update fetched_at on upsert to prevent infinite job creation
       });
     }
 

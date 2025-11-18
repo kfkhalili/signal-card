@@ -137,6 +137,7 @@ export async function fetchRatiosTtmLogic(
       effective_tax_rate_ttm: ratiosData.effectiveTaxRateTTM,
       enterprise_value_multiple_ttm: ratiosData.enterpriseValueMultipleTTM,
       dividend_per_share_ttm: ratiosData.dividendPerShareTTM,
+      fetched_at: new Date().toISOString(), // CRITICAL: Update fetched_at on upsert to prevent infinite job creation
     };
 
     const { error: upsertError, count } = await supabase

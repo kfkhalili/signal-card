@@ -15,8 +15,6 @@ import {
 } from "@/components/game/cardRenderers";
 import "@/components/game/cards/rendererRegistryInitializer";
 import type { SelectedDataItem } from "@/hooks/useWorkspaceManager"; // NEW IMPORT
-import { useTrackSubscription } from "@/hooks/useTrackSubscription";
-import { getDataTypesForCard } from "@/lib/card-data-type-mapping";
 
 interface GameCardProps {
   readonly card: DisplayableCard;
@@ -74,14 +72,10 @@ const GameCard: React.FC<GameCardProps> = ({
 
   const cardWrapperClassName = cn("w-full aspect-[63/88] relative", className);
 
-  // Track subscription for backend-controlled refresh system
-  // This runs in parallel with existing postgres_changes subscriptions
-  const dataTypes = React.useMemo(() => getDataTypesForCard(card.type), [card.type]);
-  useTrackSubscription({
-    symbol: card.symbol,
-    dataTypes,
-    enabled: dataTypes.length > 0, // Only track if card has data types
-  });
+  // NOTE: Subscription tracking is now handled centrally by useSubscriptionManager
+  // in useWorkspaceManager. This prevents the bug where deleting one card removes
+  // a subscription that other cards still need (e.g., deleting revenue card removes
+  // financial-statements subscription even though solvency and cashuse cards still need it).
 
   const CardRenderer = getCardRenderer(card.type);
 

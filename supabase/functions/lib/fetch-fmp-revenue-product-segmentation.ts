@@ -132,6 +132,7 @@ export async function fetchRevenueProductSegmentationLogic(
         date: fmpEntry.date,
         reported_currency: fmpEntry.reportedCurrency || null,
         data: fmpEntry.data,
+        fetched_at: new Date().toISOString(), // CRITICAL: Update fetched_at on upsert to prevent infinite job creation
       });
     }
 

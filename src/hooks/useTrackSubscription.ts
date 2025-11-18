@@ -46,7 +46,7 @@ export function useTrackSubscription({
 
   // CRITICAL: Memoize dataTypes to prevent unnecessary re-renders
   // Arrays are compared by reference, so we need to stabilize it
-  const stableDataTypes = useMemo(() => dataTypes, [dataTypes.join(',')]);
+  const stableDataTypes = useMemo(() => dataTypes, [dataTypes]);
 
   // CRITICAL: Store current values in refs for cleanup function
   // This ensures cleanup has access to the correct values even if component unmounts

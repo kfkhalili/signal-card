@@ -12,6 +12,7 @@ import { getFlagEmoji } from "@/lib/utils";
 export interface MapMarker {
   countryCode: string;
   label: string; // Exchange code, e.g., "NASDAQ"
+  countryName?: string | null; // Country name for tooltip, e.g., "United States"
 }
 
 interface WorldMapProps {
@@ -62,6 +63,7 @@ const locationCoordinates: Record<string, [number, number]> = {
   LIS: [38.7223, -9.1393],
   PAR: [48.8566, 2.3522],
   XETRA: [50.1109, 8.6821],
+  FSX: [50.1109, 8.6821], // Frankfurt Stock Exchange (same location as XETRA)
   BER: [52.52, 13.405],
   DUS: [51.2277, 6.7735],
   HAM: [53.5511, 9.9937],
@@ -149,7 +151,14 @@ export const WorldMap: React.FC<WorldMapProps> = React.memo(({ markers, classNam
             <Tooltip>
               <span className="font-bold flex items-center">
                 <span className="mr-2">{getFlagEmoji(marker.countryCode)}</span>
-                {marker.label}
+                <span>
+                  {marker.label}
+                  {marker.countryName && (
+                    <span className="block text-xs font-normal mt-1">
+                      {marker.countryName}
+                    </span>
+                  )}
+                </span>
               </span>
             </Tooltip>
           </Marker>

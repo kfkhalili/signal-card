@@ -131,6 +131,7 @@ export async function fetchDividendHistoryLogic(
         dividend: typeof fmpEntry.dividend === 'number' ? fmpEntry.dividend : null,
         yield: typeof fmpEntry.yield === 'number' ? fmpEntry.yield : null,
         frequency: fmpEntry.frequency || null,
+        fetched_at: new Date().toISOString(), // CRITICAL: Update fetched_at on upsert to prevent infinite job creation
       });
     }
 

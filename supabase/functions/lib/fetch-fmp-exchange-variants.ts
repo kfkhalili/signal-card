@@ -115,6 +115,7 @@ export async function fetchExchangeVariantsLogic(
         ipo_date: fmpEntry.ipoDate,
         default_image: fmpEntry.defaultImage,
         is_actively_trading: fmpEntry.isActivelyTrading,
+        fetched_at: new Date().toISOString(), // CRITICAL: Update fetched_at on upsert to prevent infinite job creation
       }));
 
     if (recordsToUpsert.length > 0) {

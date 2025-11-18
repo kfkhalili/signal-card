@@ -50,6 +50,11 @@ export default tseslint.config(
       "node_modules/",
       "supabase/", // Assuming this is a top-level directory you want to ignore
       "src/lib/supabase/database.types.ts",
+      "**/__tests__/**",
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/*.spec.ts",
+      "**/*.spec.tsx",
       // "dist/", // If you have a build output folder
       // Add any other files or directories you want ESLint to ignore
     ],

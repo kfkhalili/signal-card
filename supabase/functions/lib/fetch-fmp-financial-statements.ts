@@ -154,6 +154,9 @@ export async function fetchFinancialStatementsLogic(
         fiscal_year: stmt.fiscalYear,
       };
 
+      // CRITICAL: Always update fetched_at when processing statements (even if record already exists)
+      existing.fetched_at = new Date().toISOString();
+
       if (stmt.type === 'income') {
         existing.income_statement_payload = stmt as FmpIncomeStatementEntry;
       } else if (stmt.type === 'balance') {
