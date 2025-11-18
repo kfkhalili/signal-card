@@ -76,13 +76,11 @@ async function fetchInitialQuote(
       .eq("symbol", symbol)
       .order("fetched_at", { ascending: false })
       .limit(1)
-      .single(),
+      .maybeSingle(), // Use maybeSingle() to avoid 406 errors when data doesn't exist
     (e) => e as Error
   );
 
-  if (result.isErr() && result.error.message.includes("PGRST116")) {
-    return ok(null);
-  }
+  // maybeSingle() returns null when no rows found, so we just need to map the result
   return result.map((response) => response.data);
 }
 
@@ -95,12 +93,10 @@ async function fetchExchangeStatus(
       .from("exchange_market_status")
       .select("*")
       .eq("exchange_code", exchangeCode)
-      .single(),
+      .maybeSingle(), // Use maybeSingle() to avoid 406 errors when data doesn't exist
     (e) => e as Error
   );
-  if (result.isErr() && result.error.message.includes("PGRST116")) {
-    return ok(null);
-  }
+  // maybeSingle() returns null when no rows found, so we just need to map the result
   return result.map((response) => response.data);
 }
 
@@ -279,10 +275,15 @@ export function useStockData({
         return data;
       },
       (error) => {
-        console.error(
-          `[useStockData ${symbol}] Exception fetching initial profile:`,
-          error
-        );
+        // Only log if it's not a "not found" error (PGRST116) or RLS error (406)
+        // Missing data is expected in self-healing architecture - backend will populate it
+        const errorMessage = (error as Error).message || String(error);
+        if (!errorMessage.includes("PGRST116") && !errorMessage.includes("406")) {
+          console.error(
+            `[useStockData ${symbol}] Exception fetching initial profile:`,
+            error
+          );
+        }
         return null;
       }
     );
@@ -297,12 +298,19 @@ export function useStockData({
           setLatestQuote(data);
           if (onLiveQuoteUpdate) onLiveQuoteUpdate(data, "fetch");
         }
+        // If data is null, that's expected in self-healing architecture - backend will populate it
       },
-      (error) =>
-        console.error(
-          `[useStockData ${symbol}] Exception fetching initial quote:`,
-          error
-        )
+      (error) => {
+        // Only log if it's not a "not found" error (PGRST116) or RLS error (406)
+        // Missing data is expected in self-healing architecture
+        const errorMessage = (error as Error).message || String(error);
+        if (!errorMessage.includes("PGRST116") && !errorMessage.includes("406")) {
+          console.error(
+            `[useStockData ${symbol}] Exception fetching initial quote:`,
+            error
+          );
+        }
+      }
     );
 
     // Fetch Exchange Status
@@ -318,12 +326,19 @@ export function useStockData({
             setExchangeStatus(data);
             if (onExchangeStatusUpdate) onExchangeStatusUpdate(data);
           }
+          // If data is null, that's expected in self-healing architecture - backend will populate it
         },
-        (error) =>
-          console.error(
-            `[useStockData ${symbol}] Exception fetching initial exchange status:`,
-            error
-          )
+        (error) => {
+          // Only log if it's not a "not found" error (PGRST116) or RLS error (406)
+          // Missing data is expected in self-healing architecture
+          const errorMessage = (error as Error).message || String(error);
+          if (!errorMessage.includes("PGRST116") && !errorMessage.includes("406")) {
+            console.error(
+              `[useStockData ${symbol}] Exception fetching initial exchange status:`,
+              error
+            );
+          }
+        }
       );
     }
 
