@@ -129,6 +129,7 @@ export function useStockData({
   onLiveQuoteUpdate,
   onExchangeStatusUpdate,
   onFinancialStatementUpdate,
+  onRatiosTTMUpdate,
 }: UseStockDataProps): MarketStatusUpdate {
   const [profileData, setProfileData] = useState<ProfileDBRow | null>(null);
   const [latestQuote, setLatestQuote] =
