@@ -579,7 +579,9 @@ export function useWorkspaceManager() {
 
   const handleLiveQuoteUpdate = useCallback(
     (leanQuoteData: LiveQuoteIndicatorDBRow, source?: "fetch" | "realtime") => {
-      const updateContext: CardUpdateContext = { toast };
+      // Don't pass toast to update handlers - they're called too frequently
+      // and calling toast during setState causes React errors
+      const updateContext: CardUpdateContext = { toast: undefined };
       const eventType: CardUpdateEventType = "LIVE_QUOTE_UPDATE";
 
       // Log for debugging
@@ -589,45 +591,48 @@ export function useWorkspaceManager() {
         );
       }
 
-      setActiveCards((prevActiveCards) => {
-        let overallChanged = false;
-        const updatedCards = prevActiveCards.map((card) => {
-          if (card.symbol === leanQuoteData.symbol) {
-            const handler = getCardUpdateHandler(card.type, eventType);
-            if (handler) {
-              const concreteCardDataForHandler = getConcreteCardData(card);
-              const updatedConcreteData = handler(
-                concreteCardDataForHandler,
-                leanQuoteData,
-                card,
-                updateContext
-              );
-              if (
-                JSON.stringify(updatedConcreteData) !==
-                JSON.stringify(concreteCardDataForHandler)
-              ) {
-                overallChanged = true;
+      // Use setTimeout to defer state update and avoid "setState during render" error
+      setTimeout(() => {
+        setActiveCards((prevActiveCards) => {
+          let overallChanged = false;
+          const updatedCards = prevActiveCards.map((card) => {
+            if (card.symbol === leanQuoteData.symbol) {
+              const handler = getCardUpdateHandler(card.type, eventType);
+              if (handler) {
+                const concreteCardDataForHandler = getConcreteCardData(card);
+                const updatedConcreteData = handler(
+                  concreteCardDataForHandler,
+                  leanQuoteData,
+                  card,
+                  updateContext
+                );
+                if (
+                  JSON.stringify(updatedConcreteData) !==
+                  JSON.stringify(concreteCardDataForHandler)
+                ) {
+                  overallChanged = true;
+                  if (process.env.NODE_ENV === "development") {
+                    console.log(
+                      `[handleLiveQuoteUpdate] Card ${card.type} for ${card.symbol} updated`
+                    );
+                  }
+                  return { ...card, ...updatedConcreteData };
+                }
+              } else {
                 if (process.env.NODE_ENV === "development") {
-                  console.log(
-                    `[handleLiveQuoteUpdate] Card ${card.type} for ${card.symbol} updated`
+                  console.warn(
+                    `[handleLiveQuoteUpdate] No handler found for card type ${card.type}`
                   );
                 }
-                return { ...card, ...updatedConcreteData };
-              }
-            } else {
-              if (process.env.NODE_ENV === "development") {
-                console.warn(
-                  `[handleLiveQuoteUpdate] No handler found for card type ${card.type}`
-                );
               }
             }
-          }
-          return card;
+            return card;
+          });
+          return overallChanged ? updatedCards : prevActiveCards;
         });
-        return overallChanged ? updatedCards : prevActiveCards;
-      });
+      }, 0);
     },
-    [toast]
+    []
   );
 
   const handleStaticProfileUpdate = useCallback(
@@ -668,37 +673,41 @@ export function useWorkspaceManager() {
 
   const handleFinancialStatementUpdate = useCallback(
     (updatedStatementDBRow: FinancialStatementDBRow) => {
-      const updateContext: CardUpdateContext = { toast };
+      // Don't pass toast to update handlers - they're called too frequently
+      const updateContext: CardUpdateContext = { toast: undefined };
       const eventType: CardUpdateEventType = "FINANCIAL_STATEMENT_UPDATE";
 
-      setActiveCards((prevActiveCards) => {
-        let overallChanged = false;
-        const updatedCards = prevActiveCards.map((card) => {
-          if (card.symbol === updatedStatementDBRow.symbol) {
-            const handler = getCardUpdateHandler(card.type, eventType);
-            if (handler) {
-              const concreteCardDataForHandler = getConcreteCardData(card);
-              const updatedConcreteData = handler(
-                concreteCardDataForHandler,
-                updatedStatementDBRow,
-                card,
-                updateContext
-              );
-              if (
-                JSON.stringify(updatedConcreteData) !==
-                JSON.stringify(concreteCardDataForHandler)
-              ) {
-                overallChanged = true;
-                return { ...card, ...updatedConcreteData };
+      // Use setTimeout to defer state update and avoid "setState during render" error
+      setTimeout(() => {
+        setActiveCards((prevActiveCards) => {
+          let overallChanged = false;
+          const updatedCards = prevActiveCards.map((card) => {
+            if (card.symbol === updatedStatementDBRow.symbol) {
+              const handler = getCardUpdateHandler(card.type, eventType);
+              if (handler) {
+                const concreteCardDataForHandler = getConcreteCardData(card);
+                const updatedConcreteData = handler(
+                  concreteCardDataForHandler,
+                  updatedStatementDBRow,
+                  card,
+                  updateContext
+                );
+                if (
+                  JSON.stringify(updatedConcreteData) !==
+                  JSON.stringify(concreteCardDataForHandler)
+                ) {
+                  overallChanged = true;
+                  return { ...card, ...updatedConcreteData };
+                }
               }
             }
-          }
-          return card;
+            return card;
+          });
+          return overallChanged ? updatedCards : prevActiveCards;
         });
-        return overallChanged ? updatedCards : prevActiveCards;
-      });
+      }, 0);
     },
-    [toast]
+    []
   );
 
   const handleExchangeStatusUpdate = useCallback(
@@ -713,37 +722,41 @@ export function useWorkspaceManager() {
 
   const handleRatiosTTMUpdate = useCallback(
     (updatedRatiosDBRow: RatiosTtmDBRow) => {
-      const updateContext: CardUpdateContext = { toast };
+      // Don't pass toast to update handlers - they're called too frequently
+      const updateContext: CardUpdateContext = { toast: undefined };
       const eventType: CardUpdateEventType = "RATIOS_TTM_UPDATE";
 
-      setActiveCards((prevActiveCards) => {
-        let overallChanged = false;
-        const updatedCards = prevActiveCards.map((card) => {
-          if (card.symbol === updatedRatiosDBRow.symbol) {
-            const handler = getCardUpdateHandler(card.type, eventType);
-            if (handler) {
-              const concreteCardDataForHandler = getConcreteCardData(card);
-              const updatedConcreteData = handler(
-                concreteCardDataForHandler,
-                updatedRatiosDBRow,
-                card,
-                updateContext
-              );
-              if (
-                JSON.stringify(updatedConcreteData) !==
-                JSON.stringify(concreteCardDataForHandler)
-              ) {
-                overallChanged = true;
-                return { ...card, ...updatedConcreteData };
+      // Use setTimeout to defer state update and avoid "setState during render" error
+      setTimeout(() => {
+        setActiveCards((prevActiveCards) => {
+          let overallChanged = false;
+          const updatedCards = prevActiveCards.map((card) => {
+            if (card.symbol === updatedRatiosDBRow.symbol) {
+              const handler = getCardUpdateHandler(card.type, eventType);
+              if (handler) {
+                const concreteCardDataForHandler = getConcreteCardData(card);
+                const updatedConcreteData = handler(
+                  concreteCardDataForHandler,
+                  updatedRatiosDBRow,
+                  card,
+                  updateContext
+                );
+                if (
+                  JSON.stringify(updatedConcreteData) !==
+                  JSON.stringify(concreteCardDataForHandler)
+                ) {
+                  overallChanged = true;
+                  return { ...card, ...updatedConcreteData };
+                }
               }
             }
-          }
-          return card;
+            return card;
+          });
+          return overallChanged ? updatedCards : prevActiveCards;
         });
-        return overallChanged ? updatedCards : prevActiveCards;
-      });
+      }, 0);
     },
-    [toast]
+    []
   );
 
   const clearWorkspace = useCallback(() => {
