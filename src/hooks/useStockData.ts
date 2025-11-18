@@ -236,15 +236,16 @@ export function useStockData({
   }, [symbol, supabaseClient, onProfileUpdate]);
 
   // New effect for ratios TTM updates via Realtime
+  // Only subscribe if callback is provided
   useEffect(() => {
-    if (!supabaseClient || !symbol) return;
+    if (!supabaseClient || !symbol || !onRatiosTTMUpdate) return;
 
     const unsubscribe = subscribeToRatiosTTMUpdates(
       symbol,
       (payload: RatiosTtmPayload) => {
-        if (payload.new && isMountedRef.current) {
+        if (payload.new && isMountedRef.current && onRatiosTTMUpdate) {
           const updatedRatios = payload.new as RatiosTtmDBRow;
-          if (onRatiosTTMUpdate) onRatiosTTMUpdate(updatedRatios);
+          onRatiosTTMUpdate(updatedRatios);
         }
       },
       (status, err) => {
@@ -360,7 +361,8 @@ export function useStockData({
     onLiveQuoteUpdate,
     onExchangeStatusUpdate,
     onFinancialStatementUpdate,
-    onRatiosTTMUpdate,
+    // Note: onRatiosTTMUpdate is not included because ratios TTM data
+    // is only received via realtime subscription, not initial fetch
   ]);
 
   useEffect(() => {
