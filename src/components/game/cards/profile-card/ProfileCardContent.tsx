@@ -90,42 +90,38 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                 </p>
               )}
               <div className="space-y-0.5">
-                <DataRow
-                  label="Sector"
-                  value={
-                    staticData?.sector
-                      ? truncateText(staticData.sector, 30)
-                      : "N/A"
-                  }
-                  onClick={() => {
-                    if (staticData?.sector) {
+                {staticData?.sector && (
+                  <DataRow
+                    label="Sector"
+                    value={truncateText(staticData.sector, 30)}
+                    onClick={() => {
                       handleInteraction("FILTER_WORKSPACE_DATA", {
                         filterField: "sector",
-                        filterValue: staticData.sector,
+                        filterValue: staticData.sector!,
                         originatingElement: "sectorLink",
                       } as Omit<FilterWorkspaceDataInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                    }}
+                    title={`Sector: ${staticData.sector}`}
+                    labelClassName="text-sm font-medium text-muted-foreground"
+                    valueClassName="text-sm font-semibold text-foreground"
+                    originatingElement="sector-profile-item"
+                    data-testid="sector-profile-item"
+                    // SELECTION PROPS
+                    isSelectionMode={isSelectionMode}
+                    isSelected={selectedDataItems.some(
+                      (item) => item.id === `${id}-sector`
+                    )}
+                    onSelect={() =>
+                      onToggleItemSelection({
+                        id: `${id}-sector`,
+                        sourceCardId: id,
+                        sourceCardSymbol: symbol,
+                        label: "Sector",
+                        value: staticData.sector!,
+                      })
                     }
-                  }}
-                  title={`Sector: ${staticData?.sector || "N/A"}`}
-                  labelClassName="text-sm font-medium text-muted-foreground"
-                  valueClassName="text-sm font-semibold text-foreground"
-                  originatingElement="sector-profile-item"
-                  data-testid="sector-profile-item"
-                  // SELECTION PROPS
-                  isSelectionMode={isSelectionMode}
-                  isSelected={selectedDataItems.some(
-                    (item) => item.id === `${id}-sector`
-                  )}
-                  onSelect={() =>
-                    onToggleItemSelection({
-                      id: `${id}-sector`,
-                      sourceCardId: id,
-                      sourceCardSymbol: symbol,
-                      label: "Sector",
-                      value: staticData?.sector || "N/A",
-                    })
-                  }
-                />
+                  />
+                )}
 
                 {staticData?.country && (
                   <DataRow
@@ -171,38 +167,38 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
                   />
                 )}
 
-                <DataRow
-                  label="Employees"
-                  value={staticData?.formatted_full_time_employees}
-                  onClick={() => {
-                    handleInteraction("TRIGGER_CARD_ACTION", {
-                      actionName: "viewEmployeeData",
-                      actionData: {
-                        employees: staticData?.formatted_full_time_employees,
-                      },
-                    } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
-                  }}
-                  title={`${
-                    staticData?.formatted_full_time_employees || "N/A"
-                  } employees`}
-                  labelClassName="text-sm font-medium text-muted-foreground"
-                  valueClassName="text-sm font-semibold text-foreground"
-                  originatingElement="employees-profile-item"
-                  // SELECTION PROPS
-                  isSelectionMode={isSelectionMode}
-                  isSelected={selectedDataItems.some(
-                    (item) => item.id === `${id}-employees`
-                  )}
-                  onSelect={() =>
-                    onToggleItemSelection({
-                      id: `${id}-employees`,
-                      sourceCardId: id,
-                      sourceCardSymbol: symbol,
-                      label: "Employees",
-                      value: staticData?.formatted_full_time_employees || "N/A",
-                    })
-                  }
-                />
+                {staticData?.formatted_full_time_employees && (
+                  <DataRow
+                    label="Employees"
+                    value={staticData.formatted_full_time_employees}
+                    onClick={() => {
+                      handleInteraction("TRIGGER_CARD_ACTION", {
+                        actionName: "viewEmployeeData",
+                        actionData: {
+                          employees: staticData.formatted_full_time_employees,
+                        },
+                      } as Omit<TriggerCardActionInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">);
+                    }}
+                    title={`${staticData.formatted_full_time_employees} employees`}
+                    labelClassName="text-sm font-medium text-muted-foreground"
+                    valueClassName="text-sm font-semibold text-foreground"
+                    originatingElement="employees-profile-item"
+                    // SELECTION PROPS
+                    isSelectionMode={isSelectionMode}
+                    isSelected={selectedDataItems.some(
+                      (item) => item.id === `${id}-employees`
+                    )}
+                    onSelect={() =>
+                      onToggleItemSelection({
+                        id: `${id}-employees`,
+                        sourceCardId: id,
+                        sourceCardSymbol: symbol,
+                        label: "Employees",
+                        value: staticData.formatted_full_time_employees,
+                      })
+                    }
+                  />
+                )}
                 {liveData?.revenue !== null &&
                   liveData?.revenue !== undefined && (
                     <DataRow
@@ -361,40 +357,42 @@ export const ProfileCardContent = React.memo<ProfileCardContentProps>(
 
           <div className="p-0 pt-1 mt-auto">
             <div className="grid grid-cols-2 gap-x-2 items-center mb-0.5">
-              <DataRow
-                label="Price:"
-                value={
-                  (staticData?.currency === "USD"
-                    ? "$"
-                    : staticData?.currency || "$") +
-                  (liveData?.price?.toFixed(2) ?? "N/A")
-                }
-                onClick={() =>
-                  handleInteraction("REQUEST_NEW_CARD", {
-                    targetCardType: "price",
-                    originatingElement: "priceDisplayTriggerProfile",
-                  } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
-                }
-                isInteractive={true}
-                labelClassName="text-sm font-medium text-muted-foreground"
-                valueClassName="text-sm font-semibold text-foreground"
-                // SELECTION PROPS
-                isSelectionMode={isSelectionMode}
-                isSelected={selectedDataItems.some(
-                  (item) => item.id === `${id}-price`
-                )}
-                onSelect={() =>
-                  onToggleItemSelection({
-                    id: `${id}-price`,
-                    sourceCardId: id,
-                    sourceCardSymbol: symbol,
-                    label: "Price",
-                    value: liveData.price,
-                    isMonetary: true,
-                    currency: staticData?.currency,
-                  })
-                }
-              />
+              {liveData?.price !== null && liveData?.price !== undefined && (
+                <DataRow
+                  label="Price:"
+                  value={
+                    (staticData?.currency === "USD"
+                      ? "$"
+                      : staticData?.currency || "$") +
+                    liveData.price.toFixed(2)
+                  }
+                  onClick={() =>
+                    handleInteraction("REQUEST_NEW_CARD", {
+                      targetCardType: "price",
+                      originatingElement: "priceDisplayTriggerProfile",
+                    } as Omit<RequestNewCardInteraction, "intent" | "sourceCardId" | "sourceCardSymbol" | "sourceCardType">)
+                  }
+                  isInteractive={true}
+                  labelClassName="text-sm font-medium text-muted-foreground"
+                  valueClassName="text-sm font-semibold text-foreground"
+                  // SELECTION PROPS
+                  isSelectionMode={isSelectionMode}
+                  isSelected={selectedDataItems.some(
+                    (item) => item.id === `${id}-price`
+                  )}
+                  onSelect={() =>
+                    onToggleItemSelection({
+                      id: `${id}-price`,
+                      sourceCardId: id,
+                      sourceCardSymbol: symbol,
+                      label: "Price",
+                      value: liveData.price,
+                      isMonetary: true,
+                      currency: staticData?.currency,
+                    })
+                  }
+                />
+              )}
               {liveData?.marketCap !== null &&
                 liveData?.marketCap !== undefined && (
                   <DataRow
