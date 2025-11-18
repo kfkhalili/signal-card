@@ -235,6 +235,33 @@ export function useStockData({
     };
   }, [symbol, supabaseClient, onProfileUpdate]);
 
+  // New effect for ratios TTM updates via Realtime
+  useEffect(() => {
+    if (!supabaseClient || !symbol) return;
+
+    const unsubscribe = subscribeToRatiosTTMUpdates(
+      symbol,
+      (payload: RatiosTtmPayload) => {
+        if (payload.new && isMountedRef.current) {
+          const updatedRatios = payload.new as RatiosTtmDBRow;
+          if (onRatiosTTMUpdate) onRatiosTTMUpdate(updatedRatios);
+        }
+      },
+      (status, err) => {
+        if (status === "CHANNEL_ERROR" && err) {
+          console.error(
+            `[useStockData ${symbol}] Ratios TTM Realtime subscription error:`,
+            err
+          );
+        }
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, [symbol, supabaseClient, onRatiosTTMUpdate]);
+
   const fetchInitialData = useCallback(async () => {
     if (!isMountedRef.current || !supabaseClient || !symbol) return;
 
