@@ -4,7 +4,7 @@
 
 -- Update financial-statements
 UPDATE public.data_type_registry_v2
-SET 
+SET
   edge_function_name = 'queue-processor-v2',
   updated_at = NOW()
 WHERE data_type = 'financial-statements'
@@ -12,7 +12,7 @@ WHERE data_type = 'financial-statements'
 
 -- Update ratios-ttm
 UPDATE public.data_type_registry_v2
-SET 
+SET
   edge_function_name = 'queue-processor-v2',
   updated_at = NOW()
 WHERE data_type = 'ratios-ttm'

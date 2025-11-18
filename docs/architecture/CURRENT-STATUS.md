@@ -9,10 +9,10 @@
 
 We've successfully implemented a **metadata-driven, backend-controlled refresh system** with:
 
-✅ **8 data types registered** in `data_type_registry_v2`  
-✅ **8 data types fully migrated** to monofunction architecture  
-✅ **Centralized subscription manager** with reference counting  
-✅ **Infinite job creation bug fixed** (fetched_at properly updated)  
+✅ **8 data types registered** in `data_type_registry_v2`
+✅ **8 data types fully migrated** to monofunction architecture
+✅ **Centralized subscription manager** with reference counting
+✅ **Infinite job creation bug fixed** (fetched_at properly updated)
 ✅ **Subscription deletion bug fixed** (multiple cards share subscriptions correctly)
 
 ---
