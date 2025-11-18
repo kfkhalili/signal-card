@@ -16,11 +16,14 @@ export async function checkFeatureFlag(flagName: string): Promise<boolean> {
   }
 
   try {
-    const { data, error } = await supabase
+    const response = await supabase
       .from('feature_flags' as never)
       .select('enabled')
       .eq('flag_name', flagName)
-      .maybeSingle() as { data: { enabled: boolean } | null; error: Error | null };
+      .maybeSingle();
+
+    // Type assertion: feature_flags table exists but isn't in generated types
+    const { data, error } = response as { data: { enabled: boolean } | null; error: { message: string; code?: string } | null };
 
     if (error) {
       console.warn(`[feature-flags] Error checking flag ${flagName}:`, error);
