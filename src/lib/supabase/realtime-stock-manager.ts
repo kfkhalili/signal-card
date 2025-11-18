@@ -88,11 +88,13 @@ export class RealtimeStockManager extends EventEmitter {
       config: { broadcast: { ack: true } },
     });
 
+    // Subscribe to both INSERT and UPDATE events
+    // New records might be inserted, existing ones updated
     this.quoteChannel
       .on<LiveQuote>(
         "postgres_changes",
         {
-          event: "UPDATE",
+          event: "*", // Listen to both INSERT and UPDATE
           schema: "public",
           table: "live_quote_indicators",
           filter: `symbol=in.(${symbols.join(",")})`,
@@ -100,20 +102,31 @@ export class RealtimeStockManager extends EventEmitter {
         (payload) => {
           if (process.env.NODE_ENV === "development") {
             console.log(
-              `[RealtimeStockManager] Received quote update for ${payload.new?.symbol}`,
+              `[RealtimeStockManager] Received quote ${payload.eventType} for ${payload.new?.symbol}`,
               payload
             );
           }
+          // Use payload.new for both INSERT and UPDATE
           if (payload.new) {
             this.emit("quote", payload.new);
+          } else if (payload.old && payload.eventType === "UPDATE") {
+            // Fallback: if new is missing, try old (shouldn't happen but be safe)
+            console.warn(
+              `[RealtimeStockManager] UPDATE event missing payload.new, using payload.old`,
+              payload
+            );
           }
         }
       )
       .subscribe((status, err) => {
         if (status === "SUBSCRIBED") {
-          console.log(`[RealtimeStockManager] Subscribed to ${symbols.length} symbols`);
+          console.log(
+            `[RealtimeStockManager] Subscribed to ${symbols.length} symbols: ${symbols.join(", ")}`
+          );
         } else if (status === "CHANNEL_ERROR" && err) {
-            console.error("[RealtimeStockManager] Channel error:", err);
+          console.error("[RealtimeStockManager] Channel error:", err);
+        } else {
+          console.log(`[RealtimeStockManager] Channel status: ${status}`, err || "");
         }
       });
   }
