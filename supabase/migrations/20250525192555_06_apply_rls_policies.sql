@@ -26,7 +26,14 @@ WITH CHECK (
 DROP POLICY IF EXISTS "Allow users to update their own profile" ON "public"."user_profiles";
 CREATE POLICY "Allow users to update their own profile" ON "public"."user_profiles"
 FOR UPDATE
+-- The USING clause specifies which rows the user is allowed to update
 USING (
+  ("id" = (select auth.uid())) OR
+  (current_setting('role') = 'service_role')
+)
+-- The WITH CHECK clause validates the data being submitted in the UPDATE statement
+-- This ensures a user cannot change the 'id' of their profile to someone else's
+WITH CHECK (
   ("id" = (select auth.uid())) OR
   (current_setting('role') = 'service_role')
 );

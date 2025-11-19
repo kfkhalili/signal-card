@@ -157,6 +157,27 @@ Delete migrations that are completely overwritten:
 7. **invoke_processor_loop_v2 Function Comment**
    - **Original:** `20251117073704_create_processor_invoker_v2.sql` - Comment now includes final optimization details
 
+## Additional Fixes Applied (Second Scan)
+
+### 1. Analytics Refresh Function
+- **Merged:** Edge Function implementation into `20251117073833_create_analytics_refresh_v2.sql`
+- **Removed:** `20251117120000_update_analytics_refresh_to_edge_function.sql`
+- **Removed:** `20251117120100_update_analytics_refresh_frequency.sql` (redundant cron reschedule)
+
+### 2. Registry Entries
+- **Updated:** `20251117210000_add_financial_statements_to_registry.sql` - now uses `'queue-processor-v2'` from start
+- **Updated:** `20251117220000_add_ratios_ttm_to_registry.sql` - now uses `'queue-processor-v2'` from start
+- **Removed:** `20251118010000_fix_edge_function_name_for_financial_statements_and_ratios_ttm.sql`
+
+### 3. RLS Policies
+- **Updated:** `20250525192555_06_apply_rls_policies.sql` - now includes service_role bypass and GRANT
+- **Removed:** `20250525192558_fix_user_profiles_rls_safe.sql`
+- **Removed:** `20250525192560_temporarily_disable_rls.sql`
+- **Removed:** `20250525192564_reenable_rls_on_user_profiles.sql`
+
+### 4. Data Migrations
+- **Removed:** `20250623100903_fix_gravatar_backfill_for_empty_urls.sql` (data migration, not infrastructure)
+
 ## Test Data Migrations Removed
 
 **Principle:** Migrations should only contain infrastructure setup (tables, RLS, functions, triggers, cron jobs, realtime, etc.) needed for production. Test data insertions should NOT be in migrations.
@@ -166,4 +187,18 @@ Delete migrations that are completely overwritten:
 2. ✅ **`20251118040000_add_lcid_to_supported_symbols.sql`** - Test data (LCID symbol)
 
 **Rationale:** These migrations added test symbols to `supported_symbols` for testing empty card states. This is test data, not infrastructure. Production environments should not have these test symbols automatically inserted.
+
+---
+
+## Final Summary
+
+**Total migrations removed:** 20
+- 13 from first consolidation round
+- 7 from second scan
+
+**Total migrations updated:** 8
+- 4 from first consolidation round
+- 4 from second scan
+
+**Result:** All migrations now represent final state. Fresh database deployments get correct state immediately without intermediate changes.
 
