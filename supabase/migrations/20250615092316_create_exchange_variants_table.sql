@@ -66,3 +66,6 @@ CREATE POLICY "Allow service_role full access to exchange_variants"
 GRANT ALL ON TABLE "public"."exchange_variants" TO "service_role";
 GRANT SELECT ON TABLE "public"."exchange_variants" TO "anon";
 GRANT SELECT ON TABLE "public"."exchange_variants" TO "authenticated";
+
+-- Enable Realtime
+ALTER PUBLICATION supabase_realtime ADD TABLE exchange_variants;

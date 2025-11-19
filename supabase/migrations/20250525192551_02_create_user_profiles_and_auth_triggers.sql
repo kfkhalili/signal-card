@@ -7,12 +7,14 @@ CREATE TABLE IF NOT EXISTS "public"."user_profiles" (
     "full_name" "text",
     "avatar_url" "text",
     "updated_at" timestamp with time zone DEFAULT "timezone"('utc'::"text", "now"()),
+    "is_profile_complete" boolean NOT NULL DEFAULT false,
     CONSTRAINT "username_length" CHECK ((("char_length"("username") >= 3) AND ("char_length"("username") <= 50)))
 );
 
 ALTER TABLE "public"."user_profiles" OWNER TO "postgres";
 COMMENT ON TABLE "public"."user_profiles" IS 'Extends auth.users with custom profile data.';
 COMMENT ON COLUMN "public"."user_profiles"."id" IS 'Links to auth.users.id and is the Primary Key.';
+COMMENT ON COLUMN "public"."user_profiles"."is_profile_complete" IS 'Tracks if the user has completed the initial profile setup (e.g., setting a username). New users default to FALSE.';
 
 -- Unique constraint for username
 ALTER TABLE "public"."user_profiles" DROP CONSTRAINT IF EXISTS "user_profiles_username_key";
