@@ -117,6 +117,6 @@
 ✅ **Fresh database gets correct final state immediately**
 ✅ **Cleaner migration history**
 
-**Total migrations removed:** 7
-**Total migrations updated:** 4
+**Total migrations removed:** 7 (first pass) + 4 (second pass) = 11
+**Total migrations updated:** 4 (first pass) + 3 (second pass) = 7
 

@@ -192,13 +192,30 @@ Delete migrations that are completely overwritten:
 
 ## Final Summary
 
-**Total migrations removed:** 20
+**Total migrations removed:** 24
 - 13 from first consolidation round
-- 7 from second scan
+- 7 from second scan (first pass)
+- 4 from second scan (second pass)
 
-**Total migrations updated:** 8
+**Total migrations updated:** 11
 - 4 from first consolidation round
-- 4 from second scan
+- 4 from second scan (first pass)
+- 3 from second scan (second pass)
 
 **Result:** All migrations now represent final state. Fresh database deployments get correct state immediately without intermediate changes.
+
+### Second Pass Fixes (Second Scan)
+
+1. **Removed function creation that gets deleted later**
+   - Removed `handle_new_user()` from `20250525192551` (it gets removed later)
+   - Deleted `20250525192563_remove_broken_auth_automation.sql`
+
+2. **Merged function modifications into original creation**
+   - Updated `20250525192559` to include Gravatar URL and `is_profile_complete` handling
+   - Removed `20250623091129_add_gravatar_to_user_profile.sql`
+   - Removed `20250623105638_fix_user_creation_webhook.sql`
+
+3. **Merged RLS policy fix into original creation**
+   - Updated `20250525192555` to include `WITH CHECK` clause in UPDATE policy
+   - Removed `20250623223929_fix_user_profile_update_policy.sql`
 
