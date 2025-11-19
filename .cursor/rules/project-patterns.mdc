@@ -280,23 +280,36 @@ const memoizedCallback = useCallback(() => {
 - **Route handler client**: Use `createSupabaseRouteHandlerClient()` for API routes
 
 #### Query Patterns
-- Always handle errors from Supabase queries
+- **Always use `fromPromise()` and Result types** for Supabase queries
 - Use TypeScript types from `@/lib/supabase/database.types`
-- Prefer explicit error handling over throwing
+- Never use direct `const { data, error } = await supabase` pattern
+- See `database.mdc` for detailed query patterns
 
 ```typescript
-const { data, error } = await supabase
-  .from("table_name")
-  .select("*")
-  .eq("column", "value");
+import { fromPromise, Result } from "neverthrow";
+import { Option } from "effect";
 
-if (error) {
-  return err(new Error(error.message));
+// ✅ GOOD: Using fromPromise for async Supabase queries
+async function fetchData(
+  supabase: SupabaseClient,
+  symbol: string
+): Promise<Result<Option.Option<DataDBRow>, Error>> {
+  const result = await fromPromise(
+    supabase
+      .from("table_name")
+      .select("*")
+      .eq("column", "value")
+      .maybeSingle(),
+    (e) => e as Error
+  );
+  return result.map((response) =>
+    response.data ? Option.some(response.data) : Option.none()
+  );
 }
-if (!data || data.length === 0) {
-  return err(new Error("No data found"));
-}
-return ok(data);
+
+// ❌ BAD: Direct query pattern (don't use this)
+// const { data, error } = await supabase.from("table_name").select("*");
+// if (error) { return err(new Error(error.message)); }
 ```
 
 #### Real-time Subscription Pattern

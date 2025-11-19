@@ -91,29 +91,44 @@ export function useContextHook(): ContextValue {
 
 ### Supabase Query Pattern
 
+**Always use `fromPromise()` and Result types** - see `database.mdc` for detailed patterns.
+
 ```typescript
-import { ok, err, Result } from "neverthrow";
+import { fromPromise, Result } from "neverthrow";
+import { Option } from "effect";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+// ✅ GOOD: Using fromPromise for async Supabase queries
 async function fetchData(
   supabase: SupabaseClient,
   symbol: string
-): Promise<Result<Data[], Error>> {
-  const { data, error } = await supabase
-    .from("table_name")
-    .select("*")
-    .eq("symbol", symbol);
-
-  if (error) {
-    return err(new Error(error.message));
-  }
-
-  if (!data || data.length === 0) {
-    return err(new Error("No data found"));
-  }
-
-  return ok(data);
+): Promise<Result<Option.Option<DataDBRow>, Error>> {
+  const result = await fromPromise(
+    supabase
+      .from("table_name")
+      .select("*")
+      .eq("symbol", symbol)
+      .maybeSingle(),
+    (e) => e as Error
+  );
+  return result.map((response) =>
+    response.data ? Option.some(response.data) : Option.none()
+  );
 }
+
+// Usage:
+const dataResult = await fetchData(supabase, "AAPL");
+dataResult.match(
+  (dataOption) => {
+    if (Option.isSome(dataOption)) {
+      // Use dataOption.value
+    }
+  },
+  (error) => {
+    // Handle error
+    console.error(error);
+  }
+);
 ```
 
 ### Real-time Subscription Pattern
