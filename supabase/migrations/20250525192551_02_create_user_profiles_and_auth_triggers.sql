@@ -29,5 +29,46 @@ ALTER TABLE "public"."user_profiles" DROP CONSTRAINT IF EXISTS "user_profiles_id
 ALTER TABLE ONLY "public"."user_profiles"
     ADD CONSTRAINT "user_profiles_id_fkey" FOREIGN KEY ("id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
+-- Enable RLS
+ALTER TABLE "public"."user_profiles" ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies
+-- CRITICAL: Allow service role to bypass RLS for automatic user profile creation
+DROP POLICY IF EXISTS "Users can view their own profile" ON "public"."user_profiles";
+CREATE POLICY "Users can view their own profile" ON "public"."user_profiles"
+FOR SELECT USING (
+  (select auth.uid()) = "id" OR
+  (current_setting('role') = 'service_role')
+);
+
+DROP POLICY IF EXISTS "Allow users to insert their own profile" ON "public"."user_profiles";
+CREATE POLICY "Allow users to insert their own profile" ON "public"."user_profiles"
+FOR INSERT
+WITH CHECK (
+  ("id" = (select auth.uid())) OR
+  (current_setting('role') = 'service_role')
+);
+
+DROP POLICY IF EXISTS "Allow users to update their own profile" ON "public"."user_profiles";
+CREATE POLICY "Allow users to update their own profile" ON "public"."user_profiles"
+FOR UPDATE
+-- The USING clause specifies which rows the user is allowed to update
+USING (
+  ("id" = (select auth.uid())) OR
+  (current_setting('role') = 'service_role')
+)
+-- The WITH CHECK clause validates the data being submitted in the UPDATE statement
+-- This ensures a user cannot change the 'id' of their profile to someone else's
+WITH CHECK (
+  ("id" = (select auth.uid())) OR
+  (current_setting('role') = 'service_role')
+);
+
+-- Grants
+-- CRITICAL: Service role needs access to create user profiles automatically
+GRANT ALL ON TABLE "public"."user_profiles" TO "service_role";
+GRANT ALL ON TABLE "public"."user_profiles" TO "anon";
+GRANT ALL ON TABLE "public"."user_profiles" TO "authenticated";
+
 -- User profile creation is handled via webhook function (handle_user_created_webhook)
 -- See: 20250525192559_create_user_profile_webhook_function.sql

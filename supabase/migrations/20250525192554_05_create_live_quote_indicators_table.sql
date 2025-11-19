@@ -49,3 +49,29 @@ CREATE INDEX IF NOT EXISTS "idx_live_quote_indicators_symbol" ON "public"."live_
 -- ALTER TABLE "public"."live_quote_indicators" DROP CONSTRAINT IF EXISTS "fk_lqi_symbol";
 -- ALTER TABLE ONLY "public"."live_quote_indicators"
 --     ADD CONSTRAINT "fk_lqi_symbol" FOREIGN KEY ("symbol") REFERENCES "public"."profiles"("symbol") ON DELETE CASCADE;
+
+-- Enable RLS
+ALTER TABLE "public"."live_quote_indicators" ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies
+DROP POLICY IF EXISTS "Allow public read-only access to live quotes" ON "public"."live_quote_indicators";
+CREATE POLICY "Allow public read-only access to live quotes" ON "public"."live_quote_indicators" FOR SELECT USING (true);
+
+-- Grants
+GRANT ALL ON TABLE "public"."live_quote_indicators" TO "anon";
+GRANT ALL ON TABLE "public"."live_quote_indicators" TO "authenticated";
+GRANT ALL ON TABLE "public"."live_quote_indicators" TO "service_role";
+
+-- Enable Realtime
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables
+        WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'live_quote_indicators'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.live_quote_indicators;
+        RAISE NOTICE 'Table public.live_quote_indicators added to publication supabase_realtime.';
+    ELSE
+        RAISE NOTICE 'Table public.live_quote_indicators is already a member of publication supabase_realtime. Skipping ADD.';
+    END IF;
+END $$;

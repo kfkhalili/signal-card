@@ -62,3 +62,29 @@ CREATE INDEX IF NOT EXISTS "idx_profiles_modified_at" ON "public"."profiles" USI
 
 -- Trigger for profiles modified_at
 CREATE OR REPLACE TRIGGER "handle_profiles_updated_at" BEFORE UPDATE ON "public"."profiles" FOR EACH ROW EXECUTE FUNCTION "extensions"."moddatetime"('modified_at');
+
+-- Enable RLS
+ALTER TABLE "public"."profiles" ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies
+DROP POLICY IF EXISTS "Allow public read-only access to profiles" ON "public"."profiles";
+CREATE POLICY "Allow public read-only access to profiles" ON "public"."profiles" FOR SELECT USING (true);
+
+-- Grants
+GRANT ALL ON TABLE "public"."profiles" TO "anon";
+GRANT ALL ON TABLE "public"."profiles" TO "authenticated";
+GRANT ALL ON TABLE "public"."profiles" TO "service_role";
+
+-- Enable Realtime
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables
+        WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'profiles'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
+        RAISE NOTICE 'Table public.profiles added to publication supabase_realtime.';
+    ELSE
+        RAISE NOTICE 'Table public.profiles is already a member of publication supabase_realtime. Skipping ADD.';
+    END IF;
+END $$;
