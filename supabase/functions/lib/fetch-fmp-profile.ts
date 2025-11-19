@@ -36,7 +36,7 @@ const FmpProfileSchema = z.object({
   ceo: z.string().optional(),
   sector: z.string().optional(),
   country: z.string().length(2).optional(),
-  fullTimeEmployees: z.string().optional(), // FMP provides as string
+  fullTimeEmployees: z.string().nullable().optional(), // FMP provides as string or null
   phone: z.string().optional(),
   address: z.string().optional(),
   city: z.string().optional(),
