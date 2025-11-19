@@ -83,7 +83,7 @@ The `handle-new-user` Edge Function is designed to automatically create user pro
 3. **Webhook URL**: `https://[your-project-ref].supabase.co/functions/v1/handle-new-user`
 4. **HTTP Method**: POST
 5. **Events**: Select **User Created** (or **auth.users INSERT**)
-6. **HTTP Headers**: 
+6. **HTTP Headers**:
    ```
    Authorization: Bearer [YOUR_ANON_KEY]
    Content-Type: application/json
@@ -138,7 +138,7 @@ curl -X POST https://[project-ref].supabase.co/functions/v1/handle-new-user \
 
 ### Check Recent User Profiles
 ```sql
-SELECT 
+SELECT
   id,
   username,
   is_profile_complete,
