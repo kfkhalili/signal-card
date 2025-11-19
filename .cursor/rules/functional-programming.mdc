@@ -1,9 +1,34 @@
 ---
-description: Functional programming paradigm and Effect library usage guidelines
+description: Functional programming paradigm with Effect (Option types) and neverthrow (Result types) libraries
 globs: **/*.ts, **/*.tsx
 ---
 
-# Functional Programming with Effect
+# Functional Programming with Effect and neverthrow
+
+## Library Separation
+
+This project uses two complementary functional programming libraries for different concerns:
+
+- **Effect's `Option<T>`**: For **optional/missing values** (not errors)
+  - `Some(value)` = value exists
+  - `None` = value doesn't exist (this is NOT an error, just absence)
+  - Use when: data might not exist, but that's expected/normal
+  - Example: Profile might not exist in database yet (empty state, not an error)
+
+- **neverthrow's `Result<T, E>`**: For **error handling** (operation failures)
+  - `Ok(value)` = operation succeeded
+  - `Err(error)` = operation failed (network error, auth error, etc.)
+  - Use when: operations can fail and need error handling
+  - Example: Database query failed due to network issue (actual error)
+
+**Key Distinction:**
+- `Option` = "Is there a value?" (absence is valid, not an error)
+- `Result` = "Did the operation succeed?" (failure is an error)
+
+**They work together:** `Result<Option<T>, Error>`
+- `Result` handles: "Did the database query succeed or fail?" (errors)
+- `Option` handles: "Is there data in the successful result?" (optional data)
+- This separates error handling from optional data handling
 
 ## Core Principles
 
@@ -12,16 +37,17 @@ globs: **/*.ts, **/*.tsx
 - **Use pure functions**: Functions should have no side effects when possible
 - **Compose functions**: Build complex behavior from simple, composable functions
 - **Avoid null/undefined**: Use `Option` types instead of nullable values
-- **Handle errors functionally**: Use `Result` types (neverthrow) or `Either` (Effect) instead of throwing exceptions
+- **Handle errors functionally**: Use `Result<T, E>` types from neverthrow instead of throwing exceptions
 - **Separate data from behavior**: Data structures should be plain objects/interfaces, behavior in functions
 
 ### Effect Library Usage
 
-#### When to Use Effect
+#### When to Use Effect (Option Types Only)
 - **Option types**: Always use `Option<T>` instead of `T | null` or `T | undefined`
-- **Error handling**: Use `Result<T, E>` from neverthrow for async operations, or `Either<E, T>` from Effect
-- **Composition**: Use Effect's combinators for chaining operations
+- **NOT for error handling**: Effect's `Either` is not used; use neverthrow's `Result<T, E>` for errors
+- **Composition**: Use Effect's combinators (pipe, map, flatMap) for chaining Option operations
 - **Type safety**: Leverage Effect's type system to eliminate null checks
+- **Remember**: `Option` is for optional/missing values (not errors), `Result` is for error handling
 
 #### Option Type Pattern
 
@@ -224,6 +250,7 @@ function getDisplayName(profile: Option<Profile>): string {
 8. **Never suppress errors - handle them functionally with Result types**
 9. **State should be `Option<T>`, not `T | null`**
 10. **Use Effect's combinators (pipe, map, flatMap, etc.) for data transformations**
+11. **NEVER use `any` type** - Use `unknown` with type guards, or proper types from libraries (see `typescript.mdc` for details)
 
 ## Migration Guide
 

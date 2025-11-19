@@ -1,7 +1,7 @@
 # Current Implementation Status
 
-**Last Updated:** 2025-11-18
-**Overall Progress:** ~85% Complete
+**Last Updated:** 2025-11-19
+**Overall Progress:** ~90% Complete
 
 ---
 
@@ -73,6 +73,25 @@ We've successfully implemented a **metadata-driven, backend-controlled refresh s
 
 ---
 
+## Recent Fixes (2025-11-19)
+
+### Exchange Variants Card ✅
+- **Issue:** Card showing stale data from localStorage, not re-rendering when data arrives
+- **Root Cause:** 
+  - Realtime was disabled for `exchange_variants` table
+  - Card was using multiple tables (profiles, available_exchanges) incorrectly
+  - Special re-initialization logic was interfering with normal flow
+- **Solution:**
+  - ✅ Enabled realtime for `exchange_variants` table via migration
+  - ✅ Refactored card to use only `exchange_variants` table for variant data
+  - ✅ Kept `profiles` table for company info (name, logo, website)
+  - ✅ Kept `available_exchanges` table for country info
+  - ✅ Base exchange determined from base variant in `exchange_variants` table
+  - ✅ Removed special re-initialization logic (now behaves like all other cards)
+  - ✅ Fixed React.memo comparison to detect `baseExchangeInfo` changes
+  - ✅ Added key prop to WorldMap to force re-render when markers change
+  - ✅ Added comprehensive logging for realtime data flow debugging
+
 ## Remaining Tasks
 
 ### High Priority
@@ -85,12 +104,14 @@ We've successfully implemented a **metadata-driven, backend-controlled refresh s
    - Verify no infinite job creation
    - Verify subscriptions are managed correctly
    - Verify exchange status checks are working
+   - Verify realtime updates propagate correctly for all data types
 
 ### Low Priority
 3. **Clean up old code paths** (when all types migrated)
    - Disable old cron jobs
    - Remove old Edge Functions (if not used elsewhere)
    - Update documentation
+   - Remove debug logging (after monitoring period)
 
 ---
 

@@ -345,11 +345,9 @@ useEffect(() => {
 #### Standard Structure
 ```typescript
 // supabase/functions/[function-name]/index.ts
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "@supabase/supabase-js";
+import { CORS_HEADERS } from "../_shared/auth.ts";
 
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight
@@ -374,7 +372,7 @@ Deno.serve(async (req: Request) => {
   } catch (error) {
     console.error("[function-name] Error:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       {
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
         status: 500,
@@ -506,7 +504,9 @@ const handleClick = () => {
 
 #### Code Comments
 - Use JSDoc for exported functions and types
-- Explain **why**, not **what** (code should be self-documenting)
+- **Focus on WHY, not WHAT** - The WHY is more important than WHAT
+- Explain **why** something is done a certain way, not what it does (code should be self-documenting)
+- Document the reasoning, business logic, trade-offs, and non-obvious decisions
 - Document complex algorithms and business logic
 
 ```typescript

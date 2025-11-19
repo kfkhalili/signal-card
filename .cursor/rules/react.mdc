@@ -5,6 +5,104 @@ globs: **/*.tsx, **/*.jsx, components/**/*
 
 # React Best Practices
 
+**Version:** React 19 RC (react: ^19.0.0-rc.1)
+
+## React 19 Features
+
+### Server Actions
+Use async Server Actions for form submissions and mutations:
+```typescript
+// app/actions/submit-form.ts
+"use server";
+
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+export async function submitForm(formData: FormData) {
+  const supabase = await createSupabaseServerClient();
+  const symbol = formData.get("symbol") as string;
+
+  // Server action logic
+  const { data, error } = await supabase
+    .from("table")
+    .insert({ symbol });
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  return { success: true, data };
+}
+```
+
+### useFormStatus
+Access form submission state in form components:
+```typescript
+"use client";
+
+import { useFormStatus } from "react-dom";
+import { Button } from "@/components/ui/button";
+
+function SubmitButton() {
+  const { pending } = useFormStatus();
+
+  return (
+    <Button type="submit" disabled={pending}>
+      {pending ? "Submitting..." : "Submit"}
+    </Button>
+  );
+}
+```
+
+### useOptimistic
+Optimistically update UI before server confirmation:
+```typescript
+"use client";
+
+import { useOptimistic } from "react";
+
+function CardList({ cards }: { cards: Card[] }) {
+  const [optimisticCards, addOptimisticCard] = useOptimistic(
+    cards,
+    (state, newCard: Card) => [...state, newCard]
+  );
+
+  async function handleAddCard(card: Card) {
+    addOptimisticCard(card); // Immediately update UI
+    await submitCard(card); // Then sync with server
+  }
+
+  return (
+    <div>
+      {optimisticCards.map(card => <Card key={card.id} data={card} />)}
+    </div>
+  );
+}
+```
+
+### Improved Suspense
+Better integration with Server Components and data fetching:
+```typescript
+// app/workspace/page.tsx
+import { Suspense } from "react";
+import { WorkspaceContent } from "./workspace-content";
+
+export default function WorkspacePage() {
+  return (
+    <Suspense fallback={<WorkspaceSkeleton />}>
+      <WorkspaceContent />
+    </Suspense>
+  );
+}
+
+// workspace-content.tsx (Server Component)
+async function WorkspaceContent() {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase.from("cards").select("*");
+
+  return <Workspace cards={data} />;
+}
+```
+
 ## Component Structure
 - Use functional components over class components
 - Keep components small and focused
@@ -75,4 +173,4 @@ globs: **/*.tsx, **/*.jsx, components/**/*
 - Implement proper directory structure
 - Keep styles close to components
 - Use proper imports/exports
-- Document complex component logic 
+- Document complex component logic

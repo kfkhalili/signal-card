@@ -30,9 +30,9 @@
 | | | `profiles` | `symbol` | `modified_at` | 1440 (24h) | Company name/logo (optional) |
 | **analystgrades** | `grades-historical` | `grades_historical` | `symbol` | `fetched_at` | 43200 (30d) | Analyst ratings |
 | | | `profiles` | `symbol` | `modified_at` | 1440 (24h) | Company name/logo (optional) |
-| **exchangevariants** | `exchange-variants` | `exchange_variants` | `base_symbol` ⚠️ | `fetched_at` | 1440 (24h) | International listings |
-| | | `profiles` | `symbol` | `modified_at` | 1440 (24h) | Company name/logo (optional) |
-| | | `available_exchanges` | N/A | N/A | N/A | N/A | Exchange metadata (read-only) |
+| **exchangevariants** | `exchange-variants` | `exchange_variants` | `base_symbol` ⚠️ | `fetched_at` | 1440 (24h) | Variant data (primary) - base exchange determined from base variant |
+| | `profile` | `profiles` | `symbol` | `modified_at` | 1440 (24h) | Company name/logo/website |
+| | | `available_exchanges` | N/A | N/A | N/A | N/A | Exchange metadata (country info) - read-only reference data |
 | **custom** | None | None | N/A | N/A | N/A | Custom cards don't use database tables |
 
 ⚠️ **Note:** `exchange-variants` uses `base_symbol` instead of `symbol` in the registry.
@@ -84,9 +84,12 @@
    - Timestamp: `fetched_at`
 
 8. **`exchange_variants`** - Exchange variant information
-   - Used by: `exchangevariants` card
+   - Used by: `exchangevariants` card (primary data source)
    - Symbol column: `base_symbol` (⚠️ different from other tables)
    - Timestamp: `fetched_at`
+   - **CRITICAL:** Base exchange is determined from base variant (where `variant_symbol === symbol`)
+   - **CRITICAL:** Only actively trading variants are shown (`is_actively_trading = true`)
+   - **CRITICAL:** Realtime enabled (2025-11-19) - card re-renders when data arrives
 
 9. **`available_exchanges`** - Available exchanges list
    - Used by: `exchangevariants` card (for exchange metadata)

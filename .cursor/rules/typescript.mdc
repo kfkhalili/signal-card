@@ -44,14 +44,21 @@ globs: **/*.ts, **/*.tsx, **/*.d.ts
 - Use readonly for immutable properties
 - Leverage discriminated unions for type safety
 - Use type guards for runtime type checking
-- Implement proper null checking
+- **Prefer `Option<T>` from Effect over nullable types** (`T | null` or `T | undefined`)
+  - Use `Option<T>` for optional values in functional code
+  - Use nullable types only when interfacing with external APIs or libraries that require them
+  - See `functional-programming.mdc` for detailed Option usage patterns
 - Avoid type assertions unless necessary
 
 ## Error Handling
 - Create custom error types for domain-specific errors
-- Use Result types for operations that can fail
+- **Use `Result<T, E>` from neverthrow** for operations that can fail
+  - Never throw errors directly; return `Result<T, E>` instead
+  - Use `.match()` to handle both success and error cases
+  - Use `fromPromise()` for async operations
+  - See `project-patterns.mdc` for detailed Result usage patterns
 - Implement proper error boundaries
-- Use try-catch blocks with typed catch clauses
+- Use try-catch blocks with typed catch clauses (only when necessary, prefer Result types)
 - Handle Promise rejections properly
 
 ## Patterns

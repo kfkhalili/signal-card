@@ -1,7 +1,7 @@
 # Build Progress Tracking
 
-**Last Updated:** 2025-11-17
-**Current Phase:** Phase 3 - Staleness System
+**Last Updated:** 2025-11-19
+**Current Phase:** Phase 6 - Full Migration (95% complete)
 
 ## Progress Overview
 
@@ -10,12 +10,12 @@ Phase 0: Safety Infrastructure        [██████████] 100%
 Phase 1: Foundation (Parallel)        [██████████] 100%
 Phase 2: Queue System (Parallel)      [██████████] 100%
 Phase 3: Staleness System (Parallel)  [██████████] 100%
-Phase 4: Frontend Integration         [████████░░] 80%
-Phase 5: Migration (One Type)         [░░░░░░░░░░] 0%
-Phase 6: Full Migration               [░░░░░░░░░░] 0%
+Phase 4: Frontend Integration         [██████████] 100%
+Phase 5: Migration (One Type)         [██████████] 100%
+Phase 6: Full Migration               [█████████░] 95%
 ```
 
-**Overall Progress:** 71% (5.0/7 phases complete)
+**Overall Progress:** 99% (6.95/7 phases complete)
 
 ---
 
@@ -296,9 +296,10 @@ Phase 0 complete. Feature flags, health check, and baseline capture are in place
 
 ## Phase 6: Full Migration
 
-**Status:** 🟡 In Progress (75%)
+**Status:** 🟢 Nearly Complete (95%)
 **Target:** Week 5-6
 **Started:** 2025-11-18
+**Last Updated:** 2025-11-19
 
 ### Tasks
 
@@ -306,25 +307,35 @@ Phase 0 complete. Feature flags, health check, and baseline capture are in place
 - [x] Fix edge_function_name in registry:
   - [x] `financial-statements` → queue-processor-v2
   - [x] `ratios-ttm` → queue-processor-v2
-- [ ] Disable old cron jobs (when all types migrated)
-- [ ] Remove old code paths (when all types migrated)
-- [ ] Final monitoring and validation
+- [x] Enable realtime for all data type tables:
+  - [x] `exchange_variants` table realtime enabled (2025-11-19)
+- [x] Fix exchange variants card:
+  - [x] Refactored to use only `exchange_variants` table for variant data
+  - [x] Removed special re-initialization logic
+  - [x] Fixed React.memo comparison for proper re-rendering
+  - [x] Added comprehensive logging for debugging
+- [ ] Disable old cron jobs (when monitoring confirms stability - 24-48 hours)
+- [ ] Remove old code paths (when monitoring confirms stability)
+- [ ] Remove debug logging (after monitoring period)
+- [ ] Final monitoring and validation (in progress)
 
 **Current Migration Status:**
-- ✅ `profile` → queue-processor-v2
-- ✅ `quote` → queue-processor-v2
-- ✅ `dividend-history` → queue-processor-v2
-- ✅ `revenue-product-segmentation` → queue-processor-v2
-- ✅ `grades-historical` → queue-processor-v2
-- ✅ `exchange-variants` → queue-processor-v2
-- ✅ `financial-statements` → queue-processor-v2
-- ✅ `ratios-ttm` → queue-processor-v2
+- ✅ `profile` → queue-processor-v2 (realtime enabled)
+- ✅ `quote` → queue-processor-v2 (realtime enabled)
+- ✅ `dividend-history` → queue-processor-v2 (realtime enabled)
+- ✅ `revenue-product-segmentation` → queue-processor-v2 (realtime enabled)
+- ✅ `grades-historical` → queue-processor-v2 (realtime enabled)
+- ✅ `exchange-variants` → queue-processor-v2 (realtime enabled - 2025-11-19)
+- ✅ `financial-statements` → queue-processor-v2 (realtime enabled)
+- ✅ `ratios-ttm` → queue-processor-v2 (realtime enabled)
 
 **Deliverables:**
 - [x] 8/8 data types fully migrated to monofunction architecture
 - [x] All data types using queue-processor-v2
-- [ ] Old system removed (when monitoring confirms stability)
+- [x] All data type tables have realtime enabled
+- [x] All cards properly re-render when data arrives via realtime
 - [x] System fully operational
+- [ ] Old system removed (when monitoring confirms stability - pending)
 
 ---
 
@@ -379,3 +390,18 @@ SELECT * FROM api_call_queue_v2 ORDER BY created_at DESC LIMIT 10;
     - **Impact:** Simpler architecture, client-driven subscription management, backend only cleans up stale entries
     - **Status:** `refresh-analytics-from-presence-v2` runs every minute to clean up stale subscriptions (> 5 minutes old)
   - **System Status:** Working correctly - quote data refreshing automatically every minute
+
+**2025-11-19:**
+- Phase 6 nearly complete (95%)
+- **Exchange Variants Card Fix:**
+  - Enabled realtime for `exchange_variants` table (migration `20251119120000_enable_realtime_for_exchange_variants.sql`)
+  - Refactored card initialization to use only `exchange_variants` table for variant data
+  - Kept `profiles` table for company info (name, logo, website)
+  - Kept `available_exchanges` table for country info (exchange metadata)
+  - Base exchange determined from base variant in `exchange_variants` table (where `variant_symbol === symbol`)
+  - Removed special re-initialization logic that was causing stale data issues
+  - Fixed React.memo comparison to detect `baseExchangeInfo` changes
+  - Added key prop to WorldMap component to force re-render when markers change
+  - Added comprehensive logging throughout realtime data flow for debugging
+  - **Result:** Card now properly re-renders when data arrives via Supabase Realtime
+- **System Status:** All 8 data types fully migrated, all realtime subscriptions working, system operational
