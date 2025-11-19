@@ -603,8 +603,6 @@ export function subscribeToExchangeVariantsUpdates(
     config: { broadcast: { ack: true } },
   });
 
-  console.log(`[realtime-service (${baseSymbol})] Setting up exchange variants channel: ${channelName}, filter: ${topicFilter}`);
-
   channel
     .on<ExchangeVariantsDBRow>(
       "postgres_changes",
@@ -615,7 +613,6 @@ export function subscribeToExchangeVariantsUpdates(
         filter: topicFilter,
       },
       (payload) => {
-        console.log(`[realtime-service (${baseSymbol})] Received postgres_changes event:`, payload);
         if (typeof onData === "function") {
           onData(payload as ExchangeVariantsPayload);
         } else {
@@ -624,7 +621,9 @@ export function subscribeToExchangeVariantsUpdates(
       }
     )
     .subscribe((status, err) => {
-      console.log(`[realtime-service (${baseSymbol})] Channel subscription status: ${status}`, err ? `Error: ${err.message}` : '');
+      if (status === "CHANNEL_ERROR" && err) {
+        console.error(`[realtime-service (${baseSymbol})] Channel subscription error:`, err);
+      }
       const castedStatus = status as SubscriptionStatus;
       if (typeof onStatusChange === "function") {
         onStatusChange(castedStatus, err);
