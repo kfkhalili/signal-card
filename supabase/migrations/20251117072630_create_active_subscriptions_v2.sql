@@ -47,3 +47,13 @@ CREATE POLICY "Only service role can modify subscriptions"
   USING (true)
   WITH CHECK (true);
 
+-- Users can delete their own subscriptions (for client-side cleanup)
+-- CRITICAL: Users need to be able to delete their own subscriptions when cards are removed
+-- The upsert_active_subscription_v2 function is SECURITY DEFINER (bypasses RLS for INSERT/UPDATE)
+-- But DELETE is called directly from the client, so it needs an RLS policy
+CREATE POLICY "Users can delete their own subscriptions"
+  ON public.active_subscriptions_v2
+  FOR DELETE
+  TO authenticated
+  USING (auth.uid() = user_id);
+
