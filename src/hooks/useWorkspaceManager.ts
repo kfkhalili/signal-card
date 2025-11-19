@@ -175,7 +175,7 @@ export function useWorkspaceManager() {
 
       const symbolsResult = await fromPromise(
         supabase
-          .from("supported_symbols")
+          .from("listed_symbols")
           .select("symbol")
           .eq("is_active", true),
         (e) => e as Error
@@ -183,7 +183,7 @@ export function useWorkspaceManager() {
 
       if (symbolsResult.isErr() || !symbolsResult.value.data) {
         console.error(
-          "Failed to fetch supported symbols:",
+          "Failed to fetch listed symbols:",
           symbolsResult.isErr() && symbolsResult.error
         );
         return;
