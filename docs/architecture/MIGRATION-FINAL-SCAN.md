@@ -67,4 +67,5 @@ All remaining migrations are **infrastructure setup**:
 - Merged RLS, policies, grants, and realtime for initial tables into their table creation migrations
 - Removed 20250525192555_06_apply_rls_policies.sql (table-specific policies merged)
 - Kept 20250525192556_07_configure_realtime_and_permissions.sql for global schema settings only
+- Fixed non-idempotent cron job scheduling in 20251117074150_create_cron_jobs_v2.sql (now uses IF NOT EXISTS pattern)
 
