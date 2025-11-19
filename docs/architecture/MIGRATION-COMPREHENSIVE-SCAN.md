@@ -39,21 +39,23 @@ This comprehensive scan examined:
 - **Fix:** Changed to `DO $$ BEGIN IF NOT EXISTS ...` pattern
 - **Status:** ✅ Fixed and committed
 
-### ⚠️ Issue 2: Inconsistent Vault Secret Names and URL Patterns (NOTED)
+### ✅ Issue 2: Inconsistent Vault Secret Names and URL Patterns (FIXED)
 - **File:** `20251116161200_schedule_cron_jobs.sql`
-- **Problem:** 
-  - Some cron jobs use `latest_project_url` with old URL pattern (no `/functions/v1/` prefix)
-  - Other cron jobs use `project_url` with correct URL pattern (`/functions/v1/` prefix)
+- **Problem:**
+  - Some cron jobs used `latest_project_url` with old URL pattern (no `/functions/v1/` prefix)
+  - Other cron jobs used `project_url` with correct URL pattern (`/functions/v1/` prefix)
   - **Old pattern:** `latest_project_url || '/fetch-fmp-financial-statements'`
   - **New pattern:** `project_url || '/functions/v1/fetch-fmp-quote-indicators'`
-- **Affected Jobs:**
-  - Uses `latest_project_url` (old pattern): `monthly-fetch-fmp-financial-statements`, `hourly-fetch-fmp-profiles`, `daily-fetch-fmp-shares-float`, `daily-fetch-fmp-ratios-ttm`, `quarterly-fetch-fmp-dividend-history`, `yearly-fetch-fmp-revenue-segmentation`, `monthly-fetch-fmp-grades-historical`, `daily-fetch-fmp-exchange-variants`, `daily-fetch-exchange-rates`
+- **Affected Jobs (FIXED):**
+  - All jobs now use `project_url` with `/functions/v1/` prefix: `monthly-fetch-fmp-financial-statements`, `hourly-fetch-fmp-profiles`, `daily-fetch-fmp-shares-float`, `daily-fetch-fmp-ratios-ttm`, `quarterly-fetch-fmp-dividend-history`, `yearly-fetch-fmp-revenue-segmentation`, `monthly-fetch-fmp-grades-historical`, `daily-fetch-fmp-exchange-variants`, `daily-fetch-exchange-rates`
+- **Fix:** Updated all 9 cron jobs to use `project_url` with `/functions/v1/` prefix
+- **Status:** ✅ Fixed
   - Uses `project_url` (new pattern): `minute-fetch-fmp-quote-indicators`, `hourly-fetch-fmp-all-exchange-market-status`
-- **Impact:** 
+- **Impact:**
   - If `latest_project_url` doesn't exist in vault, these jobs will fail
   - URL pattern inconsistency may indicate deprecated Edge Functions
   - Standard Supabase Edge Function URL is `/functions/v1/{function-name}`
-- **Recommendation:** 
+- **Recommendation:**
   - Verify if these old Edge Functions still exist and use the correct URL pattern
   - Consider migrating to use `project_url` and `/functions/v1/` pattern for consistency
   - Or document why `latest_project_url` is needed if it's intentional
