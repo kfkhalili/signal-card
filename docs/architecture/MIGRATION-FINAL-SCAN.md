@@ -53,7 +53,7 @@ All remaining migrations are **infrastructure setup**:
 ✅ **Fresh database gets correct final state immediately**
 ✅ **Clean migration history**
 
-**Migration count:** 52 (down from ~80, 35% reduction)
+**Migration count:** 56 (down from ~80, 30% reduction)
 
 **Latest fixes:**
 - Merged DELETE policy into original table creation (20251117072630)
