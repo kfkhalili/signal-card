@@ -356,10 +356,13 @@ useEffect(() => {
 ### Edge Function Patterns
 
 #### Standard Structure
+**Note:** Edge Functions run in Deno runtime. Use `fromPromise()` from neverthrow for Supabase queries to maintain consistency with the codebase. Import neverthrow using npm specifier: `import { fromPromise } from "npm:neverthrow@6.0.0";`
+
 ```typescript
 // supabase/functions/[function-name]/index.ts
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
+import { fromPromise } from "npm:neverthrow@6.0.0";
 import { CORS_HEADERS } from "../_shared/auth.ts";
 
 Deno.serve(async (req: Request) => {
@@ -369,14 +372,41 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    // Validate environment variables
+    // Validate environment variables (throwing is acceptable for initialization errors)
     const apiKey = Deno.env.get("FMP_API_KEY");
     if (!apiKey) {
       throw new Error("FMP_API_KEY not set");
     }
 
-    // Function logic
-    const result = await fetchData();
+    // Supabase queries should use fromPromise() for consistency
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error("Supabase environment variables not set");
+    }
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Example: Using fromPromise for Supabase query
+    const queryResult = await fromPromise(
+      supabase.from("table_name").select("*").eq("column", "value"),
+      (e) => e as Error
+    );
+
+    const queryResponse = queryResult.match(
+      (response) => {
+        const { data, error } = response;
+        if (error) {
+          throw new Error(`Database error: ${error.message}`);
+        }
+        return data;
+      },
+      (error) => {
+        throw new Error(`Query failed: ${error.message}`);
+      }
+    );
+
+    // Function logic using queryResponse
+    const result = await processData(queryResponse);
 
     return new Response(JSON.stringify(result), {
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" },

@@ -319,10 +319,13 @@ export function [CardName]Content({
 
 ### Edge Function Template
 
+**Note:** Edge Functions run in Deno runtime. Use `fromPromise()` from neverthrow for Supabase queries to maintain consistency. Import using: `import { fromPromise } from "npm:neverthrow@6.0.0";`
+
 ```typescript
 // supabase/functions/[function-name]/index.ts
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
+import { fromPromise } from "npm:neverthrow@6.0.0";
 import { CORS_HEADERS } from "../_shared/auth.ts";
 
 Deno.serve(async (req: Request) => {
@@ -332,7 +335,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    // Validate environment variables
+    // Validate environment variables (throwing is acceptable for initialization errors)
     const apiKey = Deno.env.get("FMP_API_KEY");
     if (!apiKey) {
       throw new Error("FMP_API_KEY not set");
@@ -362,14 +365,24 @@ Deno.serve(async (req: Request) => {
 
     const data = await response.json();
 
-    // Upsert to database
-    const { error: dbError } = await supabase
-      .from("table_name")
-      .upsert(data, { onConflict: "symbol" });
+    // Upsert to database using fromPromise() for consistency
+    const upsertResult = await fromPromise(
+      supabase.from("table_name").upsert(data, { onConflict: "symbol" }),
+      (e) => e as Error
+    );
 
-    if (dbError) {
-      throw new Error(`Database error: ${dbError.message}`);
-    }
+    const upsertResponse = upsertResult.match(
+      (response) => {
+        const { error } = response;
+        if (error) {
+          throw new Error(`Database error: ${error.message}`);
+        }
+        return response;
+      },
+      (error) => {
+        throw new Error(`Database error: ${error.message}`);
+      }
+    );
 
     return new Response(
       JSON.stringify({ success: true }),
