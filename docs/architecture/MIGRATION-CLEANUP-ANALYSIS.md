@@ -117,20 +117,45 @@ Delete migrations that are completely overwritten:
 3. ✅ **Verify and clean up cron job migrations** - DONE (verified)
 4. ✅ **Add documentation comments to superseded migrations** - DONE
 
-## Cleanup Migrations Created
+## Migration Consolidation Strategy
 
-1. **`20251119210000_consolidate_staleness_checker_with_all_fixes.sql`**
-   - Consolidates all fixes for `check_and_queue_stale_data_from_presence_v2`
-   - Includes: LEFT JOIN, timeout logic, exchange status check with data existence check
-   - Supersedes: 20251117180100, 20251118000000, 20251118030000, 20251119000000
+**Principle:** Migrations should represent the FINAL desired state, not historical evolution. If you create something and later delete it, the migration should just not create it. If you add a comment later, it should be in the original CREATE statement.
 
-2. **`20251119220000_remove_redundant_processor_optimization.sql`**
-   - Documents that 20251117180000 is superseded by 20251117180200
-   - Updates function comment to reflect final state
+**Result:** Fresh database deployments get the final state immediately, without going through intermediate changes.
 
-3. **`20251119230000_add_superseded_comments_to_migrations.sql`**
-   - Adds informational notices about superseded migrations
-   - Documents migration history for audit purposes
+### Consolidations Performed
+
+1. **Exchange Market Status Cron Job**
+   - **Original:** `20251116161200_schedule_cron_jobs.sql` - Now creates `hourly-fetch-fmp-all-exchange-market-status` with `'0 * * * *'` schedule
+   - **Removed:** `20251119200000_change_exchange_market_status_to_hourly.sql` (unschedule daily, schedule hourly)
+
+2. **Processor Invoker Cron Job**
+   - **Original:** `20251117074150_create_cron_jobs_v2.sql` - Now uses final settings (2 iterations, 5s delay)
+   - **Removed:** `20251117180000_optimize_processor_for_one_minute_processing.sql`, `20251117180200_optimize_processor_for_faster_processing.sql`
+
+3. **upsert_active_subscription_v2 Function**
+   - **Original:** `20251117190000_fix_upsert_active_subscription_v2_no_update_last_seen.sql` - Now includes heartbeat support AND logging
+   - **Removed:** `20251117201000_add_logging_to_upsert_active_subscription_v2.sql`
+
+4. **check_and_queue_stale_data_from_presence_v2 Function**
+   - **Original:** `20251117073831_create_background_staleness_checker_v2.sql` - Now includes all fixes (LEFT JOIN, timeout, exchange check with data existence check)
+   - **Removed:** All intermediate fix migrations:
+     - `20251117180100_optimize_staleness_checker_timeout.sql`
+     - `20251118000000_add_exchange_status_check_to_background_staleness_checker.sql`
+     - `20251118030000_fix_background_staleness_checker_for_missing_data.sql`
+     - `20251119000000_fix_exchange_status_check_for_missing_quote_data.sql`
+     - `20251119210000_consolidate_staleness_checker_with_all_fixes.sql`
+
+5. **check_and_queue_stale_batch_v2 Function**
+   - **Original:** `20251117073830_create_staleness_check_functions_v2.sql` - Now includes exchange status check with data existence check
+   - **Removed:** `20251117130000_add_exchange_status_check_for_quotes.sql`
+
+6. **Available Exchanges Cron Job**
+   - **Original:** `20251117155508_schedule_fetch_fmp_available_exchanges_hourly.sql` - Already had correct auth
+   - **Removed:** `20251117160000_fix_available_exchanges_cron_auth.sql` (redundant)
+
+7. **invoke_processor_loop_v2 Function Comment**
+   - **Original:** `20251117073704_create_processor_invoker_v2.sql` - Comment now includes final optimization details
 
 ## Test Data Migrations Removed
 
