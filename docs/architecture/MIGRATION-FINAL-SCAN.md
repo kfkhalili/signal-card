@@ -53,5 +53,9 @@ All remaining migrations are **infrastructure setup**:
 ✅ **Fresh database gets correct final state immediately**
 ✅ **Clean migration history**
 
-**Migration count:** 55 (down from ~80, 31% reduction)
+**Migration count:** 54 (down from ~80, 33% reduction)
+
+**Latest fix:**
+- Merged DELETE policy into original table creation (20251117072630)
+- Removed 20251117200000_allow_users_to_delete_own_subscriptions.sql
 
