@@ -76,22 +76,47 @@
 ## Summary
 
 **High Priority (Must Fix):**
-1. Delete redundant cron reschedule (`20251117120100`)
-2. Merge Edge Function update into original function creation (`20251117120000` → `20251117073833`)
-3. Fix registry entries to use correct values from start (`20251118010000` → merge into `20251117210000` and `20251117220000`)
-4. Remove RLS disable/re-enable pattern (`20250525192560`, `20250525192564`)
+1. ✅ Delete redundant cron reschedule (`20251117120100`) - **FIXED**
+2. ✅ Merge Edge Function update into original function creation (`20251117120000` → `20251117073833`) - **FIXED**
+3. ✅ Fix registry entries to use correct values from start (`20251118010000` → merge into `20251117210000` and `20251117220000`) - **FIXED**
+4. ✅ Remove RLS disable/re-enable pattern (`20250525192560`, `20250525192564`) - **FIXED**
 
 **Medium Priority (Should Fix):**
-5. Remove data backfill migration (`20250623100903`)
-6. Merge RLS policy fix into original creation (`20250525192558`)
+5. ✅ Remove data backfill migration (`20250623100903`) - **FIXED**
+6. ✅ Merge RLS policy fix into original creation (`20250525192558`) - **FIXED**
 
 ---
 
-## Expected Outcome
+## Fixes Applied
 
-After fixes:
-- All migrations represent final state
-- No intermediate modifications
-- Fresh database gets correct final state immediately
-- Cleaner migration history
+### 1. Analytics Refresh Function
+- **Merged:** Edge Function implementation into `20251117073833_create_analytics_refresh_v2.sql`
+- **Removed:** `20251117120000_update_analytics_refresh_to_edge_function.sql`
+- **Removed:** `20251117120100_update_analytics_refresh_frequency.sql` (redundant)
+
+### 2. Registry Entries
+- **Updated:** `20251117210000_add_financial_statements_to_registry.sql` - now uses `'queue-processor-v2'`
+- **Updated:** `20251117220000_add_ratios_ttm_to_registry.sql` - now uses `'queue-processor-v2'`
+- **Removed:** `20251118010000_fix_edge_function_name_for_financial_statements_and_ratios_ttm.sql`
+
+### 3. RLS Policies
+- **Updated:** `20250525192555_06_apply_rls_policies.sql` - now includes service_role bypass and GRANT
+- **Removed:** `20250525192558_fix_user_profiles_rls_safe.sql`
+- **Removed:** `20250525192560_temporarily_disable_rls.sql`
+- **Removed:** `20250525192564_reenable_rls_on_user_profiles.sql`
+
+### 4. Data Migrations
+- **Removed:** `20250623100903_fix_gravatar_backfill_for_empty_urls.sql` (data migration, not infrastructure)
+
+---
+
+## Final State
+
+✅ **All migrations now represent final state**
+✅ **No intermediate modifications**
+✅ **Fresh database gets correct final state immediately**
+✅ **Cleaner migration history**
+
+**Total migrations removed:** 7
+**Total migrations updated:** 4
 
