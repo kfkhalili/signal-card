@@ -12,11 +12,11 @@ CREATE TABLE IF NOT EXISTS "public"."revenue_product_segmentation" (
     "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
 
     PRIMARY KEY ("symbol", "fiscal_year", "period", "date"), -- Composite primary key
-    CONSTRAINT "fk_revenue_product_segmentation_symbol" FOREIGN KEY ("symbol") REFERENCES "public"."supported_symbols"("symbol") ON DELETE CASCADE
+    CONSTRAINT "fk_revenue_product_segmentation_symbol" FOREIGN KEY ("symbol") REFERENCES "public"."profiles"("symbol") ON DELETE CASCADE
 );
 
 COMMENT ON TABLE "public"."revenue_product_segmentation" IS 'Stores historical revenue by product segmentation for symbols from FMP.';
-COMMENT ON COLUMN "public"."revenue_product_segmentation"."symbol" IS 'Stock/crypto symbol. Part of composite PK, references supported_symbols.symbol.';
+COMMENT ON COLUMN "public"."revenue_product_segmentation"."symbol" IS 'Stock/crypto symbol. Part of composite PK, references profiles.symbol.';
 COMMENT ON COLUMN "public"."revenue_product_segmentation"."fiscal_year" IS 'The fiscal year of the report. Part of composite PK.';
 COMMENT ON COLUMN "public"."revenue_product_segmentation"."period" IS 'Reporting period (e.g., "FY", "Q1"). Part of composite PK.';
 COMMENT ON COLUMN "public"."revenue_product_segmentation"."date" IS 'The specific end date of the reporting period. Part of composite PK.';

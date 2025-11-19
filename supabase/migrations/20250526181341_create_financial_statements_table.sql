@@ -19,11 +19,11 @@ CREATE TABLE IF NOT EXISTS "public"."financial_statements" (
     "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
 
     PRIMARY KEY ("symbol", "date", "period"),
-    CONSTRAINT "fk_financial_statements_symbol" FOREIGN KEY ("symbol") REFERENCES "public"."supported_symbols"("symbol") ON DELETE CASCADE
+    CONSTRAINT "fk_financial_statements_symbol" FOREIGN KEY ("symbol") REFERENCES "public"."profiles"("symbol") ON DELETE CASCADE
 );
 
 COMMENT ON TABLE "public"."financial_statements" IS 'Stores consolidated annual and quarterly financial statements (Income, Balance Sheet, Cash Flow) for symbols.';
-COMMENT ON COLUMN "public"."financial_statements"."symbol" IS 'Stock/crypto symbol, references supported_symbols.symbol.';
+COMMENT ON COLUMN "public"."financial_statements"."symbol" IS 'Stock/crypto symbol, references profiles.symbol.';
 COMMENT ON COLUMN "public"."financial_statements"."date" IS 'End date of the financial period (e.g., "2023-09-30"). Part of composite PK.';
 COMMENT ON COLUMN "public"."financial_statements"."period" IS 'Period identifier (e.g., "FY", "Q1"). Part of composite PK.';
 COMMENT ON COLUMN "public"."financial_statements"."reported_currency" IS 'Currency the statement was reported in.';

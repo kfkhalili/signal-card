@@ -12,11 +12,11 @@ CREATE TABLE IF NOT EXISTS "public"."grades_historical" (
     "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
 
     PRIMARY KEY ("symbol", "date"),
-    CONSTRAINT "fk_grades_historical_symbol" FOREIGN KEY ("symbol") REFERENCES "public"."supported_symbols"("symbol") ON DELETE CASCADE
+    CONSTRAINT "fk_grades_historical_symbol" FOREIGN KEY ("symbol") REFERENCES "public"."profiles"("symbol") ON DELETE CASCADE
 );
 
 COMMENT ON TABLE "public"."grades_historical" IS 'Stores historical analyst rating grades for symbols from FMP.';
-COMMENT ON COLUMN "public"."grades_historical"."symbol" IS 'Stock/crypto symbol. Part of composite PK, references supported_symbols.symbol.';
+COMMENT ON COLUMN "public"."grades_historical"."symbol" IS 'Stock/crypto symbol. Part of composite PK, references profiles.symbol.';
 COMMENT ON COLUMN "public"."grades_historical"."date" IS 'The date of the historical grade snapshot. Part of composite PK.';
 COMMENT ON COLUMN "public"."grades_historical"."analyst_ratings_strong_buy" IS 'Number of analyst ratings for Strong Buy.';
 COMMENT ON COLUMN "public"."grades_historical"."analyst_ratings_buy" IS 'Number of analyst ratings for Buy.';

@@ -26,11 +26,11 @@ CREATE TABLE IF NOT EXISTS "public"."exchange_variants" (
     "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
 
     PRIMARY KEY ("variant_symbol", "exchange_short_name"),
-    CONSTRAINT "fk_exchange_variants_base_symbol" FOREIGN KEY ("base_symbol") REFERENCES "public"."supported_symbols"("symbol") ON DELETE CASCADE
+    CONSTRAINT "fk_exchange_variants_base_symbol" FOREIGN KEY ("base_symbol") REFERENCES "public"."profiles"("symbol") ON DELETE CASCADE
 );
 
 COMMENT ON TABLE "public"."exchange_variants" IS 'Stores exchange-specific variant data for symbols from FMP.';
-COMMENT ON COLUMN "public"."exchange_variants"."base_symbol" IS 'The base stock symbol, references supported_symbols.symbol.';
+COMMENT ON COLUMN "public"."exchange_variants"."base_symbol" IS 'The base stock symbol, references profiles.symbol.';
 COMMENT ON COLUMN "public"."exchange_variants"."variant_symbol" IS 'The exchange-specific symbol (e.g., "AAPL.DE"). Part of composite PK.';
 COMMENT ON COLUMN "public"."exchange_variants"."exchange_short_name" IS 'The short name of the exchange (e.g., "XETRA"). Part of composite PK.';
 
