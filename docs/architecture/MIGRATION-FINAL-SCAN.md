@@ -53,7 +53,7 @@ All remaining migrations are **infrastructure setup**:
 ✅ **Fresh database gets correct final state immediately**
 ✅ **Clean migration history**
 
-**Migration count:** 55 (down from ~80, 31% reduction)
+**Migration count:** 54 (down from ~80, 33% reduction)
 
 **Latest fixes:**
 - Merged DELETE policy into original table creation (20251117072630)
@@ -64,4 +64,7 @@ All remaining migrations are **infrastructure setup**:
 - Removed 20251119120000_enable_realtime_for_exchange_variants.sql
 - Merged partition RLS enablement into api_call_queue_v2 table creation (20251117072631)
 - Removed 20251117123837_enable_rls_on_api_call_queue_v2_partitions.sql
+- Merged RLS, policies, grants, and realtime for initial tables into their table creation migrations
+- Removed 20250525192555_06_apply_rls_policies.sql (table-specific policies merged)
+- Kept 20250525192556_07_configure_realtime_and_permissions.sql for global schema settings only
 
