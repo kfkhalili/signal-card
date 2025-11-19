@@ -93,3 +93,15 @@ CREATE POLICY "Only service role can modify queue"
   USING (true)
   WITH CHECK (true);
 
+-- CRITICAL: Partitions must have RLS explicitly enabled even though they inherit policies from parent
+-- This ensures Supabase shows them as "restricted" instead of "unrestricted"
+ALTER TABLE public.api_call_queue_v2_pending ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.api_call_queue_v2_processing ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.api_call_queue_v2_completed ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.api_call_queue_v2_failed ENABLE ROW LEVEL SECURITY;
+
+COMMENT ON TABLE public.api_call_queue_v2_pending IS 'Partition of api_call_queue_v2 for pending jobs. RLS enabled - inherits policies from parent.';
+COMMENT ON TABLE public.api_call_queue_v2_processing IS 'Partition of api_call_queue_v2 for processing jobs. RLS enabled - inherits policies from parent.';
+COMMENT ON TABLE public.api_call_queue_v2_completed IS 'Partition of api_call_queue_v2 for completed jobs. RLS enabled - inherits policies from parent.';
+COMMENT ON TABLE public.api_call_queue_v2_failed IS 'Partition of api_call_queue_v2 for failed jobs. RLS enabled - inherits policies from parent.';
+
