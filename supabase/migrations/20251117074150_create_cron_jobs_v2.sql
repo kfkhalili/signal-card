@@ -35,13 +35,14 @@ SELECT cron.schedule(
 -- CRITICAL: Proactive recovery (runs recover_stuck_jobs as first action)
 -- CRITICAL: Advisory lock prevents cron pile-ups
 -- CRITICAL: SQL-side loop (Edge Function is stateless - processes one batch and exits)
+-- CRITICAL: Optimized for faster processing (2 iterations, 5s delay = ~10-15 seconds max)
 SELECT cron.schedule(
   'invoke-processor-v2',
   '* * * * *', -- Every minute
   $$
   SELECT invoke_processor_loop_v2(
-    p_max_iterations := 5,
-    p_iteration_delay_seconds := 12
+    p_max_iterations := 2,
+    p_iteration_delay_seconds := 5
   );
   $$
 );

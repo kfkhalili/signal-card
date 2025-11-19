@@ -14,6 +14,8 @@ DECLARE
   reg_row RECORD;
   is_stale BOOLEAN;
   sql_text TEXT;
+  exchange_is_open BOOLEAN;
+  data_exists BOOLEAN;
 BEGIN
   -- Loop through the input array (max 5-10 items, very fast)
   FOR reg_row IN
@@ -28,6 +30,33 @@ BEGIN
        NOT is_valid_identifier(reg_row.staleness_function)
     THEN
       RAISE EXCEPTION 'Invalid identifier found in data_type_registry_v2: %', reg_row.data_type;
+    END IF;
+
+    -- CRITICAL: For quote data type, check if data exists first
+    -- If data doesn't exist, always create a job (even if exchange is closed)
+    -- If data exists, check exchange status before creating a job
+    IF reg_row.data_type = 'quote' THEN
+      -- Check if quote data exists for this symbol
+      sql_text := format(
+        'SELECT EXISTS(SELECT 1 FROM %I WHERE %I = %L)',
+        reg_row.table_name,
+        reg_row.symbol_column,
+        p_symbol
+      );
+      EXECUTE sql_text INTO data_exists;
+
+      -- If data exists, check exchange status
+      -- If data doesn't exist, skip exchange status check (always create job)
+      IF data_exists THEN
+        SELECT is_exchange_open_for_symbol_v2(p_symbol, 'quote') INTO exchange_is_open;
+        IF NOT exchange_is_open THEN
+          RAISE NOTICE 'Exchange is closed for symbol % and quote data exists. Skipping quote staleness check.', p_symbol;
+          CONTINUE; -- Skip this data type
+        END IF;
+      ELSE
+        RAISE NOTICE 'No quote data exists for symbol %. Creating job regardless of exchange status.', p_symbol;
+        -- Continue to create job (don't skip)
+      END IF;
     END IF;
 
     -- FAULT TOLERANCE: Wrap in exception handler so one bad data type doesn't break the batch
@@ -76,5 +105,5 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-COMMENT ON FUNCTION public.check_and_queue_stale_batch_v2 IS 'Event-driven staleness checker. Called on user subscribe. Uses SECURITY DEFINER to access data tables. Fail-safe to stale.';
+COMMENT ON FUNCTION public.check_and_queue_stale_batch_v2 IS 'Event-driven staleness checker. Called on user subscribe. Uses SECURITY DEFINER to access data tables. Fail-safe to stale. For quote data type: always creates job if data missing (even if exchange closed), only checks exchange status if data exists.';
 

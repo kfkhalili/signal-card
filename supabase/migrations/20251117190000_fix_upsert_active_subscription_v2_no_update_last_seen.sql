@@ -16,6 +16,10 @@ BEGIN
   -- SECURITY DEFINER functions run with the privileges of the function owner (postgres)
   -- This should bypass RLS automatically
 
+  -- CRITICAL: Log who is calling this function (for debugging)
+  RAISE NOTICE '[upsert_active_subscription_v2] CALLED: user_id=%, symbol=%, data_type=%, session_user=%, current_user=%',
+    p_user_id, p_symbol, p_data_type, session_user, current_user;
+
   -- CRITICAL: Update last_seen_at on both INSERT and UPDATE (conflict)
   -- INSERT: New subscription - set both subscribed_at and last_seen_at
   -- UPDATE: Heartbeat - update last_seen_at to indicate user is still actively viewing
@@ -30,5 +34,5 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION public.upsert_active_subscription_v2 IS 'Upserts active subscription. Sets last_seen_at on INSERT (new subscription) and updates it on conflict (heartbeat). Client sends periodic heartbeats to indicate active viewing. Background cleanup removes subscriptions with last_seen_at > 5 minutes.';
+COMMENT ON FUNCTION public.upsert_active_subscription_v2 IS 'Upserts active subscription. Sets last_seen_at on INSERT (new subscription) and updates it on conflict (heartbeat). Client sends periodic heartbeats to indicate active viewing. Background cleanup removes subscriptions with last_seen_at > 5 minutes. Includes logging to track who is calling this function.';
 
