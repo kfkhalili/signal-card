@@ -53,9 +53,13 @@ All remaining migrations are **infrastructure setup**:
 ✅ **Fresh database gets correct final state immediately**
 ✅ **Clean migration history**
 
-**Migration count:** 54 (down from ~80, 33% reduction)
+**Migration count:** 52 (down from ~80, 35% reduction)
 
-**Latest fix:**
+**Latest fixes:**
 - Merged DELETE policy into original table creation (20251117072630)
 - Removed 20251117200000_allow_users_to_delete_own_subscriptions.sql
+- Merged is_profile_complete column into user_profiles table creation (20250525192551)
+- Removed 20250623102243_add_profile_complete_flag.sql
+- Merged realtime enablement into exchange_variants table creation (20250615092316)
+- Removed 20251119120000_enable_realtime_for_exchange_variants.sql
 
