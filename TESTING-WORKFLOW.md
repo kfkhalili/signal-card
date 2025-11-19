@@ -8,10 +8,12 @@ This guide shows you how to safely refactor code by writing tests first.
 
 ### 1. Choose a File to Refactor
 
-Start with high-priority files from `CODEBASE-ISSUES.md`:
-- `src/lib/feature-flags.ts` (High Priority)
-- `src/hooks/useStockData.ts` (High Priority)
-- `src/lib/supabase/realtime-service.ts` (High Priority)
+**Note:** All initial refactoring tasks from `CODEBASE-ISSUES.md` have been completed. Use this workflow for future refactoring work.
+
+Example files that were refactored (now complete):
+- ✅ `src/lib/feature-flags.ts` (Completed)
+- ✅ `src/hooks/useStockData.ts` (Completed)
+- ✅ `src/lib/supabase/realtime-service.ts` (Completed)
 
 ### 2. Create Test File
 
@@ -198,10 +200,12 @@ npm run test:e2e
 6. ✅ **Update call sites** - Update all places that use refactored code
 7. ✅ **Type check** - Run `npm run typecheck` before committing
 
-## Next Steps
+## Next Steps (For Future Refactoring)
 
-1. Review `CODEBASE-ISSUES.md` for priority files
-2. Start with `src/lib/feature-flags.ts` (simplest)
+**Note:** All initial refactoring tasks are complete. Use this workflow for future refactoring work.
+
+1. Identify files that need refactoring
+2. Start with simpler files first
 3. Follow the workflow above
 4. Move to next file when current one is complete
 
