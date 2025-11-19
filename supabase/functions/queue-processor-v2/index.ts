@@ -44,9 +44,9 @@ interface QueueJob {
   job_metadata: Record<string, unknown>;
 }
 
-// OPTIMIZATION: Reduced batch size for faster processing
-const BATCH_SIZE = 10; // Reduced from 50 to 10 for faster completion
-const MAX_CONCURRENT_JOBS = 5; // Process up to 5 jobs in parallel
+// OPTIMIZATION: Increased batch size and concurrency for faster processing
+const BATCH_SIZE = 30; // Increased from 10 to 30 for faster processing
+const MAX_CONCURRENT_JOBS = 10; // Process up to 10 jobs in parallel (increased from 5)
 const FUNCTION_TIMEOUT_MS = 50000; // 50 seconds overall timeout
 
 Deno.serve(async (req: Request) => {

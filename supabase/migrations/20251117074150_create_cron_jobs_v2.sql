@@ -61,8 +61,8 @@ BEGIN
       '* * * * *', -- Every minute
       $$
       SELECT invoke_processor_loop_v2(
-        p_max_iterations := 2,
-        p_iteration_delay_seconds := 5
+        p_max_iterations := 5,
+        p_iteration_delay_seconds := 2
       );
       $$
     );
