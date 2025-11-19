@@ -1,3 +1,4 @@
+-- Phase 1: Foundation
 -- Create upsert_active_subscription_v2 function to support heartbeat pattern
 -- CRITICAL: Updates last_seen_at on conflict (heartbeat updates)
 -- This allows client to send periodic heartbeats to indicate active viewing
