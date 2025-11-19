@@ -118,7 +118,7 @@ git commit -m "refactor(feature-flags): convert to Result types
 # 1. Create test file
 touch src/lib/__tests__/feature-flags.refactor.test.ts
 
-# 2. Copy example test from REFACTORING-TEST-STRATEGY.md
+# 2. See testing-refactoring.mdc cursor rule for test examples
 # (or use the provided example test file)
 
 # 3. Run tests - should pass
