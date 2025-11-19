@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { checkFeatureFlag } from '@/lib/feature-flags';
 import { getDataTypesForCard } from '@/lib/card-data-type-mapping';
+import { fromPromise } from 'neverthrow';
 import type { DisplayableCard } from '@/components/game/types';
 
 /**
@@ -59,7 +60,9 @@ export function useSubscriptionManager(cards: DisplayableCard[]): void {
 
   // Check feature flag on mount
   useEffect(() => {
-    checkFeatureFlag('use_queue_system').then((enabled) => {
+    checkFeatureFlag('use_queue_system').then((result) => {
+      // Extract boolean value from Result
+      const enabled = result.isOk() ? result.value : false;
       featureEnabledRef.current = enabled;
     });
   }, []);
@@ -94,18 +97,32 @@ export function useSubscriptionManager(cards: DisplayableCard[]): void {
             return;
           }
 
-          const { error: upsertError } = await supabase.rpc('upsert_active_subscription_v2', {
-            p_user_id: user.id,
-            p_symbol: symbol,
-            p_data_type: dataType,
-          });
+          const rpcResult = await fromPromise(
+            supabase.rpc('upsert_active_subscription_v2', {
+              p_user_id: user.id,
+              p_symbol: symbol,
+              p_data_type: dataType,
+            }),
+            (e) => new Error(`Failed to upsert subscription for ${symbol}/${dataType}: ${(e as Error).message}`)
+          );
 
-          if (upsertError) {
-            console.error(
-              `[useSubscriptionManager] Failed to send heartbeat for ${symbol}/${dataType}:`,
-              upsertError
-            );
-          }
+          rpcResult.match(
+            (response) => {
+              // Check for Supabase error in response
+              if (response.error) {
+                console.error(
+                  `[useSubscriptionManager] Failed to send heartbeat for ${symbol}/${dataType}:`,
+                  response.error
+                );
+              }
+            },
+            (err) => {
+              console.error(
+                `[useSubscriptionManager] Failed to send heartbeat for ${symbol}/${dataType}:`,
+                err
+              );
+            }
+          );
         }
       }
     };
@@ -162,48 +179,67 @@ export function useSubscriptionManager(cards: DisplayableCard[]): void {
 
     // Get current subscriptions from database
     const checkAndCleanup = async () => {
-      try {
-        // Fetch all current subscriptions for this user
-        const { data: currentSubscriptions, error: fetchError } = await supabase
+      // Fetch all current subscriptions for this user
+      const fetchResult = await fromPromise(
+        supabase
           .from('active_subscriptions_v2')
           .select('symbol, data_type')
-          .eq('user_id', user.id);
+          .eq('user_id', user.id),
+        (e) => new Error(`Failed to fetch subscriptions: ${(e as Error).message}`)
+      );
 
-        if (fetchError) {
-          console.error('[useSubscriptionManager] Failed to fetch current subscriptions:', fetchError);
-          return;
+      if (fetchResult.isErr()) {
+        console.error('[useSubscriptionManager] Failed to fetch current subscriptions:', fetchResult.error);
+        return;
+      }
+
+      const { data: currentSubscriptions, error: fetchError } = fetchResult.value;
+
+      if (fetchError) {
+        console.error('[useSubscriptionManager] Database error fetching subscriptions:', fetchError);
+        return;
+      }
+
+      // Build set of needed subscriptions from current cards
+      const neededSubscriptions = new Set<string>();
+      for (const [symbol, dataTypes] of subscriptions.entries()) {
+        for (const dataType of dataTypes) {
+          neededSubscriptions.add(`${symbol}:${dataType}`);
         }
+      }
 
-        // Build set of needed subscriptions from current cards
-        const neededSubscriptions = new Set<string>();
-        for (const [symbol, dataTypes] of subscriptions.entries()) {
-          for (const dataType of dataTypes) {
-            neededSubscriptions.add(`${symbol}:${dataType}`);
-          }
-        }
-
-        // Delete subscriptions that are no longer needed
-        for (const sub of currentSubscriptions || []) {
-          const key = `${sub.symbol}:${sub.data_type}`;
-          if (!neededSubscriptions.has(key)) {
-
-            const { error: deleteError } = await supabase
+      // Delete subscriptions that are no longer needed
+      for (const sub of currentSubscriptions || []) {
+        const key = `${sub.symbol}:${sub.data_type}`;
+        if (!neededSubscriptions.has(key)) {
+          const deleteResult = await fromPromise(
+            supabase
               .from('active_subscriptions_v2')
               .delete()
               .eq('user_id', user.id)
               .eq('symbol', sub.symbol)
-              .eq('data_type', sub.data_type);
+              .eq('data_type', sub.data_type),
+            (e) => new Error(`Failed to delete subscription ${sub.symbol}/${sub.data_type}: ${(e as Error).message}`)
+          );
 
-            if (deleteError) {
+          deleteResult.match(
+            (response) => {
+              // Check for Supabase error in response
+              if (response.error) {
+                console.error(
+                  `[useSubscriptionManager] Failed to delete subscription ${sub.symbol}/${sub.data_type}:`,
+                  response.error
+                );
+              }
+            },
+            (err) => {
               console.error(
                 `[useSubscriptionManager] Failed to delete subscription ${sub.symbol}/${sub.data_type}:`,
-                deleteError
+                err
               );
             }
-          }
+          );
         }
-      } catch (error) {
-        console.error('[useSubscriptionManager] Error in checkAndCleanup:', error);
       }
     };
 

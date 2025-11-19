@@ -1,4 +1,5 @@
 import { type EmailOtpType } from '@supabase/supabase-js'
+import { fromPromise } from 'neverthrow'
 import { type NextRequest, NextResponse } from 'next/server'
 import { createSupabaseRouteHandlerClient } from '@/lib/supabase/server'
 
@@ -21,12 +22,20 @@ export async function GET(request: NextRequest) {
     const response = NextResponse.redirect(new URL('/auth/complete-profile', request.url));
     const supabase = createSupabaseRouteHandlerClient({ request, response });
 
-    const { error } = await supabase.auth.verifyOtp({
-      type,
-      token_hash,
-    })
+    const verifyResult = await fromPromise(
+      supabase.auth.verifyOtp({
+        type,
+        token_hash,
+      }),
+      (e) => new Error(`Failed to verify OTP: ${(e as Error).message}`)
+    );
 
-    if (!error) {
+    const hasError = verifyResult.match(
+      (response) => !!response.error,
+      () => true
+    );
+
+    if (!hasError) {
       return response;
     }
   }

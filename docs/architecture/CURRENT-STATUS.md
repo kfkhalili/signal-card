@@ -77,7 +77,7 @@ We've successfully implemented a **metadata-driven, backend-controlled refresh s
 
 ### Exchange Variants Card ✅
 - **Issue:** Card showing stale data from localStorage, not re-rendering when data arrives
-- **Root Cause:** 
+- **Root Cause:**
   - Realtime was disabled for `exchange_variants` table
   - Card was using multiple tables (profiles, available_exchanges) incorrectly
   - Special re-initialization logic was interfering with normal flow

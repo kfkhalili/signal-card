@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
+import { fromPromise } from 'neverthrow'
+import { Option } from 'effect'
 import { User } from '@supabase/supabase-js'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,7 +16,7 @@ export default function CompleteProfilePage() {
   const router = useRouter()
   const { toast } = useToast()
 
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<Option.Option<User>>(Option.none())
   const [loading, setLoading] = useState(true)
   const [username, setUsername] = useState('')
   const [fullName, setFullName] = useState('')
@@ -22,21 +24,36 @@ export default function CompleteProfilePage() {
   useEffect(() => {
     const fetchUser = async () => {
       if (supabase) {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          setUser(user)
-        } else {
-          router.push('/auth')
-        }
+        const userResult = await fromPromise(
+          supabase.auth.getUser(),
+          (e) => new Error(`Failed to get user: ${(e as Error).message}`)
+        );
+
+        userResult.match(
+          (response) => {
+            const { data: { user } } = response;
+            if (user) {
+              setUser(Option.some(user));
+            } else {
+              router.push('/auth');
+            }
+          },
+          (err) => {
+            // Handle Result error (network/exception errors)
+            console.error('Error fetching user:', err.message);
+            router.push('/auth');
+          }
+        );
       }
-      setLoading(false)
-    }
-    fetchUser()
-  }, [supabase, router])
+      setLoading(false);
+    };
+    fetchUser();
+  }, [supabase, router]);
 
   const handleCompleteProfile = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (!user || !supabase) return
+    const currentUser = Option.isSome(user) ? user.value : null
+    if (!currentUser || !supabase) return
     if (username.length < 3) {
       toast({
         title: "Username too short",
@@ -48,51 +65,72 @@ export default function CompleteProfilePage() {
 
     setLoading(true)
 
-    const { error } = await supabase
-      .from('user_profiles')
-      .update({
-        username: username,
-        full_name: fullName,
-        is_profile_complete: true,
-      })
-      .eq('id', user.id)
-
-    if (error) {
-      console.error("Profile update failed:", error)
-      if (error.code === '23505') {
-        toast({
-          title: "Username already taken",
-          description: "Please choose a different username.",
-          variant: "destructive",
+    const updateResult = await fromPromise(
+      supabase
+        .from('user_profiles')
+        .update({
+          username: username,
+          full_name: fullName,
+          is_profile_complete: true,
         })
-      } else {
+        .eq('id', currentUser.id),
+      (e) => new Error(`Failed to update profile: ${(e as Error).message}`)
+    )
+
+    updateResult.match(
+      (response) => {
+        const { error } = response
+
+        if (error) {
+          console.error("Profile update failed:", error)
+          if (error.code === '23505') {
+            toast({
+              title: "Username already taken",
+              description: "Please choose a different username.",
+              variant: "destructive",
+            })
+          } else {
+            toast({
+              title: "Error updating profile",
+              description: "An unexpected error occurred. Please check the console for details.",
+              variant: "destructive",
+            })
+          }
+          setLoading(false)
+        } else {
+          toast({
+            title: "Profile Complete!",
+            description: "Welcome! Your profile has been set up.",
+          })
+
+          // Navigate to workspace - middleware will handle any profile completion checks
+          router.push('/workspace')
+          router.refresh() // To ensure header gets updated profile info
+          // Keep loading state active during navigation
+        }
+      },
+      (err) => {
+        // Handle Result error (network/exception errors)
+        console.error("Profile update failed:", err)
         toast({
           title: "Error updating profile",
-          description: "An unexpected error occurred. Please check the console for details.",
+          description: err.message,
           variant: "destructive",
         })
+        setLoading(false)
       }
-      setLoading(false)
-    } else {
-      toast({
-        title: "Profile Complete!",
-        description: "Welcome! Your profile has been set up.",
-      })
-
-      // Navigate to workspace - middleware will handle any profile completion checks
-      router.push('/workspace')
-      router.refresh() // To ensure header gets updated profile info
-      // Keep loading state active during navigation
-    }
+    )
   }
 
-  if (loading || !user) {
+  if (loading || Option.isNone(user)) {
     return (
       <div className="flex justify-center items-center h-screen">
         <p>Loading...</p>
       </div>
     )
   }
+
+  const currentUser = user.value
 
   return (
     <div className="container mx-auto flex flex-col items-center justify-center min-h-screen p-4">
@@ -104,7 +142,7 @@ export default function CompleteProfilePage() {
             <form onSubmit={handleCompleteProfile} className="space-y-4">
                 <div>
                     <Label htmlFor="email">Email</Label>
-                    <Input id="email" type="email" value={user.email} disabled />
+                    <Input id="email" type="email" value={currentUser.email} disabled />
                 </div>
                 <div>
                     <Label htmlFor="username">Username</Label>

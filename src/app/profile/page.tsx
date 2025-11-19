@@ -2,6 +2,8 @@
 
 import { useAuth } from "@/contexts/AuthContext";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { fromPromise } from "neverthrow";
+import { Option } from "effect";
 import { useState, useEffect, FormEvent } from "react";
 import {
   Card,
@@ -35,7 +37,7 @@ export default function ProfilePage(): JSX.Element {
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profile, setProfile] = useState<Option.Option<UserProfile>>(Option.none());
   const [pageLoading, setPageLoading] = useState<boolean>(true);
   const [supabase] = useState(() => createSupabaseBrowserClient());
 
@@ -47,23 +49,42 @@ export default function ProfilePage(): JSX.Element {
     const fetchProfile = async () => {
       if (user) {
         setPageLoading(true);
-        const { data, error } = await supabase
-          .from("user_profiles")
-          .select("*")
-          .eq("id", user.id)
-          .single();
+        const profileResult = await fromPromise(
+          supabase
+            .from("user_profiles")
+            .select("*")
+            .eq("id", user.id)
+            .single(),
+          (e) => new Error(`Failed to fetch profile: ${(e as Error).message}`)
+        );
 
-        if (error) {
-          console.error("Error fetching profile:", error);
-          toast({
-            title: "Error",
-            description: "Could not fetch your profile.",
-            variant: "destructive",
-          });
-        } else {
-          setProfile(data);
-        }
-        setPageLoading(false);
+        profileResult.match(
+          (response) => {
+            const { data, error } = response;
+
+            if (error) {
+              console.error("Error fetching profile:", error);
+              toast({
+                title: "Error",
+                description: "Could not fetch your profile.",
+                variant: "destructive",
+              });
+            } else {
+              setProfile(Option.fromNullable(data));
+            }
+            setPageLoading(false);
+          },
+          (err) => {
+            // Handle Result error (network/exception errors)
+            console.error("Error fetching profile:", err);
+            toast({
+              title: "Error",
+              description: "Could not fetch your profile.",
+              variant: "destructive",
+            });
+            setPageLoading(false);
+          }
+        );
       }
     };
     if (!authLoading) {
@@ -79,41 +100,60 @@ export default function ProfilePage(): JSX.Element {
     const fullName = formData.get("fullName") as string;
     const username = formData.get("username") as string;
 
-    const { error } = await supabase
-      .from("user_profiles")
-      .update({
-        full_name: fullName,
-        username: username,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", user.id);
+    const updateResult = await fromPromise(
+      supabase
+        .from("user_profiles")
+        .update({
+          full_name: fullName,
+          username: username,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", user.id),
+      (e) => new Error(`Failed to update profile: ${(e as Error).message}`)
+    );
 
-    if (error) {
-      toast({
-        title: "Error updating profile",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
-      setProfile((prevProfile) =>
-        prevProfile
-          ? { ...prevProfile, full_name: fullName, username }
-          : {
-              id: user.id,
-              full_name: fullName,
-              username: username,
-              avatar_url: null,
-              updated_at: new Date().toISOString(),
-              workspace_id: null,
-              settings: null,
-              is_profile_complete: false,
-            }
-      );
-      toast({
-        title: "Success",
-        description: "Your profile has been updated.",
-      });
-    }
+    updateResult.match(
+      (response) => {
+        const { error } = response;
+
+        if (error) {
+          toast({
+            title: "Error updating profile",
+            description: error.message,
+            variant: "destructive",
+          });
+        } else {
+          setProfile((prevProfileOption) => {
+            const prevProfile = Option.isSome(prevProfileOption) ? prevProfileOption.value : null;
+            const updatedProfile = prevProfile
+              ? { ...prevProfile, full_name: fullName, username }
+              : {
+                  id: user.id,
+                  full_name: fullName,
+                  username: username,
+                  avatar_url: null,
+                  updated_at: new Date().toISOString(),
+                  workspace_id: null,
+                  settings: null,
+                  is_profile_complete: false,
+                };
+            return Option.some(updatedProfile);
+          });
+          toast({
+            title: "Success",
+            description: "Your profile has been updated.",
+          });
+        }
+      },
+      (err) => {
+        // Handle Result error (network/exception errors)
+        toast({
+          title: "Error updating profile",
+          description: err.message,
+          variant: "destructive",
+        });
+      }
+    );
   };
 
   const handleDeleteAccount = async () => {
@@ -125,9 +165,21 @@ export default function ProfilePage(): JSX.Element {
         });
         return;
     }
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    const sessionResult = await fromPromise(
+      supabase.auth.getSession(),
+      (e) => new Error(`Failed to get session: ${(e as Error).message}`)
+    );
+
+    if (sessionResult.isErr()) {
+      toast({
+        title: "Error",
+        description: "Could not verify your session.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const { data: { session } } = sessionResult.value;
 
     if (!session) {
       toast({
@@ -138,26 +190,50 @@ export default function ProfilePage(): JSX.Element {
       return;
     }
 
-    const { error } = await supabase.functions.invoke("delete-user", {
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-      },
-    });
+    const deleteResult = await fromPromise(
+      supabase.functions.invoke("delete-user", {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      }),
+      (e) => new Error(`Failed to delete account: ${(e as Error).message}`)
+    );
 
-    if (error) {
-      toast({
-        title: "Error Deleting Account",
-        description: (error as Error).message,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Account Deleted",
-        description: "Your account has been successfully deleted.",
-      });
-      await supabase.auth.signOut();
-      router.push("/");
-    }
+    deleteResult.match(
+      (response) => {
+        const { error } = response;
+
+        if (error) {
+          toast({
+            title: "Error Deleting Account",
+            description: (error as Error).message,
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Account Deleted",
+            description: "Your account has been successfully deleted.",
+          });
+          void fromPromise(
+            supabase.auth.signOut(),
+            (e) => new Error(`Failed to sign out: ${(e as Error).message}`)
+          ).then((result) => {
+            result.mapErr((error) => {
+              console.error("[Profile] Error signing out:", error.message);
+            });
+          });
+          router.push("/");
+        }
+      },
+      (err) => {
+        // Handle Result error (network/exception errors)
+        toast({
+          title: "Error Deleting Account",
+          description: err.message,
+          variant: "destructive",
+        });
+      }
+    );
   };
 
   if (authLoading || pageLoading) {
@@ -189,12 +265,12 @@ export default function ProfilePage(): JSX.Element {
                 disabled
               />
             </div>
-            <div className="space-y-2">
+                <div className="space-y-2">
               <Label htmlFor="username">Username</Label>
               <Input
                 id="username"
                 name="username"
-                defaultValue={profile?.username ?? ""}
+                defaultValue={Option.isSome(profile) ? profile.value.username ?? "" : ""}
               />
             </div>
             <div className="space-y-2">
@@ -202,7 +278,7 @@ export default function ProfilePage(): JSX.Element {
               <Input
                 id="fullName"
                 name="fullName"
-                defaultValue={profile?.full_name ?? ""}
+                defaultValue={Option.isSome(profile) ? profile.value.full_name ?? "" : ""}
               />
             </div>
           </CardContent>

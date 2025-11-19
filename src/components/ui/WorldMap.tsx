@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useMemo, useState, useEffect } from "react";
+import { Option } from "effect";
 import { MapContainer, TileLayer, Marker, Tooltip } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -111,7 +112,8 @@ const locationCoordinates: Record<string, [number, number]> = {
 
 // --- Main Component ---
 export const WorldMap: React.FC<WorldMapProps> = React.memo(({ markers, className }) => {
-  const [map, setMap] = useState<L.Map | null>(null);
+  const [map, setMap] = useState<Option.Option<L.Map>>(Option.none());
+  const [isMapReady, setIsMapReady] = useState(false);
 
   const validMarkers = useMemo(
     () =>
@@ -127,13 +129,85 @@ export const WorldMap: React.FC<WorldMapProps> = React.memo(({ markers, classNam
     return L.latLngBounds(latLngs);
   }, [validMarkers]);
 
-  useEffect(() => {
-    if (map && mapBounds) {
-      map.fitBounds(mapBounds, { padding: [50, 50] });
-      // This can help if the map's container size changes during render
-      map.invalidateSize();
+  // Handle map initialization with proper cleanup
+  const handleMapRef = React.useCallback((mapInstance: L.Map | null) => {
+    if (mapInstance) {
+      // Wait for map to be fully ready before setting state
+      mapInstance.whenReady(() => {
+        // Verify map container is still valid before setting state
+        const container = mapInstance.getContainer();
+        if (container && container.parentElement) {
+          setIsMapReady(true);
+          setMap(Option.some(mapInstance));
+        }
+      });
+    } else {
+      // Cleanup on unmount
+      setIsMapReady(false);
+      setMap(Option.none());
     }
-  }, [map, mapBounds]);
+  }, []);
+
+  useEffect(() => {
+    if (Option.isNone(map) || !isMapReady || !mapBounds) return;
+
+    // Check if map container is still valid
+    const mapInstance = map.value;
+    const container = mapInstance.getContainer();
+    if (!container || !container.parentElement) {
+      return;
+    }
+
+    let timeoutId: NodeJS.Timeout | null = null;
+    let rafId: number | null = null;
+
+    try {
+      // Use requestAnimationFrame to ensure DOM is ready
+      rafId = requestAnimationFrame(() => {
+        // Double-check map container is still valid
+        if (Option.isNone(map)) return;
+        const currentMapInstance = map.value;
+        const currentContainer = currentMapInstance.getContainer();
+        if (!currentContainer || !currentContainer.parentElement) {
+          return;
+        }
+
+        try {
+          // Invalidate size first to ensure container dimensions are correct
+          currentMapInstance.invalidateSize();
+
+          // Small delay to ensure invalidateSize has taken effect
+          timeoutId = setTimeout(() => {
+            if (Option.isNone(map) || !mapBounds) return;
+            const finalMapInstance = map.value;
+            const finalContainer = finalMapInstance.getContainer();
+            if (!finalContainer || !finalContainer.parentElement) {
+              return;
+            }
+            try {
+              finalMapInstance.fitBounds(mapBounds, { padding: [50, 50] });
+            } catch (error) {
+              console.warn("Error fitting map bounds:", error);
+            }
+          }, 100);
+        } catch (error) {
+          console.warn("Error invalidating map size:", error);
+        }
+      });
+    } catch (error) {
+      console.warn("Error in map update effect:", error);
+    }
+
+    // Cleanup function
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
+    };
+  }, [map, isMapReady, mapBounds]);
 
   // Memoize the layers to prevent re-creating them on every render
   const displayLayers = useMemo(() => {
@@ -174,7 +248,7 @@ export const WorldMap: React.FC<WorldMapProps> = React.memo(({ markers, classNam
         className
       )}>
       <MapContainer
-        ref={setMap}
+        ref={handleMapRef}
         center={[20, 0]}
         zoom={2}
         bounds={mapBounds}
@@ -187,7 +261,7 @@ export const WorldMap: React.FC<WorldMapProps> = React.memo(({ markers, classNam
         zoomControl={false}
         scrollWheelZoom={true}
         dragging={true}>
-        {map ? displayLayers : null}
+        {isMapReady && map ? displayLayers : null}
       </MapContainer>
     </div>
   );

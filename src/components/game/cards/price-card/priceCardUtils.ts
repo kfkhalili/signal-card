@@ -175,21 +175,36 @@ async function initializePriceCard({
     };
   } else {
     // If no profile card exists, fetch the necessary info from the DB
-    const { data, error } = await supabase
-      .from("profiles")
-      .select(
-        "company_name, display_company_name, image, exchange, website, currency"
-      )
-      .eq("symbol", symbol)
-      .maybeSingle();
+    const profileResult = await fromPromise(
+      supabase
+        .from("profiles")
+        .select(
+          "company_name, display_company_name, image, exchange, website, currency"
+        )
+        .eq("symbol", symbol)
+        .maybeSingle(),
+      (e) => new Error(`Failed to fetch profile for ${symbol}: ${(e as Error).message}`)
+    );
 
-    if (error) {
-      console.warn(
-        `Could not fetch profile context for ${symbol}: ${error.message}`
-      );
-    } else if (data) {
-      profileContext = data;
-    }
+    profileResult.match(
+      (response) => {
+        const { data, error } = response;
+
+        if (error) {
+          console.warn(
+            `Could not fetch profile context for ${symbol}: ${error.message}`
+          );
+        } else if (data) {
+          profileContext = data;
+        }
+      },
+      (err) => {
+        // Handle Result error (network/exception errors)
+        console.warn(
+          `Could not fetch profile context for ${symbol}: ${err.message}`
+        );
+      }
+    );
   }
 
   if (quoteDataFromDB) {

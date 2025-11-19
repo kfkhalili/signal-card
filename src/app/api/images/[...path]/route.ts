@@ -1,6 +1,7 @@
 // app/api/images/[...path]/route.ts
 
 import { createClient } from "@supabase/supabase-js";
+import { fromPromise } from "neverthrow";
 import { NextRequest } from "next/server";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -24,36 +25,54 @@ export async function GET(
   }
 
   try {
-    const { data, error } = await supabaseAdmin.storage
-      .from("profile-images")
-      .download(filePath);
+    const downloadResult = await fromPromise(
+      supabaseAdmin.storage
+        .from("profile-images")
+        .download(filePath),
+      (e) => e as Error
+    );
 
-    if (error) {
-      const errorAsRecord = error as unknown as Record<string, unknown>;
-      let status = 500;
+    const downloadData = downloadResult.match(
+      (response) => {
+        const { data, error } = response;
+        if (error) {
+          const errorAsRecord = error as unknown as Record<string, unknown>;
+          let status = 500;
 
-      if (typeof errorAsRecord.statusCode === "string") {
-        const parsedStatus = parseInt(errorAsRecord.statusCode, 10);
-        if (!isNaN(parsedStatus)) {
-          status = parsedStatus;
+          if (typeof errorAsRecord.statusCode === "string") {
+            const parsedStatus = parseInt(errorAsRecord.statusCode, 10);
+            if (!isNaN(parsedStatus)) {
+              status = parsedStatus;
+            }
+          }
+
+          return { data: null, status, errorMessage: error.message };
         }
+
+        if (!data) {
+          return { data: null, status: 404, errorMessage: "File not found" };
+        }
+
+        return { data, status: 200, errorMessage: undefined };
+      },
+      (err) => {
+        // Handle Result error (network/exception errors)
+        return { data: null, status: 500, errorMessage: err.message };
       }
-      // --- END: DEFINITIVE ERROR HANDLING ---
+    );
 
-      return new Response(`Error fetching file: ${error.message}`, {
-        status,
-      });
-    }
-
-    if (!data) {
-      return new Response("File not found", { status: 404 });
+    if (!downloadData.data) {
+      return new Response(
+        downloadData.errorMessage || "File not found",
+        { status: downloadData.status }
+      );
     }
 
     const headers = new Headers();
-    headers.set("Content-Type", data.type);
+    headers.set("Content-Type", downloadData.data.type);
     headers.set("Cache-Control", "public, max-age=31536000, immutable");
 
-    return new Response(data.stream(), { status: 200, headers });
+    return new Response(downloadData.data.stream(), { status: 200, headers });
   } catch (e) {
     if (e instanceof Error) {
       return new Response(e.message, { status: 500 });

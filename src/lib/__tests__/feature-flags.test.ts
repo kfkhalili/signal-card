@@ -18,8 +18,8 @@ const createMockSupabaseClient = (): Partial<SupabaseClient<Database>> => {
     from: (table: string) => {
       if (table === 'feature_flags') {
         return {
-          select: (columns: string) => ({
-            eq: (column: string, value: string) => ({
+          select: (_columns: string) => ({
+            eq: (_column: string, value: string) => ({
               single: async () => {
                 const enabled = flags.get(value) ?? false;
                 return {
@@ -62,8 +62,6 @@ describe('Feature Flags System', () => {
     it('should return true for enabled flags', async () => {
       // In real implementation, this would be set via UPDATE
       // For test, we'll simulate it
-      const mockFlags = new Map([['use_queue_system', true]]);
-
       const { data } = await (supabase as any)
         .from('feature_flags')
         .select('enabled')
@@ -75,7 +73,7 @@ describe('Feature Flags System', () => {
     });
 
     it('should handle non-existent flags gracefully', async () => {
-      const { data, error } = await (supabase as any)
+      const { data } = await (supabase as any)
         .from('feature_flags')
         .select('enabled')
         .eq('flag_name', 'non_existent_flag')

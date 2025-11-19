@@ -1,5 +1,6 @@
 // src/middleware.ts
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { fromPromise } from "neverthrow";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest): Promise<NextResponse> {
@@ -58,16 +59,36 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const userResult = await fromPromise(
+    supabase.auth.getUser(),
+    (e) => new Error(`Failed to get user: ${(e as Error).message}`)
+  );
+
+  const user = userResult.match(
+    (response) => response.data.user,
+    () => null
+  );
 
   if (user) {
-    const { data: profile } = await supabase
-      .from("user_profiles")
-      .select("is_profile_complete")
-      .eq("id", user.id)
-      .single();
+    const profileResult = await fromPromise(
+      supabase
+        .from("user_profiles")
+        .select("is_profile_complete")
+        .eq("id", user.id)
+        .single(),
+      (e) => new Error(`Failed to fetch profile: ${(e as Error).message}`)
+    );
+
+    const profile = profileResult.match(
+      (response) => {
+        const { data, error } = response;
+        if (error) {
+          return null;
+        }
+        return data;
+      },
+      () => null
+    );
 
     if (profile && !profile.is_profile_complete && pathname !== '/auth/complete-profile') {
       const url = request.nextUrl.clone();

@@ -1,5 +1,6 @@
 // src/lib/supabase/realtime-service.ts
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { fromPromise } from "neverthrow";
 import type {
   RealtimeChannel,
   RealtimePostgresChangesPayload,
@@ -165,14 +166,18 @@ export function subscribeToQuoteUpdates(
   return () => {
     // Ensure supabase client is available before trying to remove channel
     if (supabase) {
-      supabase
-        .removeChannel(channel)
-        .catch((error) =>
+      // Use Result types for error handling (fire and forget)
+      void fromPromise(
+        supabase.removeChannel(channel),
+        (e) => e as Error
+      ).then((result) => {
+        result.mapErr((error) => {
           console.error(
             `[realtime-service] (${symbol}): Error removing live quote channel ${channel.topic}:`,
-            (error as Error).message
-          )
-        );
+            error.message
+          );
+        });
+      });
     }
   };
 }
@@ -231,14 +236,18 @@ export function subscribeToFinancialStatementUpdates(
 
   return () => {
     if (supabase) {
-      supabase
-        .removeChannel(channel)
-        .catch((error) =>
+      // Use Result types for error handling (fire and forget)
+      void fromPromise(
+        supabase.removeChannel(channel),
+        (e) => e as Error
+      ).then((result) => {
+        result.mapErr((error) => {
           console.error(
             `[realtime-service] (${symbol}): Error removing Financial Statement channel ${channel.topic}:`,
-            (error as Error).message
-          )
-        );
+            error.message
+          );
+        });
+      });
     }
   };
 }
@@ -297,14 +306,18 @@ export function subscribeToProfileUpdates(
 
   return () => {
     if (supabase) {
-      supabase
-        .removeChannel(channel)
-        .catch((error) =>
+      // Use Result types for error handling (fire and forget)
+      void fromPromise(
+        supabase.removeChannel(channel),
+        (e) => e as Error
+      ).then((result) => {
+        result.mapErr((error) => {
           console.error(
             `[realtime-service] (${symbol}): Error removing Profile channel ${channel.topic}:`,
-            (error as Error).message
-          )
-        );
+            error.message
+          );
+        });
+      });
     }
   };
 }
@@ -363,14 +376,18 @@ export function subscribeToRatiosTTMUpdates(
 
   return () => {
     if (supabase) {
-      supabase
-        .removeChannel(channel)
-        .catch((error) =>
+      // Use Result types for error handling (fire and forget)
+      void fromPromise(
+        supabase.removeChannel(channel),
+        (e) => e as Error
+      ).then((result) => {
+        result.mapErr((error) => {
           console.error(
             `[realtime-service] (${symbol}): Error removing Ratios TTM channel ${channel.topic}:`,
-            (error as Error).message
-          )
-        );
+            error.message
+          );
+        });
+      });
     }
   };
 }
@@ -429,14 +446,18 @@ export function subscribeToDividendHistoryUpdates(
 
   return () => {
     if (supabase) {
-      supabase
-        .removeChannel(channel)
-        .catch((error) =>
+      // Use Result types for error handling (fire and forget)
+      void fromPromise(
+        supabase.removeChannel(channel),
+        (e) => e as Error
+      ).then((result) => {
+        result.mapErr((error) => {
           console.error(
             `[realtime-service] (${symbol}): Error removing Dividend History channel ${channel.topic}:`,
-            (error as Error).message
-          )
-        );
+            error.message
+          );
+        });
+      });
     }
   };
 }
@@ -495,14 +516,18 @@ export function subscribeToRevenueProductSegmentationUpdates(
 
   return () => {
     if (supabase) {
-      supabase
-        .removeChannel(channel)
-        .catch((error) =>
+      // Use Result types for error handling (fire and forget)
+      void fromPromise(
+        supabase.removeChannel(channel),
+        (e) => e as Error
+      ).then((result) => {
+        result.mapErr((error) => {
           console.error(
             `[realtime-service] (${symbol}): Error removing Revenue Product Segmentation channel ${channel.topic}:`,
-            (error as Error).message
-          )
-        );
+            error.message
+          );
+        });
+      });
     }
   };
 }
@@ -561,14 +586,18 @@ export function subscribeToGradesHistoricalUpdates(
 
   return () => {
     if (supabase) {
-      supabase
-        .removeChannel(channel)
-        .catch((error) =>
+      // Use Result types for error handling (fire and forget)
+      void fromPromise(
+        supabase.removeChannel(channel),
+        (e) => e as Error
+      ).then((result) => {
+        result.mapErr((error) => {
           console.error(
             `[realtime-service] (${symbol}): Error removing Grades Historical channel ${channel.topic}:`,
-            (error as Error).message
-          )
-        );
+            error.message
+          );
+        });
+      });
     }
   };
 }
@@ -632,14 +661,18 @@ export function subscribeToExchangeVariantsUpdates(
 
   return () => {
     if (supabase) {
-      supabase
-        .removeChannel(channel)
-        .catch((error) =>
+      // Use Result types for error handling (fire and forget)
+      void fromPromise(
+        supabase.removeChannel(channel),
+        (e) => e as Error
+      ).then((result) => {
+        result.mapErr((error) => {
           console.error(
             `[realtime-service] (${baseSymbol}): Error removing Exchange Variants channel ${channel.topic}:`,
-            (error as Error).message
-          )
-        );
+            error.message
+          );
+        });
+      });
     }
   };
 }

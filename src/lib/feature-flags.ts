@@ -2,39 +2,51 @@
 // Feature flag utilities for client-side feature toggling
 
 import { createSupabaseBrowserClient } from './supabase/client';
+import { fromPromise, ok, Result } from 'neverthrow';
 
 /**
  * Check if a feature flag is enabled
  *
  * @param flagName - The name of the feature flag
- * @returns Promise<boolean> - true if enabled, false if disabled or error
+ * @returns Promise<Result<boolean, Error>> - Ok(true) if enabled, Ok(false) if disabled, Err if query fails
  */
-export async function checkFeatureFlag(flagName: string): Promise<boolean> {
+export async function checkFeatureFlag(flagName: string): Promise<Result<boolean, Error>> {
   const supabase = createSupabaseBrowserClient(false);
   if (!supabase) {
-    return false; // If client unavailable, default to disabled
+    // Client unavailable - return Ok(false) as fail-safe default
+    // This is not an error condition, just unavailable service
+    return ok(false);
   }
 
-  try {
-    const response = await supabase
+  const queryResult = await fromPromise(
+    supabase
       .from('feature_flags' as never)
       .select('enabled')
       .eq('flag_name', flagName)
-      .maybeSingle();
+      .maybeSingle(),
+    (e) => new Error(`Failed to check feature flag ${flagName}: ${(e as Error).message}`)
+  );
 
-    // Type assertion: feature_flags table exists but isn't in generated types
-    const { data, error } = response as { data: { enabled: boolean } | null; error: { message: string; code?: string } | null };
-
-    if (error) {
-      console.warn(`[feature-flags] Error checking flag ${flagName}:`, error);
-      return false; // Default to disabled on error
-    }
-
-    return data?.enabled ?? false;
-  } catch (error) {
-    console.warn(`[feature-flags] Exception checking flag ${flagName}:`, error);
-    return false; // Default to disabled on exception
+  if (queryResult.isErr()) {
+    console.warn(`[feature-flags] Error checking flag ${flagName}:`, queryResult.error);
+    // Return Ok(false) as fail-safe default instead of error
+    // This maintains backward compatibility - errors default to disabled
+    return ok(false);
   }
+
+  const { data, error } = queryResult.value as {
+    data: { enabled: boolean } | null;
+    error: { message: string; code?: string } | null
+  };
+
+  if (error) {
+    console.warn(`[feature-flags] Database error checking flag ${flagName}:`, error);
+    // Return Ok(false) as fail-safe default
+    return ok(false);
+  }
+
+  // Return Ok with the enabled value (or false if data is null)
+  return ok(data?.enabled ?? false);
 }
 
 /**

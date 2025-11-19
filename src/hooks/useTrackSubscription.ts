@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from '@/contexts/AuthContext';
 import { checkFeatureFlag } from '@/lib/feature-flags';
+import { fromPromise } from 'neverthrow';
 
 interface UseTrackSubscriptionOptions {
   symbol: string;
@@ -65,7 +66,11 @@ export function useTrackSubscription({
 
   // Check feature flag on mount
   useEffect(() => {
-    checkFeatureFlag('use_queue_system').then(setFeatureEnabled);
+    checkFeatureFlag('use_queue_system').then((result) => {
+      // Extract boolean value from Result
+      const enabled = result.isOk() ? result.value : false;
+      setFeatureEnabled(enabled);
+    });
   }, []);
 
   useEffect(() => {
@@ -129,18 +134,32 @@ export function useTrackSubscription({
           return;
         }
 
-        const { error: upsertError } = await currentSupabase.rpc('upsert_active_subscription_v2', {
-          p_user_id: currentUserId,
-          p_symbol: currentSymbol,
-          p_data_type: dataType,
-        });
+        const rpcResult = await fromPromise(
+          currentSupabase.rpc('upsert_active_subscription_v2', {
+            p_user_id: currentUserId,
+            p_symbol: currentSymbol,
+            p_data_type: dataType,
+          }),
+          (e) => new Error(`Failed to upsert subscription for ${currentSymbol}/${dataType}: ${(e as Error).message}`)
+        );
 
-        if (upsertError) {
-          console.error(
-            `[useTrackSubscription] Failed to send heartbeat for ${currentSymbol}/${dataType}:`,
-            upsertError
-          );
-        }
+        rpcResult.match(
+          (response) => {
+            // Check for Supabase error in response
+            if (response.error) {
+              console.error(
+                `[useTrackSubscription] Failed to send heartbeat for ${currentSymbol}/${dataType}:`,
+                response.error
+              );
+            }
+          },
+          (err) => {
+            console.error(
+              `[useTrackSubscription] Failed to send heartbeat for ${currentSymbol}/${dataType}:`,
+              err
+            );
+          }
+        );
       }
     };
 
@@ -224,23 +243,35 @@ export function useTrackSubscription({
               continue; // Skip invalid data types
             }
 
-
-            // CRITICAL: Execute the query and handle errors properly
-            // Convert PromiseLike to Promise to ensure .catch() is available
-            Promise.resolve(
+            // CRITICAL: Execute the query and handle errors properly using Result types
+            // Fire and forget - don't await in cleanup
+            void fromPromise(
               currentSupabase
                 .from('active_subscriptions_v2')
                 .delete()
                 .eq('user_id', currentUserId)
                 .eq('symbol', currentSymbol)
-                .eq('data_type', dataType)
-            )
-              .catch((error: unknown) => {
-                console.error(
-                  `[useTrackSubscription] DELETE ERROR for ${currentSymbol}/${dataType}:`,
-                  error
-                );
-              });
+                .eq('data_type', dataType),
+              (e) => new Error(`Failed to delete subscription ${currentSymbol}/${dataType}: ${(e as Error).message}`)
+            ).then((deleteResult) => {
+              deleteResult.match(
+                (response) => {
+                  // Check for Supabase error in response
+                  if (response.error) {
+                    console.error(
+                      `[useTrackSubscription] DELETE ERROR for ${currentSymbol}/${dataType}:`,
+                      response.error
+                    );
+                  }
+                },
+                (err) => {
+                  console.error(
+                    `[useTrackSubscription] DELETE ERROR for ${currentSymbol}/${dataType}:`,
+                    err
+                  );
+                }
+              );
+            });
           }
         } else {
           console.error(`[useTrackSubscription] Cannot delete subscription for ${symbol} - missing required values:`, {
@@ -261,24 +292,25 @@ export function useTrackSubscription({
         }
 
         // Stop tracking presence (fire and forget - don't wait)
-        try {
-          void currentChannel.untrack().catch(() => {
-            // Ignore errors during untrack
+        // Use Result types for error handling
+        void fromPromise(
+          currentChannel.untrack(),
+          (e) => e as Error
+        ).then((untrackResult) => {
+          untrackResult.mapErr(() => {
+            // Ignore errors during untrack (fire and forget)
           });
-        } catch {
-          // Ignore errors during untrack
-        }
+        });
 
         // Leave channel (presence automatically removed) - fire and forget
-        try {
-          void currentSupabase
-            .removeChannel(currentChannel)
-            .catch(() => {
-              // Ignore errors during channel removal
-            });
-        } catch {
-          // Ignore errors during channel removal
-        }
+        void fromPromise(
+          currentSupabase.removeChannel(currentChannel),
+          (e) => e as Error
+        ).then((removeChannelResult) => {
+          removeChannelResult.mapErr(() => {
+            // Ignore errors during channel removal (fire and forget)
+          });
+        });
       } catch (error) {
         // CRITICAL: Catch any unexpected errors in cleanup to prevent crashes
         console.error('[useTrackSubscription] Unexpected error in cleanup:', error);

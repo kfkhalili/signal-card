@@ -702,23 +702,24 @@ export function useWorkspaceManager() {
             cardsNeedingReinit.forEach(async (card) => {
               const initializer = getCardInitializer(card.type);
               if (initializer) {
-                try {
-                      const initResult = await initializer({
-                        symbol: card.symbol,
-                        supabase,
-                        toast: toast || undefined,
-                        activeCards: prevActiveCards,
-                      });
-                  if (initResult.isOk()) {
+                const initResult = await initializer({
+                  symbol: card.symbol,
+                  supabase,
+                  toast: toast || undefined,
+                  activeCards: prevActiveCards,
+                });
+                initResult.match(
+                  (newCard) => {
                     setActiveCards((currentCards) => {
                       return currentCards.map((c) =>
-                        c.id === card.id ? initResult.value : c
+                        c.id === card.id ? newCard : c
                       );
                     });
+                  },
+                  (error) => {
+                    console.error(`Failed to re-initialize ${card.type} card:`, error);
                   }
-                } catch (error) {
-                  console.error(`Failed to re-initialize ${card.type} card:`, error);
-                }
+                );
               }
             });
             // Return early - the async re-init will update the cards
@@ -950,25 +951,24 @@ export function useWorkspaceManager() {
             cardsNeedingReinit.forEach(async (card) => {
               const initializer = getCardInitializer(card.type);
               if (initializer) {
-                try {
-                  const initResult = await initializer({
-                    symbol: card.symbol,
-                    supabase,
-                    toast: toast || undefined,
-                    activeCards: prevActiveCards,
-                  });
-                  if (initResult.isOk()) {
+                const initResult = await initializer({
+                  symbol: card.symbol,
+                  supabase,
+                  toast: toast || undefined,
+                  activeCards: prevActiveCards,
+                });
+                initResult.match(
+                  (newCard) => {
                     setActiveCards((currentCards) => {
                       return currentCards.map((c) =>
-                        c.id === card.id ? initResult.value : c
+                        c.id === card.id ? newCard : c
                       );
                     });
-                  } else {
-                    console.error(`[useWorkspaceManager] Re-initialization failed for card ${card.id}:`, initResult.error);
+                  },
+                  (error) => {
+                    console.error(`[useWorkspaceManager] Re-initialization failed for card ${card.id}:`, error);
                   }
-                } catch (error) {
-                  console.error(`Failed to re-initialize ${card.type} card:`, error);
-                }
+                );
               }
             });
             // Return early - the async re-init will update the cards
