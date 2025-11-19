@@ -21,7 +21,7 @@ INSERT INTO public.data_type_registry_v2 (
   'fetched_at',
   'is_data_stale_v2',
   43200, -- 30 days (financial statements are updated monthly/quarterly)
-  'fetch-fmp-financial-statements',
+  'queue-processor-v2',
   'on-demand',
   'symbol',
   500000 -- 500 KB estimate (financial statements are large JSON payloads)

@@ -18,7 +18,7 @@ INSERT INTO public.data_type_registry_v2 (
   'fetched_at',
   'is_data_stale_v2',
   1440, -- 24 hours (ratios TTM are updated daily)
-  'fetch-fmp-ratios-ttm',
+  'queue-processor-v2',
   'on-demand',
   'symbol',
   50000 -- 50 KB estimate (ratios data is moderate size)
