@@ -1,17 +1,16 @@
 // Supabase Edge Function to handle new user creation
 // This function is triggered when a new user signs up
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { fromPromise } from "npm:neverthrow@6.0.0";
+import { createClient } from "@supabase/supabase-js";
+import { fromPromise } from "neverthrow";
 import { CORS_HEADERS, ensureCronAuth } from "../_shared/auth.ts";
 
-serve(async (_req) => {
+Deno.serve(async (_req: Request) => {
   // Handle CORS preflight requests
   if (_req.method === "OPTIONS") {
     return new Response("ok", { headers: CORS_HEADERS });
   }
-  
+
   // --- 🔒 Centralized Authorization Check ---
   const authError = ensureCronAuth(_req);
   if (authError) {
@@ -31,19 +30,16 @@ serve(async (_req) => {
 
     // Only handle user creation events
     if (type === "INSERT" && record) {
-      const userId = record.id;
-      const userEmail = record.email;
-
       // Call the database function to create the user profile using Result types
       const rpcResult = await fromPromise(
         supabase.rpc("handle_user_created_webhook", {
           user_data: JSON.stringify(record),
         }),
-        (e) => e as Error
+        (e: unknown) => e as Error
       );
 
       const rpcResponse = rpcResult.match(
-        (response) => {
+        (response: { data: unknown; error: { message: string } | null }) => {
           const { data, error } = response;
           if (error) {
             console.error("Error calling handle_user_created_webhook:", error);
@@ -52,7 +48,7 @@ serve(async (_req) => {
           console.log("User profile creation result:", data);
           return { success: true, data };
         },
-        (err) => {
+        (err: Error) => {
           console.error("Error calling handle_user_created_webhook:", err);
           return { success: false, error: err };
         }
@@ -62,8 +58,8 @@ serve(async (_req) => {
         return new Response(
           JSON.stringify({
             error: "Failed to create user profile",
-            details: rpcResponse.error instanceof Error 
-              ? rpcResponse.error.message 
+            details: rpcResponse.error instanceof Error
+              ? rpcResponse.error.message
               : (rpcResponse.error as { message?: string })?.message || "Unknown error",
           }),
           {
