@@ -132,3 +132,13 @@ Delete migrations that are completely overwritten:
    - Adds informational notices about superseded migrations
    - Documents migration history for audit purposes
 
+## Test Data Migrations Removed
+
+**Principle:** Migrations should only contain infrastructure setup (tables, RLS, functions, triggers, cron jobs, realtime, etc.) needed for production. Test data insertions should NOT be in migrations.
+
+**Removed:**
+1. ✅ **`20251118020000_add_rivn_to_supported_symbols.sql`** - Test data (RIVN symbol)
+2. ✅ **`20251118040000_add_lcid_to_supported_symbols.sql`** - Test data (LCID symbol)
+
+**Rationale:** These migrations added test symbols to `supported_symbols` for testing empty card states. This is test data, not infrastructure. Production environments should not have these test symbols automatically inserted.
+

@@ -1,9 +1,9 @@
 -- Remove redundant processor optimization migration
 -- SUPERSEDES: 20251117180000_optimize_processor_for_one_minute_processing.sql
--- 
+--
 -- The migration 20251117180200_optimize_processor_for_faster_processing.sql
 -- already overwrites the settings from 20251117180000, making it redundant.
--- 
+--
 -- This migration documents that 20251117180000 is superseded and adds a comment
 -- to the superseded migration file for clarity.
 

@@ -3,7 +3,7 @@
 -- 1. LEFT JOIN from 20251118030000 (handles missing data)
 -- 2. Timeout logic from 20251117180100 (prevents long-running queries)
 -- 3. Exchange status check with data existence check from 20251119000000
--- 
+--
 -- SUPERSEDES:
 -- - 20251117180100_optimize_staleness_checker_timeout.sql (keeps timeout, but fixes JOIN)
 -- - 20251118000000_add_exchange_status_check_to_background_staleness_checker.sql (keeps exchange check, but fixes JOIN)

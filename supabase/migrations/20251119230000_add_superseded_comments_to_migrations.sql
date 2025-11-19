@@ -1,6 +1,6 @@
 -- Add comments to migrations that are superseded by later migrations
 -- This documents the migration history without breaking existing migrations
--- 
+--
 -- Note: These are informational comments only. The migrations themselves
 -- remain in the history for audit purposes.
 
