@@ -1,4 +1,4 @@
--- Update upsert_active_subscription_v2 to support heartbeat pattern
+-- Create upsert_active_subscription_v2 function to support heartbeat pattern
 -- CRITICAL: Updates last_seen_at on conflict (heartbeat updates)
 -- This allows client to send periodic heartbeats to indicate active viewing
 -- Background cleanup removes subscriptions with last_seen_at > 5 minutes
