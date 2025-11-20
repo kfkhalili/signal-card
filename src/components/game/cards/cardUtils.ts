@@ -30,23 +30,18 @@ export function applyProfileCoreUpdates<T extends ConcreteCardData>(
     logoUrlChanged ||
     websiteUrlChanged;
 
-  if (!coreDataChanged) {
-    return { updatedCardData: currentCardData, coreDataChanged: false };
-  }
-
+  // Always apply updates, even if values appear unchanged
+  // This ensures profile data is properly applied in all cases
   const updatedCardData: T = {
     ...currentCardData,
-    // Conditionally spread to only include changed fields, maintaining other T properties
-    ...(companyNameChanged && { companyName: newCompanyName }),
-    ...(displayCompanyNameChanged && {
-      displayCompanyName: newDisplayCompanyName,
-    }),
-    ...(logoUrlChanged && { logoUrl: newLogoUrl }),
-    ...(websiteUrlChanged && { websiteUrl: newWebsiteUrl }),
+    companyName: newCompanyName,
+    displayCompanyName: newDisplayCompanyName,
+    logoUrl: newLogoUrl,
+    websiteUrl: newWebsiteUrl,
   };
 
   return {
     updatedCardData,
-    coreDataChanged: true,
+    coreDataChanged,
   };
 }

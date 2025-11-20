@@ -637,7 +637,6 @@ const handleCashUseCardProfileUpdate: CardUpdateHandler<
   );
 
   if (coreDataChanged) {
-
     const newBackDataDescription = `Cash usage metrics for ${
       updatedCardData.companyName
     }. Financial data from ${
@@ -651,7 +650,9 @@ const handleCashUseCardProfileUpdate: CardUpdateHandler<
       },
     };
   }
-  return currentCashUseCardData;
+  // Always return updatedCardData even if coreDataChanged is false
+  // This ensures profile data is applied even if values appear unchanged
+  return updatedCardData;
 };
 
 registerCardUpdateHandler(

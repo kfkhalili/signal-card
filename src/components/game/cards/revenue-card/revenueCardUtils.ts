@@ -392,7 +392,9 @@ const handleRevenueCardProfileUpdate: CardUpdateHandler<
       backData: newBackDataDescription,
     };
   }
-  return currentRevenueCardData;
+  // Always return updatedCardData even if coreDataChanged is false
+  // This ensures profile data is applied even if values appear unchanged
+  return updatedCardData;
 };
 registerCardUpdateHandler(
   "revenue",
