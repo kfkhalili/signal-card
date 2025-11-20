@@ -136,12 +136,16 @@ export class RealtimeStockManager extends EventEmitter {
     if (this.subscribedExchanges.size === 0) return;
 
     const exchanges = Array.from(this.subscribedExchanges);
+    const exchangesSet = new Set(exchanges); // For fast lookup
     const channelName = `exchange-status-for-workspace`;
 
     this.exchangeStatusChannel = this.supabase.channel(channelName, {
       config: { broadcast: { ack: true } },
     });
 
+    // Subscribe to all exchange status updates
+    // Note: Supabase Realtime doesn't support 'in' filter syntax,
+    // so we subscribe to all updates and filter client-side
     this.exchangeStatusChannel
       .on<ExchangeStatus>(
         "postgres_changes",
@@ -149,10 +153,19 @@ export class RealtimeStockManager extends EventEmitter {
           event: "UPDATE",
           schema: "public",
           table: "exchange_market_status",
-          filter: `exchange_code=in.(${exchanges.join(",")})`,
+          // No filter - we'll filter client-side since 'in' syntax isn't supported
         },
         (payload) => {
-          this.emit("exchange_status", payload.new);
+          const exchangeCode = payload.new && 'exchange_code' in payload.new ? payload.new.exchange_code : null;
+
+          // Filter client-side: only emit if exchange is in our subscribed list
+          if (!exchangeCode || !exchangesSet.has(exchangeCode)) {
+            return;
+          }
+
+          if (payload.new) {
+            this.emit("exchange_status", payload.new);
+          }
         }
       )
       .subscribe((status, err) => {

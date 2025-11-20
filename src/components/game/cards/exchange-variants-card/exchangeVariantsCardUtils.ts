@@ -21,6 +21,8 @@ import {
   type CardUpdateHandler,
 } from "@/components/game/cardUpdateHandler.types";
 import type { Database } from "@/lib/supabase/database.types";
+import type { ProfileDBRow } from "@/hooks/useStockData";
+import { applyProfileCoreUpdates } from "../cardUtils";
 
 type ExchangeVariantsDBRow =
   Database["public"]["Tables"]["exchange_variants"]["Row"];
@@ -330,4 +332,32 @@ registerCardUpdateHandler(
   "exchangevariants",
   "EXCHANGE_VARIANTS_UPDATE",
   handleExchangeVariantsUpdate
+);
+
+const handleExchangeVariantsProfileUpdate: CardUpdateHandler<
+  ExchangeVariantsCardData,
+  ProfileDBRow
+> = (currentCardData, profilePayload): ExchangeVariantsCardData => {
+  const { updatedCardData } = applyProfileCoreUpdates(
+    currentCardData,
+    profilePayload
+  );
+
+  // Always apply profile updates to ensure data propagates correctly
+  const newBackDataDescription = `A list of international exchanges where ${
+    updatedCardData.companyName || updatedCardData.symbol
+  } is traded.`;
+
+  return {
+    ...updatedCardData,
+    backData: {
+      description: newBackDataDescription,
+    },
+  };
+};
+
+registerCardUpdateHandler(
+  "exchangevariants",
+  "STATIC_PROFILE_UPDATE",
+  handleExchangeVariantsProfileUpdate
 );

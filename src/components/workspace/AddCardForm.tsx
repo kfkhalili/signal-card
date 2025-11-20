@@ -244,7 +244,7 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
     <div className="pt-2">
       <DialogTitle>Select a Symbol</DialogTitle>
       <DialogDescription className="pt-1">
-        Search for a stock symbol to add cards for. Type at least 1 character to search.
+        Search for a stock symbol to add cards for.
       </DialogDescription>
       <div className="mt-4 space-y-2">
         <div className="relative">
@@ -290,11 +290,6 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
                 ))}
               </div>
             )}
-          </div>
-        )}
-        {!debouncedSearchQuery.trim() && (
-          <div className="py-6 text-center text-sm text-muted-foreground">
-            Start typing a symbol to search (e.g., AAPL, MSFT, TSLA)
           </div>
         )}
       </div>

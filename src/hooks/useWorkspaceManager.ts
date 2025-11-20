@@ -472,13 +472,10 @@ export function useWorkspaceManager() {
                   updatedProfileDBRow
                 );
 
-                if (
-                  JSON.stringify(updatedConcreteData) !==
-                  JSON.stringify(concreteCardDataForHandler)
-                ) {
-                  overallChanged = true;
-                  return { ...card, ...updatedConcreteData };
-                }
+                // Always apply updates when handler exists to ensure profile data propagates
+                // The handler is responsible for returning updated data
+                overallChanged = true;
+                return { ...card, ...updatedConcreteData };
               }
             }
             return card;

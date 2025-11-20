@@ -303,7 +303,7 @@ const handlePriceCardProfileUpdate: CardUpdateHandler<
   const newBackData: BaseCardBackData = {
     description: `Market price information for ${companyNameForDesc}. Includes daily and historical price points, volume, and key moving averages.`,
   };
-  
+
   return {
     ...updatedCardData,
     staticData: {

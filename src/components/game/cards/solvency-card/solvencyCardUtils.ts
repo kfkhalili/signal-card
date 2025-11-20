@@ -380,27 +380,23 @@ const handleSolvencyCardProfileUpdate: CardUpdateHandler<
   SolvencyCardData,
   ProfileDBRow
 > = (currentSolvencyCardData, profilePayload): SolvencyCardData => {
-  const { updatedCardData, coreDataChanged } = applyProfileCoreUpdates(
+  const { updatedCardData } = applyProfileCoreUpdates(
     currentSolvencyCardData,
     profilePayload
   );
 
-  if (coreDataChanged) {
-    const newBackDataDescription: BaseCardBackData = {
-      description: `Key solvency metrics for ${updatedCardData.companyName} (${
-        updatedCardData.staticData.periodLabel
-      }, ending ${
-        updatedCardData.staticData.statementDate || "N/A"
-      }). Includes assets, liabilities, debt, and cash flow.`,
-    };
-    return {
-      ...updatedCardData,
-      backData: newBackDataDescription,
-    };
-  }
-  // Always return updatedCardData even if coreDataChanged is false
-  // This ensures profile data is applied even if values appear unchanged
-  return updatedCardData;
+  // Always apply profile updates to ensure data propagates correctly
+  const newBackDataDescription: BaseCardBackData = {
+    description: `Key solvency metrics for ${updatedCardData.companyName} (${
+      updatedCardData.staticData.periodLabel
+    }, ending ${
+      updatedCardData.staticData.statementDate || "N/A"
+    }). Includes assets, liabilities, debt, and cash flow.`,
+  };
+  return {
+    ...updatedCardData,
+    backData: newBackDataDescription,
+  };
 };
 registerCardUpdateHandler(
   "solvency",

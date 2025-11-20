@@ -631,28 +631,24 @@ const handleCashUseCardProfileUpdate: CardUpdateHandler<
   currentCashUseCardData,
   profilePayload
 ): CashUseCardData => {
-  const { updatedCardData, coreDataChanged } = applyProfileCoreUpdates(
+  const { updatedCardData } = applyProfileCoreUpdates(
     currentCashUseCardData,
     profilePayload
   );
 
-  if (coreDataChanged) {
-    const newBackDataDescription = `Cash usage metrics for ${
-      updatedCardData.companyName
-    }. Financial data from ${
-      updatedCardData.staticData.latestStatementDate || "N/A"
-    } (${updatedCardData.staticData.latestStatementPeriod || "N/A"}).`;
+  // Always apply profile updates to ensure data propagates correctly
+  const newBackDataDescription = `Cash usage metrics for ${
+    updatedCardData.companyName
+  }. Financial data from ${
+    updatedCardData.staticData.latestStatementDate || "N/A"
+  } (${updatedCardData.staticData.latestStatementPeriod || "N/A"}).`;
 
-    return {
-      ...updatedCardData,
-      backData: {
-        description: newBackDataDescription,
-      },
-    };
-  }
-  // Always return updatedCardData even if coreDataChanged is false
-  // This ensures profile data is applied even if values appear unchanged
-  return updatedCardData;
+  return {
+    ...updatedCardData,
+    backData: {
+      description: newBackDataDescription,
+    },
+  };
 };
 
 registerCardUpdateHandler(
