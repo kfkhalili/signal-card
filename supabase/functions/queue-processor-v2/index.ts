@@ -44,9 +44,12 @@ interface QueueJob {
   job_metadata: Record<string, unknown>;
 }
 
-// OPTIMIZATION: Increased batch size and concurrency for faster processing
-const BATCH_SIZE = 30; // Increased from 10 to 30 for faster processing
-const MAX_CONCURRENT_JOBS = 10; // Process up to 10 jobs in parallel (increased from 5)
+// Configuration: Process at rate of 300 jobs per minute (5 jobs per second)
+const BATCH_SIZE = 50; // Process up to 50 jobs per batch
+const MAX_CONCURRENT_JOBS = 10; // Process up to 10 jobs in parallel
+const TARGET_JOBS_PER_MINUTE = 300; // Target processing rate
+const TARGET_JOBS_PER_SECOND = TARGET_JOBS_PER_MINUTE / 60; // 5 jobs per second
+const MIN_DELAY_BETWEEN_JOBS_MS = 1000 / TARGET_JOBS_PER_SECOND; // ~200ms delay between job starts
 const FUNCTION_TIMEOUT_MS = 50000; // 50 seconds overall timeout
 
 Deno.serve(async (req: Request) => {
@@ -112,43 +115,62 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      // OPTIMIZATION: Process jobs in parallel with concurrency limit
+      // Rate-limited processing: Process at 300 jobs per minute (5 jobs per second)
       const processedJobs: Array<{ id: string; success: boolean; error?: string }> = [];
+      const processingStartTime = Date.now();
+      let jobsProcessed = 0;
 
-      // Process jobs in batches with concurrency limit
+      // Process jobs in batches with rate limiting
       for (let i = 0; i < jobs.length; i += MAX_CONCURRENT_JOBS) {
+        // Rate limiting: Ensure we don't exceed 300 jobs per minute
+        // Calculate how many jobs we should have processed by now
+        const elapsedSeconds = (Date.now() - processingStartTime) / 1000;
+        const expectedJobsProcessed = Math.floor(elapsedSeconds * TARGET_JOBS_PER_SECOND);
+
+        // If we're ahead of schedule, add a delay
+        if (jobsProcessed > expectedJobsProcessed) {
+          const delayMs = (jobsProcessed - expectedJobsProcessed) * MIN_DELAY_BETWEEN_JOBS_MS;
+          if (delayMs > 0) {
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+          }
+        }
+
+        // Collect up to MAX_CONCURRENT_JOBS jobs to process in parallel
         const batch = jobs.slice(i, i + MAX_CONCURRENT_JOBS);
-        const batchPromises = batch.map(async (job: QueueJob) => {
+
+        const batchPromises = batch.map(async (batchJob: QueueJob) => {
           try {
             // CRITICAL: Route to correct handler based on data_type
             // This replaces FaaS-to-FaaS invocations with direct function calls
-            const result = await processJob(job, supabase);
+            const result = await processJob(batchJob, supabase);
 
             if (result.success) {
               // Mark job as completed
               const { error: completeError } = await supabase.rpc('complete_queue_job_v2', {
-                p_job_id: job.id,
+                p_job_id: batchJob.id,
                 p_data_size_bytes: result.dataSizeBytes,
               });
 
               if (completeError) {
-                console.error(`[queue-processor-v2] Failed to complete job ${job.id}:`, completeError);
-                processedJobs.push({ id: job.id, success: false, error: completeError.message });
+                console.error(`[queue-processor-v2] Failed to complete job ${batchJob.id}:`, completeError);
+                processedJobs.push({ id: batchJob.id, success: false, error: completeError.message });
               } else {
-                processedJobs.push({ id: job.id, success: true });
+                processedJobs.push({ id: batchJob.id, success: true });
+                jobsProcessed++;
               }
             } else {
               // Mark job as failed (with retry logic)
               const { error: failError } = await supabase.rpc('fail_queue_job_v2', {
-                p_job_id: job.id,
+                p_job_id: batchJob.id,
                 p_error_message: result.error || 'Unknown error',
               });
 
               if (failError) {
-                console.error(`[queue-processor-v2] Failed to fail job ${job.id}:`, failError);
+                console.error(`[queue-processor-v2] Failed to fail job ${batchJob.id}:`, failError);
               }
 
-              processedJobs.push({ id: job.id, success: false, error: result.error });
+              processedJobs.push({ id: batchJob.id, success: false, error: result.error });
+              jobsProcessed++;
             }
           } catch (error) {
             // CRITICAL: Deadlock-aware error handling
@@ -156,36 +178,38 @@ Deno.serve(async (req: Request) => {
               error.message?.includes('deadlock detected') ||
               error.message?.includes('40P01')
             )) {
-              console.warn(`[queue-processor-v2] Deadlock detected for job ${job.id}, resetting immediately`);
+              console.warn(`[queue-processor-v2] Deadlock detected for job ${batchJob.id}, resetting immediately`);
 
               // Reset job immediately (doesn't increment retry_count)
               const { error: resetError } = await supabase.rpc('reset_job_immediate_v2', {
-                p_job_id: job.id,
+                p_job_id: batchJob.id,
               });
 
               if (resetError) {
-                console.error(`[queue-processor-v2] Failed to reset job ${job.id}:`, resetError);
+                console.error(`[queue-processor-v2] Failed to reset job ${batchJob.id}:`, resetError);
               }
 
-              processedJobs.push({ id: job.id, success: false, error: 'Deadlock - reset for retry' });
+              processedJobs.push({ id: batchJob.id, success: false, error: 'Deadlock - reset for retry' });
+              jobsProcessed++;
               return; // Skip fail_queue_job - let recover_stuck_jobs handle it
             }
 
             // Other errors - mark as failed
             const { error: failError } = await supabase.rpc('fail_queue_job_v2', {
-              p_job_id: job.id,
+              p_job_id: batchJob.id,
               p_error_message: error instanceof Error ? error.message : 'Unknown error',
             });
 
             if (failError) {
-              console.error(`[queue-processor-v2] Failed to fail job ${job.id}:`, failError);
+              console.error(`[queue-processor-v2] Failed to fail job ${batchJob.id}:`, failError);
             }
 
-            processedJobs.push({ id: job.id, success: false, error: error instanceof Error ? error.message : 'Unknown error' });
+            processedJobs.push({ id: batchJob.id, success: false, error: error instanceof Error ? error.message : 'Unknown error' });
+            jobsProcessed++;
           }
         });
 
-        // Wait for this batch to complete before starting the next
+        // Wait for this batch to complete
         await Promise.all(batchPromises);
       }
 

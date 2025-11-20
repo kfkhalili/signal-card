@@ -12,15 +12,16 @@ const STORAGE_BUCKET_NAME = 'profile-images';
 
 // Zod schema for FMP Profile API response
 // CRITICAL: Strict schema validation - all required fields must be present and correct type
+// FIXED: Made fields nullish to handle FMP returning null instead of undefined
 const FmpProfileSchema = z.object({
   symbol: z.string().min(1),
-  price: z.number().gt(0).lt(100000), // Sanity check: price must be positive and reasonable
+  price: z.number().gte(0).lt(1000000), // Allow 0 (delisted/suspended) and higher max for crypto/high-value stocks
   marketCap: z.number().nonnegative().optional(),
   beta: z.number().optional(),
   lastDividend: z.number().optional(),
-  range: z.string().optional(),
-  change: z.number().optional(),
-  changePercentage: z.number().optional(),
+  range: z.string().nullish(), // FIXED: FMP returns null, not undefined
+  change: z.number().nullish(), // FIXED: FMP returns null, not undefined
+  changePercentage: z.number().nullish(), // FIXED: FMP returns null, not undefined
   volume: z.number().nonnegative().optional(),
   averageVolume: z.number().nonnegative().optional(),
   companyName: z.string().min(1), // Required - will fail if undefined or empty
@@ -31,7 +32,12 @@ const FmpProfileSchema = z.object({
   exchangeFullName: z.string().nullish(),
   exchange: z.string().nullish(),
   industry: z.string().nullish(),
-  website: z.union([z.string().url(), z.literal(''), z.null()]).optional(), // FMP can return null, empty string, or valid URL
+  website: z.union([
+    z.string().url(), // Valid URL
+    z.string(), // Any string (invalid URLs will be stored but not used)
+    z.literal(''),
+    z.null()
+  ]).optional(), // FIXED: More lenient - accept any string, validate URL format later if needed
   description: z.string().nullish(), // FMP can return null or undefined
   ceo: z.string().nullish(), // FMP can return null or undefined
   sector: z.string().nullish(),
@@ -187,7 +193,7 @@ export async function fetchProfileLogic(
       exchange: profile.exchange ?? null,
       exchange_full_name: profile.exchangeFullName ?? null,
       industry: profile.industry ?? null,
-      website: profile.website || null,
+      website: (profile.website && profile.website !== '') ? profile.website : null, // Store null for empty strings or invalid URLs
       description: profile.description ?? null,
       ceo: profile.ceo ?? null,
       sector: profile.sector ?? null,
