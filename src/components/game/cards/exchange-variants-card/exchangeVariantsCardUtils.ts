@@ -22,7 +22,7 @@ import {
 } from "@/components/game/cardUpdateHandler.types";
 import type { Database } from "@/lib/supabase/database.types";
 import type { ProfileDBRow } from "@/hooks/useStockData";
-import { applyProfileCoreUpdates } from "../cardUtils";
+import { applyProfileCoreUpdates, fetchProfileInfo } from "../cardUtils";
 
 type ExchangeVariantsDBRow =
   Database["public"]["Tables"]["exchange_variants"]["Row"];
@@ -89,27 +89,29 @@ function createEmptyExchangeVariantsCard(
 async function initializeExchangeVariantsCard({
   symbol,
   supabase,
+  activeCards,
 }: CardInitializationContext): Promise<
   Result<DisplayableCard, ExchangeVariantsCardError>
 > {
-  // Fetch profile data for company name, logo, website
-  const profileResult = await fromPromise(
-    supabase
-      .from("profiles")
-      .select("company_name, display_company_name, image, website")
-      .eq("symbol", symbol)
-      .maybeSingle(),
-    (e) =>
+  // Fetch profile info using shared utility
+  const profileInfoResult = await fetchProfileInfo(symbol, supabase, activeCards);
+  if (profileInfoResult.isErr()) {
+    return err(
       new ExchangeVariantsCardError(
-        `Failed to fetch profile for ${symbol}: ${(e as Error).message}`
+        `Failed to fetch profile for ${symbol}: ${profileInfoResult.error.message}`
       )
-  );
-
-  if (profileResult.isErr()) {
-    return err(profileResult.error);
+    );
   }
 
-  const profileData = profileResult.value.data;
+  const profileInfo = profileInfoResult.value;
+  // Convert ProfileInfo to the format expected by createEmptyExchangeVariantsCard
+  // Only set companyName if it's not the symbol fallback (to avoid showing symbol in parenthesis)
+  const profileData = {
+    company_name: profileInfo.companyName !== symbol ? profileInfo.companyName : null,
+    display_company_name: profileInfo.displayCompanyName !== symbol ? profileInfo.displayCompanyName : null,
+    image: profileInfo.logoUrl,
+    website: profileInfo.websiteUrl,
+  };
 
   // Fetch only actively trading variants for the base symbol
   // The base variant (where variant_symbol === symbol) determines the base exchange

@@ -22,11 +22,10 @@ import {
 } from "@/components/game/cardUpdateHandler.types";
 import type { Database } from "@/lib/supabase/database.types";
 import type { ProfileDBRow } from "@/hooks/useStockData";
-import { applyProfileCoreUpdates } from "../cardUtils";
+import { applyProfileCoreUpdates, fetchProfileInfo } from "../cardUtils";
 
 type GradesHistoricalDBRow =
   Database["public"]["Tables"]["grades_historical"]["Row"];
-type ProfileDBRowFromSupabase = Database["public"]["Tables"]["profiles"]["Row"];
 
 class AnalystGradesCardError extends Error {
   constructor(message: string) {
@@ -251,45 +250,16 @@ async function fetchAnalystGradesData(
   supabase: CardInitializationContext["supabase"],
   activeCards?: DisplayableCard[]
 ) {
-  const profileCardForSymbol = activeCards?.find(
-    (c) => c.symbol === symbol && c.type === "profile"
-  ) as ProfileDBRowFromSupabase | undefined;
-  let profileInfo = {
-    companyName: profileCardForSymbol?.company_name ?? symbol,
-    displayCompanyName:
-      profileCardForSymbol?.display_company_name ??
-      profileCardForSymbol?.company_name ??
-      symbol,
-    logoUrl: profileCardForSymbol?.image ?? null,
-    websiteUrl: profileCardForSymbol?.website ?? null,
-  };
-
-  if (!profileCardForSymbol) {
-    const profileResult = await fromPromise(
-      supabase
-        .from("profiles")
-        .select("company_name, display_company_name, image, website")
-        .eq("symbol", symbol)
-        .maybeSingle(),
-      (e) =>
-        new AnalystGradesCardError(
-          `Profile fetch failed: ${(e as Error).message}`
-        )
-    );
-    if (profileResult.isOk() && profileResult.value.data) {
-      profileInfo = {
-        companyName: profileResult.value.data.company_name ?? symbol,
-        displayCompanyName:
-          profileResult.value.data.display_company_name ??
-          profileResult.value.data.company_name ??
-          symbol,
-        logoUrl: profileResult.value.data.image ?? null,
-        websiteUrl: profileResult.value.data.website ?? null,
+  // Fetch profile info using shared utility
+  const profileInfoResult = await fetchProfileInfo(symbol, supabase, activeCards);
+  const profileInfo = profileInfoResult.isOk()
+    ? profileInfoResult.value
+    : {
+        companyName: symbol,
+        displayCompanyName: symbol,
+        logoUrl: null,
+        websiteUrl: null,
       };
-    } else if (profileResult.isErr()) {
-      console.warn(profileResult.error.message);
-    }
-  }
 
   const gradesResult = await fromPromise(
     supabase

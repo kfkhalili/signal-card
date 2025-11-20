@@ -22,11 +22,10 @@ import {
 } from "@/components/game/cardUpdateHandler.types";
 import type { Database } from "@/lib/supabase/database.types";
 import type { ProfileDBRow } from "@/hooks/useStockData";
-import { applyProfileCoreUpdates } from "../cardUtils";
+import { applyProfileCoreUpdates, fetchProfileInfo } from "../cardUtils";
 
 type DividendHistoryDBRow =
   Database["public"]["Tables"]["dividend_history"]["Row"];
-type ProfileDBRowFromSupabase = Database["public"]["Tables"]["profiles"]["Row"];
 
 class DividendsHistoryError extends Error {
   constructor(message: string) {
@@ -136,47 +135,45 @@ async function fetchAndProcessDividendsData(
   supabase: CardInitializationContext["supabase"],
   activeCards?: DisplayableCard[]
 ) {
+  // Fetch profile info using shared utility
+  const profileInfoResult = await fetchProfileInfo(symbol, supabase, activeCards);
+  const baseProfileInfo = profileInfoResult.isOk()
+    ? profileInfoResult.value
+    : {
+        companyName: symbol,
+        displayCompanyName: symbol,
+        logoUrl: null,
+        websiteUrl: null,
+      };
+
+  // Fetch currency separately (needed for dividends history card)
+  let reportedCurrency: string | null = null;
   const profileCardForSymbol = activeCards?.find(
     (c) => c.symbol === symbol && c.type === "profile"
-  ) as ProfileDBRowFromSupabase | undefined;
-  let profileInfo = {
-    companyName: profileCardForSymbol?.company_name ?? symbol,
-    displayCompanyName:
-      profileCardForSymbol?.display_company_name ??
-      profileCardForSymbol?.company_name ??
-      symbol,
-    logoUrl: profileCardForSymbol?.image ?? null,
-    websiteUrl: profileCardForSymbol?.website ?? null,
-    reportedCurrency: profileCardForSymbol?.currency ?? null,
-  };
-  if (!profileCardForSymbol) {
-    const profileResult = await fromPromise(
+  );
+  if (profileCardForSymbol && profileCardForSymbol.type === "profile" && "staticData" in profileCardForSymbol) {
+    reportedCurrency = (profileCardForSymbol.staticData as { currency?: string | null }).currency ?? null;
+  } else {
+    const currencyResult = await fromPromise(
       supabase
         .from("profiles")
-        .select("company_name, display_company_name, image, currency, website")
+        .select("currency")
         .eq("symbol", symbol)
         .maybeSingle(),
       (e) =>
         new DividendsHistoryError(
-          `Profile fetch failed: ${(e as Error).message}`
+          `Failed to fetch currency: ${(e as Error).message}`
         )
     );
-    if (profileResult.isOk() && profileResult.value.data) {
-      const profileData = profileResult.value.data;
-      profileInfo = {
-        companyName: profileData.company_name ?? symbol,
-        displayCompanyName:
-          profileData.display_company_name ??
-          profileData.company_name ??
-          symbol,
-        logoUrl: profileData.image ?? null,
-        websiteUrl: profileData.website ?? null,
-        reportedCurrency: profileData.currency ?? null,
-      };
-    } else if (profileResult.isErr()) {
-      console.warn(profileResult.error.message);
+    if (currencyResult.isOk() && currencyResult.value.data) {
+      reportedCurrency = currencyResult.value.data.currency ?? null;
     }
   }
+
+  const profileInfo = {
+    ...baseProfileInfo,
+    reportedCurrency,
+  };
 
   const latestDividendResult = await fromPromise(
     supabase

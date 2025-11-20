@@ -20,10 +20,9 @@ import {
 } from "@/components/game/cardUpdateHandler.types";
 import type { Database } from "@/lib/supabase/database.types";
 import type { ProfileDBRow } from "@/hooks/useStockData";
-import { applyProfileCoreUpdates } from "../cardUtils";
+import { applyProfileCoreUpdates, fetchProfileInfo } from "../cardUtils";
 
 type RatiosTtmDBRow = Database["public"]["Tables"]["ratios_ttm"]["Row"];
-type ProfileDBRowFromSupabase = Database["public"]["Tables"]["profiles"]["Row"];
 
 class KeyRatiosCardError extends Error {
   constructor(message: string) {
@@ -163,49 +162,45 @@ async function initializeKeyRatiosCard({
 }: CardInitializationContext): Promise<
   Result<DisplayableCard, KeyRatiosCardError>
 > {
+  // Fetch profile info using shared utility
+  const profileInfoResult = await fetchProfileInfo(symbol, supabase, activeCards);
+  const baseProfileInfo = profileInfoResult.isOk()
+    ? profileInfoResult.value
+    : {
+        companyName: symbol,
+        displayCompanyName: symbol,
+        logoUrl: null,
+        websiteUrl: null,
+      };
+
+  // Fetch currency separately (needed for key ratios card)
+  let currency: string | null = null;
   const profileCardForSymbol = activeCards?.find(
     (c) => c.symbol === symbol && c.type === "profile"
-  ) as ProfileDBRowFromSupabase | undefined;
-
-  let fetchedProfileInfo = {
-    companyName: profileCardForSymbol?.company_name ?? symbol,
-    displayCompanyName:
-      profileCardForSymbol?.display_company_name ??
-      profileCardForSymbol?.company_name ??
-      symbol,
-    logoUrl: profileCardForSymbol?.image ?? null,
-    websiteUrl: profileCardForSymbol?.website ?? null,
-    currency: profileCardForSymbol?.currency ?? null,
-  };
-
-  if (!profileCardForSymbol) {
-    const profileResult = await fromPromise(
+  );
+  if (profileCardForSymbol && profileCardForSymbol.type === "profile" && "staticData" in profileCardForSymbol) {
+    currency = (profileCardForSymbol.staticData as { currency?: string | null }).currency ?? null;
+  } else {
+    const currencyResult = await fromPromise(
       supabase
         .from("profiles")
-        .select("company_name, display_company_name, image, website, currency")
+        .select("currency")
         .eq("symbol", symbol)
         .maybeSingle(),
       (e) =>
         new KeyRatiosCardError(
-          `Failed to fetch profile: ${(e as Error).message}`
+          `Failed to fetch currency: ${(e as Error).message}`
         )
     );
-    if (profileResult.isOk() && profileResult.value.data) {
-      const profileData = profileResult.value.data;
-      fetchedProfileInfo = {
-        companyName: profileData.company_name ?? symbol,
-        displayCompanyName:
-          profileData.display_company_name ??
-          profileData.company_name ??
-          symbol,
-        logoUrl: profileData.image ?? null,
-        websiteUrl: profileData.website ?? null,
-        currency: profileData.currency ?? null,
-      };
-    } else if (profileResult.isErr()) {
-      console.warn(profileResult.error.message);
+    if (currencyResult.isOk() && currencyResult.value.data) {
+      currency = currencyResult.value.data.currency ?? null;
     }
   }
+
+  const fetchedProfileInfo = {
+    ...baseProfileInfo,
+    currency,
+  };
 
   const fsResult = await fromPromise(
     supabase

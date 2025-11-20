@@ -22,11 +22,10 @@ import {
 import type { Database } from "@/lib/supabase/database.types";
 import type { ProfileDBRow } from "@/hooks/useStockData";
 import type { FinancialStatementDBRow as FinancialStatementDBRowFromRealtime } from "@/lib/supabase/realtime-service";
-import { applyProfileCoreUpdates } from "../cardUtils";
+import { applyProfileCoreUpdates, fetchProfileInfo } from "../cardUtils";
 
 type RevenueSegmentationDBRow =
   Database["public"]["Tables"]["revenue_product_segmentation"]["Row"];
-type ProfileDBRowFromSupabase = Database["public"]["Tables"]["profiles"]["Row"];
 
 class RevenueBreakdownCardError extends Error {
   constructor(message: string) {
@@ -56,52 +55,45 @@ async function fetchAndProcessRevenueBreakdown(
   supabase: CardInitializationContext["supabase"],
   activeCards?: DisplayableCard[]
 ) {
+  // Fetch profile info using shared utility
+  const profileInfoResult = await fetchProfileInfo(symbol, supabase, activeCards);
+  const baseProfileInfo = profileInfoResult.isOk()
+    ? profileInfoResult.value
+    : {
+        companyName: symbol,
+        displayCompanyName: symbol,
+        logoUrl: null,
+        websiteUrl: null,
+      };
+
+  // Fetch currency separately (needed for revenue breakdown card)
+  let currency: string | null = null;
   const profileCardForSymbol = activeCards?.find(
     (c) => c.symbol === symbol && c.type === "profile"
-  ) as ProfileDBRowFromSupabase | undefined;
-  let profileInfo = {
-    companyName: profileCardForSymbol?.company_name ?? symbol,
-    displayCompanyName:
-      profileCardForSymbol?.display_company_name ??
-      profileCardForSymbol?.company_name ??
-      symbol,
-    logoUrl: profileCardForSymbol?.image ?? null,
-    websiteUrl: profileCardForSymbol?.website ?? null,
-    currencySymbol:
-      profileCardForSymbol?.currency === "USD"
-        ? "$"
-        : profileCardForSymbol?.currency || "$",
-  };
-
-  if (!profileCardForSymbol) {
-    const profileResult = await fromPromise(
+  );
+  if (profileCardForSymbol && profileCardForSymbol.type === "profile" && "staticData" in profileCardForSymbol) {
+    currency = (profileCardForSymbol.staticData as { currency?: string | null }).currency ?? null;
+  } else {
+    const currencyResult = await fromPromise(
       supabase
         .from("profiles")
-        .select("company_name, display_company_name, image, currency, website")
+        .select("currency")
         .eq("symbol", symbol)
         .maybeSingle(),
       (e) =>
         new RevenueBreakdownCardError(
-          `Profile fetch failed: ${(e as Error).message}`
+          `Failed to fetch currency: ${(e as Error).message}`
         )
     );
-    if (profileResult.isOk() && profileResult.value.data) {
-      const profileData = profileResult.value.data;
-      profileInfo = {
-        companyName: profileData.company_name ?? symbol,
-        displayCompanyName:
-          profileData.display_company_name ??
-          profileData.company_name ??
-          symbol,
-        logoUrl: profileData.image ?? null,
-        websiteUrl: profileData.website ?? null,
-        currencySymbol:
-          profileData.currency === "USD" ? "$" : profileData.currency || "$",
-      };
-    } else if (profileResult.isErr()) {
-      console.warn(profileResult.error.message);
+    if (currencyResult.isOk() && currencyResult.value.data) {
+      currency = currencyResult.value.data.currency ?? null;
     }
   }
+
+  const profileInfo = {
+    ...baseProfileInfo,
+    currencySymbol: currency === "USD" ? "$" : currency || "$",
+  };
 
   // Fetch segmentation data
   // CRITICAL: Exclude sentinel records (fiscal_year: 1900, date: '1900-01-01')

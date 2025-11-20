@@ -19,13 +19,11 @@ import {
   registerCardUpdateHandler,
   type CardUpdateHandler,
 } from "@/components/game/cardUpdateHandler.types";
-import type { Database, Json } from "@/lib/supabase/database.types";
+import type { Json } from "@/lib/supabase/database.types";
 import type { FinancialStatementDBRow as FinancialStatementDBRowFromRealtime } from "@/lib/supabase/realtime-service";
 import type { ProfileDBRow as ProfileDBRowFromHook } from "@/hooks/useStockData";
-import { applyProfileCoreUpdates } from "../cardUtils";
+import { applyProfileCoreUpdates, fetchProfileInfo } from "../cardUtils";
 import { safeJsonParse } from "@/lib/utils";
-
-type ProfileDBRowFromSupabase = Database["public"]["Tables"]["profiles"]["Row"];
 
 class CashUseCardError extends Error {
   constructor(message: string) {
@@ -230,42 +228,16 @@ async function fetchAndProcessCashUseData(
 ): Promise<
   Result<ReturnType<typeof constructCashUseCardData>, CashUseCardError>
 > {
-  const profileCardForSymbol = activeCards?.find(
-    (c) => c.symbol === symbol && c.type === "profile"
-  ) as ProfileDBRowFromSupabase | undefined;
-  let fetchedProfileInfo = {
-    companyName: profileCardForSymbol?.company_name ?? symbol,
-    displayCompanyName:
-      profileCardForSymbol?.display_company_name ??
-      profileCardForSymbol?.company_name ??
-      symbol,
-    logoUrl: profileCardForSymbol?.image ?? null,
-    websiteUrl: profileCardForSymbol?.website ?? null,
-  };
-  if (!profileCardForSymbol) {
-    const profileResult = await fromPromise(
-      supabase
-        .from("profiles")
-        .select("company_name, display_company_name, image, website")
-        .eq("symbol", symbol)
-        .maybeSingle(),
-      (e) =>
-        new CashUseCardError(`Profile fetch failed: ${(e as Error).message}`)
-    );
-    if (profileResult.isOk() && profileResult.value.data) {
-      fetchedProfileInfo = {
-        companyName: profileResult.value.data.company_name ?? symbol,
-        displayCompanyName:
-          profileResult.value.data.display_company_name ??
-          profileResult.value.data.company_name ??
-          symbol,
-        logoUrl: profileResult.value.data.image ?? null,
-        websiteUrl: profileResult.value.data.website ?? null,
+  // Fetch profile info using shared utility
+  const profileInfoResult = await fetchProfileInfo(symbol, supabase, activeCards);
+  const fetchedProfileInfo = profileInfoResult.isOk()
+    ? profileInfoResult.value
+    : {
+        companyName: symbol,
+        displayCompanyName: symbol,
+        logoUrl: null,
+        websiteUrl: null,
       };
-    } else if (profileResult.isErr()) {
-      console.warn(profileResult.error.message);
-    }
-  }
 
   const fsResult = await fromPromise(
     supabase
@@ -391,52 +363,25 @@ async function initializeCashUseCard({
     const error = result.error;
     if (error.message === "No financial data found.") {
       // No data found - return empty state card
-      // Fetch profile info to apply to empty card
-      const profileCardForSymbol = activeCards?.find(
-        (c) => c.symbol === symbol && c.type === "profile"
-      ) as ProfileDBRowFromSupabase | undefined;
-
-      let fetchedProfileInfo = {
-        companyName: profileCardForSymbol?.company_name ?? null,
-        displayCompanyName:
-          profileCardForSymbol?.display_company_name ??
-          profileCardForSymbol?.company_name ??
-          null,
-        logoUrl: profileCardForSymbol?.image ?? null,
-        websiteUrl: profileCardForSymbol?.website ?? null,
-      };
-
-      if (!profileCardForSymbol) {
-        const profileResult = await fromPromise(
-          supabase
-            .from("profiles")
-            .select("company_name, display_company_name, image, website")
-            .eq("symbol", symbol)
-            .maybeSingle(),
-          (e) =>
-            new CashUseCardError(`Profile fetch failed: ${(e as Error).message}`)
-        );
-        if (profileResult.isOk() && profileResult.value.data) {
-          fetchedProfileInfo = {
-            companyName: profileResult.value.data.company_name ?? null,
-            displayCompanyName:
-              profileResult.value.data.display_company_name ??
-              profileResult.value.data.company_name ??
-              null,
-            logoUrl: profileResult.value.data.image ?? null,
-            websiteUrl: profileResult.value.data.website ?? null,
+      // Fetch profile info to apply to empty card using shared utility
+      const profileInfoResult = await fetchProfileInfo(symbol, supabase, activeCards);
+      const fetchedProfileInfo = profileInfoResult.isOk()
+        ? profileInfoResult.value
+        : {
+            companyName: symbol,
+            displayCompanyName: symbol,
+            logoUrl: null,
+            websiteUrl: null,
           };
-        }
-      }
 
       const emptyCard = createEmptyCashUseCard(symbol);
-      // Apply profile info to empty card if available
+      // Apply profile info to empty card
       // Only set companyName if it's not the symbol fallback (to avoid showing symbol in parenthesis)
       const emptyCardWithProfile: CashUseCardData & Pick<DisplayableCardState, "isFlipped"> = {
         ...emptyCard,
-        companyName: fetchedProfileInfo.companyName && fetchedProfileInfo.companyName !== symbol
+        companyName: fetchedProfileInfo.companyName !== symbol
           ? fetchedProfileInfo.companyName
-          : null,
+          : symbol,
         displayCompanyName: fetchedProfileInfo.displayCompanyName && fetchedProfileInfo.displayCompanyName !== symbol
           ? fetchedProfileInfo.displayCompanyName
           : null,

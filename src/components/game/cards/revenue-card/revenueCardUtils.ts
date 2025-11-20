@@ -23,11 +23,10 @@ import {
 import type { Database } from "@/lib/supabase/database.types";
 import type { FinancialStatementDBRow as FinancialStatementDBRowFromRealtime } from "@/lib/supabase/realtime-service";
 import type { ProfileDBRow } from "@/hooks/useStockData";
-import { applyProfileCoreUpdates } from "../cardUtils";
+import { applyProfileCoreUpdates, fetchProfileInfo } from "../cardUtils";
 
 type FinancialStatementDBRowFromSupabase =
   Database["public"]["Tables"]["financial_statements"]["Row"];
-type ProfileDBRowFromSupabase = Database["public"]["Tables"]["profiles"]["Row"];
 
 class RevenueCardError extends Error {
   constructor(message: string) {
@@ -172,46 +171,16 @@ async function initializeRevenueCard({
 }: CardInitializationContext): Promise<
   Result<DisplayableCard, RevenueCardError>
 > {
-  const profileCardForSymbol = activeCards?.find(
-    (c) => c.symbol === symbol && c.type === "profile"
-  ) as ProfileDBRowFromSupabase | undefined;
-
-  let fetchedProfileInfo = {
-    companyName: profileCardForSymbol?.company_name ?? symbol,
-    displayCompanyName:
-      profileCardForSymbol?.display_company_name ??
-      profileCardForSymbol?.company_name ??
-      symbol,
-    logoUrl: profileCardForSymbol?.image ?? null,
-    websiteUrl: profileCardForSymbol?.website ?? null,
-  };
-
-  if (!profileCardForSymbol) {
-    const profileResult = await fromPromise(
-      supabase
-        .from("profiles")
-        .select("company_name, display_company_name, image, website")
-        .eq("symbol", symbol)
-        .maybeSingle(),
-      (e) =>
-        new RevenueCardError(`Failed to fetch profile: ${(e as Error).message}`)
-    );
-
-    if (profileResult.isOk() && profileResult.value.data) {
-      const profileData = profileResult.value.data as ProfileDBRowFromSupabase;
-      fetchedProfileInfo = {
-        companyName: profileData.company_name ?? symbol,
-        displayCompanyName:
-          profileData.display_company_name ??
-          profileData.company_name ??
-          symbol,
-        logoUrl: profileData.image ?? null,
-        websiteUrl: profileData.website ?? null,
+  // Fetch profile info using shared utility
+  const profileInfoResult = await fetchProfileInfo(symbol, supabase, activeCards);
+  const fetchedProfileInfo = profileInfoResult.isOk()
+    ? profileInfoResult.value
+    : {
+        companyName: symbol,
+        displayCompanyName: symbol,
+        logoUrl: null,
+        websiteUrl: null,
       };
-    } else if (profileResult.isErr()) {
-      console.warn(profileResult.error.message);
-    }
-  }
 
   const statementResult = await fromPromise(
     supabase
