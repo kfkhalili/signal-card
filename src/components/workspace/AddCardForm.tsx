@@ -171,13 +171,13 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
       setIsSearching(true);
       const query = debouncedSearchQuery.trim().toUpperCase();
 
-      // Search in listed_symbols table
+      // Search in listed_symbols table - match symbols that start with the query
       const symbolsResult = await fromPromise(
         supabase
           .from("listed_symbols")
           .select("symbol")
           .eq("is_active", true)
-          .ilike("symbol", `%${query}%`)
+          .ilike("symbol", `${query}%`)
           .limit(50), // Limit results for performance
         (e) => e as Error
       );
