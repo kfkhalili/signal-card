@@ -24,24 +24,24 @@ const FmpProfileSchema = z.object({
   volume: z.number().nonnegative().optional(),
   averageVolume: z.number().nonnegative().optional(),
   companyName: z.string().min(1), // Required - will fail if undefined or empty
-  currency: z.string().length(3).optional(),
-  cik: z.string().optional(),
-  isin: z.string().optional(),
-  cusip: z.string().optional(),
-  exchangeFullName: z.string().optional(),
-  exchange: z.string().optional(),
-  industry: z.string().optional(),
-  website: z.string().url().optional().or(z.literal('')),
-  description: z.string().optional(),
-  ceo: z.string().optional(),
-  sector: z.string().optional(),
-  country: z.string().length(2).optional(),
+  currency: z.string().length(3).nullable().optional(),
+  cik: z.string().nullable().optional(), // FMP can return null
+  isin: z.string().nullable().optional(),
+  cusip: z.string().nullable().optional(), // FMP can return null
+  exchangeFullName: z.string().nullable().optional(),
+  exchange: z.string().nullable().optional(),
+  industry: z.string().nullable().optional(),
+  website: z.union([z.string().url(), z.literal(''), z.null()]).optional(), // FMP can return null, empty string, or valid URL
+  description: z.string().nullable().optional(), // FMP can return null
+  ceo: z.string().nullable().optional(), // FMP can return null
+  sector: z.string().nullable().optional(),
+  country: z.string().length(2).nullable().optional(), // FMP can return null
   fullTimeEmployees: z.string().nullable().optional(), // FMP provides as string or null
-  phone: z.string().optional(),
-  address: z.string().optional(),
-  city: z.string().optional(),
-  state: z.string().optional(),
-  zip: z.string().optional(),
+  phone: z.string().nullable().optional(), // FMP can return null
+  address: z.string().nullable().optional(), // FMP can return null
+  city: z.string().nullable().optional(), // FMP can return null
+  state: z.string().nullable().optional(), // FMP can return null
+  zip: z.string().nullable().optional(), // FMP can return null
   image: z.string().url().optional().or(z.literal('')),
   ipoDate: z.string().optional(), // "YYYY-MM-DD"
   defaultImage: z.boolean().optional(),
