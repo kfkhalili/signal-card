@@ -4,18 +4,32 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Database } from '@/lib/supabase/database.types';
+
+// Mock Supabase client response types
+type MockQueryBuilder = {
+  select: (columns: string) => {
+    eq: (column: string, value: string) => {
+      single: () => Promise<{
+        data: { flag_name: string; enabled: boolean; metadata: Record<string, unknown> } | null;
+        error: { message: string; code?: string } | null;
+      }>;
+    };
+  };
+};
+
+type MockSupabaseClient = {
+  from: (table: string) => MockQueryBuilder;
+};
 
 // Mock Supabase client
-const createMockSupabaseClient = (): Partial<SupabaseClient<Database>> => {
+const createMockSupabaseClient = (): MockSupabaseClient => {
   const flags = new Map<string, boolean>([
     ['use_queue_system', false],
     ['use_presence_tracking', false],
   ]);
 
   return {
-    from: (table: string) => {
+    from: (table: string): MockQueryBuilder => {
       if (table === 'feature_flags') {
         return {
           select: (_columns: string) => ({
@@ -33,11 +47,11 @@ const createMockSupabaseClient = (): Partial<SupabaseClient<Database>> => {
       }
       throw new Error(`Unknown table: ${table}`);
     },
-  } as any;
+  };
 };
 
 describe('Feature Flags System', () => {
-  let supabase: Partial<SupabaseClient<Database>>;
+  let supabase: MockSupabaseClient;
 
   beforeEach(() => {
     supabase = createMockSupabaseClient();
@@ -49,7 +63,7 @@ describe('Feature Flags System', () => {
 
   describe('isFeatureEnabled', () => {
     it('should return false for disabled flags', async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('feature_flags')
         .select('enabled')
         .eq('flag_name', 'use_queue_system')
@@ -62,7 +76,7 @@ describe('Feature Flags System', () => {
     it('should return true for enabled flags', async () => {
       // In real implementation, this would be set via UPDATE
       // For test, we'll simulate it
-      const { data } = await (supabase as any)
+      const { data } = await supabase
         .from('feature_flags')
         .select('enabled')
         .eq('flag_name', 'use_queue_system')
@@ -73,7 +87,7 @@ describe('Feature Flags System', () => {
     });
 
     it('should handle non-existent flags gracefully', async () => {
-      const { data } = await (supabase as any)
+      const { data } = await supabase
         .from('feature_flags')
         .select('enabled')
         .eq('flag_name', 'non_existent_flag')
@@ -89,7 +103,7 @@ describe('Feature Flags System', () => {
     it('should check flag before using new system', async () => {
       // Example usage pattern
       const checkFeatureFlag = async (flagName: string): Promise<boolean> => {
-        const { data, error } = await (supabase as any)
+        const { data, error } = await supabase
           .from('feature_flags')
           .select('enabled')
           .eq('flag_name', flagName)
