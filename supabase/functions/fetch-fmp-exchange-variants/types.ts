@@ -46,6 +46,7 @@ export interface SupabaseExchangeVariantRecord {
   ipo_date: string | null;
   default_image: boolean | null;
   is_actively_trading: boolean | null;
+  fetched_at?: string; // Optional for sentinel records
 }
 
 export interface SupportedSymbol {

@@ -70,11 +70,81 @@ export async function fetchExchangeVariantsLogic(
     }
 
     if (fmpVariantsResult.length === 0) {
-      // Empty array - no variants found
-      console.log(`[fetchExchangeVariantsLogic] No exchange variant entries found for ${job.symbol}.`);
+      // CRITICAL: Create a sentinel record for exchange-variants if FMP returns empty array
+      // This prevents infinite retries for symbols that genuinely have no exchange variants
+      // The sentinel record uses special values for variant_symbol and exchange_short_name
+      // to avoid conflicts with real data (primary key is on these two fields)
+      const sentinelRecord: SupabaseExchangeVariantRecord = {
+        base_symbol: job.symbol,
+        variant_symbol: `__SENTINEL__${job.symbol}__`, // Unique sentinel value per symbol
+        exchange_short_name: '__SENTINEL__', // Sentinel exchange name
+        fetched_at: new Date().toISOString(),
+        // All other fields will be null by default
+        price: null,
+        beta: null,
+        vol_avg: null,
+        mkt_cap: null,
+        last_div: null,
+        range: null,
+        changes: null,
+        currency: null,
+        cik: null,
+        isin: null,
+        cusip: null,
+        exchange: null,
+        dcf_diff: null,
+        dcf: null,
+        image: null,
+        ipo_date: null,
+        default_image: null,
+        is_actively_trading: null,
+      } as SupabaseExchangeVariantRecord; // Type assertion for fetched_at
+
+      // Check if sentinel record already exists
+      const { data: existingSentinel, error: checkError } = await supabase
+        .from('exchange_variants')
+        .select('variant_symbol')
+        .eq('base_symbol', job.symbol)
+        .eq('variant_symbol', `__SENTINEL__${job.symbol}__`)
+        .eq('exchange_short_name', '__SENTINEL__')
+        .maybeSingle();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.warn(`[fetchExchangeVariantsLogic] Error checking for sentinel record: ${checkError.message}`);
+      }
+
+      if (!existingSentinel) {
+        // Insert sentinel record
+        const { error: upsertError, count } = await supabase
+          .from('exchange_variants')
+          .upsert(sentinelRecord, {
+            onConflict: 'variant_symbol,exchange_short_name',
+            count: 'exact',
+          });
+
+        if (upsertError) {
+          throw new Error(`Database upsert of sentinel record failed: ${upsertError.message}`);
+        }
+        console.log(`[fetchExchangeVariantsLogic] Created sentinel exchange-variants record for ${job.symbol}.`);
+      } else {
+        // Update fetched_at on existing sentinel record
+        const { error: updateError } = await supabase
+          .from('exchange_variants')
+          .update({ fetched_at: new Date().toISOString() })
+          .eq('base_symbol', job.symbol)
+          .eq('variant_symbol', `__SENTINEL__${job.symbol}__`)
+          .eq('exchange_short_name', '__SENTINEL__');
+
+        if (updateError) {
+          console.warn(`[fetchExchangeVariantsLogic] Failed to update sentinel record fetched_at: ${updateError.message}`);
+        } else {
+          console.log(`[fetchExchangeVariantsLogic] Updated sentinel exchange-variants record fetched_at for ${job.symbol}.`);
+        }
+      }
+
       return {
         success: true,
-        dataSizeBytes: actualSizeBytes,
+        dataSizeBytes: actualSizeBytes, // Still count the API call size
       };
     }
 

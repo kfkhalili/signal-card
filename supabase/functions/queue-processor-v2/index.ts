@@ -44,13 +44,16 @@ interface QueueJob {
   job_metadata: Record<string, unknown>;
 }
 
-// Configuration: Process at rate of 300 jobs per minute (5 jobs per second)
-const BATCH_SIZE = 50; // Process up to 50 jobs per batch
-const MAX_CONCURRENT_JOBS = 10; // Process up to 10 jobs in parallel
-const TARGET_JOBS_PER_MINUTE = 300; // Target processing rate
-const TARGET_JOBS_PER_SECOND = TARGET_JOBS_PER_MINUTE / 60; // 5 jobs per second
-const MIN_DELAY_BETWEEN_JOBS_MS = 1000 / TARGET_JOBS_PER_SECOND; // ~200ms delay between job starts
-const FUNCTION_TIMEOUT_MS = 50000; // 50 seconds overall timeout
+  // Configuration: Process at rate of 95 jobs per minute (~1.58 jobs per second)
+  // CRITICAL: Financial-statements jobs make 3 API calls each, so 95 jobs = 285 API calls per minute
+  // (assuming all jobs are financial-statements, which are prioritized first)
+  // This targets ~290 API calls/minute with a mix of job types
+  // CRITICAL: Retries count toward the 95 jobs/minute limit - each retry is a job that makes API calls
+  const BATCH_SIZE = 48; // Process up to 48 jobs per batch (2 iterations × 48 = 96, close to 95 jobs/minute limit)
+  const TARGET_JOBS_PER_MINUTE = 95; // Target processing rate (includes retries)
+  const TARGET_JOBS_PER_SECOND = TARGET_JOBS_PER_MINUTE / 60; // ~1.58 jobs per second
+  const MIN_DELAY_BETWEEN_JOBS_MS = 1000 / TARGET_JOBS_PER_SECOND; // ~632ms delay between job starts
+  const FUNCTION_TIMEOUT_MS = 50000; // 50 seconds overall timeout
 
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight
@@ -115,19 +118,78 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      // Rate-limited processing: Process at 300 jobs per minute (5 jobs per second)
+      // CRITICAL: Global rate limit check - coordinate across all function invocations
+      // Check if processing this batch would exceed the 95 jobs/minute limit
+      // CRITICAL: UI jobs (priority 1000) bypass rate limiting - they must be processed immediately
+      const hasUIJobs = jobs.some((j: QueueJob) => j.priority >= 1000);
+
+      if (!hasUIJobs) {
+        // Only check rate limit for non-UI jobs
+        const { data: canProcess, error: rateLimitError } = await supabase.rpc('check_and_increment_rate_limit', {
+          p_jobs_to_process: jobs.length,
+        });
+
+        if (rateLimitError) {
+          console.error('[queue-processor-v2] Rate limit check failed:', rateLimitError);
+          // Continue anyway - don't block processing if rate limit check fails
+        } else if (canProcess === false) {
+          // Would exceed rate limit - return early without processing
+          console.warn(`[queue-processor-v2] Rate limit exceeded. Would process ${jobs.length} jobs but limit is 95/minute.`);
+          return new Response(
+            JSON.stringify({
+              message: 'Rate limit exceeded',
+              processed: 0,
+              skipped: jobs.length
+            }),
+            {
+              status: 200,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+      } else {
+        // UI jobs present - process them immediately, but still track for rate limiting
+        const uiJobCount = jobs.filter((j: QueueJob) => j.priority >= 1000).length;
+        const nonUIJobCount = jobs.length - uiJobCount;
+
+        // Only check rate limit for non-UI jobs
+        if (nonUIJobCount > 0) {
+          const { data: canProcess, error: rateLimitError } = await supabase.rpc('check_and_increment_rate_limit', {
+            p_jobs_to_process: nonUIJobCount,
+          });
+
+          if (rateLimitError) {
+            console.error('[queue-processor-v2] Rate limit check failed:', rateLimitError);
+          } else if (canProcess === false) {
+            // Filter out non-UI jobs if rate limit would be exceeded
+            // But always process UI jobs
+            console.warn(`[queue-processor-v2] Rate limit exceeded for non-UI jobs (limit: 95/minute). Processing ${uiJobCount} UI jobs, skipping ${nonUIJobCount} non-UI jobs.`);
+            const filteredJobs = jobs.filter((j: QueueJob) => j.priority >= 1000);
+            // Replace jobs array with only UI jobs
+            jobs.length = 0;
+            jobs.push(...filteredJobs);
+          }
+        }
+      }
+
+      // Rate-limited processing: Process at 75 jobs per minute (~1.25 jobs per second)
+      // CRITICAL: Financial-statements jobs are prioritized and make 3 API calls each
+      // This results in 225 API calls per minute (75 jobs × 3 calls = 225 calls)
+      // CRITICAL: Retries count toward the 75 jobs/minute limit - each retry is a job that makes API calls
       const processedJobs: Array<{ id: string; success: boolean; error?: string }> = [];
       const processingStartTime = Date.now();
       let jobsProcessed = 0;
 
-      // Process jobs in batches with rate limiting
-      for (let i = 0; i < jobs.length; i += MAX_CONCURRENT_JOBS) {
-        // Rate limiting: Ensure we don't exceed 300 jobs per minute
+      // Process jobs sequentially with rate limiting to ensure retries are counted
+      // CRITICAL: Process one job at a time to prevent bursts that exceed rate limits
+      for (const job of jobs) {
+        // Rate limiting: Ensure we don't exceed 75 jobs per minute
         // Calculate how many jobs we should have processed by now
         const elapsedSeconds = (Date.now() - processingStartTime) / 1000;
         const expectedJobsProcessed = Math.floor(elapsedSeconds * TARGET_JOBS_PER_SECOND);
 
-        // If we're ahead of schedule, add a delay
+        // If we're ahead of schedule, add a delay before processing the next job
+        // This ensures retries are also subject to the rate limit
         if (jobsProcessed > expectedJobsProcessed) {
           const delayMs = (jobsProcessed - expectedJobsProcessed) * MIN_DELAY_BETWEEN_JOBS_MS;
           if (delayMs > 0) {
@@ -135,82 +197,75 @@ Deno.serve(async (req: Request) => {
           }
         }
 
-        // Collect up to MAX_CONCURRENT_JOBS jobs to process in parallel
-        const batch = jobs.slice(i, i + MAX_CONCURRENT_JOBS);
+        try {
+          // CRITICAL: Route to correct handler based on data_type
+          // This replaces FaaS-to-FaaS invocations with direct function calls
+          const result = await processJob(job, supabase);
 
-        const batchPromises = batch.map(async (batchJob: QueueJob) => {
-          try {
-            // CRITICAL: Route to correct handler based on data_type
-            // This replaces FaaS-to-FaaS invocations with direct function calls
-            const result = await processJob(batchJob, supabase);
+          if (result.success) {
+            // Mark job as completed
+            const { error: completeError } = await supabase.rpc('complete_queue_job_v2', {
+              p_job_id: job.id,
+              p_data_size_bytes: result.dataSizeBytes,
+            });
 
-            if (result.success) {
-              // Mark job as completed
-              const { error: completeError } = await supabase.rpc('complete_queue_job_v2', {
-                p_job_id: batchJob.id,
-                p_data_size_bytes: result.dataSizeBytes,
-              });
-
-              if (completeError) {
-                console.error(`[queue-processor-v2] Failed to complete job ${batchJob.id}:`, completeError);
-                processedJobs.push({ id: batchJob.id, success: false, error: completeError.message });
-              } else {
-                processedJobs.push({ id: batchJob.id, success: true });
-                jobsProcessed++;
-              }
+            if (completeError) {
+              console.error(`[queue-processor-v2] Failed to complete job ${job.id}:`, completeError);
+              processedJobs.push({ id: job.id, success: false, error: completeError.message });
             } else {
-              // Mark job as failed (with retry logic)
-              const { error: failError } = await supabase.rpc('fail_queue_job_v2', {
-                p_job_id: batchJob.id,
-                p_error_message: result.error || 'Unknown error',
-              });
-
-              if (failError) {
-                console.error(`[queue-processor-v2] Failed to fail job ${batchJob.id}:`, failError);
-              }
-
-              processedJobs.push({ id: batchJob.id, success: false, error: result.error });
-              jobsProcessed++;
+              processedJobs.push({ id: job.id, success: true });
+              jobsProcessed++; // Count successful jobs toward rate limit
             }
-          } catch (error) {
-            // CRITICAL: Deadlock-aware error handling
-            if (error instanceof Error && (
-              error.message?.includes('deadlock detected') ||
-              error.message?.includes('40P01')
-            )) {
-              console.warn(`[queue-processor-v2] Deadlock detected for job ${batchJob.id}, resetting immediately`);
+          } else {
+            // Mark job as failed (with retry logic)
+            // CRITICAL: Failed jobs that will be retried still count toward the rate limit
+            // because the retry will make API calls when it's processed again
+            const { error: failError } = await supabase.rpc('fail_queue_job_v2', {
+              p_job_id: job.id,
+              p_error_message: result.error || 'Unknown error',
+            });
 
-              // Reset job immediately (doesn't increment retry_count)
-              const { error: resetError } = await supabase.rpc('reset_job_immediate_v2', {
-                p_job_id: batchJob.id,
-              });
-
-              if (resetError) {
-                console.error(`[queue-processor-v2] Failed to reset job ${batchJob.id}:`, resetError);
-              }
-
-              processedJobs.push({ id: batchJob.id, success: false, error: 'Deadlock - reset for retry' });
-              jobsProcessed++;
-              return; // Skip fail_queue_job - let recover_stuck_jobs handle it
+            if (failError) {
+              console.error(`[queue-processor-v2] Failed to fail job ${job.id}:`, failError);
             }
 
+            processedJobs.push({ id: job.id, success: false, error: result.error });
+            jobsProcessed++; // Count failed jobs toward rate limit (retries will be counted when processed)
+          }
+        } catch (error) {
+          // CRITICAL: Deadlock-aware error handling
+          if (error instanceof Error && (
+            error.message?.includes('deadlock detected') ||
+            error.message?.includes('40P01')
+          )) {
+            console.warn(`[queue-processor-v2] Deadlock detected for job ${job.id}, resetting immediately`);
+
+            // Reset job immediately (doesn't increment retry_count)
+            const { error: resetError } = await supabase.rpc('reset_job_immediate_v2', {
+              p_job_id: job.id,
+            });
+
+            if (resetError) {
+              console.error(`[queue-processor-v2] Failed to reset job ${job.id}:`, resetError);
+            }
+
+            processedJobs.push({ id: job.id, success: false, error: 'Deadlock - reset for retry' });
+            jobsProcessed++; // Count deadlock resets toward rate limit
+          } else {
             // Other errors - mark as failed
             const { error: failError } = await supabase.rpc('fail_queue_job_v2', {
-              p_job_id: batchJob.id,
+              p_job_id: job.id,
               p_error_message: error instanceof Error ? error.message : 'Unknown error',
             });
 
             if (failError) {
-              console.error(`[queue-processor-v2] Failed to fail job ${batchJob.id}:`, failError);
+              console.error(`[queue-processor-v2] Failed to fail job ${job.id}:`, failError);
             }
 
-            processedJobs.push({ id: batchJob.id, success: false, error: error instanceof Error ? error.message : 'Unknown error' });
-            jobsProcessed++;
+            processedJobs.push({ id: job.id, success: false, error: error instanceof Error ? error.message : 'Unknown error' });
+            jobsProcessed++; // Count errors toward rate limit
           }
-        });
-
-        // Wait for this batch to complete
-        await Promise.all(batchPromises);
+        }
       }
 
       const successCount = processedJobs.filter(j => j.success).length;

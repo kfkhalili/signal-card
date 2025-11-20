@@ -48,6 +48,11 @@ async function fetchFmpData<T extends FmpStatementEntryBase>(
 
   if (!response.ok) {
     const errorText = await response.text();
+    // CRITICAL: 429 rate limit errors should not be retried immediately
+    // Retrying will just hit the rate limit again, wasting API calls
+    if (response.status === 429) {
+      throw new Error(`RATE_LIMIT_429: FMP API rate limit reached for ${statementType}. ${errorText}`);
+    }
     throw new Error(`FMP API error for ${statementType}: ${response.status} ${errorText}`);
   }
 

@@ -120,15 +120,26 @@ export async function fetchQuoteLogic(
         const oldSourceTimestamp = existingData.api_timestamp;
         const newSourceTimestamp = quote.timestamp;
 
-        // CRITICAL: If new source timestamp is <= old source timestamp, this is stale data
+        // CRITICAL: If new source timestamp is < old source timestamp, this is stale data
         // The API is returning old data (caching bug, stale cache, etc.)
         // We must reject this to prevent "data laundering"
-        if (newSourceTimestamp <= oldSourceTimestamp) {
+        // CRITICAL: For UI jobs (priority 1000), be more lenient - accept equal timestamps
+        // This prevents UI jobs from failing when the API returns the same timestamp
+        // (which can happen legitimately if the price hasn't changed)
+        const isUIJob = job.priority >= 1000;
+        if (newSourceTimestamp < oldSourceTimestamp) {
+          throw new Error(
+            `FMP returned 200 OK but data is stale. Source timestamp: ${newSourceTimestamp} (existing: ${oldSourceTimestamp}). ` +
+            `This indicates an API caching bug or stale cache. Rejecting to prevent data laundering.`
+          );
+        } else if (!isUIJob && newSourceTimestamp === oldSourceTimestamp) {
+          // For non-UI jobs, reject equal timestamps (data laundering prevention)
           throw new Error(
             `FMP returned 200 OK but data is stale. Source timestamp: ${newSourceTimestamp} (existing: ${oldSourceTimestamp}). ` +
             `This indicates an API caching bug or stale cache. Rejecting to prevent data laundering.`
           );
         }
+        // For UI jobs, accept equal timestamps (user is actively waiting, better to show data than fail)
       }
     }
 
