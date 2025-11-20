@@ -118,7 +118,7 @@ Deno.serve(async (req: Request) => {
       // Process jobs in batches with concurrency limit
       for (let i = 0; i < jobs.length; i += MAX_CONCURRENT_JOBS) {
         const batch = jobs.slice(i, i + MAX_CONCURRENT_JOBS);
-        const batchPromises = batch.map(async (job) => {
+        const batchPromises = batch.map(async (job: QueueJob) => {
           try {
             // CRITICAL: Route to correct handler based on data_type
             // This replaces FaaS-to-FaaS invocations with direct function calls

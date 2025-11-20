@@ -3,7 +3,7 @@
 // CRITICAL: This function is imported directly by queue-processor-v2 (monofunction architecture)
 
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
-import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import type { QueueJob, ProcessJobResult } from './types.ts';
 
 const FMP_API_KEY = Deno.env.get('FMP_API_KEY');
@@ -192,7 +192,7 @@ export async function fetchProfileLogic(
       ceo: profile.ceo ?? null,
       sector: profile.sector ?? null,
       country: profile.country ?? null,
-      full_time_employees: parseFmpFullTimeEmployees(profile.fullTimeEmployees),
+      full_time_employees: parseFmpFullTimeEmployees(profile.fullTimeEmployees ?? undefined),
       phone: profile.phone ?? null,
       address: profile.address ?? null,
       city: profile.city ?? null,

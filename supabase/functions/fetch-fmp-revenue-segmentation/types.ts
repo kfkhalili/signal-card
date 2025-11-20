@@ -16,7 +16,8 @@ export interface SupabaseRevenueProductSegmentationRecord {
   date: string;
   reported_currency: string | null;
   data: Record<string, number> | null;
-  // fetched_at and updated_at are handled by DB
+  fetched_at?: string; // Optional: can be set explicitly for sentinel records
+  // updated_at is handled by DB defaults/triggers
 }
 
 export interface SupportedSymbol {

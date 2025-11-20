@@ -2,7 +2,7 @@
 // Library function for processing dividend-history jobs from the queue
 // CRITICAL: This function is imported directly by queue-processor-v2 (monofunction architecture)
 
-import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import type { QueueJob, ProcessJobResult } from './types.ts';
 
 // Import types from the original Edge Function
@@ -14,15 +14,6 @@ import type {
 const FMP_API_KEY = Deno.env.get('FMP_API_KEY');
 const FMP_DIVIDENDS_BASE_URL = 'https://financialmodelingprep.com/stable/dividends';
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === 'string') return error;
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return 'An unknown error occurred.';
-  }
-}
 
 function isValidDateString(dateStr: string | null | undefined): boolean {
   if (!dateStr) return false;
@@ -194,7 +185,7 @@ export async function fetchDividendHistoryLogic(
         yield: typeof fmpEntry.yield === 'number' ? fmpEntry.yield : null,
         frequency: fmpEntry.frequency || null,
         fetched_at: new Date().toISOString(), // CRITICAL: Update fetched_at on upsert to prevent infinite job creation
-      });
+      } as SupabaseDividendRecord);
     }
 
     if (recordsToUpsert.length > 0) {

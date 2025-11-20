@@ -10,6 +10,7 @@ import type {
   FmpRatiosTtmData,
   SupabaseRatiosTtmRecord,
 } from '../fetch-fmp-ratios-ttm/types.ts';
+// Note: SupabaseRatiosTtmRecord includes fetched_at?: string
 
 const FMP_API_KEY = Deno.env.get('FMP_API_KEY');
 const FMP_RATIOS_TTM_BASE_URL = 'https://financialmodelingprep.com/stable/ratios-ttm';
@@ -132,7 +133,7 @@ export async function fetchRatiosTtmLogic(
         enterprise_value_multiple_ttm: null,
         dividend_per_share_ttm: null,
         fetched_at: new Date().toISOString(), // Mark as fetched to prevent re-queueing
-      };
+      } as SupabaseRatiosTtmRecord;
 
       const { error: upsertError } = await supabase
         .from('ratios_ttm')
@@ -143,7 +144,7 @@ export async function fetchRatiosTtmLogic(
       }
 
       console.log(`[fetchRatiosTtmLogic] FMP API returned empty array for ${job.symbol}. Created sentinel record.`);
-      
+
       return {
         success: true,
         dataSizeBytes: actualSizeBytes,
@@ -219,7 +220,7 @@ export async function fetchRatiosTtmLogic(
       enterprise_value_multiple_ttm: ratiosData.enterpriseValueMultipleTTM,
       dividend_per_share_ttm: ratiosData.dividendPerShareTTM,
       fetched_at: new Date().toISOString(), // CRITICAL: Update fetched_at on upsert to prevent infinite job creation
-    };
+    } as SupabaseRatiosTtmRecord;
 
     const { error: upsertError, count } = await supabase
       .from('ratios_ttm')

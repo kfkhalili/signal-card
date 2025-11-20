@@ -22,7 +22,8 @@ export interface SupabaseDividendRecord {
   dividend: number | null;
   yield: number | null;
   frequency: string | null;
-  // fetched_at and updated_at are handled by DB
+  fetched_at?: string; // Optional: can be set explicitly for sentinel records
+  // updated_at is handled by DB defaults/triggers
 }
 
 export interface SupportedSymbol {

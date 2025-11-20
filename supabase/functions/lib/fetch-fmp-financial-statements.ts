@@ -2,7 +2,7 @@
 // Library function for processing financial-statements jobs from the queue
 // CRITICAL: This function is imported directly by queue-processor-v2 (monofunction architecture)
 
-import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import type { QueueJob, ProcessJobResult } from './types.ts';
 
 // Import types from the original Edge Function
@@ -21,15 +21,6 @@ const BALANCE_SHEET_ENDPOINT = `${FMP_BASE_URL}/balance-sheet-statement`;
 const CASH_FLOW_ENDPOINT = `${FMP_BASE_URL}/cash-flow-statement`;
 const FMP_API_DELAY_MS = 300; // Delay between API calls to respect rate limits
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === 'string') return error;
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return 'An unknown error occurred.';
-  }
-}
 
 async function fetchFmpData<T extends FmpStatementEntryBase>(
   baseUrl: string,
@@ -155,7 +146,8 @@ export async function fetchFinancialStatementsLogic(
       };
 
       // CRITICAL: Always update fetched_at when processing statements (even if record already exists)
-      existing.fetched_at = new Date().toISOString();
+      // Type assertion needed because fetched_at is optional in the type definition
+      (existing as FinancialStatementRecord & { fetched_at: string }).fetched_at = new Date().toISOString();
 
       if (stmt.type === 'income') {
         existing.income_statement_payload = stmt as FmpIncomeStatementEntry;
