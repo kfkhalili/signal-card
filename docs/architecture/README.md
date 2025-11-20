@@ -40,9 +40,26 @@ Read these documents in order:
   - Migration strategy
   - **Read this as a reference while building**
 
+- **[PROGRESS-SUMMARY-2025-11-20.md](./PROGRESS-SUMMARY-2025-11-20.md)** - Current system status and progress
+  - Overall progress: ~98% complete
+  - Recent fixes and improvements
+  - System health metrics
+
+- **[API_QUEUE_ERROR_ANALYSIS.md](./API_QUEUE_ERROR_ANALYSIS.md)** - Queue error analysis and fixes
+  - Error breakdown and patterns
+  - Root cause analysis
+  - Fix implementations
+
+- **[CARD-OPEN-TO-JOB-CREATION-FLOW.md](./CARD-OPEN-TO-JOB-CREATION-FLOW.md)** - Data flow documentation
+  - How cards trigger data fetching
+  - Queue system integration
+  - Real-time update flow
+
 ## Archived Documents
 
-- **[archived/](./archived/)** - Stashed documents (not relevant to current build)
+- **[archived/](./archived/)** - Completed and outdated documents
+  - `completed-migrations/` - Migration cleanup documentation (completed)
+  - `outdated-status/` - Old status reports and planning docs (superseded)
   - `architectural-analysis.md.stashed` - Code quality analysis (stashed)
   - `refactoring-implementation-guide.md.stashed` - Refactoring guide (stashed)
 
