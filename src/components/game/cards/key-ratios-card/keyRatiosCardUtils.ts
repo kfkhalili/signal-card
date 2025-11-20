@@ -311,25 +311,23 @@ const handleKeyRatiosProfileUpdate: CardUpdateHandler<
   KeyRatiosCardData,
   ProfileDBRow
 > = (currentCardData, profilePayload): KeyRatiosCardData => {
-  const { updatedCardData, coreDataChanged } = applyProfileCoreUpdates(
+  const { updatedCardData } = applyProfileCoreUpdates(
     currentCardData,
     profilePayload
   );
 
-  if (coreDataChanged) {
-    const lastUpdatedDateString = updatedCardData.staticData.lastUpdated
-      ? new Date(updatedCardData.staticData.lastUpdated).toLocaleDateString()
-      : "N/A";
-    const newBackDataDescription = `Key Trailing Twelve Months (TTM) financial ratios for ${updatedCardData.companyName}. Ratios last updated on ${lastUpdatedDateString}.`;
+  // Always apply profile updates to ensure data propagates correctly
+  const lastUpdatedDateString = updatedCardData.staticData.lastUpdated
+    ? new Date(updatedCardData.staticData.lastUpdated).toLocaleDateString()
+    : "N/A";
+  const newBackDataDescription = `Key Trailing Twelve Months (TTM) financial ratios for ${updatedCardData.companyName}. Ratios last updated on ${lastUpdatedDateString}.`;
 
-    return {
-      ...updatedCardData,
-      backData: {
-        description: newBackDataDescription,
-      },
-    };
-  }
-  return currentCardData;
+  return {
+    ...updatedCardData,
+    backData: {
+      description: newBackDataDescription,
+    },
+  };
 };
 registerCardUpdateHandler(
   "keyratios",

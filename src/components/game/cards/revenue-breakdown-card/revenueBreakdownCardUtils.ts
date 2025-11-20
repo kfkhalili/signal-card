@@ -340,7 +340,7 @@ const handleRevenueBreakdownProfileUpdate: CardUpdateHandler<
   RevenueBreakdownCardData,
   ProfileDBRow
 > = (currentCardData, profilePayload): RevenueBreakdownCardData => {
-  const { updatedCardData, coreDataChanged } = applyProfileCoreUpdates(
+  const { updatedCardData } = applyProfileCoreUpdates(
     currentCardData,
     profilePayload
   );
@@ -350,27 +350,22 @@ const handleRevenueBreakdownProfileUpdate: CardUpdateHandler<
     newBaseCurrency === "USD"
       ? "$"
       : newBaseCurrency || updatedCardData.staticData.currencySymbol;
-  const currencySymbolChanged =
-    updatedCardData.staticData.currencySymbol !== newCurrencySymbol;
+  // Always apply profile updates to ensure data propagates correctly
+  const finalCardData = {
+    ...updatedCardData,
+    staticData: {
+      ...updatedCardData.staticData,
+      currencySymbol: newCurrencySymbol,
+    },
+  };
 
-  if (coreDataChanged || currencySymbolChanged) {
-    const finalCardData = {
-      ...updatedCardData,
-      staticData: {
-        ...updatedCardData.staticData,
-        currencySymbol: newCurrencySymbol,
-      },
-    };
-
-    const newBackData: BaseCardBackData = {
-      description: `Revenue breakdown by product/segment for ${finalCardData.companyName} for ${finalCardData.staticData.latestPeriodLabel}, showing year-over-year changes.`,
-    };
-    return {
-      ...finalCardData,
-      backData: newBackData,
-    };
-  }
-  return currentCardData;
+  const newBackData: BaseCardBackData = {
+    description: `Revenue breakdown by product/segment for ${finalCardData.companyName} for ${finalCardData.staticData.latestPeriodLabel}, showing year-over-year changes.`,
+  };
+  return {
+    ...finalCardData,
+    backData: newBackData,
+  };
 };
 registerCardUpdateHandler(
   "revenuebreakdown",

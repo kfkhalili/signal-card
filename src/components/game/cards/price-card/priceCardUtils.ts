@@ -292,31 +292,26 @@ const handlePriceCardProfileUpdate: CardUpdateHandler<
   PriceCardData,
   ProfileDBRow
 > = (currentPriceCardData, profilePayload): PriceCardData => {
-  const { updatedCardData, coreDataChanged } = applyProfileCoreUpdates(
+  const { updatedCardData } = applyProfileCoreUpdates(
     currentPriceCardData,
     profilePayload
   );
 
-  const currencyChanged =
-    currentPriceCardData.staticData.currency !== profilePayload.currency;
-
-  if (coreDataChanged || currencyChanged) {
-    const companyNameForDesc =
-      updatedCardData.companyName ?? updatedCardData.symbol;
-    const newBackData: BaseCardBackData = {
-      description: `Market price information for ${companyNameForDesc}. Includes daily and historical price points, volume, and key moving averages.`,
-    };
-    return {
-      ...updatedCardData,
-      staticData: {
-        ...updatedCardData.staticData,
-        currency: profilePayload.currency ?? "USD",
-      },
-      backData: newBackData,
-    };
-  }
-
-  return currentPriceCardData;
+  // Always apply profile updates to ensure data propagates correctly
+  const companyNameForDesc =
+    updatedCardData.companyName ?? updatedCardData.symbol;
+  const newBackData: BaseCardBackData = {
+    description: `Market price information for ${companyNameForDesc}. Includes daily and historical price points, volume, and key moving averages.`,
+  };
+  
+  return {
+    ...updatedCardData,
+    staticData: {
+      ...updatedCardData.staticData,
+      currency: profilePayload.currency ?? "USD",
+    },
+    backData: newBackData,
+  };
 };
 
 registerCardUpdateHandler(

@@ -356,21 +356,19 @@ const handleAnalystGradesProfileUpdate: CardUpdateHandler<
   AnalystGradesCardData,
   ProfileDBRow
 > = (currentCardData, profilePayload): AnalystGradesCardData => {
-  const { updatedCardData, coreDataChanged } = applyProfileCoreUpdates(
+  const { updatedCardData } = applyProfileCoreUpdates(
     currentCardData,
     profilePayload
   );
 
-  if (coreDataChanged) {
-    const newBackData: BaseCardBackData = {
-      description: `Analyst rating distribution for ${updatedCardData.companyName} as of ${updatedCardData.staticData.currentPeriodDate}, with changes from the previous period.`,
-    };
-    return {
-      ...updatedCardData,
-      backData: newBackData,
-    };
-  }
-  return currentCardData;
+  // Always apply profile updates to ensure data propagates correctly
+  const newBackData: BaseCardBackData = {
+    description: `Analyst rating distribution for ${updatedCardData.companyName} as of ${updatedCardData.staticData.currentPeriodDate}, with changes from the previous period.`,
+  };
+  return {
+    ...updatedCardData,
+    backData: newBackData,
+  };
 };
 registerCardUpdateHandler(
   "analystgrades",

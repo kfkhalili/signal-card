@@ -512,21 +512,19 @@ const handleDividendsHistoryProfileUpdate: CardUpdateHandler<
   DividendsHistoryCardData,
   ProfileDBRow
 > = (currentCardData, profilePayload): DividendsHistoryCardData => {
-  const { updatedCardData, coreDataChanged } = applyProfileCoreUpdates(
+  const { updatedCardData } = applyProfileCoreUpdates(
     currentCardData,
     profilePayload
   );
 
-  if (coreDataChanged) {
-    const newBackDataDescription: BaseCardBackData = {
-      description: `Historical dividend payments and trends for ${updatedCardData.companyName}, including recent payments and annual totals. Next year estimate based on latest payment.`,
-    };
-    return {
-      ...updatedCardData,
-      backData: newBackDataDescription,
-    };
-  }
-  return currentCardData;
+  // Always apply profile updates to ensure data propagates correctly
+  const newBackDataDescription: BaseCardBackData = {
+    description: `Historical dividend payments and trends for ${updatedCardData.companyName}, including recent payments and annual totals. Next year estimate based on latest payment.`,
+  };
+  return {
+    ...updatedCardData,
+    backData: newBackDataDescription,
+  };
 };
 registerCardUpdateHandler(
   "dividendshistory",
