@@ -65,8 +65,89 @@ export async function fetchRatiosTtmLogic(
 
     const fmpRatiosResult: unknown = await response.json();
 
+    // Handle empty array response - create sentinel record to prevent infinite retries
     if (!Array.isArray(fmpRatiosResult) || fmpRatiosResult.length === 0) {
-      throw new Error(`FMP API returned empty array or invalid response for ${job.symbol}`);
+      // Create a sentinel record with fetched_at to mark that we checked and found no data
+      // This prevents the staleness checker from continuously re-queueing jobs
+      const sentinelRecord: SupabaseRatiosTtmRecord = {
+        symbol: job.symbol,
+        // Set all numeric fields to null (sentinel record)
+        gross_profit_margin_ttm: null,
+        ebit_margin_ttm: null,
+        ebitda_margin_ttm: null,
+        operating_profit_margin_ttm: null,
+        pretax_profit_margin_ttm: null,
+        continuous_operations_profit_margin_ttm: null,
+        net_profit_margin_ttm: null,
+        bottom_line_profit_margin_ttm: null,
+        receivables_turnover_ttm: null,
+        payables_turnover_ttm: null,
+        inventory_turnover_ttm: null,
+        fixed_asset_turnover_ttm: null,
+        asset_turnover_ttm: null,
+        current_ratio_ttm: null,
+        quick_ratio_ttm: null,
+        solvency_ratio_ttm: null,
+        cash_ratio_ttm: null,
+        price_to_earnings_ratio_ttm: null,
+        price_to_earnings_growth_ratio_ttm: null,
+        forward_price_to_earnings_growth_ratio_ttm: null,
+        price_to_book_ratio_ttm: null,
+        price_to_sales_ratio_ttm: null,
+        price_to_free_cash_flow_ratio_ttm: null,
+        price_to_operating_cash_flow_ratio_ttm: null,
+        debt_to_assets_ratio_ttm: null,
+        debt_to_equity_ratio_ttm: null,
+        debt_to_capital_ratio_ttm: null,
+        long_term_debt_to_capital_ratio_ttm: null,
+        financial_leverage_ratio_ttm: null,
+        working_capital_turnover_ratio_ttm: null,
+        operating_cash_flow_ratio_ttm: null,
+        operating_cash_flow_sales_ratio_ttm: null,
+        free_cash_flow_operating_cash_flow_ratio_ttm: null,
+        debt_service_coverage_ratio_ttm: null,
+        interest_coverage_ratio_ttm: null,
+        short_term_operating_cash_flow_coverage_ratio_ttm: null,
+        operating_cash_flow_coverage_ratio_ttm: null,
+        capital_expenditure_coverage_ratio_ttm: null,
+        dividend_paid_and_capex_coverage_ratio_ttm: null,
+        dividend_payout_ratio_ttm: null,
+        dividend_yield_ttm: null,
+        enterprise_value_ttm: null,
+        revenue_per_share_ttm: null,
+        net_income_per_share_ttm: null,
+        interest_debt_per_share_ttm: null,
+        cash_per_share_ttm: null,
+        book_value_per_share_ttm: null,
+        tangible_book_value_per_share_ttm: null,
+        shareholders_equity_per_share_ttm: null,
+        operating_cash_flow_per_share_ttm: null,
+        capex_per_share_ttm: null,
+        free_cash_flow_per_share_ttm: null,
+        net_income_per_ebt_ttm: null,
+        ebt_per_ebit_ttm: null,
+        price_to_fair_value_ttm: null,
+        debt_to_market_cap_ttm: null,
+        effective_tax_rate_ttm: null,
+        enterprise_value_multiple_ttm: null,
+        dividend_per_share_ttm: null,
+        fetched_at: new Date().toISOString(), // Mark as fetched to prevent re-queueing
+      };
+
+      const { error: upsertError } = await supabase
+        .from('ratios_ttm')
+        .upsert(sentinelRecord, { onConflict: 'symbol' });
+
+      if (upsertError) {
+        throw new Error(`Database upsert failed for sentinel record: ${upsertError.message}`);
+      }
+
+      console.log(`[fetchRatiosTtmLogic] FMP API returned empty array for ${job.symbol}. Created sentinel record.`);
+      
+      return {
+        success: true,
+        dataSizeBytes: actualSizeBytes,
+      };
     }
 
     const ratiosData = fmpRatiosResult[0] as FmpRatiosTtmData;

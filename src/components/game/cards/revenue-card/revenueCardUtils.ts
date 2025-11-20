@@ -252,12 +252,17 @@ async function initializeRevenueCard({
   // No data found - return empty state card
   const emptyCard = createEmptyRevenueCard(symbol);
   // Apply profile info to empty card if available
+  // Only set companyName if it's not the symbol fallback (to avoid showing symbol in parenthesis)
   const emptyCardWithProfile: RevenueCardData & Pick<DisplayableCardState, "isFlipped"> = {
     ...emptyCard,
-    companyName: fetchedProfileInfo.companyName,
-    displayCompanyName: fetchedProfileInfo.displayCompanyName,
-    logoUrl: fetchedProfileInfo.logoUrl,
-    websiteUrl: fetchedProfileInfo.websiteUrl,
+    companyName: fetchedProfileInfo.companyName && fetchedProfileInfo.companyName !== symbol
+      ? fetchedProfileInfo.companyName
+      : null,
+    displayCompanyName: fetchedProfileInfo.displayCompanyName && fetchedProfileInfo.displayCompanyName !== symbol
+      ? fetchedProfileInfo.displayCompanyName
+      : null,
+    logoUrl: fetchedProfileInfo.logoUrl ?? null,
+    websiteUrl: fetchedProfileInfo.websiteUrl ?? null,
   };
   return ok(emptyCardWithProfile);
 }

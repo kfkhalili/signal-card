@@ -258,10 +258,15 @@ async function initializeSolvencyCard({
   // No data found - return empty state card
   const emptyCard = createEmptySolvencyCard(symbol);
   // Apply profile info to empty card if available
+  // Only set companyName if it's not the symbol fallback (to avoid showing symbol in parenthesis)
   const emptyCardWithProfile: SolvencyCardData & Pick<DisplayableCardState, "isFlipped"> = {
     ...emptyCard,
-    companyName: fetchedProfileInfo.companyName ?? null,
-    displayCompanyName: fetchedProfileInfo.displayCompanyName ?? null,
+    companyName: fetchedProfileInfo.companyName && fetchedProfileInfo.companyName !== symbol
+      ? fetchedProfileInfo.companyName
+      : null,
+    displayCompanyName: fetchedProfileInfo.displayCompanyName && fetchedProfileInfo.displayCompanyName !== symbol
+      ? fetchedProfileInfo.displayCompanyName
+      : null,
     logoUrl: fetchedProfileInfo.logoUrl ?? null,
     websiteUrl: fetchedProfileInfo.websiteUrl ?? null,
   };

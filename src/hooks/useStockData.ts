@@ -350,6 +350,30 @@ export function useStockData({
           const updatedProfile = payload.new as ProfileDBRow;
           setProfileData(Option.some(updatedProfile));
           if (onProfileUpdate) onProfileUpdate(updatedProfile);
+
+          // If profile arrives via realtime and has an exchange, fetch exchange status if not already fetched
+          if (updatedProfile.exchange && Option.isNone(exchangeStatus)) {
+            fetchExchangeStatus(supabaseClient, updatedProfile.exchange).then(
+              (result) => {
+                result.match(
+                  (statusOption) => {
+                    if (isMountedRef.current) {
+                      setExchangeStatus(statusOption);
+                      if (Option.isSome(statusOption) && onExchangeStatusUpdate) {
+                        onExchangeStatusUpdate(statusOption.value);
+                      }
+                    }
+                  },
+                  (error) => {
+                    console.error(
+                      `[useStockData ${symbol}] Error fetching exchange status after profile update:`,
+                      error
+                    );
+                  }
+                );
+              }
+            );
+          }
         }
       },
       (status, err) => {
@@ -365,7 +389,7 @@ export function useStockData({
     return () => {
       unsubscribe();
     };
-  }, [symbol, supabaseClient, onProfileUpdate]);
+  }, [symbol, supabaseClient, onProfileUpdate, exchangeStatus, onExchangeStatusUpdate]);
 
   // New effect for financial statement updates via Realtime
   // Only subscribe if callback is provided

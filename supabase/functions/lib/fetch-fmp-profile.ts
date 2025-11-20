@@ -25,23 +25,23 @@ const FmpProfileSchema = z.object({
   averageVolume: z.number().nonnegative().optional(),
   companyName: z.string().min(1), // Required - will fail if undefined or empty
   currency: z.string().length(3).nullable().optional(),
-  cik: z.string().nullable().optional(), // FMP can return null
-  isin: z.string().nullable().optional(),
-  cusip: z.string().nullable().optional(), // FMP can return null
-  exchangeFullName: z.string().nullable().optional(),
-  exchange: z.string().nullable().optional(),
-  industry: z.string().nullable().optional(),
+  cik: z.string().nullish(), // FMP can return null or undefined
+  isin: z.string().nullish(),
+  cusip: z.string().nullish(), // FMP can return null or undefined
+  exchangeFullName: z.string().nullish(),
+  exchange: z.string().nullish(),
+  industry: z.string().nullish(),
   website: z.union([z.string().url(), z.literal(''), z.null()]).optional(), // FMP can return null, empty string, or valid URL
-  description: z.string().nullable().optional(), // FMP can return null
-  ceo: z.string().nullable().optional(), // FMP can return null
-  sector: z.string().nullable().optional(),
-  country: z.string().length(2).nullable().optional(), // FMP can return null
-  fullTimeEmployees: z.string().nullable().optional(), // FMP provides as string or null
-  phone: z.string().nullable().optional(), // FMP can return null
-  address: z.string().nullable().optional(), // FMP can return null
-  city: z.string().nullable().optional(), // FMP can return null
-  state: z.string().nullable().optional(), // FMP can return null
-  zip: z.string().nullable().optional(), // FMP can return null
+  description: z.string().nullish(), // FMP can return null or undefined
+  ceo: z.string().nullish(), // FMP can return null or undefined
+  sector: z.string().nullish(),
+  country: z.string().length(2).nullish(), // FMP can return null or undefined
+  fullTimeEmployees: z.string().nullish(), // FMP provides as string, null, or undefined
+  phone: z.string().nullish(), // FMP can return null or undefined
+  address: z.string().nullish(), // FMP can return null or undefined
+  city: z.string().nullish(), // FMP can return null or undefined
+  state: z.string().nullish(), // FMP can return null or undefined
+  zip: z.string().nullish(), // FMP can return null or undefined
   image: z.string().url().optional().or(z.literal('')),
   ipoDate: z.string().optional(), // "YYYY-MM-DD"
   defaultImage: z.boolean().optional(),
