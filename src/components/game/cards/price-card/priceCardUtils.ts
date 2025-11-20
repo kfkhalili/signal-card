@@ -126,7 +126,6 @@ function createDisplayablePriceCard(
 async function initializePriceCard({
   symbol,
   supabase,
-  toast,
   activeCards,
 }: CardInitializationContext): Promise<
   Result<DisplayableCard, PriceCardError>
@@ -247,13 +246,6 @@ async function initializePriceCard({
     true
   );
 
-  if (toast) {
-    toast({
-      title: "Price Card Added (Shell)",
-      description: `Awaiting live data for ${symbol}.`,
-      variant: "default",
-    });
-  }
   return ok(shellDisplayableCard);
 }
 

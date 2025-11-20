@@ -172,7 +172,6 @@ function constructSolvencyCardData(
 async function initializeSolvencyCard({
   symbol,
   supabase,
-  toast,
   activeCards,
 }: CardInitializationContext): Promise<
   Result<DisplayableCard, SolvencyCardError>
@@ -266,13 +265,6 @@ async function initializeSolvencyCard({
     logoUrl: fetchedProfileInfo.logoUrl ?? null,
     websiteUrl: fetchedProfileInfo.websiteUrl ?? null,
   };
-  if (toast) {
-    toast({
-      title: "Solvency Card Added (Empty State)",
-      description: `Awaiting financial statements data for ${symbol}.`,
-      variant: "default",
-    });
-  }
   return ok(emptyCardWithProfile);
 }
 
@@ -283,9 +275,7 @@ const handleSolvencyCardStatementUpdate: CardUpdateHandler<
   FinancialStatementDBRowFromRealtime
 > = (
   currentSolvencyCardData,
-  newFinancialStatementRow,
-  _currentDisplayableCard,
-  context
+  newFinancialStatementRow
 ): SolvencyCardData => {
   const currentStatementDateStr =
     currentSolvencyCardData.staticData.statementDate;
@@ -366,14 +356,6 @@ const handleSolvencyCardStatementUpdate: CardUpdateHandler<
   }
 
   if (shouldUpdate) {
-    if (context.toast) {
-      context.toast({
-        title: `Solvency Data Updated: ${newFinancialStatementRow.symbol}`,
-        description: `New statement for period ${
-          newFinancialStatementRow.period
-        } ${newFinancialStatementRow.fiscal_year || ""} applied.`,
-      });
-    }
     return constructSolvencyCardData(
       newFinancialStatementRow,
       {

@@ -16,7 +16,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import {
   AlertDialog,
@@ -35,7 +34,6 @@ type UserProfile = Tables<"user_profiles">;
 
 export default function ProfilePage(): JSX.Element {
   const { user, isLoading: authLoading } = useAuth();
-  const { toast } = useToast();
   const router = useRouter();
   const [profile, setProfile] = useState<Option.Option<UserProfile>>(Option.none());
   const [pageLoading, setPageLoading] = useState<boolean>(true);
@@ -64,11 +62,6 @@ export default function ProfilePage(): JSX.Element {
 
             if (error) {
               console.error("Error fetching profile:", error);
-              toast({
-                title: "Error",
-                description: "Could not fetch your profile.",
-                variant: "destructive",
-              });
             } else {
               setProfile(Option.fromNullable(data));
             }
@@ -77,11 +70,6 @@ export default function ProfilePage(): JSX.Element {
           (err) => {
             // Handle Result error (network/exception errors)
             console.error("Error fetching profile:", err);
-            toast({
-              title: "Error",
-              description: "Could not fetch your profile.",
-              variant: "destructive",
-            });
             setPageLoading(false);
           }
         );
@@ -90,7 +78,7 @@ export default function ProfilePage(): JSX.Element {
     if (!authLoading) {
       void fetchProfile();
     }
-  }, [user, authLoading, supabase, toast]);
+  }, [user, authLoading, supabase]);
 
   const handleUpdateProfile = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -117,11 +105,7 @@ export default function ProfilePage(): JSX.Element {
         const { error } = response;
 
         if (error) {
-          toast({
-            title: "Error updating profile",
-            description: error.message,
-            variant: "destructive",
-          });
+          console.error("Error updating profile:", error.message);
         } else {
           setProfile((prevProfileOption) => {
             const prevProfile = Option.isSome(prevProfileOption) ? prevProfileOption.value : null;
@@ -139,30 +123,17 @@ export default function ProfilePage(): JSX.Element {
                 };
             return Option.some(updatedProfile);
           });
-          toast({
-            title: "Success",
-            description: "Your profile has been updated.",
-          });
         }
       },
       (err) => {
         // Handle Result error (network/exception errors)
-        toast({
-          title: "Error updating profile",
-          description: err.message,
-          variant: "destructive",
-        });
+        console.error("Error updating profile:", err.message);
       }
     );
   };
 
   const handleDeleteAccount = async () => {
     if (!supabase) {
-        toast({
-            title: "Error",
-            description: "Database connection not available.",
-            variant: "destructive",
-        });
         return;
     }
     const sessionResult = await fromPromise(
@@ -171,22 +142,13 @@ export default function ProfilePage(): JSX.Element {
     );
 
     if (sessionResult.isErr()) {
-      toast({
-        title: "Error",
-        description: "Could not verify your session.",
-        variant: "destructive",
-      });
+      console.error("Could not verify session:", sessionResult.error);
       return;
     }
 
     const { data: { session } } = sessionResult.value;
 
     if (!session) {
-      toast({
-        title: "Error",
-        description: "You must be logged in to delete your account.",
-        variant: "destructive",
-      });
       return;
     }
 
@@ -204,16 +166,8 @@ export default function ProfilePage(): JSX.Element {
         const { error } = response;
 
         if (error) {
-          toast({
-            title: "Error Deleting Account",
-            description: (error as Error).message,
-            variant: "destructive",
-          });
+          console.error("Error deleting account:", (error as Error).message);
         } else {
-          toast({
-            title: "Account Deleted",
-            description: "Your account has been successfully deleted.",
-          });
           void fromPromise(
             supabase.auth.signOut(),
             (e) => new Error(`Failed to sign out: ${(e as Error).message}`)
@@ -227,11 +181,7 @@ export default function ProfilePage(): JSX.Element {
       },
       (err) => {
         // Handle Result error (network/exception errors)
-        toast({
-          title: "Error Deleting Account",
-          description: err.message,
-          variant: "destructive",
-        });
+        console.error("Error deleting account:", err.message);
       }
     );
   };

@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { useDebounce } from "use-debounce";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -16,14 +17,7 @@ import {
   DialogClose,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
+import { Input } from "@/components/ui/input";
 import {
   Form,
   FormControl,
@@ -46,9 +40,13 @@ import {
   Landmark,
   Layers3,
   Check,
+  Search,
+  Loader2,
 } from "lucide-react";
 import type { CardType } from "@/components/game/cards/base-card/base-card.types";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { fromPromise } from "neverthrow";
 
 const AVAILABLE_CARD_TYPES: {
   value: CardType;
@@ -131,26 +129,28 @@ const AddCardFormSchema = z.object({
 
 export type AddCardFormValues = z.infer<typeof AddCardFormSchema>;
 
-interface SymbolSuggestion {
-  value: string;
-  label: string; // Combination of symbol and name for searching.
-  companyName: string;
+interface SymbolSearchResult {
+  symbol: string;
+  companyName: string | null;
 }
 
 interface AddCardFormProps {
   onAddCard: (values: AddCardFormValues) => Promise<void>;
-  supportedSymbols: SymbolSuggestion[];
   triggerButton?: React.ReactNode;
 }
 
 export const AddCardForm: React.FC<AddCardFormProps> = ({
   onAddCard,
-  supportedSymbols,
   triggerButton,
 }) => {
+  const { supabase } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [view, setView] = useState<"symbol" | "types">("symbol");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery] = useDebounce(searchQuery, 300);
+  const [searchResults, setSearchResults] = useState<SymbolSearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   const form = useForm<AddCardFormValues>({
     resolver: zodResolver(AddCardFormSchema),
@@ -160,6 +160,66 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
     },
   });
 
+  // Search for symbols as user types
+  useEffect(() => {
+    if (!supabase || !debouncedSearchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    const searchSymbols = async () => {
+      setIsSearching(true);
+      const query = debouncedSearchQuery.trim().toUpperCase();
+
+      // Search in listed_symbols table
+      const symbolsResult = await fromPromise(
+        supabase
+          .from("listed_symbols")
+          .select("symbol")
+          .eq("is_active", true)
+          .ilike("symbol", `%${query}%`)
+          .limit(50), // Limit results for performance
+        (e) => e as Error
+      );
+
+      if (symbolsResult.isErr() || !symbolsResult.value.data) {
+        setIsSearching(false);
+        setSearchResults([]);
+        return;
+      }
+
+      const symbols = symbolsResult.value.data.map((s) => s.symbol);
+
+      // Optionally fetch company names from profiles (if available)
+      const profilesResult = await fromPromise(
+        supabase
+          .from("profiles")
+          .select("symbol, display_company_name")
+          .in("symbol", symbols.length > 0 ? symbols : []),
+        (e) => e as Error
+      );
+
+      const companyNamesMap = new Map<string, string>();
+      if (profilesResult.isOk() && profilesResult.value.data) {
+        profilesResult.value.data.forEach((p) => {
+          if (p.symbol && p.display_company_name) {
+            companyNamesMap.set(p.symbol, p.display_company_name);
+          }
+        });
+      }
+
+      const results: SymbolSearchResult[] = symbols.map((symbol) => ({
+        symbol,
+        companyName: companyNamesMap.get(symbol) || null,
+      }));
+
+      setSearchResults(results);
+      setIsSearching(false);
+    };
+
+    searchSymbols();
+  }, [debouncedSearchQuery, supabase]);
+
   useEffect(() => {
     if (isOpen) {
       form.reset({
@@ -168,6 +228,8 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
       });
       setView("symbol");
       setIsSubmitting(false);
+      setSearchQuery("");
+      setSearchResults([]);
     }
   }, [isOpen, form]);
 
@@ -182,36 +244,60 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
     <div className="pt-2">
       <DialogTitle>Select a Symbol</DialogTitle>
       <DialogDescription className="pt-1">
-        Search for a stock symbol or company name to add cards for.
+        Search for a stock symbol to add cards for. Type at least 1 character to search.
       </DialogDescription>
-      <Command className="rounded-lg border shadow-md mt-4">
-        <CommandInput placeholder="Type a symbol or company name..." />
-        <CommandList className="max-h-[250px]">
-          <CommandEmpty>No results found.</CommandEmpty>
-          <CommandGroup>
-            {supportedSymbols.map((suggestion) => (
-              <CommandItem
-                key={suggestion.value}
-                value={suggestion.label}
-                onSelect={() => {
-                  form.setValue("symbol", suggestion.value, {
-                    shouldValidate: true,
-                  });
-                  setView("types");
-                }}>
-                <div className="flex justify-between w-full items-center">
-                  <span className="font-semibold">{suggestion.value}</span>
-                  {suggestion.companyName && (
-                    <span className="text-muted-foreground text-xs truncate ml-4">
-                      {suggestion.companyName}
-                    </span>
-                  )}
-                </div>
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        </CommandList>
-      </Command>
+      <div className="mt-4 space-y-2">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Type a symbol (e.g., AAPL, MSFT)..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+            autoFocus
+          />
+          {isSearching && (
+            <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+          )}
+        </div>
+        {debouncedSearchQuery.trim() && (
+          <div className="border rounded-lg max-h-[300px] overflow-y-auto">
+            {searchResults.length === 0 && !isSearching ? (
+              <div className="py-6 text-center text-sm text-muted-foreground">
+                No symbols found. Try a different search.
+              </div>
+            ) : (
+              <div className="divide-y">
+                {searchResults.map((result) => (
+                  <button
+                    key={result.symbol}
+                    type="button"
+                    onClick={() => {
+                      form.setValue("symbol", result.symbol, {
+                        shouldValidate: true,
+                      });
+                      setView("types");
+                    }}
+                    className="w-full px-4 py-3 text-left hover:bg-accent transition-colors flex justify-between items-center">
+                    <span className="font-semibold">{result.symbol}</span>
+                    {result.companyName && (
+                      <span className="text-muted-foreground text-xs truncate ml-4">
+                        {result.companyName}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {!debouncedSearchQuery.trim() && (
+          <div className="py-6 text-center text-sm text-muted-foreground">
+            Start typing a symbol to search (e.g., AAPL, MSFT, TSLA)
+          </div>
+        )}
+      </div>
     </div>
   );
 

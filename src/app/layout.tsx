@@ -22,7 +22,6 @@ const GeistMono = localFont({
   weight: "100 900",
 });
 import { homeMetadata, generateStructuredData } from "./metadata";
-import { Toaster } from "@/components/ui/toaster";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -59,7 +58,6 @@ export default function RootLayout({
               </main>
               <Footer />
             </div>
-            <Toaster />
           </RealtimeStockProvider>
         </AuthProvider>
         <CookieBanner />

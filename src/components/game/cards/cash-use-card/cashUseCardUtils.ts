@@ -377,7 +377,6 @@ async function fetchAndProcessCashUseData(
 async function initializeCashUseCard({
   symbol,
   supabase,
-  toast,
   activeCards,
 }: CardInitializationContext): Promise<
   Result<DisplayableCard, CashUseCardError>
@@ -439,13 +438,6 @@ async function initializeCashUseCard({
         logoUrl: fetchedProfileInfo.logoUrl,
         websiteUrl: fetchedProfileInfo.websiteUrl,
       };
-      if (toast) {
-        toast({
-          title: "Cash Use Card Added (Empty State)",
-          description: `Awaiting financial statements data for ${symbol}.`,
-          variant: "default",
-        });
-      }
       return ok(emptyCardWithProfile);
     }
     return err(error);
@@ -459,13 +451,6 @@ async function initializeCashUseCard({
       return ok({ ...cardData, ...cardState });
     })
     .mapErr((error) => {
-      if (toast) {
-        toast({
-          title: "Cash Use Card Error",
-          description: `Could not fetch necessary data for ${symbol}: ${error.message}`,
-          variant: "destructive",
-        });
-      }
       return error;
     });
 }
@@ -477,9 +462,7 @@ const handleCashUseCardFinancialStatementUpdate: CardUpdateHandler<
   FinancialStatementDBRowFromRealtime
 > = (
   currentCashUseCardData,
-  newFinancialStatementRow,
-  _currentDisplayableCard,
-  context
+  newFinancialStatementRow
 ): CashUseCardData => {
   const newWeightedAverageShsOut = safeJsonParseWithField<number | null>(
     newFinancialStatementRow.income_statement_payload,
@@ -619,14 +602,6 @@ const handleCashUseCardFinancialStatementUpdate: CardUpdateHandler<
   }
 
   if (hasChanged) {
-    if (context.toast) {
-      context.toast({
-        title: `Cash Use Figures Updated: ${currentCashUseCardData.symbol}`,
-        description: `Latest statement data (${
-          newPeriod ?? "N/A"
-        } ${newDate}) applied. Annual charts are based on initial card data.`,
-      });
-    }
     const newBackDataDescription = `Cash usage metrics for ${
       currentCashUseCardData.companyName || currentCashUseCardData.symbol
     }. Financial data from ${updatedStaticData.latestStatementDate || "N/A"} (${
@@ -654,9 +629,7 @@ const handleCashUseCardProfileUpdate: CardUpdateHandler<
   ProfileDBRowFromHook
 > = (
   currentCashUseCardData,
-  profilePayload,
-  _currentDisplayableCard,
-  context
+  profilePayload
 ): CashUseCardData => {
   const { updatedCardData, coreDataChanged } = applyProfileCoreUpdates(
     currentCashUseCardData,
@@ -664,12 +637,6 @@ const handleCashUseCardProfileUpdate: CardUpdateHandler<
   );
 
   if (coreDataChanged) {
-    if (context.toast) {
-      context.toast({
-        title: "Profile Info Updated",
-        description: `Company details for ${currentCashUseCardData.symbol} card refreshed.`,
-      });
-    }
 
     const newBackDataDescription = `Cash usage metrics for ${
       updatedCardData.companyName

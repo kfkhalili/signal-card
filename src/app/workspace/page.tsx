@@ -68,7 +68,6 @@ export default function WorkspacePage() {
     stockDataCallbacks,
     uniqueSymbolsInWorkspace,
     onGenericInteraction,
-    supportedSymbols,
     isSelectionMode,
     setIsSelectionMode,
     selectedDataItems,
@@ -236,7 +235,6 @@ export default function WorkspacePage() {
             </Button>
             <AddCardForm
               onAddCard={addCardToWorkspace}
-              supportedSymbols={supportedSymbols}
             />
           </div>
         </div>
@@ -313,7 +311,6 @@ export default function WorkspacePage() {
             </p>
             <AddCardForm
               onAddCard={addCardToWorkspace}
-              supportedSymbols={supportedSymbols}
               triggerButton={
                 <Button size="lg">
                   <PlusCircle className="mr-2 h-5 w-5" /> Add Your First Card

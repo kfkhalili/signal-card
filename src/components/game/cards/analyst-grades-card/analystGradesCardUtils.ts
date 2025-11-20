@@ -317,7 +317,6 @@ async function fetchAnalystGradesData(
 async function initializeAnalystGradesCard({
   symbol,
   supabase,
-  toast,
   activeCards,
 }: CardInitializationContext): Promise<
   Result<DisplayableCard, AnalystGradesCardError>
@@ -329,12 +328,6 @@ async function initializeAnalystGradesCard({
   );
 
   if (fetchDataResult.isErr()) {
-    if (toast)
-      toast({
-        title: "Error Initializing Analyst Grades",
-        description: fetchDataResult.error.message,
-        variant: "destructive",
-      });
     return err(fetchDataResult.error);
   }
 
@@ -343,13 +336,6 @@ async function initializeAnalystGradesCard({
   if (!latestGrading) {
     // No data found - return empty state card
     const emptyCard = createEmptyAnalystGradesCard(symbol);
-    if (toast) {
-      toast({
-        title: "Analyst Grades Card Added (Empty State)",
-        description: `Awaiting analyst grades data for ${symbol}.`,
-        variant: "default",
-      });
-    }
     return ok(emptyCard);
   }
 

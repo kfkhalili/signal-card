@@ -87,7 +87,6 @@ function createEmptyExchangeVariantsCard(
 async function initializeExchangeVariantsCard({
   symbol,
   supabase,
-  toast,
 }: CardInitializationContext): Promise<
   Result<DisplayableCard, ExchangeVariantsCardError>
 > {
@@ -125,13 +124,6 @@ async function initializeExchangeVariantsCard({
     // If query fails, still return empty card but log the error
     console.warn(`Failed to fetch exchange variants for ${symbol}:`, variantsResult.error);
     const emptyCard = createEmptyExchangeVariantsCard(symbol, profileData);
-    if (toast) {
-      toast({
-        title: "Exchange Variants Card Added (Empty State)",
-        description: `Awaiting exchange variants data for ${symbol}.`,
-        variant: "default",
-      });
-    }
     return ok(emptyCard);
   }
 
@@ -140,13 +132,6 @@ async function initializeExchangeVariantsCard({
   // If no variants found at all, return empty card
   if (allVariantsData.length === 0) {
     const emptyCard = createEmptyExchangeVariantsCard(symbol, profileData);
-    if (toast) {
-      toast({
-        title: "Exchange Variants Card Added (Empty State)",
-        description: `No exchange variants found for ${symbol}.`,
-        variant: "default",
-      });
-    }
     return ok(emptyCard);
   }
 
@@ -158,13 +143,6 @@ async function initializeExchangeVariantsCard({
   if (!baseVariantData) {
     // No base variant found - return empty card
     const emptyCard = createEmptyExchangeVariantsCard(symbol, profileData);
-    if (toast) {
-      toast({
-        title: "Exchange Variants Card Added (Empty State)",
-        description: `Base variant not found for ${symbol}.`,
-        variant: "default",
-      });
-    }
     return ok(emptyCard);
   }
 

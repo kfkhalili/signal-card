@@ -9,12 +9,10 @@ import { User } from '@supabase/supabase-js'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useToast } from '@/hooks/use-toast'
 
 export default function CompleteProfilePage() {
   const supabase = createSupabaseBrowserClient()
   const router = useRouter()
-  const { toast } = useToast()
 
   const [user, setUser] = useState<Option.Option<User>>(Option.none())
   const [loading, setLoading] = useState(true)
@@ -55,11 +53,6 @@ export default function CompleteProfilePage() {
     const currentUser = Option.isSome(user) ? user.value : null
     if (!currentUser || !supabase) return
     if (username.length < 3) {
-      toast({
-        title: "Username too short",
-        description: "Your username must be at least 3 characters long.",
-        variant: "destructive",
-      })
       return
     }
 
@@ -83,26 +76,9 @@ export default function CompleteProfilePage() {
 
         if (error) {
           console.error("Profile update failed:", error)
-          if (error.code === '23505') {
-            toast({
-              title: "Username already taken",
-              description: "Please choose a different username.",
-              variant: "destructive",
-            })
-          } else {
-            toast({
-              title: "Error updating profile",
-              description: "An unexpected error occurred. Please check the console for details.",
-              variant: "destructive",
-            })
-          }
+          // Error updating profile - check console for details
           setLoading(false)
         } else {
-          toast({
-            title: "Profile Complete!",
-            description: "Welcome! Your profile has been set up.",
-          })
-
           // Navigate to workspace - middleware will handle any profile completion checks
           router.push('/workspace')
           router.refresh() // To ensure header gets updated profile info
@@ -112,11 +88,6 @@ export default function CompleteProfilePage() {
       (err) => {
         // Handle Result error (network/exception errors)
         console.error("Profile update failed:", err)
-        toast({
-          title: "Error updating profile",
-          description: err.message,
-          variant: "destructive",
-        })
         setLoading(false)
       }
     )

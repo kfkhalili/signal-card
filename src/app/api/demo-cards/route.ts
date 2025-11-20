@@ -80,15 +80,6 @@ export async function GET() {
       const context: CardInitializationContext = {
         symbol,
         supabase,
-        toast: () => ({
-          id: "",
-          dismiss: () => {
-            // No-op for background demo card generation.
-          },
-          update: () => {
-            // No-op for background demo card generation.
-          },
-        }),
         activeCards: [],
       };
       const result = await initializer(context);

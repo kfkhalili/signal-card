@@ -344,7 +344,6 @@ function constructDividendsHistoryCardData(
 async function initializeDividendsHistoryCard({
   symbol,
   supabase,
-  toast,
   activeCards,
 }: CardInitializationContext): Promise<
   Result<DisplayableCard, DividendsHistoryError>
@@ -355,12 +354,6 @@ async function initializeDividendsHistoryCard({
     activeCards
   );
   if (fetchDataResult.isErr()) {
-    if (toast)
-      toast({
-        title: "Error Initializing Dividends History",
-        description: fetchDataResult.error.message,
-        variant: "destructive",
-      });
     return err(fetchDataResult.error);
   }
 
@@ -370,13 +363,6 @@ async function initializeDividendsHistoryCard({
   if (!latestDividendRow && historicalRows.length === 0) {
     // No data found - return empty state card
     const emptyCard = createEmptyDividendsHistoryCard(symbol);
-    if (toast) {
-      toast({
-        title: "Dividends History Card Added (Empty State)",
-        description: `Awaiting dividend history data for ${symbol}.`,
-        variant: "default",
-      });
-    }
     return ok(emptyCard);
   }
 
@@ -399,9 +385,7 @@ const handleSingleDividendRowUpdate: CardUpdateHandler<
   DividendHistoryDBRow
 > = (
   currentCardData,
-  newDividendRow,
-  _currentDisplayableCard,
-  context
+  newDividendRow
 ): DividendsHistoryCardData => {
   // If card is in empty state (latestDividend is null), always update
   if (!currentCardData.liveData.latestDividend && newDividendRow.date) {
@@ -508,12 +492,6 @@ const handleSingleDividendRowUpdate: CardUpdateHandler<
   }
 
   if (hasChanged) {
-    if (context.toast) {
-      context.toast({
-        title: "Dividend Info Updated",
-        description: `Latest dividend for ${currentCardData.symbol} processed for ${newDividendRow.date}. Next year estimate may have updated.`,
-      });
-    }
     return {
       ...currentCardData,
       liveData: updatedLiveData,

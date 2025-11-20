@@ -168,7 +168,6 @@ function constructRevenueCardData(
 async function initializeRevenueCard({
   symbol,
   supabase,
-  toast,
   activeCards,
 }: CardInitializationContext): Promise<
   Result<DisplayableCard, RevenueCardError>
@@ -260,13 +259,6 @@ async function initializeRevenueCard({
     logoUrl: fetchedProfileInfo.logoUrl,
     websiteUrl: fetchedProfileInfo.websiteUrl,
   };
-  if (toast) {
-    toast({
-      title: "Revenue Card Added (Empty State)",
-      description: `Awaiting financial statements data for ${symbol}.`,
-      variant: "default",
-    });
-  }
   return ok(emptyCardWithProfile);
 }
 
@@ -277,9 +269,7 @@ const handleRevenueCardStatementUpdate: CardUpdateHandler<
   FinancialStatementDBRowFromRealtime
 > = (
   currentRevenueCardData,
-  newFinancialStatementRow,
-  _currentDisplayableCard,
-  context
+  newFinancialStatementRow
 ): RevenueCardData => {
   const currentStatementDateStr =
     currentRevenueCardData.staticData.statementDate;
@@ -360,14 +350,6 @@ const handleRevenueCardStatementUpdate: CardUpdateHandler<
   }
 
   if (shouldUpdate) {
-    if (context.toast) {
-      context.toast({
-        title: `Financials Updated: ${newFinancialStatementRow.symbol}`,
-        description: `New statement for period ${
-          newFinancialStatementRow.period
-        } ${newFinancialStatementRow.fiscal_year || ""} available.`,
-      });
-    }
     return constructRevenueCardData(
       newFinancialStatementRow,
       {

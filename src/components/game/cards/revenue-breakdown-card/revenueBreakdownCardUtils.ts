@@ -291,7 +291,6 @@ function constructRevenueBreakdownCardData(
 async function initializeRevenueBreakdownCard({
   symbol,
   supabase,
-  toast,
   activeCards,
 }: CardInitializationContext): Promise<
   Result<DisplayableCard, RevenueBreakdownCardError>
@@ -303,12 +302,6 @@ async function initializeRevenueBreakdownCard({
   );
 
   if (fetchDataResult.isErr()) {
-    if (toast)
-      toast({
-        title: "Error Initializing Revenue Breakdown",
-        description: fetchDataResult.error.message,
-        variant: "destructive",
-      });
     return err(fetchDataResult.error);
   }
 
@@ -317,13 +310,6 @@ async function initializeRevenueBreakdownCard({
   if (!latestRow) {
     // No data found - return empty state card
     const emptyCard = createEmptyRevenueBreakdownCard(symbol);
-    if (toast) {
-      toast({
-        title: "Revenue Breakdown Card Added (Empty State)",
-        description: `Awaiting revenue segmentation data for ${symbol}.`,
-        variant: "default",
-      });
-    }
     return ok(emptyCard);
   }
 

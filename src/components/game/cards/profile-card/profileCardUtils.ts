@@ -19,7 +19,6 @@ import {
 import {
   registerCardUpdateHandler,
   type CardUpdateHandler,
-  type CardUpdateContext,
 } from "@/components/game/cardUpdateHandler.types";
 import type {
   LiveQuoteIndicatorDBRow,
@@ -256,7 +255,6 @@ function createEmptyProfileCard(
 async function initializeProfileCard({
   symbol,
   supabase,
-  toast,
 }: CardInitializationContext): Promise<
   Result<DisplayableCard, ProfileCardError>
 > {
@@ -280,13 +278,6 @@ async function initializeProfileCard({
     // This allows subscription to be created and card to update when data arrives
     const emptyCard = createEmptyProfileCard(symbol);
 
-    if (toast) {
-      toast({
-        title: "Profile Card Added (Empty State)",
-        description: `Awaiting profile data for ${symbol}.`,
-        variant: "default",
-      });
-    }
 
     return ok(emptyCard);
   }
@@ -434,9 +425,7 @@ const handleProfileCardFinancialStatementUpdate: CardUpdateHandler<
   FinancialStatementDBRowFromRealtime
 > = (
   currentProfileCardData,
-  financialStatementRow,
-  _currentDisplayableCard,
-  context: CardUpdateContext
+  financialStatementRow
 ): ProfileCardData => {
   const statementSource: ProfileFinancialStatementSource = {
     income_statement_payload: financialStatementRow.income_statement_payload,
@@ -450,12 +439,6 @@ const handleProfileCardFinancialStatementUpdate: CardUpdateHandler<
     currentLiveDataReadOnly
   );
   if (currentProfileCardData.liveData.revenue !== newLiveData.revenue) {
-    if (context.toast) {
-      context.toast({
-        title: `Revenue Updated: ${currentProfileCardData.symbol}`,
-        description: `TTM Revenue from statement ${financialStatementRow.date} (${financialStatementRow.period}) applied.`,
-      });
-    }
     return {
       ...currentProfileCardData,
       liveData: { ...newLiveData, financialsCurrency: statementSource.reported_currency },
@@ -474,9 +457,7 @@ const handleProfileCardRatiosTTMUpdate: CardUpdateHandler<
   RatiosTtmDBRow
 > = (
   currentProfileCardData,
-  ratiosTtmPayload,
-  _currentDisplayableCard,
-  context: CardUpdateContext
+  ratiosTtmPayload
 ): ProfileCardData => {
   const currentLiveDataReadOnly = { ...currentProfileCardData.liveData };
   const newLiveData = createProfileCardLiveData(
@@ -500,12 +481,6 @@ const handleProfileCardRatiosTTMUpdate: CardUpdateHandler<
     changed = true;
 
   if (changed) {
-    if (context.toast) {
-      context.toast({
-        title: `Key Ratios Updated: ${currentProfileCardData.symbol}`,
-        description: `P/E, EPS (TTM), or P/B ratios have been refreshed.`,
-      });
-    }
     return { ...currentProfileCardData, liveData: newLiveData };
   }
   return currentProfileCardData;

@@ -43,5 +43,6 @@
   "jest.configPath": "jest.config.mjs",
   "jest.useDashedArgs": false,
   "jest.autoRevealOutput": "on-run",
-  "jest.enable": true
+  "jest.enable": true,
+  "markdown.validate.enabled": true
 }

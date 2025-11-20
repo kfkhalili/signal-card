@@ -159,7 +159,6 @@ function constructKeyRatiosCardData(
 async function initializeKeyRatiosCard({
   symbol,
   supabase,
-  toast,
   activeCards,
 }: CardInitializationContext): Promise<
   Result<DisplayableCard, KeyRatiosCardError>
@@ -240,13 +239,6 @@ async function initializeKeyRatiosCard({
     if (error.message.includes("PGRST116")) {
       // No data found - return empty state card
       const emptyCard = createEmptyKeyRatiosCard(symbol);
-      if (toast) {
-        toast({
-          title: "Key Ratios Card Added (Empty State)",
-          description: `Awaiting TTM ratios data for ${symbol}.`,
-          variant: "default",
-        });
-      }
       return ok(emptyCard);
     }
     // Other errors - return error
@@ -258,13 +250,6 @@ async function initializeKeyRatiosCard({
   if (!ratiosData) {
     // No data found - return empty state card
     const emptyCard = createEmptyKeyRatiosCard(symbol);
-    if (toast) {
-      toast({
-        title: "Key Ratios Card Added (Empty State)",
-        description: `Awaiting TTM ratios data for ${symbol}.`,
-        variant: "default",
-      });
-    }
     return ok(emptyCard);
   }
 
@@ -285,9 +270,7 @@ const handleKeyRatiosTTMUpdate: CardUpdateHandler<
   RatiosTtmDBRow
 > = (
   currentCardData,
-  newRatiosRow,
-  _currentDisplayableCard,
-  context
+  newRatiosRow
 ): KeyRatiosCardData => {
   const newLiveData = mapDbRowToLiveData(newRatiosRow);
   const newStaticData: KeyRatiosCardStaticData = {
@@ -302,14 +285,6 @@ const handleKeyRatiosTTMUpdate: CardUpdateHandler<
     return currentCardData;
   }
 
-  if (context.toast) {
-    context.toast({
-      title: `Key Ratios Updated: ${currentCardData.symbol}`,
-      description: `TTM Ratios have been refreshed as of ${new Date(
-        newRatiosRow.updated_at
-      ).toLocaleTimeString()}.`,
-    });
-  }
   const lastUpdatedDateString = newStaticData.lastUpdated
     ? new Date(newStaticData.lastUpdated).toLocaleDateString()
     : "N/A";

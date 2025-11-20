@@ -4,10 +4,9 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { arrayMove } from "@dnd-kit/sortable";
 import { type DragEndEvent } from "@dnd-kit/core";
-import { useToast } from "@/hooks/use-toast";
 import useLocalStorage from "@/hooks/use-local-storage";
 import { useAuth } from "@/contexts/AuthContext";
-import { fromPromise, Result } from "neverthrow";
+import { Result } from "neverthrow";
 import type {
   DisplayableCard,
   ConcreteCardData,
@@ -19,8 +18,6 @@ import type {
   InteractionPayload,
   RequestNewCardInteraction,
   NavigateExternalInteraction,
-  FilterWorkspaceDataInteraction,
-  TriggerCardActionInteraction,
   CardType,
 } from "@/components/game/cards/base-card/base-card.types";
 import { rehydrateCardFromStorage } from "@/components/game/cardRehydration";
@@ -42,7 +39,6 @@ import {
 import "@/components/game/cards/initializers";
 import {
   getCardUpdateHandler,
-  type CardUpdateContext,
   type CardUpdateEventType,
 } from "@/components/game/cardUpdateHandler.types";
 import "@/components/game/cards/updateHandlerInitializer";
@@ -70,12 +66,6 @@ type StoredCardRawArray = BaseStoredCard[];
 
 const INITIAL_RAW_CARDS: StoredCardRawArray = [];
 
-interface SymbolSuggestion {
-  value: string;
-  label: string; // Combination of symbol and name for searching.
-  companyName: string;
-}
-
 export interface SelectedDataItem {
   id: string;
   sourceCardId: string;
@@ -102,7 +92,6 @@ const getConcreteCardData = (card: DisplayableCard): ConcreteCardData => {
 };
 
 export function useWorkspaceManager() {
-  const { toast } = useToast();
   const { supabase } = useAuth();
 
   const [rawCardsFromStorage, setCardsInLocalStorage] =
@@ -130,9 +119,6 @@ export function useWorkspaceManager() {
   const [exchangeStatuses, setExchangeStatuses] = useState<
     Record<string, ExchangeMarketStatusRecord>
   >({});
-  const [supportedSymbols, setSupportedSymbols] = useState<SymbolSuggestion[]>(
-    []
-  );
 
   const [isSelectionMode, setIsSelectionMode] = useState<boolean>(false);
   const [selectedDataItems, setSelectedDataItems] = useState<
@@ -170,77 +156,6 @@ export function useWorkspaceManager() {
   }, [activeCards, sortConfig]);
 
   useEffect(() => {
-    const fetchAllSymbols = async () => {
-      if (!supabase) return;
-
-      const symbolsResult = await fromPromise(
-        supabase
-          .from("listed_symbols")
-          .select("symbol")
-          .eq("is_active", true),
-        (e) => e as Error
-      );
-
-      if (symbolsResult.isErr() || !symbolsResult.value.data) {
-        console.error(
-          "Failed to fetch listed symbols:",
-          symbolsResult.isErr() && symbolsResult.error
-        );
-        return;
-      }
-
-      const symbolStrings = symbolsResult.value.data.map((s) => s.symbol);
-
-      const profilesResult = await fromPromise(
-        supabase
-          .from("profiles")
-          .select("symbol, display_company_name")
-          .in("symbol", symbolStrings),
-        (e) => e as Error
-      );
-
-      if (profilesResult.isErr() || !profilesResult.value.data) {
-        console.error(
-          "Failed to fetch profiles for symbols:",
-          profilesResult.isErr() && profilesResult.error
-        );
-        // Fallback to symbols only if profiles fail
-        const symbolOnlySuggestions = symbolStrings
-          .map((s) => ({
-            value: s,
-            label: s,
-            companyName: "",
-          }))
-          .sort((a, b) => a.value.localeCompare(b.value));
-        setSupportedSymbols(symbolOnlySuggestions);
-        return;
-      }
-
-      const companyNamesMap = new Map<string, string>();
-      profilesResult.value.data.forEach((p) => {
-        if (p.symbol && p.display_company_name) {
-          companyNamesMap.set(p.symbol, p.display_company_name);
-        }
-      });
-
-      const suggestions: SymbolSuggestion[] = symbolStrings
-        .map((symbol) => {
-          const companyName = companyNamesMap.get(symbol) ?? "";
-          return {
-            value: symbol,
-            companyName,
-            label: companyName ? `${symbol} ${companyName}` : symbol,
-          };
-        })
-        .sort((a, b) => a.value.localeCompare(b.value));
-
-      setSupportedSymbols(suggestions);
-    };
-
-    fetchAllSymbols();
-  }, [supabase]);
-
-  useEffect(() => {
     setCardsInLocalStorage(activeCards as unknown as StoredCardRawArray);
   }, [activeCards, setCardsInLocalStorage]);
 
@@ -263,18 +178,13 @@ export function useWorkspaceManager() {
           return prev.filter((p) => p.id !== item.id);
         } else {
           if (prev.length >= 20) {
-            toast({
-              title: "Selection Limit Reached",
-              description: "A custom card can hold up to 20 items.",
-              variant: "default",
-            });
             return prev;
           }
           return [...prev, item];
         }
       });
-    },
-    [toast]
+      },
+    []
   );
 
   const onDragEnd = useCallback(
@@ -296,12 +206,6 @@ export function useWorkspaceManager() {
   const createCustomStaticCard = useCallback(
     (narrative: string, description: string) => {
       if (selectedDataItems.length === 0) {
-        toast({
-          title: "No Items Selected",
-          description:
-            "Please select one or more data points to create a card.",
-          variant: "destructive",
-        });
         return;
       }
 
@@ -334,15 +238,10 @@ export function useWorkspaceManager() {
 
       setActiveCards((prev) => [newCustomCard, ...prev]);
 
-      toast({
-        title: "Custom Card Created",
-        description: `Successfully created "${narrative}".`,
-      });
-
       setSelectedDataItems([]);
       setIsSelectionMode(false);
     },
-    [activeCards, selectedDataItems, toast]
+    [activeCards, selectedDataItems]
   );
 
   const addCardToWorkspace = useCallback(
@@ -353,12 +252,6 @@ export function useWorkspaceManager() {
       setIsAddingCardInProgress(true);
 
       if (!supabase) {
-        toast({
-          title: "Service Unavailable",
-          description:
-            "Cannot add card(s): Data service is not properly initialized.",
-          variant: "destructive",
-        });
         setIsAddingCardInProgress(false);
         return;
       }
@@ -371,10 +264,6 @@ export function useWorkspaceManager() {
       let cardsReorderedCount = 0;
       const duplicateMessages: string[] = [];
       const errorMessages: string[] = [];
-
-      toast({
-        title: `Processing ${cardTypesToAttempt.length} card request(s) for ${determinedSymbol}...`,
-      });
 
       for (const individualCardType of cardTypesToAttempt) {
         const existingCardIndex = activeCards.findIndex(
@@ -431,7 +320,6 @@ export function useWorkspaceManager() {
         const initContext: CardInitializationContext = {
           symbol: determinedSymbol,
           supabase,
-          toast,
           activeCards,
         };
 
@@ -466,47 +354,18 @@ export function useWorkspaceManager() {
         );
       }
 
-      if (cardsAddedCount > 0) {
-        toast({
-          title: "Cards Added",
-          description: `${cardsAddedCount} new card(s) for ${determinedSymbol} added to workspace.`,
-        });
-      }
-      if (cardsReorderedCount > 0) {
-        toast({
-          title: "Cards Reordered",
-          description: `${cardsReorderedCount} existing card(s) moved.`,
-        });
-      }
-      if (duplicateMessages.length > 0) {
-        toast({
-          title: "Duplicates Found",
-          description: duplicateMessages.join(" "),
-          variant: "default",
-        });
-      }
-      if (errorMessages.length > 0) {
-        toast({
-          title: "Errors Adding Cards",
-          description: errorMessages.join(" "),
-          variant: "destructive",
-        });
-      }
       if (
         cardsAddedCount === 0 &&
         cardsReorderedCount === 0 &&
         duplicateMessages.length === 0 &&
         errorMessages.length === 0
       ) {
-        toast({
-          title: "No Action Taken",
-          description: "No new cards were added or reordered.",
-        });
+        // No action taken
       }
 
       setIsAddingCardInProgress(false);
     },
-    [activeCards, supabase, toast]
+    [activeCards, supabase]
   );
 
   const onGenericInteraction: OnGenericInteraction = useCallback(
@@ -527,39 +386,15 @@ export function useWorkspaceManager() {
           const navigatePayload = payload as NavigateExternalInteraction;
           if (navigatePayload.url) {
             window.open(navigatePayload.url, "_blank", "noopener,noreferrer");
-            toast({
-              title: "Navigating",
-              description: `Opening ${
-                navigatePayload.navigationTargetName || "link"
-              }...`,
-            });
-          } else {
-            toast({
-              title: "Navigation Error",
-              description: "No URL provided.",
-              variant: "destructive",
-            });
           }
           break;
         }
         case "FILTER_WORKSPACE_DATA": {
-          const filterPayload = payload as FilterWorkspaceDataInteraction;
-          toast({
-            title: "Filter Action Triggered",
-            description: `Filter by ${filterPayload.filterField}: ${filterPayload.filterValue}. (Actual filtering TBD)`,
-          });
+          // Filter action - implementation TBD
           break;
         }
         case "TRIGGER_CARD_ACTION": {
-          const actionPayload = payload as TriggerCardActionInteraction;
-          toast({
-            title: `Card Action: ${actionPayload.sourceCardSymbol}`,
-            description: `Action: ${
-              actionPayload.actionName
-            }, Data: ${JSON.stringify(
-              actionPayload.actionData || {}
-            )}. (Handler TBD)`,
-          });
+          // Card action triggered
           break;
         }
         default: {
@@ -571,22 +406,14 @@ export function useWorkspaceManager() {
               payload
             );
           }
-          toast({
-            title: "Unknown Interaction",
-            description: `An interaction of type "${unhandledPayload.intent}" occurred but is not handled.`,
-            variant: "default",
-          });
         }
       }
     },
-    [addCardToWorkspace, toast]
+    [addCardToWorkspace]
   );
 
   const handleLiveQuoteUpdate = useCallback(
     (leanQuoteData: LiveQuoteIndicatorDBRow) => {
-      // Don't pass toast to update handlers - they're called too frequently
-      // and calling toast during setState causes React errors
-      const updateContext: CardUpdateContext = { toast: undefined };
       const eventType: CardUpdateEventType = "LIVE_QUOTE_UPDATE";
 
       // Only process cards that actually need quote updates (profile and price)
@@ -607,9 +434,7 @@ export function useWorkspaceManager() {
                 const concreteCardDataForHandler = getConcreteCardData(card);
                 const updatedConcreteData = handler(
                   concreteCardDataForHandler,
-                  leanQuoteData,
-                  card,
-                  updateContext
+                  leanQuoteData
                 );
                 if (
                   JSON.stringify(updatedConcreteData) !==
@@ -631,8 +456,6 @@ export function useWorkspaceManager() {
 
   const handleStaticProfileUpdate = useCallback(
     (updatedProfileDBRow: ProfileDBRow) => {
-      // Don't pass toast to update handlers - they're called too frequently
-      const updateContext: CardUpdateContext = { toast: undefined };
       const eventType: CardUpdateEventType = "STATIC_PROFILE_UPDATE";
 
       // Use setTimeout to defer state update and avoid "setState during render" error
@@ -646,9 +469,7 @@ export function useWorkspaceManager() {
                 const concreteCardDataForHandler = getConcreteCardData(card);
                 const updatedConcreteData = handler(
                   concreteCardDataForHandler,
-                  updatedProfileDBRow,
-                  card,
-                  updateContext
+                  updatedProfileDBRow
                 );
 
                 if (
@@ -671,8 +492,6 @@ export function useWorkspaceManager() {
 
   const handleFinancialStatementUpdate = useCallback(
     (updatedStatementDBRow: FinancialStatementDBRow) => {
-      // Don't pass toast to update handlers - they're called too frequently
-      const updateContext: CardUpdateContext = { toast: undefined };
       const eventType: CardUpdateEventType = "FINANCIAL_STATEMENT_UPDATE";
 
       // Use setTimeout to defer state update and avoid "setState during render" error
@@ -705,7 +524,6 @@ export function useWorkspaceManager() {
                 const initResult = await initializer({
                   symbol: card.symbol,
                   supabase,
-                  toast: toast || undefined,
                   activeCards: prevActiveCards,
                 });
                 initResult.match(
@@ -735,9 +553,7 @@ export function useWorkspaceManager() {
                 const concreteCardDataForHandler = getConcreteCardData(card);
                 const updatedConcreteData = handler(
                   concreteCardDataForHandler,
-                  updatedStatementDBRow,
-                  card,
-                  updateContext
+                  updatedStatementDBRow
                 );
                 if (
                   JSON.stringify(updatedConcreteData) !==
@@ -754,7 +570,7 @@ export function useWorkspaceManager() {
         });
       }, 0);
     },
-    [supabase, toast]
+    [supabase]
   );
 
   const handleExchangeStatusUpdate = useCallback(
@@ -769,8 +585,6 @@ export function useWorkspaceManager() {
 
   const handleRatiosTTMUpdate = useCallback(
     (updatedRatiosDBRow: RatiosTtmDBRow) => {
-      // Don't pass toast to update handlers - they're called too frequently
-      const updateContext: CardUpdateContext = { toast: undefined };
       const eventType: CardUpdateEventType = "RATIOS_TTM_UPDATE";
 
       // Use setTimeout to defer state update and avoid "setState during render" error
@@ -784,9 +598,7 @@ export function useWorkspaceManager() {
                 const concreteCardDataForHandler = getConcreteCardData(card);
                 const updatedConcreteData = handler(
                   concreteCardDataForHandler,
-                  updatedRatiosDBRow,
-                  card,
-                  updateContext
+                  updatedRatiosDBRow
                 );
                 if (
                   JSON.stringify(updatedConcreteData) !==
@@ -808,19 +620,10 @@ export function useWorkspaceManager() {
 
   const clearWorkspace = useCallback(() => {
     setActiveCards(INITIAL_ACTIVE_CARDS);
-    setTimeout(
-      () =>
-        toast({
-          title: "Workspace Cleared",
-          description: "You can now start fresh with any symbol.",
-        }),
-      0
-    );
-  }, [toast]);
+  }, []);
 
   const handleDividendHistoryUpdate = useCallback(
     (updatedDividendDBRow: DividendHistoryDBRow) => {
-      const updateContext: CardUpdateContext = { toast: undefined };
       const eventType: CardUpdateEventType = "DIVIDEND_ROW_UPDATE";
 
       setTimeout(() => {
@@ -833,9 +636,7 @@ export function useWorkspaceManager() {
                 const concreteCardDataForHandler = getConcreteCardData(card);
                 const updatedConcreteData = handler(
                   concreteCardDataForHandler,
-                  updatedDividendDBRow,
-                  card,
-                  updateContext
+                  updatedDividendDBRow
                 );
                 if (
                   JSON.stringify(updatedConcreteData) !==
@@ -857,7 +658,6 @@ export function useWorkspaceManager() {
 
   const handleRevenueSegmentationUpdate = useCallback(
     (updatedSegmentationDBRow: RevenueProductSegmentationDBRow) => {
-      const updateContext: CardUpdateContext = { toast: undefined };
       const eventType: CardUpdateEventType = "REVENUE_SEGMENTATION_UPDATE";
 
       setTimeout(() => {
@@ -870,9 +670,7 @@ export function useWorkspaceManager() {
                 const concreteCardDataForHandler = getConcreteCardData(card);
                 const updatedConcreteData = handler(
                   concreteCardDataForHandler,
-                  updatedSegmentationDBRow,
-                  card,
-                  updateContext
+                  updatedSegmentationDBRow
                 );
                 if (
                   JSON.stringify(updatedConcreteData) !==
@@ -894,7 +692,6 @@ export function useWorkspaceManager() {
 
   const handleGradesHistoricalUpdate = useCallback(
     (updatedGradesDBRow: GradesHistoricalDBRow) => {
-      const updateContext: CardUpdateContext = { toast: undefined };
       const eventType: CardUpdateEventType = "GRADES_HISTORICAL_UPDATE";
 
       setTimeout(() => {
@@ -907,9 +704,7 @@ export function useWorkspaceManager() {
                 const concreteCardDataForHandler = getConcreteCardData(card);
                 const updatedConcreteData = handler(
                   concreteCardDataForHandler,
-                  updatedGradesDBRow,
-                  card,
-                  updateContext
+                  updatedGradesDBRow
                 );
                 if (
                   JSON.stringify(updatedConcreteData) !==
@@ -931,7 +726,6 @@ export function useWorkspaceManager() {
 
   const handleExchangeVariantsUpdate = useCallback(
     (updatedVariantDBRow: ExchangeVariantsDBRow) => {
-      const updateContext: CardUpdateContext = { toast: undefined };
       const eventType: CardUpdateEventType = "EXCHANGE_VARIANTS_UPDATE";
 
       setTimeout(() => {
@@ -954,7 +748,6 @@ export function useWorkspaceManager() {
                 const initResult = await initializer({
                   symbol: card.symbol,
                   supabase,
-                  toast: toast || undefined,
                   activeCards: prevActiveCards,
                 });
                 initResult.match(
@@ -985,9 +778,7 @@ export function useWorkspaceManager() {
                 const concreteCardDataForHandler = getConcreteCardData(card);
                 const updatedConcreteData = handler(
                   concreteCardDataForHandler,
-                  updatedVariantDBRow,
-                  card,
-                  updateContext
+                  updatedVariantDBRow
                 );
                 const hasChanged = JSON.stringify(updatedConcreteData) !==
                   JSON.stringify(concreteCardDataForHandler);
@@ -1003,7 +794,7 @@ export function useWorkspaceManager() {
         });
       }, 0);
     },
-    [supabase, toast]
+    [supabase]
   );
 
   const stockDataCallbacks = useMemo(
@@ -1047,7 +838,6 @@ export function useWorkspaceManager() {
     uniqueSymbolsInWorkspace,
     exchangeStatuses,
     onGenericInteraction,
-    supportedSymbols,
     isSelectionMode,
     setIsSelectionMode,
     selectedDataItems,
