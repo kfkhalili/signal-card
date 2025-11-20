@@ -245,8 +245,15 @@ function constructRevenueBreakdownCardData(
     })
     .sort((a, b) => b.currentRevenue - a.currentRevenue);
 
+  // Convert currency code to symbol (e.g., "USD" -> "$")
+  const getCurrencySymbol = (currency: string | null | undefined): string => {
+    if (!currency) return profileInfo.currencySymbol;
+    if (currency === "USD") return "$";
+    return currency; // For other currencies, use as-is (could be extended later)
+  };
+
   const staticData: RevenueBreakdownCardStaticData = {
-    currencySymbol: latestRow.reported_currency || profileInfo.currencySymbol,
+    currencySymbol: getCurrencySymbol(latestRow.reported_currency) || profileInfo.currencySymbol,
     latestPeriodLabel: `FY${latestRow.fiscal_year} ending ${latestRow.date}`,
     previousPeriodLabel: previousRow
       ? `FY${previousRow.fiscal_year} ending ${previousRow.date}`
@@ -431,7 +438,12 @@ const handleRevenueSegmentationUpdate: CardUpdateHandler<
         lastUpdated: updatedRow.updated_at || updatedRow.fetched_at,
       },
       staticData: {
-        currencySymbol: updatedRow.reported_currency || currentCardData.staticData.currencySymbol,
+        currencySymbol: (() => {
+          const currency = updatedRow.reported_currency;
+          if (!currency) return currentCardData.staticData.currencySymbol;
+          if (currency === "USD") return "$";
+          return currency;
+        })(),
         latestPeriodLabel: `FY${updatedRow.fiscal_year} ending ${updatedRow.date}`,
         previousPeriodLabel: null,
       },

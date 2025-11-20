@@ -252,6 +252,14 @@ async function initializeRevenueCard({
 
   // No data found - return empty state card
   const emptyCard = createEmptyRevenueCard(symbol);
+  // Apply profile info to empty card if available
+  const emptyCardWithProfile: RevenueCardData & Pick<DisplayableCardState, "isFlipped"> = {
+    ...emptyCard,
+    companyName: fetchedProfileInfo.companyName,
+    displayCompanyName: fetchedProfileInfo.displayCompanyName,
+    logoUrl: fetchedProfileInfo.logoUrl,
+    websiteUrl: fetchedProfileInfo.websiteUrl,
+  };
   if (toast) {
     toast({
       title: "Revenue Card Added (Empty State)",
@@ -259,7 +267,7 @@ async function initializeRevenueCard({
       variant: "default",
     });
   }
-  return ok(emptyCard);
+  return ok(emptyCardWithProfile);
 }
 
 registerCardInitializer("revenue", initializeRevenueCard);

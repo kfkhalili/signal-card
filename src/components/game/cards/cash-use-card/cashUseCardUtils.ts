@@ -392,7 +392,53 @@ async function initializeCashUseCard({
     const error = result.error;
     if (error.message === "No financial data found.") {
       // No data found - return empty state card
+      // Fetch profile info to apply to empty card
+      const profileCardForSymbol = activeCards?.find(
+        (c) => c.symbol === symbol && c.type === "profile"
+      ) as ProfileDBRowFromSupabase | undefined;
+
+      let fetchedProfileInfo = {
+        companyName: profileCardForSymbol?.company_name ?? null,
+        displayCompanyName:
+          profileCardForSymbol?.display_company_name ??
+          profileCardForSymbol?.company_name ??
+          null,
+        logoUrl: profileCardForSymbol?.image ?? null,
+        websiteUrl: profileCardForSymbol?.website ?? null,
+      };
+
+      if (!profileCardForSymbol) {
+        const profileResult = await fromPromise(
+          supabase
+            .from("profiles")
+            .select("company_name, display_company_name, image, website")
+            .eq("symbol", symbol)
+            .maybeSingle(),
+          (e) =>
+            new CashUseCardError(`Profile fetch failed: ${(e as Error).message}`)
+        );
+        if (profileResult.isOk() && profileResult.value.data) {
+          fetchedProfileInfo = {
+            companyName: profileResult.value.data.company_name ?? null,
+            displayCompanyName:
+              profileResult.value.data.display_company_name ??
+              profileResult.value.data.company_name ??
+              null,
+            logoUrl: profileResult.value.data.image ?? null,
+            websiteUrl: profileResult.value.data.website ?? null,
+          };
+        }
+      }
+
       const emptyCard = createEmptyCashUseCard(symbol);
+      // Apply profile info to empty card if available
+      const emptyCardWithProfile: CashUseCardData & Pick<DisplayableCardState, "isFlipped"> = {
+        ...emptyCard,
+        companyName: fetchedProfileInfo.companyName,
+        displayCompanyName: fetchedProfileInfo.displayCompanyName,
+        logoUrl: fetchedProfileInfo.logoUrl,
+        websiteUrl: fetchedProfileInfo.websiteUrl,
+      };
       if (toast) {
         toast({
           title: "Cash Use Card Added (Empty State)",
@@ -400,7 +446,7 @@ async function initializeCashUseCard({
           variant: "default",
         });
       }
-      return ok(emptyCard);
+      return ok(emptyCardWithProfile);
     }
     return err(error);
   }
