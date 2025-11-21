@@ -16,6 +16,10 @@ AS $function$BEGIN
       (1 - PERCENT_RANK() OVER (ORDER BY debt_to_equity_ratio_ttm ASC)) * 100 AS norm_de
     FROM
       public.ratios_ttm as rt
+    INNER JOIN public.listed_symbols ls
+      ON rt.symbol = ls.symbol
+    WHERE
+      ls.is_active = TRUE
   ),
   pillar_scores AS (
     SELECT

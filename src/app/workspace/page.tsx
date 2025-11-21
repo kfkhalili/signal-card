@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { AddCardForm } from "@/components/workspace/AddCardForm";
+import type { CardType } from "@/components/game/cards/base-card/base-card.types";
 import { StockDataHandler } from "@/components/workspace/StockDataHandler";
 import MarketDataStatusBanner from "@/components/workspace/MarketStatusBanner";
 import { CustomCardCreatorPanel } from "@/components/workspace/CustomCardCreatorPanel";
@@ -92,6 +93,30 @@ export default function WorkspacePage() {
       router.push("/");
     }
   }, [user, isAuthLoading, router, hasMounted]);
+
+  // Handle pending cards from Compass or other pages
+  useEffect(() => {
+    if (hasMounted && user && !isAuthLoading) {
+      const pendingCardJson = sessionStorage.getItem("pendingCardToAdd");
+      if (pendingCardJson) {
+        try {
+          const pendingCard: { symbol: string; cardTypes: CardType[] } =
+            JSON.parse(pendingCardJson);
+          sessionStorage.removeItem("pendingCardToAdd");
+          // Add the card to workspace (ensure non-empty array)
+          if (pendingCard.cardTypes.length > 0) {
+            addCardToWorkspace({
+              symbol: pendingCard.symbol,
+              cardTypes: pendingCard.cardTypes as [CardType, ...CardType[]],
+            });
+          }
+        } catch (error) {
+          console.error("Failed to parse pending card:", error);
+          sessionStorage.removeItem("pendingCardToAdd");
+        }
+      }
+    }
+  }, [hasMounted, user, isAuthLoading, addCardToWorkspace]);
 
   useEffect(() => {
     if (!isSelectionMode) {

@@ -13,8 +13,12 @@ const FMP_QUOTE_BASE_URL = 'https://financialmodelingprep.com/stable/quote';
 // CRITICAL: Strict schema validation - all required fields must be present and correct type
 const FmpQuoteSchema = z.object({
   symbol: z.string().min(1),
-  price: z.number().gt(0).lt(100000), // Sanity check: price must be positive and reasonable
-  timestamp: z.number().positive(), // Unix timestamp (seconds) - required for source timestamp validation
+  // FIXED: Allow price = 0 (delisted/suspended stocks) and increase max to 1M (for BRK-A and other high-value stocks)
+  // Matches profile schema pattern: z.number().gte(0).lt(1000000)
+  price: z.number().gte(0).lt(1000000),
+  // FIXED: Allow timestamp = 0 (FMP sometimes returns 0 for invalid/missing timestamps)
+  // Changed from .positive() to .gte(0) to handle bad data gracefully
+  timestamp: z.number().gte(0),
   changesPercentage: z.number().optional().nullable(),
   changePercentage: z.number().optional().nullable(), // FMP sometimes uses this variant
   change: z.number().optional().nullable(),
@@ -24,8 +28,10 @@ const FmpQuoteSchema = z.object({
   yearHigh: z.number().nonnegative().optional().nullable(),
   yearLow: z.number().nonnegative().optional().nullable(),
   marketCap: z.number().nonnegative().optional().nullable(),
-  priceAvg50: z.number().nonnegative().optional().nullable(),
-  priceAvg200: z.number().nonnegative().optional().nullable(),
+  // FIXED: Allow negative values (FMP sometimes returns negative moving averages for bad data)
+  // Changed from .nonnegative() to allow any number (including negative)
+  priceAvg50: z.number().optional().nullable(),
+  priceAvg200: z.number().optional().nullable(),
   exchange: z.string().optional().nullable(),
   open: z.number().nonnegative().optional().nullable(),
   previousClose: z.number().nonnegative().optional().nullable(),

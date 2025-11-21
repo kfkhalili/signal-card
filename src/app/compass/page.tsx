@@ -1,12 +1,16 @@
-// src/app/leaderboard/page.tsx
+// src/app/compass/page.tsx
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLeaderboardStore } from "@/stores/compassStore";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDebounce } from "use-debounce";
 import type { LeaderboardEntry } from "@/stores/compassStore";
 import { Button } from "@/components/ui/button";
+import { useAddCardToWorkspace } from "@/hooks/useAddCardToWorkspace";
+import { PlusCircle, Sparkles, TrendingUp, Loader2 } from "lucide-react";
+import { cn, createSecureImageUrl } from "@/lib/utils";
+import { fromPromise } from "neverthrow";
 
 type Pillar = "value" | "growth" | "profitability" | "income" | "health";
 type Weights = Record<Pillar, number>;
@@ -133,8 +137,13 @@ const WeightSliders = () => {
   );
 };
 
-export default function LeaderboardPage() {
-  const { supabase } = useAuth();
+interface ProfileData {
+  company_name: string | null;
+  image: string | null;
+}
+
+export default function CompassPage() {
+  const { supabase, user } = useAuth();
   const {
     weights,
     leaderboardData,
@@ -143,6 +152,9 @@ export default function LeaderboardPage() {
     actions,
   } = useLeaderboardStore();
   const [debouncedWeights] = useDebounce(weights, 500);
+  const { addCard } = useAddCardToWorkspace();
+  const [addingSymbols, setAddingSymbols] = useState<Set<string>>(new Set());
+  const [profileData, setProfileData] = useState<Record<string, ProfileData>>({});
 
   useEffect(() => {
     if (supabase) {
@@ -150,45 +162,233 @@ export default function LeaderboardPage() {
     }
   }, [debouncedWeights, supabase, actions]);
 
+  // Fetch profile data for all symbols in leaderboard
+  useEffect(() => {
+    if (!supabase || leaderboardData.length === 0) return;
+
+    const fetchProfiles = async () => {
+      const symbols = leaderboardData.map((item) => item.symbol);
+
+      const profileResult = await fromPromise(
+        supabase
+          .from("profiles")
+          .select("symbol, company_name, image")
+          .in("symbol", symbols),
+        (e) => new Error(`Failed to fetch profiles: ${(e as Error).message}`)
+      );
+
+      profileResult.match(
+        (response) => {
+          const { data, error } = response;
+          if (error) {
+            console.error("Error fetching profiles:", error);
+            return;
+          }
+
+          const profileMap: Record<string, ProfileData> = {};
+          if (data) {
+            data.forEach((profile) => {
+              profileMap[profile.symbol] = {
+                company_name: profile.company_name,
+                image: profile.image,
+              };
+            });
+          }
+          setProfileData(profileMap);
+        },
+        (err) => {
+          console.error("Error fetching profiles:", err);
+        }
+      );
+    };
+
+    fetchProfiles();
+  }, [supabase, leaderboardData]);
+
+  const handleAddToWorkspace = async (symbol: string) => {
+    setAddingSymbols((prev) => new Set(prev).add(symbol));
+    try {
+      await addCard(symbol, ["profile"]);
+    } finally {
+      setAddingSymbols((prev) => {
+        const next = new Set(prev);
+        next.delete(symbol);
+        return next;
+      });
+    }
+  };
+
+  const handleExploreTop3 = async () => {
+    if (leaderboardData.length < 3) return;
+    const top3 = leaderboardData.slice(0, 3);
+    setAddingSymbols(new Set(top3.map((item) => item.symbol)));
+    try {
+      // Add all top 3 to workspace
+      for (const item of top3) {
+        await addCard(item.symbol, ["profile"]);
+      }
+    } finally {
+      setAddingSymbols(new Set());
+    }
+  };
+
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">
-        Market Compass
-      </h1>
+    <div className="container mx-auto p-4 max-w-7xl">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold mb-2">Market Compass</h1>
+        <p className="text-muted-foreground">
+          Discover stocks ranked by your investment style. Adjust the weights below to personalize your rankings.
+        </p>
+      </div>
+
       <InvestorProfileButtons />
       <WeightSliders />
-      <div className="mt-4">
-        {isLoading && <p>Loading...</p>}
-        {error && <p className="text-red-500">Error: {error}</p>}
-        {!isLoading && !error && (
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Rank
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Symbol
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Composite Score
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {leaderboardData.map((item: LeaderboardEntry) => (
-                <tr key={item.symbol}>
-                  <td className="px-6 py-4 whitespace-nowrap">{item.rank}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {item.symbol}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {item.composite_score.toFixed(2)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+      {leaderboardData.length >= 3 && (
+        <div className="mt-6 mb-4">
+          <Button
+            onClick={handleExploreTop3}
+            size="lg"
+            className="w-full sm:w-auto"
+            disabled={addingSymbols.size > 0}
+          >
+            <Sparkles className="mr-2 h-4 w-4" />
+            Explore Top 3 Stocks
+          </Button>
+        </div>
+      )}
+
+      <div className="mt-6">
+        {isLoading && (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Loading rankings...</p>
+          </div>
+        )}
+        {error && (
+          <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+            <p className="text-destructive">Error: {error}</p>
+          </div>
+        )}
+        {!isLoading && !error && leaderboardData.length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">No rankings available.</p>
+          </div>
+        )}
+        {!isLoading && !error && leaderboardData.length > 0 && (
+          <div className="bg-card border rounded-lg overflow-hidden">
+            {/* Table Header */}
+            <div className="grid grid-cols-[50px_1fr_120px_140px] gap-4 px-4 py-3 bg-muted/50 border-b text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <div>#</div>
+              <div>Name</div>
+              <div className="text-right">Score</div>
+              <div className="text-right">Action</div>
+            </div>
+
+            {/* Table Rows */}
+            <div className="divide-y divide-border">
+              {leaderboardData.map((item: LeaderboardEntry, index: number) => {
+                const isTop3 = index < 3;
+                const isTop10 = index < 10;
+                const isAdding = addingSymbols.has(item.symbol);
+                const profile = profileData[item.symbol];
+                const companyName = profile?.company_name || null;
+                const logoUrl = profile?.image || null;
+
+                return (
+                  <div
+                    key={item.symbol}
+                    className={cn(
+                      "grid grid-cols-[50px_1fr_120px_140px] gap-4 px-4 py-3 hover:bg-muted/30 transition-colors",
+                      isTop3 && "bg-primary/5"
+                    )}
+                  >
+                    {/* Rank Number */}
+                    <div className="flex items-center">
+                      <span className={cn(
+                        "text-sm font-semibold",
+                        isTop3 && "text-primary",
+                        !isTop3 && isTop10 && "text-primary/70",
+                        !isTop10 && "text-muted-foreground"
+                      )}>
+                        {item.rank}
+                      </span>
+                    </div>
+
+                    {/* Name with Logo */}
+                    <div className="flex items-center gap-3 min-w-0">
+                      {/* Logo Circle */}
+                      <div className="relative w-10 h-10 rounded-full bg-muted shrink-0 overflow-hidden border border-border/50">
+                        {logoUrl ? (
+                          // Use API route for images (works with Next.js Image optimization)
+                          <img
+                            src={createSecureImageUrl(logoUrl)}
+                            alt={companyName || item.symbol}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              // Hide image on error, show fallback
+                              e.currentTarget.style.display = "none";
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-xs font-semibold text-muted-foreground">
+                            {item.symbol.charAt(0)}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Company Name and Symbol */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-base truncate">
+                            {companyName ? (
+                              <>
+                                {companyName} <span className="text-muted-foreground font-normal">({item.symbol})</span>
+                              </>
+                            ) : (
+                              item.symbol
+                            )}
+                          </h3>
+                          {isTop3 && (
+                            <TrendingUp className="h-4 w-4 text-primary shrink-0" />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Score */}
+                    <div className="flex items-center justify-end">
+                      <span className="font-semibold text-sm">
+                        {item.composite_score.toFixed(2)}
+                      </span>
+                    </div>
+
+                    {/* Action Button */}
+                    <div className="flex items-center justify-end">
+                      <Button
+                        onClick={() => handleAddToWorkspace(item.symbol)}
+                        disabled={isAdding || !user}
+                        size="sm"
+                        variant={isTop3 ? "default" : "outline"}
+                        className="whitespace-nowrap"
+                      >
+                        {isAdding ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Adding...
+                          </>
+                        ) : (
+                          <>
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Add
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         )}
       </div>
     </div>

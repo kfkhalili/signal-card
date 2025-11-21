@@ -108,19 +108,17 @@ const Header: React.FC = () => {
           {!clientInitError && !isLoading && user && (
             <>
               <NavLinkItem
-                href="/workspace"
-                title="Workspace"
-                icon={LayoutDashboard}
-                text="Workspace"
-              />
-              {/* --- NEW LINK ADDED HERE --- */}
-              <NavLinkItem
                 href="/compass"
                 title="Market Compass"
                 icon={Compass}
                 text="Compass"
               />
-              {/* ------------------------- */}
+              <NavLinkItem
+                href="/workspace"
+                title="Workspace"
+                icon={LayoutDashboard}
+                text="Workspace"
+              />
               <Link href="/profile" title="Your Profile" className="flex items-center space-x-2 p-1 rounded-md hover:bg-muted transition-colors">
                 {Option.isSome(profile) && (
                     <Avatar
