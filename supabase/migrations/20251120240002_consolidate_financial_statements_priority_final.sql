@@ -1,10 +1,69 @@
--- Update background staleness checker to set financial-statements to priority 500
+-- Consolidated financial-statements priority settings (final state)
 -- CRITICAL: Financial-statements jobs make 3 API calls each, so prioritizing them
 -- ensures we hit exactly 300 API calls per minute (100 jobs × 3 calls = 300 calls)
 -- CRITICAL: Priority 500 is higher than background jobs (0) but lower than UI jobs (1000)
 
--- Update the background staleness checker to use CASE WHEN in the INSERT statement
--- to set financial-statements to priority 500 (unless user_count >= 1000, indicating UI priority)
+-- Update queue_refresh_if_not_exists_v2 to set financial-statements to priority 500
+CREATE OR REPLACE FUNCTION public.queue_refresh_if_not_exists_v2(
+  p_symbol TEXT,
+  p_data_type TEXT,
+  p_priority INTEGER,
+  p_estimated_size_bytes BIGINT DEFAULT 0
+)
+RETURNS UUID AS $$
+DECLARE
+  job_id UUID;
+  existing_job_id UUID;
+  final_priority INTEGER;
+BEGIN
+  -- CRITICAL: Set financial-statements to priority 500 (unless it's a UI job with priority 1000)
+  IF p_data_type = 'financial-statements' AND p_priority < 1000 THEN
+    final_priority := 500;
+  ELSE
+    final_priority := p_priority;
+  END IF;
+
+  -- Check if job already exists (pending or processing)
+  SELECT id INTO existing_job_id
+  FROM public.api_call_queue_v2
+  WHERE symbol = p_symbol
+    AND data_type = p_data_type
+    AND status IN ('pending', 'processing')
+  LIMIT 1;
+
+  IF existing_job_id IS NOT NULL THEN
+    -- Job exists: UPDATE priority to promote it (UI/heartbeat jobs take precedence)
+    UPDATE public.api_call_queue_v2
+    SET priority = GREATEST(priority, final_priority) -- Only raise priority, never lower it
+    WHERE id = existing_job_id;
+
+    job_id := existing_job_id;
+  ELSE
+    -- Job doesn't exist: INSERT new job with appropriate priority
+    INSERT INTO public.api_call_queue_v2 (
+      symbol,
+      data_type,
+      status,
+      priority,
+      estimated_data_size_bytes
+    )
+    VALUES (
+      p_symbol,
+      p_data_type,
+      'pending',
+      final_priority,
+      p_estimated_size_bytes
+    )
+    RETURNING id INTO job_id;
+  END IF;
+
+  RETURN job_id;
+END;
+$$ LANGUAGE plpgsql;
+
+COMMENT ON FUNCTION public.queue_refresh_if_not_exists_v2 IS 'Idempotently queues a refresh job. Financial-statements jobs automatically get priority 500 (unless UI job with priority 1000). If job exists (pending/processing), updates priority to promote it (UI/heartbeat jobs take precedence). If job does not exist, inserts new job. Uses GREATEST to only raise priority, never lower it.';
+
+-- Update background staleness checker to set financial-statements to priority 500
 CREATE OR REPLACE FUNCTION public.check_and_queue_stale_data_from_presence_v2()
 RETURNS void AS $$
 DECLARE
@@ -36,9 +95,6 @@ BEGIN
     END IF;
 
     -- CRITICAL: Symbol-by-Symbol query pattern (prevents temp table thundering herd)
-    -- Outer loop: Iterate over distinct symbols from active_subscriptions (typically 1k-10k, not 300k)
-    -- This creates tiny, fast, indexed queries instead of giant JOINs
-    -- CRITICAL: Added LIMIT to prevent long-running queries
     FOR symbol_row IN
       SELECT DISTINCT symbol
       FROM public.active_subscriptions_v2
@@ -54,7 +110,7 @@ BEGIN
 
       symbols_processed := symbols_processed + 1;
 
-      -- Inner loop: Get data types for THIS symbol (typically 1-5 types per symbol)
+      -- Inner loop: Get data types for THIS symbol
       FOR reg_row IN
         SELECT DISTINCT r.*
         FROM public.data_type_registry_v2 r
@@ -82,10 +138,7 @@ BEGIN
         END IF;
 
         -- CRITICAL: For quote data type, check if data exists first
-        -- If data doesn't exist, always create a job (even if exchange is closed)
-        -- If data exists, check exchange status before creating a job
         IF reg_row.data_type = 'quote' THEN
-          -- Check if quote data exists for this symbol
           sql_text := format(
             'SELECT EXISTS(SELECT 1 FROM %I WHERE %I = %L)',
             reg_row.table_name,
@@ -94,24 +147,19 @@ BEGIN
           );
           EXECUTE sql_text INTO data_exists;
 
-          -- If data exists, check exchange status
-          -- If data doesn't exist, skip exchange status check (always create job)
           IF data_exists THEN
             SELECT is_exchange_open_for_symbol_v2(symbol_row.symbol, 'quote') INTO exchange_is_open;
             IF NOT exchange_is_open THEN
               RAISE NOTICE 'Exchange is closed for symbol % and quote data exists. Skipping quote staleness check.', symbol_row.symbol;
-              CONTINUE; -- Skip this symbol/data_type combination
+              CONTINUE;
             END IF;
           ELSE
             RAISE NOTICE 'No quote data exists for symbol %. Creating job regardless of exchange status.', symbol_row.symbol;
-            -- Continue to create job (don't skip)
           END IF;
         END IF;
 
-        -- FAULT TOLERANCE: Wrap in exception handler so one bad symbol/data_type doesn't break the cron job
+        -- FAULT TOLERANCE: Wrap in exception handler
         BEGIN
-          -- Build dynamic SQL for THIS symbol and data type (100% generic, no hardcoding)
-          -- CRITICAL: Use LEFT JOIN to handle missing data (treat missing as stale)
           -- CRITICAL: Use CASE WHEN to set financial-statements to priority 500 (unless user_count >= 1000)
           sql_text := format(
             $SQL$
@@ -132,7 +180,6 @@ BEGIN
                 asub.symbol = %L
                 AND asub.data_type = %L
                 AND (
-                  -- Data doesn't exist (t.%I IS NULL) OR data is stale
                   t.%I IS NULL
                   OR %I(t.%I, %L::INTEGER) = true
                 )
@@ -146,43 +193,39 @@ BEGIN
               HAVING COUNT(DISTINCT asub.user_id) > 0
               ON CONFLICT DO NOTHING;
             $SQL$,
-            symbol_row.symbol,                    -- 1: %L symbol
-            reg_row.data_type,                    -- 2: %L data_type
-            reg_row.data_type,                    -- 3: %L data_type (for CASE WHEN)
-            reg_row.estimated_data_size_bytes,    -- 4: %L estimated_size
-            reg_row.table_name,                   -- 5: %I table_name
-            reg_row.symbol_column,                -- 6: %I symbol_column (ON clause)
-            symbol_row.symbol,                    -- 7: %L asub.symbol
-            reg_row.data_type,                    -- 8: %L asub.data_type
-            reg_row.symbol_column,                -- 9: %I t.%I IS NULL
-            reg_row.symbol_column,                -- 10: %I t.%I (staleness function)
-            reg_row.staleness_function,           -- 11: %I staleness_function
-            reg_row.timestamp_column,             -- 12: %I timestamp_column
-            reg_row.default_ttl_minutes,          -- 13: %L default_ttl_minutes
-            symbol_row.symbol,                    -- 14: %L q.symbol
-            reg_row.data_type                     -- 15: %L q.data_type
+            symbol_row.symbol,
+            reg_row.data_type,
+            reg_row.data_type,
+            reg_row.estimated_data_size_bytes,
+            reg_row.table_name,
+            reg_row.symbol_column,
+            symbol_row.symbol,
+            reg_row.data_type,
+            reg_row.symbol_column,
+            reg_row.staleness_function,
+            reg_row.timestamp_column,
+            reg_row.default_ttl_minutes,
+            symbol_row.symbol,
+            reg_row.data_type
           );
 
           EXECUTE sql_text;
         EXCEPTION
           WHEN OTHERS THEN
-            -- Log the error and continue the loop (fault tolerance)
             RAISE WARNING 'Staleness check failed for symbol % and data type %: %',
               symbol_row.symbol, reg_row.data_type, SQLERRM;
             CONTINUE;
         END;
-      END LOOP; -- Inner loop: data types for this symbol
-    END LOOP; -- Outer loop: symbols
+      END LOOP;
+    END LOOP;
 
     RAISE NOTICE 'Staleness checker completed. Processed % symbols in % seconds.',
       symbols_processed, EXTRACT(EPOCH FROM (clock_timestamp() - start_time));
 
-    -- Release the advisory lock on successful completion
     PERFORM pg_advisory_unlock(42);
 
   EXCEPTION
     WHEN OTHERS THEN
-      -- CRITICAL: Always release the lock, even if function fails
       PERFORM pg_advisory_unlock(42);
       RAISE;
   END;
