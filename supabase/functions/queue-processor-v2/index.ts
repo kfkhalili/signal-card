@@ -44,15 +44,14 @@ interface QueueJob {
   job_metadata: Record<string, unknown>;
 }
 
-  // Configuration: Process at rate of 95 jobs per minute (~1.58 jobs per second)
-  // CRITICAL: Financial-statements jobs make 3 API calls each, so 95 jobs = 285 API calls per minute
-  // (assuming all jobs are financial-statements, which are prioritized first)
-  // This targets ~290 API calls/minute with a mix of job types
-  // CRITICAL: Retries count toward the 95 jobs/minute limit - each retry is a job that makes API calls
-  const BATCH_SIZE = 48; // Process up to 48 jobs per batch (2 iterations × 48 = 96, close to 95 jobs/minute limit)
-  const TARGET_JOBS_PER_MINUTE = 95; // Target processing rate (includes retries)
-  const TARGET_JOBS_PER_SECOND = TARGET_JOBS_PER_MINUTE / 60; // ~1.58 jobs per second
-  const MIN_DELAY_BETWEEN_JOBS_MS = 1000 / TARGET_JOBS_PER_SECOND; // ~632ms delay between job starts
+  // Configuration: Process at rate of 250 jobs per minute (~4.17 jobs per second)
+  // CRITICAL: Financial-statements jobs (3 API calls each) are done, remaining jobs are 1 API call each
+  // So 250 jobs/minute = 250 API calls/minute (safely under 300 limit)
+  // CRITICAL: Retries count toward the 250 jobs/minute limit - each retry is a job that makes API calls
+  const BATCH_SIZE = 125; // Process up to 125 jobs per batch (2 iterations × 125 = 250, matches 250 jobs/minute limit)
+  const TARGET_JOBS_PER_MINUTE = 250; // Target processing rate (includes retries)
+  const TARGET_JOBS_PER_SECOND = TARGET_JOBS_PER_MINUTE / 60; // ~4.17 jobs per second
+  const MIN_DELAY_BETWEEN_JOBS_MS = 1000 / TARGET_JOBS_PER_SECOND; // ~240ms delay between job starts
   const FUNCTION_TIMEOUT_MS = 50000; // 50 seconds overall timeout
 
 Deno.serve(async (req: Request) => {
@@ -118,64 +117,40 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      // CRITICAL: Global rate limit check - coordinate across all function invocations
-      // Check if processing this batch would exceed the 95 jobs/minute limit
-      // CRITICAL: UI jobs (priority 1000) bypass rate limiting - they must be processed immediately
-      const hasUIJobs = jobs.some((j: QueueJob) => j.priority >= 1000);
+      // CRITICAL: Job rate limiting removed - API call rate limiting is now the primary constraint
+      // API call rate limiting (300 calls/minute) is more accurate than job rate limiting
+      // Each job is checked individually for API call limits before processing
+      // This allows us to maximize throughput while respecting the real constraint (API calls)
 
-      if (!hasUIJobs) {
-        // Only check rate limit for non-UI jobs
-        const { data: canProcess, error: rateLimitError } = await supabase.rpc('check_and_increment_rate_limit', {
-          p_jobs_to_process: jobs.length,
-        });
+      // CRITICAL: Circuit breaker - check if we should stop processing entirely
+      // If we're at or near the API call limit (295+), stop processing this batch
+      // Wait for the minute to roll over before resuming (prevents exceeding 300 limit)
+      const { data: shouldStop, error: circuitBreakerError } = await supabase.rpc('should_stop_processing_api_calls', {
+        p_api_calls_to_reserve: 1, // Check with minimum (1 call)
+        p_max_api_calls_per_minute: 300,
+        p_safety_buffer: 5, // Stop 5 calls before the limit to prevent overruns
+      });
 
-        if (rateLimitError) {
-          console.error('[queue-processor-v2] Rate limit check failed:', rateLimitError);
-          // Continue anyway - don't block processing if rate limit check fails
-        } else if (canProcess === false) {
-          // Would exceed rate limit - return early without processing
-          console.warn(`[queue-processor-v2] Rate limit exceeded. Would process ${jobs.length} jobs but limit is 95/minute.`);
-          return new Response(
-            JSON.stringify({
-              message: 'Rate limit exceeded',
-              processed: 0,
-              skipped: jobs.length
-            }),
-            {
-              status: 200,
-              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-            }
-          );
-        }
-      } else {
-        // UI jobs present - process them immediately, but still track for rate limiting
-        const uiJobCount = jobs.filter((j: QueueJob) => j.priority >= 1000).length;
-        const nonUIJobCount = jobs.length - uiJobCount;
-
-        // Only check rate limit for non-UI jobs
-        if (nonUIJobCount > 0) {
-          const { data: canProcess, error: rateLimitError } = await supabase.rpc('check_and_increment_rate_limit', {
-            p_jobs_to_process: nonUIJobCount,
-          });
-
-          if (rateLimitError) {
-            console.error('[queue-processor-v2] Rate limit check failed:', rateLimitError);
-          } else if (canProcess === false) {
-            // Filter out non-UI jobs if rate limit would be exceeded
-            // But always process UI jobs
-            console.warn(`[queue-processor-v2] Rate limit exceeded for non-UI jobs (limit: 95/minute). Processing ${uiJobCount} UI jobs, skipping ${nonUIJobCount} non-UI jobs.`);
-            const filteredJobs = jobs.filter((j: QueueJob) => j.priority >= 1000);
-            // Replace jobs array with only UI jobs
-            jobs.length = 0;
-            jobs.push(...filteredJobs);
+      if (circuitBreakerError) {
+        console.error('[queue-processor-v2] Circuit breaker check failed:', circuitBreakerError);
+        // Continue anyway - don't block if check fails
+      } else if (shouldStop === true) {
+        // Circuit breaker triggered - stop processing this batch entirely
+        console.warn(`[queue-processor-v2] Circuit breaker: API call limit reached (295+). Stopping processing for this batch. Will resume when minute rolls over.`);
+        return new Response(
+          JSON.stringify({
+            message: 'Circuit breaker: API call limit reached',
+            processed: 0,
+            skipped: jobs.length,
+            reason: 'API call limit reached (295+) - waiting for minute rollover to prevent exceeding 300 limit'
+          }),
+          {
+            status: 200,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
           }
-        }
+        );
       }
 
-      // Rate-limited processing: Process at 75 jobs per minute (~1.25 jobs per second)
-      // CRITICAL: Financial-statements jobs are prioritized and make 3 API calls each
-      // This results in 225 API calls per minute (75 jobs × 3 calls = 225 calls)
-      // CRITICAL: Retries count toward the 75 jobs/minute limit - each retry is a job that makes API calls
       const processedJobs: Array<{ id: string; success: boolean; error?: string }> = [];
       const processingStartTime = Date.now();
       let jobsProcessed = 0;
@@ -197,6 +172,51 @@ Deno.serve(async (req: Request) => {
           }
         }
 
+        // CRITICAL: Check API call limit before processing each job
+        // Look up how many API calls this job type makes
+        const { data: registryData, error: registryError } = await supabase
+          .from('data_type_registry_v2')
+          .select('api_calls_per_job')
+          .eq('data_type', job.data_type)
+          .single();
+
+        if (registryError || !registryData) {
+          console.warn(`[queue-processor-v2] Failed to get api_calls_per_job for ${job.data_type}, defaulting to 1. Error:`, registryError);
+        }
+
+        const apiCallsForJob = registryData?.api_calls_per_job ?? 1;
+
+        // CRITICAL: Atomically reserve API calls BEFORE making them
+        // This prevents multiple processors from all checking at once and exceeding the limit
+        // The reservation is atomic (check + increment in one operation with row lock)
+        let reservationSuccessful: boolean | null = null;
+        let reservationError: Error | null = null;
+
+        try {
+          const result = await supabase.rpc('reserve_api_calls', {
+            p_api_calls_to_reserve: apiCallsForJob,
+          });
+
+          reservationSuccessful = result.data;
+          reservationError = result.error;
+        } catch (error) {
+          reservationError = error instanceof Error ? error : new Error(String(error));
+          console.error(`[queue-processor-v2] Exception during API call reservation for job ${job.id}:`, reservationError);
+        }
+
+        if (reservationError) {
+          console.error(`[queue-processor-v2] API call reservation failed for job ${job.id}:`, reservationError);
+          // Skip this job - don't process without reservation to prevent exceeding limits
+          processedJobs.push({ id: job.id, success: false, error: `Reservation failed: ${reservationError.message}` });
+          continue;
+        } else if (reservationSuccessful === false || reservationSuccessful === null) {
+          // Would exceed API call limit or reservation returned null - skip this job, leave it pending
+          console.warn(`[queue-processor-v2] Skipping job ${job.id} (${job.data_type}): would exceed API call limit (needs ${apiCallsForJob} calls)`);
+          processedJobs.push({ id: job.id, success: false, error: `Skipped: would exceed API call limit (needs ${apiCallsForJob} calls)` });
+          continue; // Skip to next job in queue
+        }
+
+        // API call reservation successful - proceed with processing
         try {
           // CRITICAL: Route to correct handler based on data_type
           // This replaces FaaS-to-FaaS invocations with direct function calls
@@ -204,9 +224,12 @@ Deno.serve(async (req: Request) => {
 
           if (result.success) {
             // Mark job as completed
+            // CRITICAL: API calls were already reserved and counted in reserve_api_calls
+            // Pass the actual API calls made (in case job failed partway through)
             const { error: completeError } = await supabase.rpc('complete_queue_job_v2', {
               p_job_id: job.id,
               p_data_size_bytes: result.dataSizeBytes,
+              p_api_calls_made: apiCallsForJob, // Pass actual calls made
             });
 
             if (completeError) {
@@ -217,9 +240,10 @@ Deno.serve(async (req: Request) => {
               jobsProcessed++; // Count successful jobs toward rate limit
             }
           } else {
-            // Mark job as failed (with retry logic)
-            // CRITICAL: Failed jobs that will be retried still count toward the rate limit
-            // because the retry will make API calls when it's processed again
+            // Job failed - but API call was already made (counts toward limit)
+            // CRITICAL: Do NOT release the reservation - the API call was made to FMP
+            // Even if validation failed, database upsert failed, etc., the call counts
+            // The reservation was already incremented in reserve_api_calls, keep it
             const { error: failError } = await supabase.rpc('fail_queue_job_v2', {
               p_job_id: job.id,
               p_error_message: result.error || 'Unknown error',
@@ -233,6 +257,11 @@ Deno.serve(async (req: Request) => {
             jobsProcessed++; // Count failed jobs toward rate limit (retries will be counted when processed)
           }
         } catch (error) {
+          // CRITICAL: Do NOT release API call reservation on error
+          // The API call may have been made (even if it failed or threw an exception)
+          // Once we reserve, we commit to making the call - it counts toward the limit
+          // The reservation was already incremented in reserve_api_calls, keep it
+
           // CRITICAL: Deadlock-aware error handling
           if (error instanceof Error && (
             error.message?.includes('deadlock detected') ||

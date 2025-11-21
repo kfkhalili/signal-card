@@ -110,12 +110,33 @@ COMMENT ON FUNCTION public.get_queue_batch_v2 IS 'Atomically claims a batch of j
 -- CRITICAL: Handles zero-start case (first update uses actual size directly)
 CREATE OR REPLACE FUNCTION public.complete_queue_job_v2(
   p_job_id UUID,
-  p_data_size_bytes BIGINT
+  p_data_size_bytes BIGINT,
+  p_api_calls_made INTEGER DEFAULT NULL
 )
 RETURNS void AS $$
 DECLARE
   job_data_type TEXT;
+  expected_api_calls INTEGER;
+  actual_api_calls INTEGER;
 BEGIN
+  -- Get job data type and expected API calls
+  SELECT data_type INTO job_data_type
+  FROM public.api_call_queue_v2
+  WHERE id = p_job_id;
+
+  IF NOT FOUND THEN
+    RAISE WARNING 'Job % not found', p_job_id;
+    RETURN;
+  END IF;
+
+  -- Get expected API calls from registry (fallback to provided value or 1)
+  SELECT api_calls_per_job INTO expected_api_calls
+  FROM public.data_type_registry_v2
+  WHERE data_type = job_data_type;
+
+  -- Use provided value if available, otherwise use expected from registry, otherwise 1
+  actual_api_calls := COALESCE(p_api_calls_made, expected_api_calls, 1);
+
   -- Update job status
   UPDATE public.api_call_queue_v2
   SET
@@ -133,6 +154,9 @@ BEGIN
   -- CRITICAL: Track data usage for quota enforcement
   INSERT INTO public.api_data_usage_v2 (data_size_bytes, job_id)
   VALUES (p_data_size_bytes, p_job_id);
+
+  -- CRITICAL: API calls were already incremented in check_and_increment_api_calls
+  -- No need to increment again here - the counter is already correct
 
   -- OPTIMIZATION: Auto-correct estimated_data_size_bytes (statistical sampling)
   -- Use random() < 0.01 instead of COUNT(*) for O(1) performance
