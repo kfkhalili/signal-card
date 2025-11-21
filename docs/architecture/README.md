@@ -1,75 +1,81 @@
 # Architecture Documentation
 
-This directory contains the canonical architecture and build documentation for Tickered's backend-controlled refresh system.
+This directory contains the canonical architecture and operational documentation for Tickered's backend-controlled refresh system.
 
-## Reading Order
+**System Status:** ✅ Fully Operational (98%+ Complete)
 
-Read these documents in order:
+---
 
-0. **[00-IMPLEMENTATION-PLAN.md](./00-IMPLEMENTATION-PLAN.md)** - Complete implementation plan (what I'll build)
-1. **[01-BUILD-ANSWERS.md](./01-BUILD-ANSWERS.md)** - Quick answers to build readiness questions
-   - Is the codebase ready?
-   - How to build without breaking things?
-   - How to track progress?
-   - How to avoid breaking things without tests?
+## Current Status
 
-2. **[02-BUILD-READINESS-ASSESSMENT.md](./02-BUILD-READINESS-ASSESSMENT.md)** - Detailed readiness analysis
-   - Current state assessment
-   - Risk analysis
-   - Recommended approach
-   - Timeline estimates
+- **[PROGRESS-SUMMARY-2025-11-20.md](./PROGRESS-SUMMARY-2025-11-20.md)** ⭐ - **Start here**
+  - Current system status (98%+ complete)
+  - Recent fixes and improvements
+  - System health metrics
+  - Remaining work
 
-3. **[03-SAFETY-MECHANISMS.md](./03-SAFETY-MECHANISMS.md)** - Safety procedures for building
-   - Feature flags system
-   - Parallel system pattern
-   - Manual testing checklists
-   - Monitoring & rollback procedures
+---
 
-4. **[04-BUILD-TRACKING.md](./04-BUILD-TRACKING.md)** - Progress tracking
-   - Phase-by-phase checklists
-   - Daily/weekly review templates
-   - Migration status tracking
-   - Quick reference commands
+## Core Documentation
 
-## Reference Documentation
+### Architecture Reference
 
-- **[MASTER-ARCHITECTURE.md](./MASTER-ARCHITECTURE.md)** - The canonical architecture specification
+- **[MASTER-ARCHITECTURE.md](./MASTER-ARCHITECTURE.md)** ⭐ - The canonical architecture specification
   - Complete system design
   - All Sacred Contracts
   - Implementation details
-  - Migration strategy
-  - **Read this as a reference while building**
+  - **Primary reference for system understanding**
 
-- **[PROGRESS-SUMMARY-2025-11-20.md](./PROGRESS-SUMMARY-2025-11-20.md)** - Current system status and progress
-  - Overall progress: ~98% complete
-  - Recent fixes and improvements
-  - System health metrics
-
-- **[API_QUEUE_ERROR_ANALYSIS.md](./API_QUEUE_ERROR_ANALYSIS.md)** - Queue error analysis and fixes
-  - Error breakdown and patterns
-  - Root cause analysis
-  - Fix implementations
+### System Flow & Operations
 
 - **[CARD-OPEN-TO-JOB-CREATION-FLOW.md](./CARD-OPEN-TO-JOB-CREATION-FLOW.md)** - Data flow documentation
   - How cards trigger data fetching
   - Queue system integration
   - Real-time update flow
+  - Exchange status checks
 
-## Archived Documents
+- **[API_QUEUE_ERROR_ANALYSIS.md](./API_QUEUE_ERROR_ANALYSIS.md)** - Queue error analysis and fixes
+  - Error breakdown and patterns
+  - Root cause analysis
+  - Fix implementations
+  - Recent error resolution
 
-- **[archived/](./archived/)** - Completed and outdated documents
-  - `completed-migrations/` - Migration cleanup documentation (completed)
-  - `outdated-status/` - Old status reports and planning docs (superseded)
-  - `architectural-analysis.md.stashed` - Code quality analysis (stashed)
-  - `refactoring-implementation-guide.md.stashed` - Refactoring guide (stashed)
+### Development Guidelines
+
+- **[MIGRATION-PRINCIPLES.md](./MIGRATION-PRINCIPLES.md)** - Guidelines for database migrations
+  - What should be in migrations
+  - What should NOT be in migrations
+  - Migration naming conventions
+  - Verification checklist
+
+- **[HANDLE-NEW-USER-FUNCTION-EXPLANATION.md](./HANDLE-NEW-USER-FUNCTION-EXPLANATION.md)** - Function documentation
+  - How the new user webhook works
+  - Configuration and setup
+  - Troubleshooting guide
 
 ---
 
-## Quick Start
+## Archived Documents
 
-**New to the build?** Start with [00-IMPLEMENTATION-PLAN.md](./00-IMPLEMENTATION-PLAN.md) to see what will be built, then read [01-BUILD-ANSWERS.md](./01-BUILD-ANSWERS.md) for quick answers.
+- **[archived/](./archived/)** - Historical and completed documents
+  - `completed-migrations/` - Migration cleanup documentation (completed)
+  - `outdated-status/` - Build planning docs (system is complete)
+    - Implementation plans
+    - Build readiness assessments
+    - Safety mechanisms
+    - Progress tracking
+    - Testing guides
+    - Migration automation guides
 
-**Ready to build?** Follow the order above, then use [04-BUILD-TRACKING.md](./04-BUILD-TRACKING.md) to track progress.
+---
 
-**Need implementation details?** Reference [MASTER-ARCHITECTURE.md](./MASTER-ARCHITECTURE.md) as you build.
+## Quick Reference
+
+**Understanding the system?** Read [PROGRESS-SUMMARY-2025-11-20.md](./PROGRESS-SUMMARY-2025-11-20.md) first, then [MASTER-ARCHITECTURE.md](./MASTER-ARCHITECTURE.md) for details.
+
+**Troubleshooting?** Check [API_QUEUE_ERROR_ANALYSIS.md](./API_QUEUE_ERROR_ANALYSIS.md) and [CARD-OPEN-TO-JOB-CREATION-FLOW.md](./CARD-OPEN-TO-JOB-CREATION-FLOW.md).
+
+**Creating migrations?** Follow [MIGRATION-PRINCIPLES.md](./MIGRATION-PRINCIPLES.md).
+
+**Historical context?** See [archived/outdated-status/](./archived/outdated-status/) for build planning documents.
 
