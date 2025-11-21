@@ -21,6 +21,24 @@ COMMENT ON TABLE public.api_calls_rate_tracker IS 'Tracks API calls made per min
 CREATE INDEX IF NOT EXISTS idx_api_calls_rate_tracker_minute_bucket
   ON public.api_calls_rate_tracker(minute_bucket DESC);
 
+-- RLS: API call rate tracking is read-only for authenticated users (for monitoring)
+-- Only service role can modify (INSERT/UPDATE) - only queue processor should modify
+ALTER TABLE public.api_calls_rate_tracker ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can read API call rate data for monitoring"
+  ON public.api_calls_rate_tracker
+  FOR SELECT
+  TO authenticated, anon
+  USING (true);
+
+-- Only service role can insert/update rate tracking data
+CREATE POLICY "Only service role can modify API call rate tracking"
+  ON public.api_calls_rate_tracker
+  FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
+
 -- Step 3: Atomic reservation function (check AND reserve in one operation)
 CREATE OR REPLACE FUNCTION public.reserve_api_calls(
   p_api_calls_to_reserve INTEGER,
