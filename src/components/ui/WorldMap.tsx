@@ -3,7 +3,7 @@
 
 import React, { useMemo, useState, useEffect } from "react";
 import { Option } from "effect";
-import { MapContainer, TileLayer, Marker, Tooltip } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { cn } from "@/lib/utils";
@@ -39,6 +39,71 @@ const createCustomIcon = () => {
 };
 
 const customIcon = createCustomIcon();
+
+// Separate component for markers that uses useMap hook to ensure map context is available
+const MarkersLayer: React.FC<{ markers: { label: string; position: [number, number]; countryCode: string; countryName?: string | null }[] }> = ({ markers }) => {
+  const map = useMap();
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    // Wait for map to be fully initialized before rendering markers
+    if (map) {
+      let timer: NodeJS.Timeout | null = null;
+      
+      map.whenReady(() => {
+        // Additional small delay to ensure panes are ready
+        timer = setTimeout(() => {
+          const container = map.getContainer();
+          if (container && container.parentElement) {
+            // Check if marker pane exists
+            const markerPane = map.getPane('markerPane');
+            if (markerPane) {
+              setIsReady(true);
+            }
+          }
+        }, 50);
+      });
+      
+      return () => {
+        if (timer) {
+          clearTimeout(timer);
+        }
+        setIsReady(false);
+      };
+    } else {
+      setIsReady(false);
+    }
+  }, [map]);
+
+  if (!isReady) {
+    return null;
+  }
+
+  return (
+    <>
+      {markers.map((marker) => (
+        <Marker
+          key={marker.label}
+          position={marker.position as L.LatLngExpression}
+          icon={customIcon}>
+          <Tooltip>
+            <span className="font-bold flex items-center">
+              <span className="mr-2">{getFlagEmoji(marker.countryCode)}</span>
+              <span>
+                {marker.label}
+                {marker.countryName && (
+                  <span className="block text-xs font-normal mt-1">
+                    {marker.countryName}
+                  </span>
+                )}
+              </span>
+            </span>
+          </Tooltip>
+        </Marker>
+      ))}
+    </>
+  );
+};
 
 // --- Coordinate Mapping ---
 const locationCoordinates: Record<string, [number, number]> = {
@@ -213,27 +278,6 @@ export const WorldMap: React.FC<WorldMapProps> = React.memo(({ markers, classNam
     };
   }, [map, isMapReady, mapBounds]);
 
-  // Track when we can safely render markers (after map is ready and a small delay)
-  const [canRenderMarkers, setCanRenderMarkers] = useState(false);
-
-  // Only allow marker rendering after map is ready and a small delay
-  useEffect(() => {
-    if (isMapReady && Option.isSome(map)) {
-      // Small delay to ensure map container and panes are fully initialized
-      const timer = setTimeout(() => {
-        const mapInstance = map.value;
-        const container = mapInstance.getContainer();
-        // Double-check container is still valid before allowing marker rendering
-        if (container && container.parentElement) {
-          setCanRenderMarkers(true);
-        }
-      }, 100);
-      return () => clearTimeout(timer);
-    } else {
-      setCanRenderMarkers(false);
-    }
-  }, [isMapReady, map]);
-
   // Memoize the layers to prevent re-creating them on every render
   // Only render layers when map is ready to prevent Leaflet DOM access errors
   const displayLayers = useMemo(() => {
@@ -247,29 +291,10 @@ export const WorldMap: React.FC<WorldMapProps> = React.memo(({ markers, classNam
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        {canRenderMarkers && validMarkers.map((marker) => (
-          <Marker
-            key={marker.label}
-            position={marker.position as L.LatLngExpression}
-            icon={customIcon}>
-            <Tooltip>
-              <span className="font-bold flex items-center">
-                <span className="mr-2">{getFlagEmoji(marker.countryCode)}</span>
-                <span>
-                  {marker.label}
-                  {marker.countryName && (
-                    <span className="block text-xs font-normal mt-1">
-                      {marker.countryName}
-                    </span>
-                  )}
-                </span>
-              </span>
-            </Tooltip>
-          </Marker>
-        ))}
+        <MarkersLayer markers={validMarkers} />
       </>
     );
-  }, [validMarkers, isMapReady, map, canRenderMarkers]);
+  }, [validMarkers, isMapReady, map]);
 
   return (
     <div
