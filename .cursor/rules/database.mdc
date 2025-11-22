@@ -85,9 +85,18 @@ async function fetchProfile(
     supabase.from("profiles").select("*").eq("symbol", symbol).maybeSingle(),
     (e) => e as Error
   );
-  return result.map((response) =>
-    response.data ? Option.some(response.data) : Option.none()
-  );
+
+  if (result.isErr()) {
+    return err(result.error);
+  }
+
+  // CRITICAL: Check for Supabase query errors (Supabase returns { data, error } without rejecting)
+  const { data, error } = result.value;
+  if (error) {
+    return err(new Error(`Supabase query error: ${error.message}`));
+  }
+
+  return ok(data ? Option.some(data) : Option.none());
 }
 
 // Pattern 3: Multiple queries with Promise.all
