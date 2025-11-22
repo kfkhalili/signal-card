@@ -28,12 +28,11 @@ This directory contains the canonical architecture and operational documentation
 
 ### System Flow & Operations
 
-- **[CARD-OPEN-TO-JOB-CREATION-FLOW.md](./CARD-OPEN-TO-JOB-CREATION-FLOW.md)** - Data flow documentation
-  - How cards trigger data fetching (event-driven + background)
-  - Queue system integration
-  - Real-time update flow
-  - Exchange status checks
-
+- **[OPERATIONAL_RUNBOOK.md](./OPERATIONAL_RUNBOOK.md)** - Operational procedures and troubleshooting
+  - Troubleshooting guides
+  - Common issues and fixes
+  - Emergency procedures
+  - System flow documentation
 
 ### Development Guidelines
 
@@ -43,10 +42,6 @@ This directory contains the canonical architecture and operational documentation
   - Migration naming conventions
   - Verification checklist
 
-- **[HANDLE-NEW-USER-FUNCTION-EXPLANATION.md](./HANDLE-NEW-USER-FUNCTION-EXPLANATION.md)** - Function documentation
-  - How the new user webhook works
-  - Configuration and setup
-  - Troubleshooting guide
 
 ### Monitoring & Operations
 
@@ -88,7 +83,7 @@ This directory contains the canonical architecture and operational documentation
 
 **Understanding the system?** Read [PROGRESS-SUMMARY-2025-11-20.md](./PROGRESS-SUMMARY-2025-11-20.md) first, then [MASTER-ARCHITECTURE.md](./MASTER-ARCHITECTURE.md) for details.
 
-**Troubleshooting?** Check [CARD-OPEN-TO-JOB-CREATION-FLOW.md](./CARD-OPEN-TO-JOB-CREATION-FLOW.md) and [OPERATIONAL_RUNBOOK.md](./OPERATIONAL_RUNBOOK.md). For historical error analysis, see [archived/historical-analysis/](./archived/historical-analysis/).
+**Troubleshooting?** Check [OPERATIONAL_RUNBOOK.md](./OPERATIONAL_RUNBOOK.md) for procedures and [MASTER-ARCHITECTURE.md](./MASTER-ARCHITECTURE.md) for system details. For historical error analysis, see [archived/historical-analysis/](./archived/historical-analysis/).
 
 **Creating migrations?** Follow [MIGRATION-PRINCIPLES.md](./MIGRATION-PRINCIPLES.md).
 
