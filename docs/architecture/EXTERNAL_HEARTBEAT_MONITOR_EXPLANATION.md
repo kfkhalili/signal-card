@@ -84,7 +84,7 @@ The system can be **100% dead for hours or days** before anyone notices.
 
 1. **Sign up for UptimeRobot** (free tier supports 50 monitors)
 2. **Create HTTP(s) Monitor:**
-   - **URL:** `https://[your-project].supabase.co/functions/v1/health-check`
+   - **URL:** `https://api.tickered.com/functions/v1/health-check`
    - **Interval:** 5 minutes
    - **Alert Contacts:** Your email/SMS/Slack
 3. **Configure Alert:**
@@ -110,7 +110,7 @@ The system can be **100% dead for hours or days** before anyone notices.
 
 ### Endpoint
 ```
-GET https://[your-project].supabase.co/functions/v1/health-check
+GET https://api.tickered.com/functions/v1/health-check
 ```
 
 ### Response Format
@@ -191,7 +191,7 @@ Action Required:
 3. Check for database locks or stuck queries
 4. Restart pg_cron if necessary
 
-Health Check URL: https://[project].supabase.co/functions/v1/health-check
+Health Check URL: https://api.tickered.com/functions/v1/health-check
 ```
 
 ---

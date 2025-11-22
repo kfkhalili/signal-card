@@ -705,7 +705,7 @@ BEGIN
   -- Better to fail fast (retry in 5 minutes) than succeed slow (block all other work)
   SELECT * INTO http_response
   FROM http_get(
-    url := 'https://your-project.supabase.co/realtime/v1/api/presence',
+    url := 'https://api.tickered.com/realtime/v1/api/presence',
     headers := jsonb_build_object(
       'apikey', current_setting('app.settings.supabase_anon_key', true),
       'Authorization', 'Bearer ' || current_setting('app.settings.supabase_anon_key', true)
@@ -2345,7 +2345,7 @@ The system uses two priority tiers:
 
    c. **Configure External Monitor:**
 
-   - **UptimeRobot:** Create HTTP(s) monitor pinging `https://your-project.supabase.co/functions/v1/health-check` every 5 minutes
+   - **UptimeRobot:** Create HTTP(s) monitor pinging `https://api.tickered.com/functions/v1/health-check` every 5 minutes
    - **GitHub Actions:** Create scheduled workflow (`.github/workflows/cron-health-check.yml`) that runs every 5 minutes
    - **AWS Lambda:** Create CloudWatch Events rule triggering Lambda every 5 minutes
 

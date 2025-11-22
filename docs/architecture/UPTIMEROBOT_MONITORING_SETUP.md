@@ -19,7 +19,7 @@ Each monitor checks the `monitoring-alerts` Edge Function endpoint and triggers 
 
 1. **UptimeRobot Account** - Sign up at https://uptimerobot.com (free tier: 50 monitors)
 2. **Edge Function Deployed** - `monitoring-alerts` function must be deployed
-3. **Supabase Project URL** - Your Supabase project URL (e.g., `https://xxxxx.supabase.co`)
+3. **API URL** - Your API URL: `https://api.tickered.com`
 
 ---
 
@@ -41,7 +41,7 @@ supabase functions deploy monitoring-alerts
 
 ```bash
 curl -H "apikey: [YOUR_ANON_KEY]" \
-  https://[your-project].supabase.co/functions/v1/monitoring-alerts/all-alerts
+  https://api.tickered.com/functions/v1/monitoring-alerts/all-alerts
 ```
 
 **Expected response (200 OK when healthy):**
@@ -103,7 +103,7 @@ curl -H "apikey: [YOUR_ANON_KEY]" \
 3. **Configure:**
    - **Monitor Type:** HTTP(s)
    - **Friendly Name:** `Tickered - Queue Success Rate`
-   - **URL:** `https://[your-project].supabase.co/functions/v1/monitoring-alerts/queue-success-rate`
+   - **URL:** `https://api.tickered.com/functions/v1/monitoring-alerts/queue-success-rate`
    - **Monitoring Interval:** 5 minutes
    - **Alert Contacts:** Select your alert contacts
    - **Alert When Down:** Immediately (0 minutes)
@@ -130,7 +130,7 @@ curl -H "apikey: [YOUR_ANON_KEY]" \
 2. **Configure:**
    - **Monitor Type:** HTTP(s)
    - **Friendly Name:** `Tickered - Quota Usage`
-   - **URL:** `https://[your-project].supabase.co/functions/v1/monitoring-alerts/quota-usage`
+   - **URL:** `https://api.tickered.com/functions/v1/monitoring-alerts/quota-usage`
    - **Monitoring Interval:** 15 minutes (quota changes slowly)
    - **Alert Contacts:** Select your alert contacts
    - **Alert When Down:** Immediately (0 minutes)
@@ -153,7 +153,7 @@ curl -H "apikey: [YOUR_ANON_KEY]" \
 2. **Configure:**
    - **Monitor Type:** HTTP(s)
    - **Friendly Name:** `Tickered - Stuck Jobs`
-   - **URL:** `https://[your-project].supabase.co/functions/v1/monitoring-alerts/stuck-jobs`
+   - **URL:** `https://api.tickered.com/functions/v1/monitoring-alerts/stuck-jobs`
    - **Monitoring Interval:** 5 minutes
    - **Alert Contacts:** Select your alert contacts
    - **Alert When Down:** Immediately (0 minutes)
@@ -176,7 +176,7 @@ curl -H "apikey: [YOUR_ANON_KEY]" \
 2. **Configure:**
    - **Monitor Type:** HTTP(s)
    - **Friendly Name:** `Tickered - All Alerts Summary`
-   - **URL:** `https://[your-project].supabase.co/functions/v1/monitoring-alerts/all-alerts`
+   - **URL:** `https://api.tickered.com/functions/v1/monitoring-alerts/all-alerts`
    - **Monitoring Interval:** 5 minutes
    - **Alert Contacts:** Select your alert contacts
    - **Alert When Down:** Immediately (0 minutes)
@@ -248,7 +248,7 @@ WHERE status = 'failed'
 **Note:** Quota usage is calculated from rolling 30-day window. To test, you'd need to artificially inflate usage, which is not recommended. Instead, monitor the endpoint manually:
 
 ```bash
-curl https://[your-project].supabase.co/functions/v1/monitoring-alerts/quota-usage
+curl https://api.tickered.com/functions/v1/monitoring-alerts/quota-usage
 ```
 
 If quota is >80%, it will return 503.

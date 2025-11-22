@@ -35,7 +35,7 @@ The `handle-new-user` Edge Function is designed to automatically create user pro
 
 ### Step 2: Webhook Triggered
 - Supabase Auth automatically sends a POST request to the webhook URL
-- **Webhook URL**: `https://[project-ref].supabase.co/functions/v1/handle-new-user`
+- **Webhook URL**: `https://api.tickered.com/functions/v1/handle-new-user`
 - **Payload Format**:
   ```json
   {
@@ -80,7 +80,7 @@ The `handle-new-user` Edge Function is designed to automatically create user pro
 
 1. Go to **Supabase Dashboard** → **Authentication** → **Webhooks**
 2. Click **Add Webhook** or **Edit** existing webhook
-3. **Webhook URL**: `https://[your-project-ref].supabase.co/functions/v1/handle-new-user`
+3. **Webhook URL**: `https://api.tickered.com/functions/v1/handle-new-user`
 4. **HTTP Method**: POST
 5. **Events**: Select **User Created** (or **auth.users INSERT**)
 6. **HTTP Headers**:
@@ -124,7 +124,7 @@ The Edge Function requires these secrets (configured in Supabase Dashboard → E
 You can manually test the function by calling it directly:
 
 ```bash
-curl -X POST https://[project-ref].supabase.co/functions/v1/handle-new-user \
+curl -X POST https://api.tickered.com/functions/v1/handle-new-user \
   -H "Authorization: Bearer [ANON_KEY]" \
   -H "Content-Type: application/json" \
   -d '{
