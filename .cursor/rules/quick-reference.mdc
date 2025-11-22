@@ -319,7 +319,7 @@ export function [CardName]Content({
 
 ### Edge Function Template
 
-**Note:** Edge Functions run in Deno runtime. Use `fromPromise()` from neverthrow for Supabase queries to maintain consistency. Import using: `import { fromPromise } from "npm:neverthrow@6.0.0";`
+**Note:** Edge Functions run in Deno runtime. Use `fromPromise()` from neverthrow for Supabase queries to maintain consistency. Import using: `import { fromPromise } from "npm:neverthrow@8.2.0";`
 
 ```typescript
 // supabase/functions/[function-name]/index.ts

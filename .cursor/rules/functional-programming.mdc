@@ -125,7 +125,7 @@ setData(Option.some(value));
 **Combining Result and Option:**
 ```typescript
 import { Result } from "neverthrow";
-import { Option, some, none } from "effect";
+import { Option } from "effect";
 
 // Fetch functions should return Result<Option<T>, Error>
 async function fetchProfile(
@@ -137,7 +137,7 @@ async function fetchProfile(
     (e) => e as Error
   );
   return result.map((response) =>
-    response.data ? some(response.data) : none()
+    response.data ? Option.some(response.data) : Option.none()
   );
 }
 ```
@@ -243,7 +243,7 @@ function getDisplayName(profile: Option<Profile>): string {
 1. **Always use `Option<T>` instead of `T | null` or `T | undefined`**
 2. **Never use null or undefined for optional values**
 3. **Use `Option.isSome()` and `Option.isNone()` for checks, never `!== null`**
-4. **Use `some(value)` and `none()` instead of setting values to null**
+4. **Use `Option.some(value)` and `Option.none()` instead of setting values to null**
 5. **Empty states are valid states - render them gracefully, don't throw errors**
 6. **Combine `Result` (neverthrow) with `Option` (Effect) for async operations**
 7. **Use functional composition over imperative conditionals**
@@ -257,11 +257,11 @@ function getDisplayName(profile: Option<Profile>): string {
 When refactoring existing code:
 
 1. Replace `T | null` types with `Option<T>`
-2. Replace `useState<T | null>(null)` with `useState<Option<T>>(none())`
+2. Replace `useState<T | null>(null)` with `useState<Option<T>>(Option.none())`
 3. Replace `if (value !== null)` with `if (Option.isSome(value))`
 4. Replace `value?.property` with `Option.isSome(value) ? value.value.property : defaultValue`
-5. Replace `setValue(null)` with `setValue(none())`
-6. Replace `setValue(data)` with `setValue(some(data))`
+5. Replace `setValue(null)` with `setValue(Option.none())`
+6. Replace `setValue(data)` with `setValue(Option.some(data))`
 7. Update fetch functions to return `Result<Option<T>, Error>`
 8. Update error handling to distinguish between actual errors and empty states
 
@@ -285,7 +285,7 @@ async function fetchInitialData(
     (e) => e as Error
   );
   return result.map((response) =>
-    response.data ? some(response.data) : none()
+    response.data ? Option.some(response.data) : Option.none()
   );
 }
 ```

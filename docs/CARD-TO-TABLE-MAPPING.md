@@ -30,12 +30,12 @@
 | | | `profiles` | `symbol` | `modified_at` | 1440 (24h) | Company name/logo (optional) |
 | **analystgrades** | `grades-historical` | `grades_historical` | `symbol` | `fetched_at` | 43200 (30d) | Analyst ratings |
 | | | `profiles` | `symbol` | `modified_at` | 1440 (24h) | Company name/logo (optional) |
-| **exchangevariants** | `exchange-variants` | `exchange_variants` | `base_symbol` ⚠️ | `fetched_at` | 1440 (24h) | Variant data (primary) - base exchange determined from base variant |
+| **exchangevariants** | `exchange-variants` | `exchange_variants` | `symbol` | `fetched_at` | 1440 (24h) | Variant data (primary) - base exchange determined from base variant |
 | | `profile` | `profiles` | `symbol` | `modified_at` | 1440 (24h) | Company name/logo/website |
 | | | `available_exchanges` | N/A | N/A | N/A | N/A | Exchange metadata (country info) - read-only reference data |
 | **custom** | None | None | N/A | N/A | N/A | Custom cards don't use database tables |
 
-⚠️ **Note:** `exchange-variants` uses `base_symbol` instead of `symbol` in the registry.
+**Note:** `exchange-variants` table uses `symbol` column (renamed from `base_symbol` for consistency with other tables).
 
 ---
 
@@ -85,7 +85,7 @@
 
 8. **`exchange_variants`** - Exchange variant information
    - Used by: `exchangevariants` card (primary data source)
-   - Symbol column: `base_symbol` (⚠️ different from other tables)
+   - Symbol column: `symbol` (renamed from `base_symbol` for consistency)
    - Timestamp: `fetched_at`
    - **CRITICAL:** Base exchange is determined from base variant (where `variant_symbol === symbol`)
    - **CRITICAL:** Only actively trading variants are shown (`is_actively_trading = true`)
@@ -155,11 +155,11 @@
 - All four cards benefit from the same refresh
 - **revenuebreakdown** uses `financial-statements` for total revenue (consistent with revenue card), while segment breakdown comes from `revenue-product-segmentation`
 
-### 2. Exchange Variants Special Case
-- Uses `base_symbol` column (not `symbol`)
-- Registry configured with `symbol_column = 'base_symbol'`
-- Staleness check queries: `WHERE base_symbol = 'AAPL'`
-- Card queries: `WHERE base_symbol = 'AAPL'`
+### 2. Exchange Variants
+- Uses `symbol` column (renamed from `base_symbol` for consistency)
+- Registry configured with `symbol_column = 'symbol'`
+- Staleness check queries: `WHERE symbol = 'AAPL'`
+- Card queries: `WHERE symbol = 'AAPL'`
 
 ### 3. Profile Card
 - Uses `modified_at` timestamp (not `fetched_at`)
@@ -309,7 +309,7 @@ SELECT queue_refresh_if_not_exists_v2('AAPL', 'ratios-ttm', 0);
 
 - **Profile card** is the most complex, using 4 different tables
 - **Most cards** also fetch from `profiles` for company name/logo (optional)
-- **Exchange variants** is unique in using `base_symbol` instead of `symbol`
+- **Exchange variants** uses `symbol` column (renamed from `base_symbol` for consistency with other tables)
 - **Custom cards** don't use any database tables (user-created content)
 - All tables use Realtime subscriptions for live updates
 - TTL (Time To Live) determines how often data is refreshed
