@@ -8,7 +8,7 @@ import type { AddCardFormValues } from "@/components/workspace/AddCardForm";
 
 /**
  * Hook to add cards to workspace from any page.
- * If called from outside workspace, navigates to workspace and adds the card.
+ * If called from outside workspace, navigates to workspace and adds the card(s).
  * If called from workspace, uses the workspace manager directly.
  */
 export function useAddCardToWorkspace() {
@@ -33,6 +33,32 @@ export function useAddCardToWorkspace() {
     [router]
   );
 
-  return { addCard };
+  const addCards = useCallback(
+    async (cards: { symbol: string; cardTypes?: CardType[] }[]) => {
+      // Store multiple cards to add in sessionStorage
+      // The workspace page will check for this and add them on mount
+      const cardsToAdd: AddCardFormValues[] = cards.map((card) => {
+        const safeCardTypes =
+          card.cardTypes && card.cardTypes.length > 0
+            ? card.cardTypes
+            : ["profile"];
+        return {
+          symbol: card.symbol.toUpperCase(),
+          cardTypes: safeCardTypes as [CardType, ...CardType[]],
+        };
+      });
+
+      sessionStorage.setItem(
+        "pendingCardsToAdd",
+        JSON.stringify(cardsToAdd)
+      );
+
+      // Navigate to workspace
+      router.push("/workspace");
+    },
+    [router]
+  );
+
+  return { addCard, addCards };
 }
 

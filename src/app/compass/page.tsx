@@ -153,7 +153,7 @@ export default function CompassPage() {
     actions,
   } = useLeaderboardStore();
   const [debouncedWeights] = useDebounce(weights, 500);
-  const { addCard } = useAddCardToWorkspace();
+  const { addCard, addCards } = useAddCardToWorkspace();
   const [addingSymbols, setAddingSymbols] = useState<Set<string>>(new Set());
   const [profileData, setProfileData] = useState<Record<string, ProfileData>>({});
 
@@ -224,10 +224,10 @@ export default function CompassPage() {
     const top3 = leaderboardData.slice(0, 3);
     setAddingSymbols(new Set(top3.map((item) => item.symbol)));
     try {
-      // Add all top 3 to workspace
-      for (const item of top3) {
-        await addCard(item.symbol, ["profile"]);
-      }
+      // Add all top 3 to workspace at once
+      await addCards(
+        top3.map((item) => ({ symbol: item.symbol, cardTypes: ["profile"] }))
+      );
     } finally {
       setAddingSymbols(new Set());
     }

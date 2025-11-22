@@ -97,6 +97,32 @@ export default function WorkspacePage() {
   // Handle pending cards from Compass or other pages
   useEffect(() => {
     if (hasMounted && user && !isAuthLoading) {
+      // Check for multiple pending cards first (for "Explore Top 3" functionality)
+      const pendingCardsJson = sessionStorage.getItem("pendingCardsToAdd");
+      if (pendingCardsJson) {
+        try {
+          const pendingCards: {
+            symbol: string;
+            cardTypes: CardType[];
+          }[] = JSON.parse(pendingCardsJson);
+          sessionStorage.removeItem("pendingCardsToAdd");
+          // Add all cards to workspace
+          pendingCards.forEach((card) => {
+            if (card.cardTypes.length > 0) {
+              addCardToWorkspace({
+                symbol: card.symbol,
+                cardTypes: card.cardTypes as [CardType, ...CardType[]],
+              });
+            }
+          });
+          return; // Exit early if we handled multiple cards
+        } catch (error) {
+          console.error("Failed to parse pending cards:", error);
+          sessionStorage.removeItem("pendingCardsToAdd");
+        }
+      }
+
+      // Fall back to single pending card (for backward compatibility)
       const pendingCardJson = sessionStorage.getItem("pendingCardToAdd");
       if (pendingCardJson) {
         try {
