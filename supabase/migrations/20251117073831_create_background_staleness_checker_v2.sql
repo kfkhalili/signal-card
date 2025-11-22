@@ -162,56 +162,112 @@ BEGIN
           -- Build dynamic SQL for THIS symbol and data type (100% generic, no hardcoding)
           -- CRITICAL: Use LEFT JOIN to handle missing data (treat missing as stale)
           -- CRITICAL: Use CASE WHEN to set financial-statements to priority 500 (unless user_count >= 1000)
+          -- CRITICAL: For exchange-variants, use MAX(timestamp_column) to handle multiple records per symbol
           -- MIGRATED: Now uses get_active_subscriptions_from_realtime() instead of active_subscriptions_v2
-          sql_text := format(
-            $SQL$
-              INSERT INTO api_call_queue_v2 (symbol, data_type, status, priority, estimated_data_size_bytes)
-              SELECT
-                %L AS symbol,
-                %L AS data_type,
-                'pending' AS status,
-                CASE
-                  WHEN %L = 'financial-statements' AND COUNT(DISTINCT asub.user_id) < 1000 THEN 500
-                  ELSE COUNT(DISTINCT asub.user_id)::INTEGER
-                END AS priority,
-                %L::BIGINT AS estimated_size
-              FROM get_active_subscriptions_from_realtime() asub
-              LEFT JOIN %I t
-                ON t.%I = asub.symbol
-              WHERE
-                asub.symbol = %L
-                AND asub.data_type = %L
-                AND (
-                  -- Data doesn't exist (t.%I IS NULL) OR data is stale
-                  t.%I IS NULL
-                  OR %I(t.%I, %L::INTEGER) = true
-                )
-                AND NOT EXISTS (
-                  SELECT 1 FROM api_call_queue_v2 q
-                  WHERE q.symbol = %L
-                    AND q.data_type = %L
-                    AND q.status IN ('pending', 'processing')
-                )
-              GROUP BY asub.symbol
-              HAVING COUNT(DISTINCT asub.user_id) > 0
-              ON CONFLICT DO NOTHING;
-            $SQL$,
-            symbol_row.symbol,                    -- 1: %L symbol
-            reg_row.data_type,                    -- 2: %L data_type
-            reg_row.data_type,                    -- 3: %L data_type (for CASE WHEN)
-            reg_row.estimated_data_size_bytes,    -- 4: %L estimated_size
-            reg_row.table_name,                   -- 5: %I table_name
-            reg_row.symbol_column,                -- 6: %I symbol_column (ON clause)
-            symbol_row.symbol,                    -- 7: %L asub.symbol
-            reg_row.data_type,                    -- 8: %L asub.data_type
-            reg_row.symbol_column,                -- 9: %I t.%I IS NULL
-            reg_row.symbol_column,                -- 10: %I t.%I (staleness function)
-            reg_row.staleness_function,           -- 11: %I staleness_function
-            reg_row.timestamp_column,             -- 12: %I timestamp_column
-            reg_row.default_ttl_minutes,          -- 13: %L default_ttl_minutes
-            symbol_row.symbol,                    -- 14: %L q.symbol
-            reg_row.data_type                     -- 15: %L q.data_type
-          );
+          IF reg_row.data_type = 'exchange-variants' THEN
+            -- For exchange-variants, use MAX to get the most recent fetched_at across all variants
+            sql_text := format(
+              $SQL$
+                INSERT INTO api_call_queue_v2 (symbol, data_type, status, priority, estimated_data_size_bytes)
+                SELECT
+                  %L AS symbol,
+                  %L AS data_type,
+                  'pending' AS status,
+                  CASE
+                    WHEN %L = 'financial-statements' AND COUNT(DISTINCT asub.user_id) < 1000 THEN 500
+                    ELSE COUNT(DISTINCT asub.user_id)::INTEGER
+                  END AS priority,
+                  %L::BIGINT AS estimated_size
+                FROM get_active_subscriptions_from_realtime() asub
+                LEFT JOIN LATERAL (
+                  SELECT MAX(t.%I) AS max_timestamp
+                  FROM %I t
+                  WHERE t.%I = asub.symbol
+                ) t_max ON true
+                WHERE
+                  asub.symbol = %L
+                  AND asub.data_type = %L
+                  AND (
+                    -- Data doesn't exist (t_max.max_timestamp IS NULL) OR data is stale
+                    t_max.max_timestamp IS NULL
+                    OR %I(t_max.max_timestamp, %L::INTEGER) = true
+                  )
+                  AND NOT EXISTS (
+                    SELECT 1 FROM api_call_queue_v2 q
+                    WHERE q.symbol = %L
+                      AND q.data_type = %L
+                      AND q.status IN ('pending', 'processing')
+                  )
+                GROUP BY asub.symbol
+                HAVING COUNT(DISTINCT asub.user_id) > 0
+                ON CONFLICT DO NOTHING;
+              $SQL$,
+              symbol_row.symbol,                    -- 1: %L symbol
+              reg_row.data_type,                    -- 2: %L data_type
+              reg_row.data_type,                    -- 3: %L data_type (for CASE WHEN)
+              reg_row.estimated_data_size_bytes,    -- 4: %L estimated_size
+              reg_row.timestamp_column,             -- 5: %I timestamp_column (for MAX)
+              reg_row.table_name,                   -- 6: %I table_name
+              reg_row.symbol_column,                -- 7: %I symbol_column (WHERE clause)
+              symbol_row.symbol,                    -- 8: %L asub.symbol
+              reg_row.data_type,                    -- 9: %L asub.data_type
+              reg_row.staleness_function,            -- 10: %I staleness_function
+              reg_row.default_ttl_minutes,          -- 11: %L default_ttl_minutes
+              symbol_row.symbol,                    -- 12: %L q.symbol
+              reg_row.data_type                     -- 13: %L q.data_type
+            );
+          ELSE
+            -- For other data types, use the standard query (assumes one record per symbol)
+            sql_text := format(
+              $SQL$
+                INSERT INTO api_call_queue_v2 (symbol, data_type, status, priority, estimated_data_size_bytes)
+                SELECT
+                  %L AS symbol,
+                  %L AS data_type,
+                  'pending' AS status,
+                  CASE
+                    WHEN %L = 'financial-statements' AND COUNT(DISTINCT asub.user_id) < 1000 THEN 500
+                    ELSE COUNT(DISTINCT asub.user_id)::INTEGER
+                  END AS priority,
+                  %L::BIGINT AS estimated_size
+                FROM get_active_subscriptions_from_realtime() asub
+                LEFT JOIN %I t
+                  ON t.%I = asub.symbol
+                WHERE
+                  asub.symbol = %L
+                  AND asub.data_type = %L
+                  AND (
+                    -- Data doesn't exist (t.%I IS NULL) OR data is stale
+                    t.%I IS NULL
+                    OR %I(t.%I, %L::INTEGER) = true
+                  )
+                  AND NOT EXISTS (
+                    SELECT 1 FROM api_call_queue_v2 q
+                    WHERE q.symbol = %L
+                      AND q.data_type = %L
+                      AND q.status IN ('pending', 'processing')
+                  )
+                GROUP BY asub.symbol
+                HAVING COUNT(DISTINCT asub.user_id) > 0
+                ON CONFLICT DO NOTHING;
+              $SQL$,
+              symbol_row.symbol,                    -- 1: %L symbol
+              reg_row.data_type,                    -- 2: %L data_type
+              reg_row.data_type,                    -- 3: %L data_type (for CASE WHEN)
+              reg_row.estimated_data_size_bytes,    -- 4: %L estimated_size
+              reg_row.table_name,                   -- 5: %I table_name
+              reg_row.symbol_column,                -- 6: %I symbol_column (ON clause)
+              symbol_row.symbol,                    -- 7: %L asub.symbol
+              reg_row.data_type,                    -- 8: %L asub.data_type
+              reg_row.symbol_column,                -- 9: %I t.%I IS NULL
+              reg_row.symbol_column,                -- 10: %I t.%I (staleness function)
+              reg_row.staleness_function,           -- 11: %I staleness_function
+              reg_row.timestamp_column,             -- 12: %I timestamp_column
+              reg_row.default_ttl_minutes,          -- 13: %L default_ttl_minutes
+              symbol_row.symbol,                    -- 14: %L q.symbol
+              reg_row.data_type                     -- 15: %L q.data_type
+            );
+          END IF;
 
           EXECUTE sql_text;
         EXCEPTION
@@ -239,5 +295,5 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-COMMENT ON FUNCTION public.check_and_queue_stale_data_from_presence_v2 IS 'Background staleness checker. Runs every minute. MIGRATED: Now uses get_active_subscriptions_from_realtime() instead of active_subscriptions_v2. Financial-statements jobs automatically get priority 500 (unless user_count >= 1000 indicating UI priority). Uses LEFT JOIN to handle missing data (treats missing as stale). Timeout-protected to complete within 50 seconds. For quote data type: always creates job if data missing (even if exchange closed), only checks exchange status if data exists. Quota-aware.';
+COMMENT ON FUNCTION public.check_and_queue_stale_data_from_presence_v2 IS 'Background staleness checker. Runs every minute. MIGRATED: Now uses get_active_subscriptions_from_realtime() instead of active_subscriptions_v2. Financial-statements jobs automatically get priority 500 (unless user_count >= 1000 indicating UI priority). Uses LEFT JOIN to handle missing data (treats missing as stale). For exchange-variants, uses MAX(timestamp_column) to handle multiple records per symbol. Timeout-protected to complete within 50 seconds. For quote data type: always creates job if data missing (even if exchange closed), only checks exchange status if data exists. Quota-aware.';
 
