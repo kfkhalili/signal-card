@@ -60,7 +60,7 @@ BEGIN
       'pending' AS status,
       -1 AS priority, -- CRITICAL: Hardcoded low priority (prevents priority inversion)
       r.estimated_data_size_bytes
-    FROM public.supported_symbols TABLESAMPLE SYSTEM (10) s
+    FROM public.supported_symbols s TABLESAMPLE SYSTEM (10)
     CROSS JOIN public.data_type_registry_v2 r
     WHERE r.refresh_strategy = 'scheduled'
       AND NOT EXISTS (
