@@ -157,7 +157,7 @@ VALUES ('AAPL', 'profile', 'pending');
 ```sql
 -- Execute via MCP or Supabase Dashboard (NOT a migration)
 INSERT INTO api_call_queue_v2 (symbol, data_type, status, priority, estimated_data_size_bytes)
-SELECT 
+SELECT
   s.symbol,
   d.data_type,
   'pending',
@@ -186,7 +186,7 @@ WHERE NOT EXISTS (
 2. "Is this infrastructure or data?"
 3. "Is this idempotent and safe to run on any environment?"
 
-**If infrastructure → Migration**  
+**If infrastructure → Migration**
 **If data → Direct SQL Operation**
 
 ---
