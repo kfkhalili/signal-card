@@ -8,14 +8,14 @@
 
 There are **TWO separate paths** that can create jobs in the queue:
 
-1. **User-Facing Path** (`check_and_queue_stale_batch_v2`) - Called when user adds a card
-2. **Background Path** (`check_and_queue_stale_data_from_presence_v2`) - Runs every minute via cron
+1. **Trigger Path** (`on_realtime_subscription_insert` → `check_and_queue_stale_batch_v2`) - Automatically called when subscription is created (0 latency)
+2. **Background Path** (`check_and_queue_stale_data_from_presence_v2`) - Runs every minute via cron to catch data that becomes stale over time
 
-**CRITICAL:** Both paths now check exchange status for quote data type (as of migration `20251118000000`).
+**CRITICAL:** Both paths check exchange status for quote data type (as of migration `20251118000000`).
 
 ---
 
-## Path 1: User-Facing (When Card is Added)
+## Path 1: Trigger Path (When Subscription is Created) ✅ **AUTOMATIC**
 
 ### Step 1: Card is Added to Workspace
 - User adds a card via `AddCardForm`
@@ -24,30 +24,19 @@ There are **TWO separate paths** that can create jobs in the queue:
 
 ### Step 2: Card Component Mounts
 - Card component (e.g., `PriceCard`, `ProfileCard`) mounts
-- **CRITICAL:** Cards no longer call `useTrackSubscription` directly
-- Subscription tracking is now handled centrally by `useSubscriptionManager` in `useWorkspaceManager`
+- Subscription tracking is handled centrally by `useSubscriptionManager` in `useWorkspaceManager`
 
-### Step 3: Centralized Subscription Tracking
-- `useSubscriptionManager` hook (in `useWorkspaceManager`):
-  1. Aggregates data types per symbol across ALL cards
-     - Example: revenue + solvency + cashuse cards → `financial-statements` subscription
-  2. Creates ONE subscription per symbol/data_type combination
-  3. Calls `upsert_active_subscription_v2()` RPC function for each unique subscription
-  4. Creates entry in `active_subscriptions_v2` table:
-     ```sql
-     INSERT INTO active_subscriptions_v2 (user_id, symbol, data_type, subscribed_at, last_seen_at)
-     VALUES (user_id, 'AAPL', 'financial-statements', NOW(), NOW())
-     ON CONFLICT (user_id, symbol, data_type)
-     DO UPDATE SET last_seen_at = NOW();
-     ```
-  5. Sends heartbeat every 1 minute to update `last_seen_at` for all subscriptions
-  6. **Reference Counting:** Only removes subscriptions when NO cards need them
-     - Prevents bug where deleting one card removes subscription that other cards still need
+### Step 3: Realtime Subscription Created
+- `useSubscriptionManager` creates Realtime subscription via Supabase client
+- Subscription is inserted into `realtime.subscription` table
 
-### Step 4: Staleness Check (User-Facing)
-- **NOTE:** Currently, the frontend does NOT call `check_and_queue_stale_batch_v2` when a card is added
-- The frontend only tracks subscriptions via `useSubscriptionManager`
-- Job creation happens via **Path 2** (background staleness checker)
+### Step 4: Database Trigger Fires ✅ **AUTOMATIC**
+- **Trigger:** `on_realtime_subscription_insert_trigger` fires `AFTER INSERT` on `realtime.subscription`
+- **Trigger Function:** `on_realtime_subscription_insert()`:
+  1. Extracts symbol from `filters` JSONB
+  2. Maps `entity` to `data_type`
+  3. Calls `check_and_queue_stale_batch_v2()` immediately with high priority
+  4. Job is created immediately (0 latency)
 
 ### Step 5: Job Creation (If Called)
 - If `check_and_queue_stale_batch_v2()` were called (e.g., via RPC from frontend):
