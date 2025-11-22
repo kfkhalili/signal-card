@@ -236,6 +236,10 @@ Deno.serve(async (req: Request) => {
               console.error(`[queue-processor-v2] Failed to complete job ${job.id}:`, completeError);
               processedJobs.push({ id: job.id, success: false, error: completeError.message });
             } else {
+              // Log informational message if present (e.g., stale data rejection)
+              if (result.message) {
+                console.log(`[queue-processor-v2] Job ${job.id} completed: ${result.message}`);
+              }
               processedJobs.push({ id: job.id, success: true });
               jobsProcessed++; // Count successful jobs toward rate limit
             }
