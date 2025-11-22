@@ -194,7 +194,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- Create trigger to automatically set max_retries for UI jobs
 DROP TRIGGER IF EXISTS set_ui_job_max_retries_trigger ON public.api_call_queue_v2;

@@ -110,7 +110,7 @@ import { fromPromise } from "neverthrow";
 
 async function WorkspaceContent() {
   const supabase = await createSupabaseServerClient();
-  
+
   // ✅ GOOD: Using fromPromise for consistency with project patterns
   const cardsResult = await fromPromise(
     supabase.from("cards").select("*"),
