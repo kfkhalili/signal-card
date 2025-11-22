@@ -50,14 +50,10 @@ This directory contains the canonical architecture and operational documentation
 
 ### Monitoring & Operations
 
-- **[UPTIMEROBOT_MONITORING_SETUP.md](./UPTIMEROBOT_MONITORING_SETUP.md)** - Monitoring alerts setup
-  - Queue success rate monitoring
-  - Quota usage monitoring
-  - Stuck jobs monitoring
-
-- **[UPTIMEROBOT_SETUP_GUIDE.md](./UPTIMEROBOT_SETUP_GUIDE.md)** - Health check monitoring
-  - Cron job health monitoring
-  - System liveness checks
+- **[UPTIMEROBOT_SETUP_GUIDE.md](./UPTIMEROBOT_SETUP_GUIDE.md)** - Complete UptimeRobot monitoring setup
+  - Operational metrics monitoring (queue, quota, stuck jobs)
+  - System liveness monitoring (cron jobs)
+  - Alert configuration and testing
 
 - **[MONITORING_QUERIES.md](./MONITORING_QUERIES.md)** - SQL queries for monitoring
   - Queue health queries
@@ -96,7 +92,7 @@ This directory contains the canonical architecture and operational documentation
 
 **Creating migrations?** Follow [MIGRATION-PRINCIPLES.md](./MIGRATION-PRINCIPLES.md).
 
-**Setting up monitoring?** See [UPTIMEROBOT_MONITORING_SETUP.md](./UPTIMEROBOT_MONITORING_SETUP.md) and [UPTIMEROBOT_SETUP_GUIDE.md](./UPTIMEROBOT_SETUP_GUIDE.md).
+**Setting up monitoring?** See [UPTIMEROBOT_SETUP_GUIDE.md](./UPTIMEROBOT_SETUP_GUIDE.md) for complete monitoring setup.
 
 **Historical context?** See [archived/outdated-status/](./archived/outdated-status/) for build planning documents and [archived/completed-migrations/](./archived/completed-migrations/) for completed migration plans.
 
