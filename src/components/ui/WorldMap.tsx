@@ -151,17 +151,6 @@ export const WorldMap: React.FC<WorldMapProps> = React.memo(({ markers, classNam
     }
   }, []);
 
-  // Cleanup effect: reset state on unmount
-  // NOTE: We do NOT call mapInstance.remove() here because React-Leaflet's MapContainer
-  // already handles map cleanup. Calling remove() manually causes "Map container is being
-  // reused by another instance" error when both try to clean up the same instance.
-  useEffect(() => {
-    return () => {
-      // Just reset our state - React-Leaflet will handle the actual map cleanup
-      setIsMapReady(false);
-      setMap(Option.none());
-    };
-  }, []);
 
   useEffect(() => {
     if (Option.isNone(map) || !isMapReady || !mapBounds) return;
