@@ -4,10 +4,11 @@
 
 -- Constants for quota limits (in bytes)
 -- 20 GB = 20 * 1024 * 1024 * 1024 bytes
+-- CRITICAL: Cast to BIGINT before multiplication to avoid integer overflow
 DO $$
 BEGIN
   -- Set quota limit (20 GB per month)
-  PERFORM set_config('app.settings.quota_limit_bytes', (20 * 1024 * 1024 * 1024)::TEXT, false);
+  PERFORM set_config('app.settings.quota_limit_bytes', (20::BIGINT * 1024::BIGINT * 1024::BIGINT * 1024::BIGINT)::TEXT, false);
 
   -- Set safety buffer (95% of quota to prevent overshoot)
   PERFORM set_config('app.settings.quota_safety_buffer', '0.95', false);
