@@ -68,10 +68,10 @@ SET search_path = public, extensions;
 COMMENT ON FUNCTION public.on_realtime_subscription_insert IS 'Trigger function that automatically checks staleness and creates jobs when a new subscription is added to realtime.subscription. Extracts symbol from filters and maps entity to data_type, then calls check_and_queue_stale_batch_v2() with high priority. Uses same filter parsing logic as get_active_subscriptions_from_realtime(). Wrapped in exception handler to prevent trigger failure from blocking subscription creation.';
 
 -- Create the trigger on realtime.subscription
+-- NOTE: Cannot add COMMENT on trigger in realtime schema (not owner of realtime.subscription)
+-- Documentation is in the function comment above
 CREATE TRIGGER on_realtime_subscription_insert_trigger
 AFTER INSERT ON realtime.subscription
 FOR EACH ROW
 EXECUTE FUNCTION public.on_realtime_subscription_insert();
-
-COMMENT ON TRIGGER on_realtime_subscription_insert_trigger ON realtime.subscription IS 'Automatically checks staleness and creates jobs when subscriptions are created. Eliminates 1-minute latency for new subscriptions.';
 
