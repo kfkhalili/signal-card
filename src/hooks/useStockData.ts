@@ -223,7 +223,7 @@ async function fetchInitialExchangeVariants(
     supabase
       .from("exchange_variants")
       .select("*")
-      .eq("base_symbol", symbol)
+      .eq("symbol", symbol)
       .limit(1)
       .maybeSingle(),
     (e) => e as Error

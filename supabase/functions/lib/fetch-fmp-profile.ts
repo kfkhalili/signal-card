@@ -122,8 +122,11 @@ export async function fetchProfileLogic(
     const profile = FmpProfileSchema.parse(data[0]);
 
     // CRITICAL VALIDATION #3: Source Timestamp Check (if available in registry)
-    // TODO: Implement source timestamp checking when registry has source_timestamp_column
-    // For now, profiles don't have a source timestamp column, so we skip this
+    // NOTE: Profile data type does not have a source timestamp in the FMP API response.
+    // The profile endpoint returns company information (name, description, etc.) which doesn't include
+    // a timestamp indicating when the data was last updated. Business dates like ipoDate are not suitable
+    // for freshness validation as they represent historical events, not data freshness.
+    // Therefore, source timestamp validation is not applicable for profile data type.
 
     // Handle image upload (if needed)
     let finalImageUrl: string | null = profile.image || null;

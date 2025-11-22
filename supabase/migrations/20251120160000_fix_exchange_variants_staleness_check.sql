@@ -1,5 +1,5 @@
--- Fix staleness check for exchange-variants to handle multiple records per base_symbol
--- CRITICAL: exchange-variants can have multiple records per base_symbol (one per variant)
+-- Fix staleness check for exchange-variants to handle multiple records per symbol
+-- CRITICAL: exchange-variants can have multiple records per symbol (one per variant)
 -- The staleness checker needs to use MAX(fetched_at) to get the most recent fetch time
 -- This ensures sentinel records work correctly
 
@@ -66,7 +66,7 @@ BEGIN
       -- use MAX(timestamp_column) to get the most recent fetch time
       -- This ensures sentinel records work correctly
       IF reg_row.data_type = 'exchange-variants' THEN
-        -- Use MAX to get the most recent fetched_at across all variants for this base_symbol
+        -- Use MAX to get the most recent fetched_at across all variants for this symbol
         sql_text := format(
           'SELECT %I(MAX(t.%I), %L::INTEGER) FROM %I t WHERE t.%I = %L',
           reg_row.staleness_function,
@@ -122,5 +122,5 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-COMMENT ON FUNCTION public.check_and_queue_stale_batch_v2 IS 'Event-driven staleness checker. For exchange-variants, uses MAX(fetched_at) to handle multiple records per base_symbol. Uses SECURITY DEFINER to access data tables. Fail-safe to stale.';
+COMMENT ON FUNCTION public.check_and_queue_stale_batch_v2 IS 'Event-driven staleness checker. For exchange-variants, uses MAX(fetched_at) to handle multiple records per symbol. Uses SECURITY DEFINER to access data tables. Fail-safe to stale.';
 

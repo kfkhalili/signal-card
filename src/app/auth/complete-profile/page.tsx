@@ -58,8 +58,16 @@ export default function CompleteProfilePage() {
 
     setLoading(true)
 
+    // Type assertion needed because database.types.ts is empty (local Supabase may not be running)
+    interface SupabaseWithUserProfiles {
+      from: (table: string) => {
+        update: (data: { username: string; full_name: string; is_profile_complete: boolean }) => {
+          eq: (column: string, value: string) => Promise<{ data: unknown; error: unknown }>;
+        };
+      };
+    }
     const updateResult = await fromPromise(
-      supabase
+      (supabase as unknown as SupabaseWithUserProfiles)
         .from('user_profiles')
         .update({
           username: username,

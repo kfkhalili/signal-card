@@ -30,13 +30,15 @@ serve(async (req: Request) => {
     );
 
     // Query pg_cron job execution history
+    // NOTE: Parameter name must match SQL function parameter (p_critical_jobs)
+    // Using actual cron job names from the database
     const { data: jobRuns, error } = await supabase.rpc('check_cron_job_health', {
-      critical_jobs: [
-        'check-stale-data',
-        'process-queue-batch',
-        'scheduled-refreshes',
-        'refresh-analytics-table',
-        'maintain-queue-partitions',
+      p_critical_jobs: [
+        'check-stale-data-v2',
+        'invoke-processor-v2',
+        'queue-scheduled-refreshes-v2',
+        'refresh-analytics-v2',
+        'maintain-queue-partitions-v2',
       ],
     });
 
@@ -64,16 +66,25 @@ serve(async (req: Request) => {
     // Check if any critical job is stale (hasn't run in expected interval)
     const staleJobs = (jobRuns || []).filter((job: JobRun) => {
       if (!job.last_run) {
-        // Job has never run - this is a problem
-        return true;
+        // Job has never run - this could be a problem, but for weekly jobs
+        // (like maintain-queue-partitions-v2), it's normal if they haven't run yet
+        // Only flag as stale if it's a frequent job (should have run by now)
+        const isFrequentJob =
+          job.jobname === 'invoke-processor-v2' ||
+          job.jobname === 'check-stale-data-v2' ||
+          job.jobname === 'queue-scheduled-refreshes-v2' ||
+          job.jobname === 'refresh-analytics-v2';
+
+        // Frequent jobs should have run by now, weekly jobs are OK if they haven't run yet
+        return isFrequentJob;
       }
 
       const expectedInterval =
-        job.jobname === 'process-queue-batch' ? 2 : // 2 minutes (runs every 1 min, allow 1 min buffer)
-        job.jobname === 'check-stale-data' ? 10 : // 10 minutes (runs every 5 min, allow 5 min buffer)
-        job.jobname === 'scheduled-refreshes' ? 5 : // 5 minutes (runs every 1 min, allow 4 min buffer)
-        job.jobname === 'refresh-analytics-table' ? 20 : // 20 minutes (runs every 15 min, allow 5 min buffer)
-        job.jobname === 'maintain-queue-partitions' ? 10080 : // 1 week (runs weekly, allow 1 day buffer)
+        job.jobname === 'invoke-processor-v2' ? 2 : // 2 minutes (runs every 1 min, allow 1 min buffer)
+        job.jobname === 'check-stale-data-v2' ? 10 : // 10 minutes (runs every 1 min, allow 9 min buffer)
+        job.jobname === 'queue-scheduled-refreshes-v2' ? 5 : // 5 minutes (runs every 1 min, allow 4 min buffer)
+        job.jobname === 'refresh-analytics-v2' ? 20 : // 20 minutes (runs every 1 min, allow 19 min buffer)
+        job.jobname === 'maintain-queue-partitions-v2' ? 10080 : // 1 week (runs weekly, allow 1 day buffer)
         10; // Default 10 minutes
 
       const timeSinceLastRun = Date.now() - new Date(job.last_run).getTime();

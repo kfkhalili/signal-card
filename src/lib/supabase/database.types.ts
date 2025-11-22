@@ -14,6 +14,285 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_call_queue_v2: {
+        Row: {
+          actual_data_size_bytes: number | null
+          created_at: string
+          data_type: string
+          error_message: string | null
+          estimated_data_size_bytes: number | null
+          id: string
+          job_metadata: Json | null
+          max_retries: number | null
+          priority: number | null
+          processed_at: string | null
+          retry_count: number | null
+          status: string
+          symbol: string
+        }
+        Insert: {
+          actual_data_size_bytes?: number | null
+          created_at?: string
+          data_type: string
+          error_message?: string | null
+          estimated_data_size_bytes?: number | null
+          id?: string
+          job_metadata?: Json | null
+          max_retries?: number | null
+          priority?: number | null
+          processed_at?: string | null
+          retry_count?: number | null
+          status: string
+          symbol: string
+        }
+        Update: {
+          actual_data_size_bytes?: number | null
+          created_at?: string
+          data_type?: string
+          error_message?: string | null
+          estimated_data_size_bytes?: number | null
+          id?: string
+          job_metadata?: Json | null
+          max_retries?: number | null
+          priority?: number | null
+          processed_at?: string | null
+          retry_count?: number | null
+          status?: string
+          symbol?: string
+        }
+        Relationships: []
+      }
+      api_call_queue_v2_completed: {
+        Row: {
+          actual_data_size_bytes: number | null
+          created_at: string
+          data_type: string
+          error_message: string | null
+          estimated_data_size_bytes: number | null
+          id: string
+          job_metadata: Json | null
+          max_retries: number | null
+          priority: number | null
+          processed_at: string | null
+          retry_count: number | null
+          status: string
+          symbol: string
+        }
+        Insert: {
+          actual_data_size_bytes?: number | null
+          created_at?: string
+          data_type: string
+          error_message?: string | null
+          estimated_data_size_bytes?: number | null
+          id?: string
+          job_metadata?: Json | null
+          max_retries?: number | null
+          priority?: number | null
+          processed_at?: string | null
+          retry_count?: number | null
+          status: string
+          symbol: string
+        }
+        Update: {
+          actual_data_size_bytes?: number | null
+          created_at?: string
+          data_type?: string
+          error_message?: string | null
+          estimated_data_size_bytes?: number | null
+          id?: string
+          job_metadata?: Json | null
+          max_retries?: number | null
+          priority?: number | null
+          processed_at?: string | null
+          retry_count?: number | null
+          status?: string
+          symbol?: string
+        }
+        Relationships: []
+      }
+      api_call_queue_v2_failed: {
+        Row: {
+          actual_data_size_bytes: number | null
+          created_at: string
+          data_type: string
+          error_message: string | null
+          estimated_data_size_bytes: number | null
+          id: string
+          job_metadata: Json | null
+          max_retries: number | null
+          priority: number | null
+          processed_at: string | null
+          retry_count: number | null
+          status: string
+          symbol: string
+        }
+        Insert: {
+          actual_data_size_bytes?: number | null
+          created_at?: string
+          data_type: string
+          error_message?: string | null
+          estimated_data_size_bytes?: number | null
+          id?: string
+          job_metadata?: Json | null
+          max_retries?: number | null
+          priority?: number | null
+          processed_at?: string | null
+          retry_count?: number | null
+          status: string
+          symbol: string
+        }
+        Update: {
+          actual_data_size_bytes?: number | null
+          created_at?: string
+          data_type?: string
+          error_message?: string | null
+          estimated_data_size_bytes?: number | null
+          id?: string
+          job_metadata?: Json | null
+          max_retries?: number | null
+          priority?: number | null
+          processed_at?: string | null
+          retry_count?: number | null
+          status?: string
+          symbol?: string
+        }
+        Relationships: []
+      }
+      api_call_queue_v2_pending: {
+        Row: {
+          actual_data_size_bytes: number | null
+          created_at: string
+          data_type: string
+          error_message: string | null
+          estimated_data_size_bytes: number | null
+          id: string
+          job_metadata: Json | null
+          max_retries: number | null
+          priority: number | null
+          processed_at: string | null
+          retry_count: number | null
+          status: string
+          symbol: string
+        }
+        Insert: {
+          actual_data_size_bytes?: number | null
+          created_at?: string
+          data_type: string
+          error_message?: string | null
+          estimated_data_size_bytes?: number | null
+          id?: string
+          job_metadata?: Json | null
+          max_retries?: number | null
+          priority?: number | null
+          processed_at?: string | null
+          retry_count?: number | null
+          status: string
+          symbol: string
+        }
+        Update: {
+          actual_data_size_bytes?: number | null
+          created_at?: string
+          data_type?: string
+          error_message?: string | null
+          estimated_data_size_bytes?: number | null
+          id?: string
+          job_metadata?: Json | null
+          max_retries?: number | null
+          priority?: number | null
+          processed_at?: string | null
+          retry_count?: number | null
+          status?: string
+          symbol?: string
+        }
+        Relationships: []
+      }
+      api_call_queue_v2_processing: {
+        Row: {
+          actual_data_size_bytes: number | null
+          created_at: string
+          data_type: string
+          error_message: string | null
+          estimated_data_size_bytes: number | null
+          id: string
+          job_metadata: Json | null
+          max_retries: number | null
+          priority: number | null
+          processed_at: string | null
+          retry_count: number | null
+          status: string
+          symbol: string
+        }
+        Insert: {
+          actual_data_size_bytes?: number | null
+          created_at?: string
+          data_type: string
+          error_message?: string | null
+          estimated_data_size_bytes?: number | null
+          id?: string
+          job_metadata?: Json | null
+          max_retries?: number | null
+          priority?: number | null
+          processed_at?: string | null
+          retry_count?: number | null
+          status: string
+          symbol: string
+        }
+        Update: {
+          actual_data_size_bytes?: number | null
+          created_at?: string
+          data_type?: string
+          error_message?: string | null
+          estimated_data_size_bytes?: number | null
+          id?: string
+          job_metadata?: Json | null
+          max_retries?: number | null
+          priority?: number | null
+          processed_at?: string | null
+          retry_count?: number | null
+          status?: string
+          symbol?: string
+        }
+        Relationships: []
+      }
+      api_calls_rate_tracker: {
+        Row: {
+          api_calls_made: number
+          minute_bucket: string
+          updated_at: string
+        }
+        Insert: {
+          api_calls_made?: number
+          minute_bucket: string
+          updated_at?: string
+        }
+        Update: {
+          api_calls_made?: number
+          minute_bucket?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      api_data_usage_v2: {
+        Row: {
+          data_size_bytes: number
+          id: number
+          job_id: string | null
+          recorded_at: string
+        }
+        Insert: {
+          data_size_bytes: number
+          id?: number
+          job_id?: string | null
+          recorded_at?: string
+        }
+        Update: {
+          data_size_bytes?: number
+          id?: number
+          job_id?: string | null
+          recorded_at?: string
+        }
+        Relationships: []
+      }
       available_exchanges: {
         Row: {
           country_code: string | null
@@ -43,6 +322,60 @@ export type Database = {
           fetched_at?: string
           name?: string | null
           symbol_suffix?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      data_type_registry_v2: {
+        Row: {
+          api_calls_per_job: number
+          created_at: string
+          data_type: string
+          default_ttl_minutes: number
+          edge_function_name: string
+          estimated_data_size_bytes: number | null
+          priority: number | null
+          refresh_schedule: string | null
+          refresh_strategy: string
+          source_timestamp_column: string | null
+          staleness_function: string
+          symbol_column: string | null
+          table_name: string
+          timestamp_column: string
+          updated_at: string
+        }
+        Insert: {
+          api_calls_per_job?: number
+          created_at?: string
+          data_type: string
+          default_ttl_minutes: number
+          edge_function_name: string
+          estimated_data_size_bytes?: number | null
+          priority?: number | null
+          refresh_schedule?: string | null
+          refresh_strategy: string
+          source_timestamp_column?: string | null
+          staleness_function: string
+          symbol_column?: string | null
+          table_name: string
+          timestamp_column: string
+          updated_at?: string
+        }
+        Update: {
+          api_calls_per_job?: number
+          created_at?: string
+          data_type?: string
+          default_ttl_minutes?: number
+          edge_function_name?: string
+          estimated_data_size_bytes?: number | null
+          priority?: number | null
+          refresh_schedule?: string | null
+          refresh_strategy?: string
+          source_timestamp_column?: string | null
+          staleness_function?: string
+          symbol_column?: string | null
+          table_name?: string
+          timestamp_column?: string
           updated_at?: string
         }
         Relationships: []
@@ -92,7 +425,7 @@ export type Database = {
             foreignKeyName: "fk_dividend_history_symbol"
             columns: ["symbol"]
             isOneToOne: false
-            referencedRelation: "supported_symbols"
+            referencedRelation: "profiles"
             referencedColumns: ["symbol"]
           },
         ]
@@ -165,7 +498,6 @@ export type Database = {
       }
       exchange_variants: {
         Row: {
-          base_symbol: string
           beta: number | null
           changes: number | null
           cik: string | null
@@ -185,12 +517,12 @@ export type Database = {
           mkt_cap: number | null
           price: number | null
           range: string | null
+          symbol: string
+          symbol_variant: string
           updated_at: string
-          variant_symbol: string
           vol_avg: number | null
         }
         Insert: {
-          base_symbol: string
           beta?: number | null
           changes?: number | null
           cik?: string | null
@@ -210,12 +542,12 @@ export type Database = {
           mkt_cap?: number | null
           price?: number | null
           range?: string | null
+          symbol: string
+          symbol_variant: string
           updated_at?: string
-          variant_symbol: string
           vol_avg?: number | null
         }
         Update: {
-          base_symbol?: string
           beta?: number | null
           changes?: number | null
           cik?: string | null
@@ -235,19 +567,44 @@ export type Database = {
           mkt_cap?: number | null
           price?: number | null
           range?: string | null
+          symbol?: string
+          symbol_variant?: string
           updated_at?: string
-          variant_symbol?: string
           vol_avg?: number | null
         }
         Relationships: [
           {
-            foreignKeyName: "fk_exchange_variants_base_symbol"
-            columns: ["base_symbol"]
+            foreignKeyName: "fk_exchange_variants_symbol"
+            columns: ["symbol"]
             isOneToOne: false
-            referencedRelation: "supported_symbols"
+            referencedRelation: "profiles"
             referencedColumns: ["symbol"]
           },
         ]
+      }
+      feature_flags: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          flag_name: string
+          metadata: Json | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          flag_name: string
+          metadata?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          flag_name?: string
+          metadata?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       financial_statements: {
         Row: {
@@ -300,7 +657,7 @@ export type Database = {
             foreignKeyName: "fk_financial_statements_symbol"
             columns: ["symbol"]
             isOneToOne: false
-            referencedRelation: "supported_symbols"
+            referencedRelation: "profiles"
             referencedColumns: ["symbol"]
           },
         ]
@@ -344,10 +701,31 @@ export type Database = {
             foreignKeyName: "fk_grades_historical_symbol"
             columns: ["symbol"]
             isOneToOne: false
-            referencedRelation: "supported_symbols"
+            referencedRelation: "profiles"
             referencedColumns: ["symbol"]
           },
         ]
+      }
+      listed_symbols: {
+        Row: {
+          added_at: string
+          is_active: boolean
+          last_processed_at: string | null
+          symbol: string
+        }
+        Insert: {
+          added_at?: string
+          is_active?: boolean
+          last_processed_at?: string | null
+          symbol: string
+        }
+        Update: {
+          added_at?: string
+          is_active?: boolean
+          last_processed_at?: string | null
+          symbol?: string
+        }
+        Relationships: []
       }
       live_quote_indicators: {
         Row: {
@@ -409,6 +787,30 @@ export type Database = {
           volume?: number | null
           year_high?: number | null
           year_low?: number | null
+        }
+        Relationships: []
+      }
+      migration_baseline: {
+        Row: {
+          id: number
+          metric_name: string
+          metric_value: Json
+          notes: string | null
+          recorded_at: string
+        }
+        Insert: {
+          id?: number
+          metric_name: string
+          metric_value: Json
+          notes?: string | null
+          recorded_at?: string
+        }
+        Update: {
+          id?: number
+          metric_name?: string
+          metric_value?: Json
+          notes?: string | null
+          recorded_at?: string
         }
         Relationships: []
       }
@@ -736,7 +1138,7 @@ export type Database = {
             foreignKeyName: "fk_ratios_ttm_symbol"
             columns: ["symbol"]
             isOneToOne: true
-            referencedRelation: "supported_symbols"
+            referencedRelation: "profiles"
             referencedColumns: ["symbol"]
           },
         ]
@@ -777,7 +1179,7 @@ export type Database = {
             foreignKeyName: "fk_revenue_product_segmentation_symbol"
             columns: ["symbol"]
             isOneToOne: false
-            referencedRelation: "supported_symbols"
+            referencedRelation: "profiles"
             referencedColumns: ["symbol"]
           },
         ]
@@ -865,6 +1267,70 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      capture_system_baseline: {
+        Args: never
+        Returns: {
+          metric_name: string
+          metric_value: Json
+        }[]
+      }
+      check_and_queue_stale_batch_v2: {
+        Args: { p_data_types: string[]; p_priority: number; p_symbol: string }
+        Returns: undefined
+      }
+      check_and_queue_stale_data_from_presence_v2: {
+        Args: never
+        Returns: undefined
+      }
+      check_cron_job_health: {
+        Args: { p_critical_jobs: string[] }
+        Returns: {
+          jobname: string
+          last_run: string
+        }[]
+      }
+      complete_queue_job_v2:
+        | {
+            Args: { p_data_size_bytes: number; p_job_id: string }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_api_calls_made?: number
+              p_data_size_bytes: number
+              p_job_id: string
+            }
+            Returns: undefined
+          }
+      fail_queue_job_v2: {
+        Args: { p_error_message: string; p_job_id: string }
+        Returns: undefined
+      }
+      get_active_subscriptions_from_realtime: {
+        Args: never
+        Returns: {
+          data_type: string
+          last_seen_at: string
+          subscribed_at: string
+          symbol: string
+          user_id: string
+        }[]
+      }
+      get_queue_batch_v2: {
+        Args: { p_batch_size?: number; p_max_priority?: number }
+        Returns: {
+          created_at: string
+          data_type: string
+          estimated_data_size_bytes: number
+          id: string
+          job_metadata: Json
+          max_retries: number
+          priority: number
+          retry_count: number
+          status: string
+          symbol: string
+        }[]
+      }
       get_weighted_leaderboard: {
         Args: { weights: Json }
         Returns: {
@@ -873,14 +1339,82 @@ export type Database = {
           symbol: string
         }[]
       }
-      handle_user_created_webhook: {
-        Args: { user_data: Json }
-        Returns: Json
-      }
-      upsert_profile: {
-        Args: { profile_data: Json }
+      handle_user_created_webhook: { Args: { user_data: Json }; Returns: Json }
+      increment_api_calls: {
+        Args: { p_api_calls_made: number }
         Returns: undefined
       }
+      invoke_edge_function_v2: {
+        Args: {
+          p_function_name: string
+          p_payload?: Json
+          p_timeout_milliseconds?: number
+        }
+        Returns: number
+      }
+      invoke_processor_if_healthy_v2: { Args: never; Returns: undefined }
+      invoke_processor_loop_v2: {
+        Args: { p_iteration_delay_seconds?: number; p_max_iterations?: number }
+        Returns: number
+      }
+      is_data_stale_v2: {
+        Args: { p_fetched_at: string; p_ttl_minutes: number }
+        Returns: boolean
+      }
+      is_exchange_open_for_symbol_v2: {
+        Args: { p_data_type: string; p_symbol: string }
+        Returns: boolean
+      }
+      is_feature_enabled: { Args: { p_flag_name: string }; Returns: boolean }
+      is_profile_stale_v2: {
+        Args: { p_modified_at: string; p_ttl_minutes: number }
+        Returns: boolean
+      }
+      is_quota_exceeded_v2: {
+        Args: { p_safety_buffer?: number }
+        Returns: boolean
+      }
+      is_quote_stale_v2: {
+        Args: { p_fetched_at: string; p_ttl_minutes: number }
+        Returns: boolean
+      }
+      is_valid_identifier: { Args: { p_identifier: string }; Returns: boolean }
+      maintain_queue_partitions_v2: { Args: never; Returns: undefined }
+      queue_refresh_if_not_exists_v2: {
+        Args: {
+          p_data_type: string
+          p_estimated_size_bytes?: number
+          p_priority: number
+          p_symbol: string
+        }
+        Returns: string
+      }
+      queue_scheduled_refreshes_v2: { Args: never; Returns: number }
+      record_baseline_metric: {
+        Args: { p_metric_name: string; p_metric_value: Json; p_notes?: string }
+        Returns: number
+      }
+      recover_stuck_jobs_v2: { Args: never; Returns: number }
+      release_api_calls_reservation: {
+        Args: { p_api_calls_to_release: number }
+        Returns: undefined
+      }
+      reserve_api_calls: {
+        Args: {
+          p_api_calls_to_reserve: number
+          p_max_api_calls_per_minute?: number
+        }
+        Returns: boolean
+      }
+      should_stop_processing_api_calls: {
+        Args: {
+          p_api_calls_to_reserve: number
+          p_max_api_calls_per_minute?: number
+          p_safety_buffer?: number
+        }
+        Returns: boolean
+      }
+      upsert_profile: { Args: { profile_data: Json }; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
@@ -1013,3 +1547,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+

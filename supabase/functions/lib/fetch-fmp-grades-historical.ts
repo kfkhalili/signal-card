@@ -96,6 +96,14 @@ export async function fetchGradesHistoricalLogic(
       };
     }
 
+    // CRITICAL VALIDATION #3: Source Timestamp Check (if available in registry)
+    // NOTE: Grades historical data type does not have a source timestamp in the FMP API response.
+    // The grades-historical endpoint returns historical analyst ratings for specific dates. The 'date'
+    // field represents the date when the ratings were issued, not a timestamp indicating when the
+    // data was last updated. These are historical facts that don't change, so comparing them would
+    // not detect stale data. Therefore, source timestamp validation is not applicable for
+    // grades-historical data type.
+
     // CRITICAL: Map FMP data to Supabase record format
     const recordsToUpsert: SupabaseGradesHistoricalRecord[] = [];
     for (const fmpEntry of fmpGradesResult as FmpGradesHistoricalData[]) {

@@ -165,6 +165,14 @@ export async function fetchRevenueProductSegmentationLogic(
       };
     }
 
+    // CRITICAL VALIDATION #3: Source Timestamp Check (if available in registry)
+    // NOTE: Revenue product segmentation data type does not have a source timestamp in the FMP API response.
+    // The revenue-product-segmentation endpoint returns revenue breakdown by product/segment for specific
+    // fiscal periods (fiscalYear, period, date). The 'date' field represents the fiscal period end date,
+    // not a timestamp indicating when the data was last updated. These are business dates that don't
+    // change once reported, so comparing them would not detect stale data. Therefore, source timestamp
+    // validation is not applicable for revenue-product-segmentation data type.
+
     // CRITICAL: Map FMP data to Supabase record format
     const recordsToUpsert: SupabaseRevenueProductSegmentationRecord[] = [];
     for (const fmpEntry of fmpSegmentationResult as FmpRevenueProductSegmentationData[]) {

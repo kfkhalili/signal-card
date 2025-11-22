@@ -253,7 +253,7 @@ INSERT INTO public.data_type_registry_v2 (
 
 -- Exchange-variants data type
 -- CRITICAL: Exchange variants are updated daily, so use 24-hour TTL (1440 minutes)
--- NOTE: This table uses base_symbol instead of symbol, so symbol_column is set to base_symbol
+-- NOTE: This table uses symbol (renamed from base_symbol) for consistency with other tables
 INSERT INTO public.data_type_registry_v2 (
   data_type,
   table_name,
@@ -272,7 +272,7 @@ INSERT INTO public.data_type_registry_v2 (
   1440, -- 24 hours (exchange variants update daily)
   'queue-processor-v2',
   'on-demand',
-  'base_symbol', -- CRITICAL: This table uses base_symbol, not symbol
+  'symbol', -- CRITICAL: Uses symbol (renamed from base_symbol) for consistency
   80000 -- 80 KB estimate (multiple variant records per symbol)
 ) ON CONFLICT (data_type) DO UPDATE SET
   table_name = EXCLUDED.table_name,

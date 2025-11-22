@@ -626,7 +626,7 @@ export function subscribeToExchangeVariantsUpdates(
     .replace(/[^a-z0-9_.-]/gi, "-")}-${Math.random()
     .toString(36)
     .substring(2, 7)}`;
-  const topicFilter = `base_symbol=eq.${baseSymbol}`;
+  const topicFilter = `symbol=eq.${baseSymbol}`; // Updated: exchange_variants now uses 'symbol' column (renamed from base_symbol)
 
   const channel: RealtimeChannel = supabase.channel(channelName, {
     config: { broadcast: { ack: true } },

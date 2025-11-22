@@ -113,13 +113,15 @@ async function initializeExchangeVariantsCard({
     website: profileInfo.websiteUrl,
   };
 
-  // Fetch only actively trading variants for the base symbol
-  // The base variant (where variant_symbol === symbol) determines the base exchange
+  // Fetch only actively trading variants for the symbol
+  // The base variant (where symbol_variant === symbol) determines the base exchange
+  // CRITICAL: Sentinel records (where symbol_variant === symbol and exchange_short_name === 'N/A')
+  // are treated as "the only variant" and will be visualized on the card
   const variantsResult = await fromPromise(
     supabase
       .from("exchange_variants")
-      .select("variant_symbol, exchange_short_name, vol_avg, is_actively_trading")
-      .eq("base_symbol", symbol)
+      .select("symbol_variant, exchange_short_name, vol_avg, is_actively_trading")
+      .eq("symbol", symbol)
       .eq("is_actively_trading", true),
     (e) => new ExchangeVariantsCardError((e as Error).message)
   );
@@ -139,9 +141,11 @@ async function initializeExchangeVariantsCard({
     return ok(emptyCard);
   }
 
-  // Find the base variant (variant_symbol === symbol) - this determines the base exchange
+  // Find the base variant (symbol_variant === symbol) - this determines the base exchange
+  // CRITICAL: Sentinel records have symbol_variant === symbol and exchange_short_name === 'N/A'
+  // They are treated as "the only variant" and will be visualized
   const baseVariantData = allVariantsData.find(
-    (v) => v.variant_symbol === symbol
+    (v) => v.symbol_variant === symbol
   );
 
   if (!baseVariantData) {
@@ -187,16 +191,20 @@ async function initializeExchangeVariantsCard({
   }
 
   // Build variants list with country info from available_exchanges
-  const variants: ExchangeVariant[] = filteredVariantsData.map((v) => {
-    const exchangeInfo = exchangeInfoMap.get(v.exchange_short_name);
-    return {
-      variantSymbol: v.variant_symbol,
-      exchangeShortName: v.exchange_short_name,
-      averageVolume: v.vol_avg,
-      countryName: exchangeInfo?.name ?? null,
-      countryCode: exchangeInfo?.code ?? null,
-    };
-  });
+  // CRITICAL: Filter out sentinel records (exchange_short_name === 'N/A') from the variants list
+  // Sentinel records are already represented by the base variant, so we don't need to show them separately
+  const variants: ExchangeVariant[] = filteredVariantsData
+    .filter((v) => v.exchange_short_name !== 'N/A') // Exclude sentinel records from variants list
+    .map((v) => {
+      const exchangeInfo = exchangeInfoMap.get(v.exchange_short_name);
+      return {
+        variantSymbol: v.symbol_variant,
+        exchangeShortName: v.exchange_short_name,
+        averageVolume: v.vol_avg,
+        countryName: exchangeInfo?.name ?? null,
+        countryCode: exchangeInfo?.code ?? null,
+      };
+    });
 
   const baseExchangeDetails = exchangeInfoMap.get(baseExchange) ?? {
     name: null,
@@ -250,13 +258,15 @@ const handleExchangeVariantsUpdate: CardUpdateHandler<
   updatedRow
 ): ExchangeVariantsCardData => {
   // If card is in empty state (no variants), always add the first variant
+  // CRITICAL: Sentinel records (symbol_variant === symbol, exchange_short_name === 'N/A') are treated as "the only variant"
+  // and should update the base exchange info, not be added as a variant
   if (
     currentCardData.liveData.variants.length === 0 &&
     updatedRow.is_actively_trading &&
-    updatedRow.variant_symbol !== currentCardData.symbol
+    updatedRow.symbol_variant !== currentCardData.symbol
   ) {
     const updatedVariant: ExchangeVariant = {
-      variantSymbol: updatedRow.variant_symbol,
+      variantSymbol: updatedRow.symbol_variant,
       exchangeShortName: updatedRow.exchange_short_name,
       averageVolume: updatedRow.vol_avg,
       countryName: null, // Would need to fetch from available_exchanges
@@ -277,16 +287,17 @@ const handleExchangeVariantsUpdate: CardUpdateHandler<
 
   // Check if this variant is already in the list
   const existingVariantIndex = currentCardData.liveData.variants.findIndex(
-    (v) => v.variantSymbol === updatedRow.variant_symbol
+    (v) => v.variantSymbol === updatedRow.symbol_variant
   );
 
   // Only update if the variant is actively trading and not the base symbol
+  // CRITICAL: Sentinel records (symbol_variant === symbol, exchange_short_name === 'N/A') update base exchange info
   if (
     updatedRow.is_actively_trading &&
-    updatedRow.variant_symbol !== currentCardData.symbol
+    updatedRow.symbol_variant !== currentCardData.symbol
   ) {
     const updatedVariant: ExchangeVariant = {
-      variantSymbol: updatedRow.variant_symbol,
+      variantSymbol: updatedRow.symbol_variant,
       exchangeShortName: updatedRow.exchange_short_name,
       averageVolume: updatedRow.vol_avg,
       countryName: null, // Would need to fetch from available_exchanges

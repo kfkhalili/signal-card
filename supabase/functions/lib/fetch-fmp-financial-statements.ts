@@ -176,6 +176,75 @@ export async function fetchFinancialStatementsLogic(
       }
     });
 
+    // CRITICAL VALIDATION #3: Source Timestamp Check (Prevents "Liar API Stale Data" Catastrophe)
+    // The API may return 200 OK with valid shape and sanity, but the data itself may be stale
+    // (e.g., API caching bug returns 3-day-old data). We must compare source timestamps.
+    // This prevents "data laundering" where stale data is marked as fresh.
+    // For financial-statements, we use accepted_date (when SEC accepted the filing) as the source timestamp.
+    // We check the MAX(accepted_date) for the symbol to detect if we're getting older data.
+    const { data: registryData, error: registryError } = await supabase
+      .from('data_type_registry_v2')
+      .select('source_timestamp_column')
+      .eq('data_type', 'financial-statements')
+      .single();
+
+    if (registryError) {
+      console.warn(`[fetchFinancialStatementsLogic] Failed to fetch registry for source timestamp check: ${registryError.message}`);
+    } else if (registryData?.source_timestamp_column && statementsForSymbolUpsert.length > 0) {
+      // Get the maximum accepted_date from the new data
+      const maxNewAcceptedDate = statementsForSymbolUpsert
+        .map((stmt) => stmt.accepted_date)
+        .filter((date): date is string => date !== null && date !== undefined)
+        .sort()
+        .reverse()[0]; // Get the latest accepted_date
+
+      if (maxNewAcceptedDate) {
+        // Get the maximum accepted_date from existing data for this symbol
+        // CRITICAL: accepted_date is stored as TIMESTAMPTZ in the database
+        const { data: existingData, error: existingError } = await supabase
+          .from('financial_statements')
+          .select('accepted_date')
+          .eq('symbol', job.symbol)
+          .not('accepted_date', 'is', null)
+          .order('accepted_date', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (existingError) {
+          console.warn(`[fetchFinancialStatementsLogic] Failed to fetch existing data for source timestamp check: ${existingError.message}`);
+        } else if (existingData?.accepted_date) {
+          // Parse timestamps - accepted_date is in format "YYYY-MM-DD HH:MM:SS" or ISO string
+          const oldSourceTimestamp = new Date(existingData.accepted_date);
+          const newSourceTimestamp = new Date(maxNewAcceptedDate);
+
+          // Validate that dates are valid
+          if (isNaN(oldSourceTimestamp.getTime()) || isNaN(newSourceTimestamp.getTime())) {
+            console.warn(`[fetchFinancialStatementsLogic] Invalid timestamp format. Old: ${existingData.accepted_date}, New: ${maxNewAcceptedDate}`);
+          } else {
+            // CRITICAL: If new source timestamp is < old source timestamp, this is stale data
+            // The API is returning older filings (caching bug, stale cache, etc.)
+            // We must reject this to prevent "data laundering"
+            // CRITICAL: For UI jobs (priority 1000), be more lenient - accept equal timestamps
+            // This prevents UI jobs from failing when the API returns the same data
+            const isUIJob = job.priority >= 1000;
+            if (newSourceTimestamp < oldSourceTimestamp) {
+              throw new Error(
+                `FMP returned 200 OK but data is stale. Source timestamp (max accepted_date): ${maxNewAcceptedDate} (existing: ${existingData.accepted_date}). ` +
+                `This indicates an API caching bug or stale cache. Rejecting to prevent data laundering.`
+              );
+            } else if (!isUIJob && newSourceTimestamp.getTime() === oldSourceTimestamp.getTime()) {
+              // For non-UI jobs, reject equal timestamps (data laundering prevention)
+              throw new Error(
+                `FMP returned 200 OK but data is stale. Source timestamp (max accepted_date): ${maxNewAcceptedDate} (existing: ${existingData.accepted_date}). ` +
+                `This indicates an API caching bug or stale cache. Rejecting to prevent data laundering.`
+              );
+            }
+            // For UI jobs, accept equal timestamps (user is actively waiting, better to show data than fail)
+          }
+        }
+      }
+    }
+
     if (statementsForSymbolUpsert.length > 0) {
       const { error: upsertError, count } = await supabase
         .from('financial_statements')

@@ -8,7 +8,7 @@ type ExchangeStatus =
 
 export class RealtimeStockManager extends EventEmitter {
   private supabase: SupabaseClient<Database>;
-  private quoteChannel: RealtimeChannel | null = null;
+  private quoteChannels = new Map<string, RealtimeChannel>();
   private exchangeStatusChannel: RealtimeChannel | null = null;
   private subscribedSymbols = new Set<string>();
   private subscribedExchanges = new Set<string>();
@@ -74,57 +74,55 @@ export class RealtimeStockManager extends EventEmitter {
   }
 
   private updateSubscription() {
-    if (this.quoteChannel) {
-      this.quoteChannel.unsubscribe();
-      this.quoteChannel = null;
+    // Remove channels for symbols that are no longer subscribed
+    for (const [symbol, channel] of this.quoteChannels.entries()) {
+      if (!this.subscribedSymbols.has(symbol)) {
+        channel.unsubscribe();
+        this.quoteChannels.delete(symbol);
+      }
     }
 
-    if (this.subscribedSymbols.size === 0) return;
+    // Add channels for newly subscribed symbols
+    for (const symbol of this.subscribedSymbols) {
+      if (this.quoteChannels.has(symbol)) continue; // Already subscribed
 
-    const symbols = Array.from(this.subscribedSymbols);
-    const symbolsSet = new Set(symbols); // For fast lookup
-    const channelName = `live-quotes-for-workspace`;
+      const channelName = `live-quote-${symbol.toLowerCase().replace(/[^a-z0-9_.-]/gi, "-")}`;
+      const filter = `symbol=eq.${symbol}`;
 
-    this.quoteChannel = this.supabase.channel(channelName, {
-      config: { broadcast: { ack: true } },
-    });
-
-    // Subscribe to both INSERT and UPDATE events
-    // Note: Supabase Realtime doesn't support 'in' filter syntax,
-    // so we subscribe to all updates and filter client-side
-    this.quoteChannel
-      .on<LiveQuote>(
-        "postgres_changes",
-        {
-          event: "*", // Listen to both INSERT and UPDATE
-          schema: "public",
-          table: "live_quote_indicators",
-          // No filter - we'll filter client-side since 'in' syntax isn't supported
-        },
-        (payload) => {
-          const quoteSymbol = payload.new && 'symbol' in payload.new ? payload.new.symbol : null;
-
-          // Filter client-side: only emit if symbol is in our subscribed list
-          if (!quoteSymbol || !symbolsSet.has(quoteSymbol)) {
-            return;
-          }
-
-          // Use payload.new for both INSERT and UPDATE
-          if (payload.new) {
-            this.emit("quote", payload.new);
-          } else if (payload.old && payload.eventType === "UPDATE") {
-            // Fallback: if new is missing, try old (shouldn't happen but be safe)
-            console.warn(
-              `[RealtimeStockManager] UPDATE event missing payload.new, using payload.old`
-            );
-          }
-        }
-      )
-      .subscribe((status, err) => {
-        if (status === "CHANNEL_ERROR" && err) {
-          console.error("[RealtimeStockManager] Channel error:", err);
-        }
+      const channel = this.supabase.channel(channelName, {
+        config: { broadcast: { ack: true } },
       });
+
+      // Subscribe to both INSERT and UPDATE events with symbol-specific filter
+      channel
+        .on<LiveQuote>(
+          "postgres_changes",
+          {
+            event: "*", // Listen to both INSERT and UPDATE
+            schema: "public",
+            table: "live_quote_indicators",
+            filter: filter, // Symbol-specific filter for realtime.subscription tracking
+          },
+          (payload) => {
+            // Use payload.new for both INSERT and UPDATE
+            if (payload.new) {
+              this.emit("quote", payload.new);
+            } else if (payload.old && payload.eventType === "UPDATE") {
+              // Fallback: if new is missing, try old (shouldn't happen but be safe)
+              console.warn(
+                `[RealtimeStockManager] UPDATE event missing payload.new, using payload.old`
+              );
+            }
+          }
+        )
+        .subscribe((status, err) => {
+          if (status === "CHANNEL_ERROR" && err) {
+            console.error(`[RealtimeStockManager] Channel error for ${symbol}:`, err);
+          }
+        });
+
+      this.quoteChannels.set(symbol, channel);
+    }
   }
 
   private updateExchangeSubscription() {
@@ -179,6 +177,12 @@ export class RealtimeStockManager extends EventEmitter {
   }
 
   private resubscribe() {
+    // Unsubscribe all quote channels and re-subscribe
+    for (const channel of this.quoteChannels.values()) {
+      channel.unsubscribe();
+    }
+    this.quoteChannels.clear();
+
     if (this.subscribedSymbols.size > 0) {
       this.updateSubscription();
     }
@@ -192,10 +196,12 @@ export class RealtimeStockManager extends EventEmitter {
   }
 
   public destroy() {
-    if (this.quoteChannel) {
-      this.quoteChannel.unsubscribe();
-      this.quoteChannel = null;
+    // Unsubscribe all quote channels
+    for (const channel of this.quoteChannels.values()) {
+      channel.unsubscribe();
     }
+    this.quoteChannels.clear();
+
     if (this.exchangeStatusChannel) {
       this.exchangeStatusChannel.unsubscribe();
       this.exchangeStatusChannel = null;

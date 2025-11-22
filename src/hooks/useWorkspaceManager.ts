@@ -43,7 +43,6 @@ import {
 } from "@/components/game/cardUpdateHandler.types";
 import "@/components/game/cards/updateHandlerInitializer";
 import type { CustomCardData } from "@/components/game/cards/custom-card/custom-card.types";
-import { useSubscriptionManager } from "@/hooks/useSubscriptionManager";
 
 type ExchangeMarketStatusRecord =
   Database["public"]["Tables"]["exchange_market_status"]["Row"];
@@ -729,7 +728,7 @@ export function useWorkspaceManager() {
         setActiveCards((prevActiveCards) => {
           // First, check if any card needs full re-initialization (empty state)
           const cardsNeedingReinit = prevActiveCards.filter((card) => {
-            if (card.symbol === updatedVariantDBRow.base_symbol && card.type === "exchangevariants") {
+            if (card.symbol === updatedVariantDBRow.symbol && card.type === "exchangevariants") {
               const concreteCardDataForHandler = getConcreteCardData(card);
               const cardLiveData = (concreteCardDataForHandler as { liveData?: { variants?: unknown[] } }).liveData;
               return cardLiveData?.variants?.length === 0;
@@ -768,8 +767,8 @@ export function useWorkspaceManager() {
           // Otherwise, do normal update
           let overallChanged = false;
           const updatedCards = prevActiveCards.map((card) => {
-            // Exchange variants use base_symbol, not symbol
-            if (card.symbol === updatedVariantDBRow.base_symbol && card.type === "exchangevariants") {
+            // Exchange variants use symbol (renamed from base_symbol for consistency)
+            if (card.symbol === updatedVariantDBRow.symbol && card.type === "exchangevariants") {
               const handler = getCardUpdateHandler(card.type, eventType);
               if (handler) {
                 const concreteCardDataForHandler = getConcreteCardData(card);
@@ -819,11 +818,10 @@ export function useWorkspaceManager() {
     ]
   );
 
-  // CRITICAL: Centralized subscription manager with reference counting
-  // This prevents the bug where deleting one card removes a subscription
-  // that other cards still need (e.g., deleting revenue card removes
-  // financial-statements subscription even though solvency and cashuse cards still need it)
-  useSubscriptionManager(activeCards);
+  // MIGRATED: Subscription tracking is now automatic via realtime.subscription
+  // When clients subscribe to postgres_changes events, Supabase automatically
+  // tracks them in realtime.subscription. The backend staleness checker reads
+  // from this table directly. No manual subscription management needed.
 
   return {
     activeCards: displayedCards,

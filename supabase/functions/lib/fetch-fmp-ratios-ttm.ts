@@ -157,6 +157,13 @@ export async function fetchRatiosTtmLogic(
       throw new Error(`Empty or invalid TTM ratios data object from FMP for ${job.symbol}`);
     }
 
+    // CRITICAL VALIDATION #3: Source Timestamp Check (if available in registry)
+    // NOTE: Ratios TTM data type does not have a source timestamp in the FMP API response.
+    // The ratios-ttm endpoint returns calculated financial ratios (TTM = trailing twelve months)
+    // which are derived from financial statements, not raw timestamps. There is no field in the
+    // API response that indicates when the data was last updated. Therefore, source timestamp
+    // validation is not applicable for ratios-ttm data type.
+
     // CRITICAL: Map FMP data to Supabase record format
     const recordToUpsert: SupabaseRatiosTtmRecord = {
       symbol: ratiosData.symbol,

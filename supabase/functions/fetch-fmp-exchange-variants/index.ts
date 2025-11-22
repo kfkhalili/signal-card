@@ -90,8 +90,8 @@ async function fetchAndProcessSymbolExchangeVariants(
         return isValid;
       })
       .map((fmpEntry) => ({
-        base_symbol: baseSymbol,
-        variant_symbol: fmpEntry.symbol,
+        symbol: baseSymbol, // Renamed from base_symbol for consistency
+        symbol_variant: fmpEntry.symbol, // Renamed from variant_symbol
         exchange_short_name: fmpEntry.exchangeShortName,
         price: fmpEntry.price,
         beta: fmpEntry.beta,
@@ -117,7 +117,7 @@ async function fetchAndProcessSymbolExchangeVariants(
       const { error: upsertError, count } = await supabaseAdmin
         .from("exchange_variants")
         .upsert(recordsToUpsert, {
-          onConflict: "variant_symbol,exchange_short_name",
+          onConflict: "symbol_variant,exchange_short_name",
           count: "exact",
         });
 

@@ -40,7 +40,7 @@ export async function GET() {
 
     const symbolsResult = await fromPromise(
       supabase
-        .from("supported_symbols")
+        .from("listed_symbols")
         .select("symbol")
         .eq("is_active", true),
       (e) => new Error(`Failed to fetch supported symbols: ${(e as Error).message}`)

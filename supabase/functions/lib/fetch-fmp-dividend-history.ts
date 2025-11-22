@@ -159,6 +159,14 @@ export async function fetchDividendHistoryLogic(
       };
     }
 
+    // CRITICAL VALIDATION #3: Source Timestamp Check (if available in registry)
+    // NOTE: Dividend history data type does not have a source timestamp in the FMP API response.
+    // The dividend-history endpoint returns historical dividend payment dates (date, paymentDate,
+    // recordDate, declarationDate) which are business dates representing when dividends were
+    // paid/declared, not timestamps indicating when the data was last updated. These dates are
+    // historical facts that don't change, so comparing them would not detect stale data. Therefore,
+    // source timestamp validation is not applicable for dividend-history data type.
+
     // CRITICAL: Map FMP data to Supabase record format
     const recordsToUpsert: SupabaseDividendRecord[] = [];
     for (const fmpEntry of fmpDividendResult as FmpDividendData[]) {

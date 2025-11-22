@@ -25,8 +25,8 @@ export interface FmpExchangeVariantData {
 }
 
 export interface SupabaseExchangeVariantRecord {
-  base_symbol: string;
-  variant_symbol: string;
+  symbol: string; // Renamed from base_symbol for consistency
+  symbol_variant: string; // Renamed from variant_symbol
   exchange_short_name: string;
   price: number | null;
   beta: number | null;
