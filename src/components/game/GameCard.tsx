@@ -72,6 +72,11 @@ const GameCard: React.FC<GameCardProps> = ({
 
   const cardWrapperClassName = cn("w-full aspect-[63/88] relative", className);
 
+  // NOTE: Subscription tracking is now handled centrally by useSubscriptionManager
+  // in useWorkspaceManager. This prevents the bug where deleting one card removes
+  // a subscription that other cards still need (e.g., deleting revenue card removes
+  // financial-statements subscription even though solvency and cashuse cards still need it).
+
   const CardRenderer = getCardRenderer(card.type);
 
   if (!CardRenderer) {

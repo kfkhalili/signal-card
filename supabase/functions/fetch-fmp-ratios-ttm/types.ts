@@ -126,7 +126,8 @@ export interface SupabaseRatiosTtmRecord {
   effective_tax_rate_ttm?: number | null;
   enterprise_value_multiple_ttm?: number | null;
   dividend_per_share_ttm?: number | null;
-  // fetched_at and updated_at are handled by DB defaults/triggers
+  fetched_at?: string; // Optional: can be set explicitly for sentinel records
+  // updated_at is handled by DB defaults/triggers
 }
 
 export interface SupportedSymbol {

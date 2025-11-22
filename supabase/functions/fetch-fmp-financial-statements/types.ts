@@ -160,7 +160,8 @@ export interface FinancialStatementRecord {
   income_statement_payload?: FmpIncomeStatementEntry | null;
   balance_sheet_payload?: FmpBalanceSheetEntry | null;
   cash_flow_payload?: FmpCashFlowEntry | null;
-  // fetched_at and updated_at are typically handled by DB defaults/triggers
+  fetched_at?: string; // Optional: can be set explicitly for sentinel records
+  // updated_at is handled by DB defaults/triggers
 }
 
 // Interface for rows from 'supported_symbols' table

@@ -155,12 +155,14 @@ async function fetchAndProcessSymbolProfile(
     }
 
     // This object maps directly to the JSONB expected by the PostgreSQL function
+    // CRITICAL: Truncate bigint values (volume, market_cap) to integers
+    // FMP API sometimes returns decimals like "3955124346827.0005" which breaks bigint columns
     const recordToUpsert = {
       symbol: profileData.symbol,
       price: profileData.price,
       beta: profileData.beta,
       average_volume: Math.trunc(profileData.averageVolume),
-      market_cap: profileData.marketCap,
+      market_cap: profileData.marketCap ? Math.trunc(profileData.marketCap) : null,
       last_dividend: profileData.lastDividend,
       range: profileData.range,
       change: profileData.change,
@@ -193,7 +195,7 @@ async function fetchAndProcessSymbolProfile(
       is_actively_trading: profileData.isActivelyTrading,
       is_adr: profileData.isAdr,
       is_fund: profileData.isFund,
-      volume: profileData.volume,
+      volume: profileData.volume ? Math.trunc(profileData.volume) : null,
     };
 
     const { error: rpcError } = await supabaseAdmin.rpc("upsert_profile", {

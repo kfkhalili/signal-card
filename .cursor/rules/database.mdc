@@ -1,63 +1,338 @@
 ---
-description: Database best practices focusing on Prisma and Supabase integration
-globs: prisma/**/*, src/db/**/*, **/*.prisma, supabase/**/*
+description: Database best practices for Supabase (PostgreSQL) integration
+globs: supabase/**/*, src/lib/supabase/**/*
 alwaysApply: false
 ---
 
-# Database Best Practices
+# Supabase Database Best Practices
 
-## Supabase Setup
-- Configure proper project setup
-- Implement proper authentication
-- Use proper database setup
-- Configure proper storage
-- Implement proper policies
-- Use proper client setup
+## Supabase Client Setup
 
-## Supabase Security
-- Implement proper RLS policies
-- Use proper authentication
-- Configure proper permissions
-- Handle sensitive data properly
-- Implement proper backups
-- Use proper encryption
+### Browser Client
+```typescript
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+const supabase = createSupabaseBrowserClient();
+```
 
-## Supabase Queries
-- Use proper query optimization
-- Implement proper filtering
-- Use proper joins
-- Handle real-time properly
-- Implement proper pagination
-- Use proper functions
+### Server Client
+```typescript
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+const supabase = await createSupabaseServerClient();
+```
+
+### Route Handler Client
+```typescript
+import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
+const supabase = await createSupabaseRouteHandlerClient();
+```
+
+## Row Level Security (RLS)
+
+- **Always enable RLS** on tables containing user data
+- **Create policies** for SELECT, INSERT, UPDATE, DELETE operations
+- **Use service role key** only in Edge Functions and server-side code
+- **Test RLS policies** to ensure proper access control
+- **Document policy logic** in migration comments
+
+### RLS Policy Pattern
+```sql
+-- Enable RLS
+ALTER TABLE table_name ENABLE ROW LEVEL SECURITY;
+
+-- Policy example: Users can only see their own data
+CREATE POLICY "Users can view own data"
+ON table_name FOR SELECT
+USING (auth.uid() = user_id);
+```
+
+## Query Patterns
+
+### Error Handling
+Always handle Supabase query errors using neverthrow Result types:
+```typescript
+import { fromPromise, err, ok, Result } from "neverthrow";
+
+// Pattern 1: Using fromPromise for async Supabase queries
+const profileResult = await fromPromise(
+  supabase
+    .from("profiles")
+    .select("*")
+    .eq("symbol", symbol)
+    .maybeSingle(),
+  (e) => new Error((e as Error).message)
+);
+
+if (profileResult.isErr()) {
+  return err(profileResult.error);
+}
+
+// CRITICAL: Check for Supabase query errors (Supabase returns { data, error } without rejecting)
+const { data, error } = profileResult.value;
+if (error) {
+  return err(new Error(`Supabase query error: ${error.message}`));
+}
+
+const profileData = data;
+
+// Pattern 2: Handling empty results (use Option for optional data)
+import { Option } from "effect";
+
+async function fetchProfile(
+  supabase: SupabaseClient,
+  symbol: string
+): Promise<Result<Option.Option<ProfileDBRow>, Error>> {
+  const result = await fromPromise(
+    supabase.from("profiles").select("*").eq("symbol", symbol).maybeSingle(),
+    (e) => e as Error
+  );
+
+  if (result.isErr()) {
+    return err(result.error);
+  }
+
+  // CRITICAL: Check for Supabase query errors (Supabase returns { data, error } without rejecting)
+  const { data, error } = result.value;
+  if (error) {
+    return err(new Error(`Supabase query error: ${error.message}`));
+  }
+
+  return ok(data ? Option.some(data) : Option.none());
+}
+
+// Pattern 3: Multiple queries with Promise.all
+const [quoteResult, fsResult, ratiosResult] = await Promise.all([
+  fromPromise(
+    supabase.from("live_quote_indicators").select("*").eq("symbol", symbol).maybeSingle(),
+    (e) => new Error(`Quote fetch failed: ${(e as Error).message}`)
+  ),
+  fromPromise(
+    supabase.from("financial_statements").select("*").eq("symbol", symbol).limit(1),
+    (e) => new Error(`Financial statement fetch failed: ${(e as Error).message}`)
+  ),
+  fromPromise(
+    supabase.from("ratios_ttm").select("*").eq("symbol", symbol).maybeSingle(),
+    (e) => new Error(`Ratios fetch failed: ${(e as Error).message}`)
+  ),
+]);
+
+// Handle each result independently
+if (quoteResult.isErr()) {
+  console.warn(quoteResult.error.message);
+  // Continue with other data
+}
+```
+
+### Filtering
+- Use `.eq()`, `.neq()`, `.gt()`, `.lt()` for comparisons
+- Use `.in()` for multiple values
+- Use `.like()` or `.ilike()` for pattern matching
+- Chain filters for complex queries
+
+**Examples:**
+```typescript
+import { fromPromise } from "neverthrow";
+
+// Single filter
+const result = await fromPromise(
+  supabase.from("profiles").select("*").eq("symbol", "AAPL"),
+  (e) => new Error((e as Error).message)
+);
+if (result.isErr()) {
+  // Handle error
+  return;
+}
+const { data, error } = result.value;
+if (error) {
+  // Handle Supabase query error
+  return;
+}
+// Use data here
+
+// Multiple filters (chained)
+const result = await fromPromise(
+  supabase
+    .from("financial_statements")
+    .select("*")
+    .eq("symbol", "AAPL")
+    .eq("period", "FY")
+    .order("date", { ascending: false })
+    .limit(1),
+  (e) => new Error((e as Error).message)
+);
+if (result.isErr()) {
+  // Handle error
+  return;
+}
+const { data, error } = result.value;
+if (error) {
+  // Handle Supabase query error
+  return;
+}
+// Use data here
+
+// IN clause for multiple values
+const result = await fromPromise(
+  supabase.from("profiles").select("*").in("symbol", ["AAPL", "MSFT", "GOOGL"]),
+  (e) => new Error((e as Error).message)
+);
+if (result.isErr()) {
+  // Handle error
+  return;
+}
+const { data, error } = result.value;
+if (error) {
+  // Handle Supabase query error
+  return;
+}
+// Use data here
+
+// Pattern matching
+const result = await fromPromise(
+  supabase.from("profiles").select("*").ilike("company_name", "%Apple%"),
+  (e) => new Error((e as Error).message)
+);
+if (result.isErr()) {
+  // Handle error
+  return;
+}
+const { data, error } = result.value;
+if (error) {
+  // Handle Supabase query error
+  return;
+}
+// Use data here
+
+// maybeSingle() for optional results (returns null if not found)
+const result = await fromPromise(
+  supabase.from("profiles").select("*").eq("symbol", symbol).maybeSingle(),
+  (e) => new Error((e as Error).message)
+);
+if (result.isErr()) {
+  // Handle error
+  return;
+}
+const { data, error } = result.value;
+if (error) {
+  // Handle Supabase query error
+  return;
+}
+// data is null if no match, instead of empty array
+```
+
+### Real-time Subscriptions
+Always clean up subscriptions:
+```typescript
+useEffect(() => {
+  const channel = supabase
+    .channel(`table_name:${symbol}`)
+    .on("postgres_changes", {
+      event: "*",
+      schema: "public",
+      table: "table_name",
+      filter: `symbol=eq.${symbol}`,
+    }, callback)
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [symbol, supabase]);
+```
 
 ## Database Design
-- Use proper normalization
-- Implement proper indexing
-- Use proper constraints
-- Define proper relations
-- Implement proper cascades
-- Use proper data types
+
+### Naming Conventions
+- Use `snake_case` for table and column names
+- Use descriptive names (e.g., `live_quote_indicators` not `lqi`)
+- Prefix junction tables with descriptive names
+
+### Indexing
+- Create indexes on frequently queried columns (e.g., `symbol`, `user_id`)
+- Use composite indexes for multi-column queries
+- Monitor query performance and add indexes as needed
+
+### Constraints
+- Use foreign keys to maintain referential integrity
+- Add NOT NULL constraints where appropriate
+- Use CHECK constraints for data validation
+- Use UNIQUE constraints for business rules
+
+### Data Types
+- Use `uuid` for primary keys (with `gen_random_uuid()`)
+- Use `timestamptz` for timestamps (not `timestamp`)
+- Use `text` for variable-length strings
+- Use `numeric` or `decimal` for financial data (not `float`)
+
+## Migrations
+
+### Migration Best Practices
+- **Use MCP tools** for all migrations (never use CLI directly)
+- **Name migrations** descriptively: `YYYYMMDDHHMMSS_descriptive_name.sql`
+- **Test migrations** on development branch before production
+- **Include rollback** logic when possible
+- **Document breaking changes** in migration comments
+
+### Migration Pattern
+```sql
+-- Migration: Add new column to table
+-- Date: 2025-01-15
+-- Description: Adds display_name column to profiles table
+
+ALTER TABLE profiles
+ADD COLUMN display_name TEXT;
+
+-- Add index if needed for queries
+CREATE INDEX idx_profiles_display_name ON profiles(display_name);
+
+-- Update RLS policies if needed
+-- (policies are automatically versioned)
+```
 
 ## Performance
-- Use proper connection pooling
-- Implement proper caching
-- Use proper query optimization
-- Handle N+1 queries properly
-- Implement proper batching
-- Monitor performance metrics
+
+### Query Optimization
+- Use `.select()` to fetch only needed columns
+- Use `.limit()` to restrict result sets
+- Use `.order()` with indexes for efficient sorting
+- Avoid N+1 queries by batching or using joins
+
+### Connection Pooling
+- Supabase handles connection pooling automatically
+- Use connection pooling settings in production
+- Monitor connection usage
+
+### Caching
+- Cache frequently accessed data in application layer
+- Use Supabase Realtime for live updates instead of polling
+- Consider Redis for complex caching needs
 
 ## Security
-- Use proper authentication
-- Implement proper authorization
-- Handle sensitive data properly
-- Use proper encryption
-- Implement proper backups
-- Monitor security issues
+
+### Authentication
+- Use Supabase Auth for user authentication
+- Never expose service role key in client code
+- Use anon key for client-side queries (protected by RLS)
+- Validate user permissions before sensitive operations
+
+### Data Protection
+- Encrypt sensitive data at rest (Supabase handles this)
+- Use HTTPS for all connections
+- Sanitize user inputs before database queries
+- Use parameterized queries (Supabase does this automatically)
+
+### Backup and Recovery
+- Supabase provides automatic backups
+- Test restore procedures regularly
+- Document backup retention policies
+- Use point-in-time recovery for critical data
 
 ## Best Practices
-- Follow database conventions
-- Use proper migrations
-- Implement proper versioning
-- Handle errors properly
-- Document schema properly
-- Monitor database health
+
+- **Always use TypeScript types** from `@/lib/supabase/database.types`
+- **Handle errors gracefully** with Result types (neverthrow)
+- **Use migrations** for all schema changes (never modify directly)
+- **Test RLS policies** thoroughly before deployment
+- **Monitor query performance** using Supabase dashboard
+- **Document complex queries** and business logic
+- **Use transactions** for multi-step operations
+- **Clean up subscriptions** to prevent memory leaks

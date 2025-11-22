@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { fromPromise } from "neverthrow";
 import type { DisplayableCard } from "@/components/game/types";
 import { ActiveCards } from "@/components/game/ActiveCards";
 
@@ -23,7 +24,19 @@ const DemoCardsGrid: React.FC = () => {
       try {
         const response = await fetch("/api/demo-cards");
         if (!response.ok) {
-          throw new Error(`API responded with status ${response.status}`);
+          // Defensive JSON parsing - response might not be valid JSON
+          const jsonResult = await fromPromise(
+            response.json(),
+            (e) => e as Error
+          );
+          const errorData = jsonResult.match(
+            (data) => data,
+            () => ({} as { details?: string })
+          );
+          const errorMessage = errorData.details || `API responded with status ${response.status}`;
+          console.error("Failed to fetch demo cards from API:", errorMessage);
+          setDemoCards([]);
+          return;
         }
         const cards: DisplayableCard[] = await response.json();
         setDemoCards(cards);

@@ -20,10 +20,9 @@ import {
 } from "@/components/game/cardUpdateHandler.types";
 import type { Database } from "@/lib/supabase/database.types";
 import type { ProfileDBRow } from "@/hooks/useStockData";
-import { applyProfileCoreUpdates } from "../cardUtils";
+import { applyProfileCoreUpdates, fetchProfileInfo } from "../cardUtils";
 
 type RatiosTtmDBRow = Database["public"]["Tables"]["ratios_ttm"]["Row"];
-type ProfileDBRowFromSupabase = Database["public"]["Tables"]["profiles"]["Row"];
 
 class KeyRatiosCardError extends Error {
   constructor(message: string) {
@@ -53,6 +52,62 @@ function mapDbRowToLiveData(dbRow: RatiosTtmDBRow): KeyRatiosCardLiveData {
     currentRatioTTM: dbRow.current_ratio_ttm,
     quickRatioTTM: dbRow.quick_ratio_ttm,
     assetTurnoverTTM: dbRow.asset_turnover_ttm,
+  };
+}
+
+function createEmptyKeyRatiosCard(
+  symbol: string,
+  existingCardId?: string,
+  existingCreatedAt?: number
+): KeyRatiosCardData & Pick<DisplayableCardState, "isFlipped"> {
+  const emptyStaticData: KeyRatiosCardStaticData = {
+    lastUpdated: null,
+    reportedCurrency: null,
+  };
+
+  const emptyLiveData: KeyRatiosCardLiveData = {
+    priceToEarningsRatioTTM: null,
+    priceToSalesRatioTTM: null,
+    priceToBookRatioTTM: null,
+    priceToFreeCashFlowRatioTTM: null,
+    enterpriseValueMultipleTTM: null,
+    netProfitMarginTTM: null,
+    grossProfitMarginTTM: null,
+    ebitdaMarginTTM: null,
+    debtToEquityRatioTTM: null,
+    dividendYieldTTM: null,
+    dividendPayoutRatioTTM: null,
+    earningsPerShareTTM: null,
+    revenuePerShareTTM: null,
+    bookValuePerShareTTM: null,
+    freeCashFlowPerShareTTM: null,
+    effectiveTaxRateTTM: null,
+    currentRatioTTM: null,
+    quickRatioTTM: null,
+    assetTurnoverTTM: null,
+  };
+
+  const cardBackData: BaseCardBackData = {
+    description: `Key Trailing Twelve Months (TTM) financial ratios for ${symbol}.`,
+  };
+
+  const concreteCardData: KeyRatiosCardData = {
+    id: existingCardId || `keyratios-${symbol}-${Date.now()}`,
+    type: "keyratios",
+    symbol: symbol,
+    companyName: null,
+    displayCompanyName: null,
+    logoUrl: null,
+    createdAt: existingCreatedAt ?? Date.now(),
+    staticData: emptyStaticData,
+    liveData: emptyLiveData,
+    backData: cardBackData,
+    websiteUrl: null,
+  };
+
+  return {
+    ...concreteCardData,
+    isFlipped: false,
   };
 }
 
@@ -88,9 +143,9 @@ function constructKeyRatiosCardData(
     id: idOverride || `keyratios-${dbRow.symbol}-${Date.now()}`,
     type: "keyratios",
     symbol: dbRow.symbol,
-    companyName: profileInfo.companyName ?? dbRow.symbol,
+    companyName: profileInfo.companyName ?? null,
     displayCompanyName:
-      profileInfo.displayCompanyName ?? profileInfo.companyName ?? dbRow.symbol,
+      profileInfo.displayCompanyName ?? profileInfo.companyName ?? null,
     logoUrl: profileInfo.logoUrl ?? null,
     websiteUrl: profileInfo.websiteUrl ?? null,
     createdAt: existingCreatedAt ?? Date.now(),
@@ -103,54 +158,49 @@ function constructKeyRatiosCardData(
 async function initializeKeyRatiosCard({
   symbol,
   supabase,
-  toast,
   activeCards,
 }: CardInitializationContext): Promise<
   Result<DisplayableCard, KeyRatiosCardError>
 > {
+  // Fetch profile info using shared utility
+  const profileInfoResult = await fetchProfileInfo(symbol, supabase, activeCards);
+  const baseProfileInfo = profileInfoResult.isOk()
+    ? profileInfoResult.value
+    : {
+        companyName: symbol,
+        displayCompanyName: symbol,
+        logoUrl: null,
+        websiteUrl: null,
+      };
+
+  // Fetch currency separately (needed for key ratios card)
+  let currency: string | null = null;
   const profileCardForSymbol = activeCards?.find(
     (c) => c.symbol === symbol && c.type === "profile"
-  ) as ProfileDBRowFromSupabase | undefined;
-
-  let fetchedProfileInfo = {
-    companyName: profileCardForSymbol?.company_name ?? symbol,
-    displayCompanyName:
-      profileCardForSymbol?.display_company_name ??
-      profileCardForSymbol?.company_name ??
-      symbol,
-    logoUrl: profileCardForSymbol?.image ?? null,
-    websiteUrl: profileCardForSymbol?.website ?? null,
-    currency: profileCardForSymbol?.currency ?? null,
-  };
-
-  if (!profileCardForSymbol) {
-    const profileResult = await fromPromise(
+  );
+  if (profileCardForSymbol && profileCardForSymbol.type === "profile" && "staticData" in profileCardForSymbol) {
+    currency = (profileCardForSymbol.staticData as { currency?: string | null }).currency ?? null;
+  } else {
+    const currencyResult = await fromPromise(
       supabase
         .from("profiles")
-        .select("company_name, display_company_name, image, website, currency")
+        .select("currency")
         .eq("symbol", symbol)
         .maybeSingle(),
       (e) =>
         new KeyRatiosCardError(
-          `Failed to fetch profile: ${(e as Error).message}`
+          `Failed to fetch currency: ${(e as Error).message}`
         )
     );
-    if (profileResult.isOk() && profileResult.value.data) {
-      const profileData = profileResult.value.data;
-      fetchedProfileInfo = {
-        companyName: profileData.company_name ?? symbol,
-        displayCompanyName:
-          profileData.display_company_name ??
-          profileData.company_name ??
-          symbol,
-        logoUrl: profileData.image ?? null,
-        websiteUrl: profileData.website ?? null,
-        currency: profileData.currency ?? null,
-      };
-    } else if (profileResult.isErr()) {
-      console.warn(profileResult.error.message);
+    if (currencyResult.isOk() && currencyResult.value.data) {
+      currency = currencyResult.value.data.currency ?? null;
     }
   }
+
+  const fetchedProfileInfo = {
+    ...baseProfileInfo,
+    currency,
+  };
 
   const fsResult = await fromPromise(
     supabase
@@ -175,30 +225,27 @@ async function initializeKeyRatiosCard({
   }
 
   const ratiosResult = await fromPromise(
-    supabase.from("ratios_ttm").select("*").eq("symbol", symbol).single(),
+    supabase.from("ratios_ttm").select("*").eq("symbol", symbol).maybeSingle(),
     (e) => new KeyRatiosCardError((e as Error).message)
   );
 
   if (ratiosResult.isErr()) {
     const error = ratiosResult.error;
-    const description = error.message.includes("PGRST116")
-      ? `No TTM ratios currently available for ${symbol}.`
-      : `Could not fetch TTM ratios for ${symbol}: ${error.message}`;
-    if (toast) {
-      toast({ title: "Ratios Not Found", description, variant: "default" });
+    if (error.message.includes("PGRST116")) {
+      // No data found - return empty state card
+      const emptyCard = createEmptyKeyRatiosCard(symbol);
+      return ok(emptyCard);
     }
-    return err(new KeyRatiosCardError(description));
+    // Other errors - return error
+    return err(new KeyRatiosCardError(error.message));
   }
 
   const ratiosData = ratiosResult.value.data;
 
   if (!ratiosData) {
-    // This case should theoretically be covered by the .single() error above, but as a safeguard:
-    return err(
-      new KeyRatiosCardError(
-        `TTM ratios data is unexpectedly missing for ${symbol}.`
-      )
-    );
+    // No data found - return empty state card
+    const emptyCard = createEmptyKeyRatiosCard(symbol);
+    return ok(emptyCard);
   }
 
   const concreteCardData = constructKeyRatiosCardData(
@@ -218,9 +265,7 @@ const handleKeyRatiosTTMUpdate: CardUpdateHandler<
   RatiosTtmDBRow
 > = (
   currentCardData,
-  newRatiosRow,
-  _currentDisplayableCard,
-  context
+  newRatiosRow
 ): KeyRatiosCardData => {
   const newLiveData = mapDbRowToLiveData(newRatiosRow);
   const newStaticData: KeyRatiosCardStaticData = {
@@ -235,14 +280,6 @@ const handleKeyRatiosTTMUpdate: CardUpdateHandler<
     return currentCardData;
   }
 
-  if (context.toast) {
-    context.toast({
-      title: `Key Ratios Updated: ${currentCardData.symbol}`,
-      description: `TTM Ratios have been refreshed as of ${new Date(
-        newRatiosRow.updated_at
-      ).toLocaleTimeString()}.`,
-    });
-  }
   const lastUpdatedDateString = newStaticData.lastUpdated
     ? new Date(newStaticData.lastUpdated).toLocaleDateString()
     : "N/A";
@@ -269,25 +306,23 @@ const handleKeyRatiosProfileUpdate: CardUpdateHandler<
   KeyRatiosCardData,
   ProfileDBRow
 > = (currentCardData, profilePayload): KeyRatiosCardData => {
-  const { updatedCardData, coreDataChanged } = applyProfileCoreUpdates(
+  const { updatedCardData } = applyProfileCoreUpdates(
     currentCardData,
     profilePayload
   );
 
-  if (coreDataChanged) {
-    const lastUpdatedDateString = updatedCardData.staticData.lastUpdated
-      ? new Date(updatedCardData.staticData.lastUpdated).toLocaleDateString()
-      : "N/A";
-    const newBackDataDescription = `Key Trailing Twelve Months (TTM) financial ratios for ${updatedCardData.companyName}. Ratios last updated on ${lastUpdatedDateString}.`;
+  // Always apply profile updates to ensure data propagates correctly
+  const lastUpdatedDateString = updatedCardData.staticData.lastUpdated
+    ? new Date(updatedCardData.staticData.lastUpdated).toLocaleDateString()
+    : "N/A";
+  const newBackDataDescription = `Key Trailing Twelve Months (TTM) financial ratios for ${updatedCardData.companyName}. Ratios last updated on ${lastUpdatedDateString}.`;
 
-    return {
-      ...updatedCardData,
-      backData: {
-        description: newBackDataDescription,
-      },
-    };
-  }
-  return currentCardData;
+  return {
+    ...updatedCardData,
+    backData: {
+      description: newBackDataDescription,
+    },
+  };
 };
 registerCardUpdateHandler(
   "keyratios",

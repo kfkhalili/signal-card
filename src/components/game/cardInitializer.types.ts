@@ -1,6 +1,5 @@
 // src/components/game/cardInitializer.types.ts
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ToastFunctionType } from "@/hooks/use-toast";
 import type { DisplayableCard } from "@/components/game/types";
 import type { CardType } from "@/components/game/cards/base-card/base-card.types";
 import type { Result } from "neverthrow";
@@ -8,7 +7,6 @@ import type { Result } from "neverthrow";
 export interface CardInitializationContext {
   symbol: string;
   supabase: SupabaseClient;
-  toast: ToastFunctionType;
   activeCards?: DisplayableCard[];
 }
 

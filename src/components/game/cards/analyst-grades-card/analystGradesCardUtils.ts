@@ -22,11 +22,10 @@ import {
 } from "@/components/game/cardUpdateHandler.types";
 import type { Database } from "@/lib/supabase/database.types";
 import type { ProfileDBRow } from "@/hooks/useStockData";
-import { applyProfileCoreUpdates } from "../cardUtils";
+import { applyProfileCoreUpdates, fetchProfileInfo } from "../cardUtils";
 
 type GradesHistoricalDBRow =
   Database["public"]["Tables"]["grades_historical"]["Row"];
-type ProfileDBRowFromSupabase = Database["public"]["Tables"]["profiles"]["Row"];
 
 class AnalystGradesCardError extends Error {
   constructor(message: string) {
@@ -124,6 +123,48 @@ function formatPeriodDate(dateString: string | null): string {
   }
 }
 
+function createEmptyAnalystGradesCard(
+  symbol: string,
+  existingCardId?: string,
+  existingCreatedAt?: number
+): AnalystGradesCardData & Pick<DisplayableCardState, "isFlipped"> {
+  const emptyStaticData: AnalystGradesCardStaticData = {
+    currentPeriodDate: null,
+    previousPeriodDate: null,
+  };
+
+  const emptyLiveData: AnalystGradesCardLiveData = {
+    ratingsDistribution: [],
+    totalAnalystsCurrent: 0,
+    totalAnalystsPrevious: null,
+    consensusLabelCurrent: null,
+    lastUpdated: null,
+  };
+
+  const cardBackData: BaseCardBackData = {
+    description: `Analyst rating distribution for ${symbol}.`,
+  };
+
+  const concreteCardData: AnalystGradesCardData = {
+    id: existingCardId || `analystgrades-${symbol}-${Date.now()}`,
+    type: "analystgrades",
+    symbol: symbol,
+    companyName: null,
+    displayCompanyName: null,
+    logoUrl: null,
+    createdAt: existingCreatedAt ?? Date.now(),
+    staticData: emptyStaticData,
+    liveData: emptyLiveData,
+    backData: cardBackData,
+    websiteUrl: null,
+  };
+
+  return {
+    ...concreteCardData,
+    isFlipped: false,
+  };
+}
+
 function constructAnalystGradesCardData(
   symbol: string,
   profileInfo: {
@@ -192,9 +233,9 @@ function constructAnalystGradesCardData(
     id: idOverride || `analystgrades-${symbol}-${Date.now()}`,
     type: "analystgrades",
     symbol,
-    companyName: profileInfo.companyName ?? symbol,
+    companyName: profileInfo.companyName ?? null,
     displayCompanyName:
-      profileInfo.displayCompanyName ?? profileInfo.companyName ?? symbol,
+      profileInfo.displayCompanyName ?? profileInfo.companyName ?? null,
     logoUrl: profileInfo.logoUrl ?? null,
     websiteUrl: profileInfo.websiteUrl ?? null,
     createdAt: existingCreatedAt ?? Date.now(),
@@ -209,45 +250,16 @@ async function fetchAnalystGradesData(
   supabase: CardInitializationContext["supabase"],
   activeCards?: DisplayableCard[]
 ) {
-  const profileCardForSymbol = activeCards?.find(
-    (c) => c.symbol === symbol && c.type === "profile"
-  ) as ProfileDBRowFromSupabase | undefined;
-  let profileInfo = {
-    companyName: profileCardForSymbol?.company_name ?? symbol,
-    displayCompanyName:
-      profileCardForSymbol?.display_company_name ??
-      profileCardForSymbol?.company_name ??
-      symbol,
-    logoUrl: profileCardForSymbol?.image ?? null,
-    websiteUrl: profileCardForSymbol?.website ?? null,
-  };
-
-  if (!profileCardForSymbol) {
-    const profileResult = await fromPromise(
-      supabase
-        .from("profiles")
-        .select("company_name, display_company_name, image, website")
-        .eq("symbol", symbol)
-        .maybeSingle(),
-      (e) =>
-        new AnalystGradesCardError(
-          `Profile fetch failed: ${(e as Error).message}`
-        )
-    );
-    if (profileResult.isOk() && profileResult.value.data) {
-      profileInfo = {
-        companyName: profileResult.value.data.company_name ?? symbol,
-        displayCompanyName:
-          profileResult.value.data.display_company_name ??
-          profileResult.value.data.company_name ??
-          symbol,
-        logoUrl: profileResult.value.data.image ?? null,
-        websiteUrl: profileResult.value.data.website ?? null,
+  // Fetch profile info using shared utility
+  const profileInfoResult = await fetchProfileInfo(symbol, supabase, activeCards);
+  const profileInfo = profileInfoResult.isOk()
+    ? profileInfoResult.value
+    : {
+        companyName: symbol,
+        displayCompanyName: symbol,
+        logoUrl: null,
+        websiteUrl: null,
       };
-    } else if (profileResult.isErr()) {
-      console.warn(profileResult.error.message);
-    }
-  }
 
   const gradesResult = await fromPromise(
     supabase
@@ -275,7 +287,6 @@ async function fetchAnalystGradesData(
 async function initializeAnalystGradesCard({
   symbol,
   supabase,
-  toast,
   activeCards,
 }: CardInitializationContext): Promise<
   Result<DisplayableCard, AnalystGradesCardError>
@@ -287,26 +298,15 @@ async function initializeAnalystGradesCard({
   );
 
   if (fetchDataResult.isErr()) {
-    if (toast)
-      toast({
-        title: "Error Initializing Analyst Grades",
-        description: fetchDataResult.error.message,
-        variant: "destructive",
-      });
     return err(fetchDataResult.error);
   }
 
   const { profileInfo, latestGrading, previousGrading } = fetchDataResult.value;
 
   if (!latestGrading) {
-    if (toast)
-      toast({
-        title: "No Analyst Grades Data",
-        description: `No analyst grades found for ${symbol}.`,
-      });
-    return err(
-      new AnalystGradesCardError(`No analyst grades found for ${symbol}.`)
-    );
+    // No data found - return empty state card
+    const emptyCard = createEmptyAnalystGradesCard(symbol);
+    return ok(emptyCard);
   }
 
   const concreteCardData = constructAnalystGradesCardData(
@@ -326,24 +326,104 @@ const handleAnalystGradesProfileUpdate: CardUpdateHandler<
   AnalystGradesCardData,
   ProfileDBRow
 > = (currentCardData, profilePayload): AnalystGradesCardData => {
-  const { updatedCardData, coreDataChanged } = applyProfileCoreUpdates(
+  const { updatedCardData } = applyProfileCoreUpdates(
     currentCardData,
     profilePayload
   );
 
-  if (coreDataChanged) {
-    const newBackData: BaseCardBackData = {
-      description: `Analyst rating distribution for ${updatedCardData.companyName} as of ${updatedCardData.staticData.currentPeriodDate}, with changes from the previous period.`,
-    };
-    return {
-      ...updatedCardData,
-      backData: newBackData,
-    };
-  }
-  return currentCardData;
+  // Always apply profile updates to ensure data propagates correctly
+  const newBackData: BaseCardBackData = {
+    description: `Analyst rating distribution for ${updatedCardData.companyName} as of ${updatedCardData.staticData.currentPeriodDate}, with changes from the previous period.`,
+  };
+  return {
+    ...updatedCardData,
+    backData: newBackData,
+  };
 };
 registerCardUpdateHandler(
   "analystgrades",
   "STATIC_PROFILE_UPDATE",
   handleAnalystGradesProfileUpdate
+);
+
+const handleGradesHistoricalUpdate: CardUpdateHandler<
+  AnalystGradesCardData,
+  GradesHistoricalDBRow
+> = (
+  currentCardData,
+  updatedRow
+): AnalystGradesCardData => {
+  // Check if the updated row is for a newer or same period
+  const currentPeriodDate = currentCardData.staticData.currentPeriodDate;
+  const updatedPeriodDate = formatPeriodDate(updatedRow.date);
+
+  // Compare dates to see if this is a newer period
+  // For simplicity, if the date string is different or newer, update
+  if (
+    !currentPeriodDate ||
+    updatedPeriodDate !== currentPeriodDate ||
+    (updatedRow.date && updatedRow.updated_at) // If we have an update timestamp, treat as newer
+  ) {
+    // Reconstruct the card data with the updated row as the latest
+    // Use current data as previous
+    const currentCounts = mapDbRowToRatingCounts(updatedRow);
+    // For previous counts, we'll use the current values from the card
+    const previousCounts: Record<RatingCategory, number> = {
+      strongBuy: currentCardData.liveData.ratingsDistribution[0]?.currentValue ?? 0,
+      buy: currentCardData.liveData.ratingsDistribution[1]?.currentValue ?? 0,
+      hold: currentCardData.liveData.ratingsDistribution[2]?.currentValue ?? 0,
+      sell: currentCardData.liveData.ratingsDistribution[3]?.currentValue ?? 0,
+      strongSell: currentCardData.liveData.ratingsDistribution[4]?.currentValue ?? 0,
+    };
+
+    const ratingsDistribution: AnalystRatingDetail[] =
+      RATING_CATEGORIES_ORDERED.map(({ category, label, colorClass }) => {
+        const currentValue = currentCounts[category] ?? 0;
+        const previousValue = previousCounts[category] ?? null;
+        const change =
+          previousValue !== null ? currentValue - previousValue : null;
+        return {
+          category,
+          label,
+          currentValue,
+          previousValue,
+          change,
+          colorClass,
+        };
+      });
+
+    const totalAnalystsCurrent = calculateTotalAnalysts(currentCounts);
+    const totalAnalystsPrevious = currentCardData.liveData.totalAnalystsCurrent;
+    const consensusLabelCurrent = deriveConsensusLabel(
+      ratingsDistribution,
+      totalAnalystsCurrent
+    );
+
+    const updatedStaticData: AnalystGradesCardStaticData = {
+      currentPeriodDate: updatedPeriodDate,
+      previousPeriodDate: currentPeriodDate,
+    };
+
+    const updatedLiveData: AnalystGradesCardLiveData = {
+      ratingsDistribution,
+      totalAnalystsCurrent,
+      totalAnalystsPrevious,
+      consensusLabelCurrent,
+      lastUpdated: updatedRow.updated_at,
+    };
+
+    return {
+      ...currentCardData,
+      liveData: updatedLiveData,
+      staticData: updatedStaticData,
+    };
+  }
+
+  return currentCardData; // Update is for the same period, no change needed
+};
+
+registerCardUpdateHandler(
+  "analystgrades",
+  "GRADES_HISTORICAL_UPDATE",
+  handleGradesHistoricalUpdate
 );

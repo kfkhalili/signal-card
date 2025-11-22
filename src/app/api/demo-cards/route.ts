@@ -1,5 +1,6 @@
 // src/app/api/demo-cards/route.ts
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { fromPromise } from "neverthrow";
 import { NextResponse } from "next/server";
 import {
   getCardInitializer,
@@ -37,16 +38,32 @@ export async function GET() {
   try {
     const supabase = await createSupabaseServerClient();
 
-    const { data: symbolsData, error: symbolsError } = await supabase
-      .from("supported_symbols")
-      .select("symbol")
-      .eq("is_active", true);
+    const symbolsResult = await fromPromise(
+      supabase
+        .from("listed_symbols")
+        .select("symbol")
+        .eq("is_active", true),
+      (e) => new Error(`Failed to fetch supported symbols: ${(e as Error).message}`)
+    );
 
-    if (symbolsError || !symbolsData || symbolsData.length < GRID_SIZE) {
-      throw new Error(
-        `Could not fetch enough supported symbols. Need ${GRID_SIZE}, got ${
-          symbolsData?.length || 0
-        }.`
+    const symbolsData = symbolsResult.match(
+      (response) => {
+        const { data, error } = response;
+        if (error) {
+          return null;
+        }
+        if (!data || data.length < GRID_SIZE) {
+          return null;
+        }
+        return data;
+      },
+      () => null
+    );
+
+    if (!symbolsData) {
+      return NextResponse.json(
+        { error: "Failed to generate demo cards.", details: "Could not fetch enough supported symbols." },
+        { status: 500 }
       );
     }
 
@@ -63,15 +80,6 @@ export async function GET() {
       const context: CardInitializationContext = {
         symbol,
         supabase,
-        toast: () => ({
-          id: "",
-          dismiss: () => {
-            // No-op for background demo card generation.
-          },
-          update: () => {
-            // No-op for background demo card generation.
-          },
-        }),
         activeCards: [],
       };
       const result = await initializer(context);

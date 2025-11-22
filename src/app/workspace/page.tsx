@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { AddCardForm } from "@/components/workspace/AddCardForm";
+import type { CardType } from "@/components/game/cards/base-card/base-card.types";
 import { StockDataHandler } from "@/components/workspace/StockDataHandler";
 import MarketDataStatusBanner from "@/components/workspace/MarketStatusBanner";
 import { CustomCardCreatorPanel } from "@/components/workspace/CustomCardCreatorPanel";
@@ -44,7 +45,14 @@ import { useWorkspaceManager } from "@/hooks/useWorkspaceManager";
 import type { SortConfig } from "@/hooks/useWorkspaceManager";
 import ActiveCardsSection from "@/components/game/ActiveCardsSection";
 import type { MarketStatusUpdate } from "@/hooks/useStockData";
-import type { FinancialStatementDBRow } from "@/lib/supabase/realtime-service";
+import type {
+  FinancialStatementDBRow,
+  RatiosTtmDBRow,
+  DividendHistoryDBRow,
+  RevenueProductSegmentationDBRow,
+  GradesHistoricalDBRow,
+  ExchangeVariantsDBRow,
+} from "@/lib/supabase/realtime-service";
 
 type MarketStatus = Record<string, MarketStatusUpdate>;
 
@@ -61,7 +69,6 @@ export default function WorkspacePage() {
     stockDataCallbacks,
     uniqueSymbolsInWorkspace,
     onGenericInteraction,
-    supportedSymbols,
     isSelectionMode,
     setIsSelectionMode,
     selectedDataItems,
@@ -86,6 +93,30 @@ export default function WorkspacePage() {
       router.push("/");
     }
   }, [user, isAuthLoading, router, hasMounted]);
+
+  // Handle pending cards from Compass or other pages
+  useEffect(() => {
+    if (hasMounted && user && !isAuthLoading) {
+      const pendingCardJson = sessionStorage.getItem("pendingCardToAdd");
+      if (pendingCardJson) {
+        try {
+          const pendingCard: { symbol: string; cardTypes: CardType[] } =
+            JSON.parse(pendingCardJson);
+          sessionStorage.removeItem("pendingCardToAdd");
+          // Add the card to workspace (ensure non-empty array)
+          if (pendingCard.cardTypes.length > 0) {
+            addCardToWorkspace({
+              symbol: pendingCard.symbol,
+              cardTypes: pendingCard.cardTypes as [CardType, ...CardType[]],
+            });
+          }
+        } catch (error) {
+          console.error("Failed to parse pending card:", error);
+          sessionStorage.removeItem("pendingCardToAdd");
+        }
+      }
+    }
+  }, [hasMounted, user, isAuthLoading, addCardToWorkspace]);
 
   useEffect(() => {
     if (!isSelectionMode) {
@@ -229,7 +260,6 @@ export default function WorkspacePage() {
             </Button>
             <AddCardForm
               onAddCard={addCardToWorkspace}
-              supportedSymbols={supportedSymbols}
             />
           </div>
         </div>
@@ -239,16 +269,46 @@ export default function WorkspacePage() {
         if (!stockDataCallbacks) {
           return null;
         }
+        // Get card types for this symbol
+        const cardTypesForSymbol = activeCards
+          .filter((card) => card.symbol === s)
+          .map((card) => card.type);
         return (
           <StockDataHandler
             key={`handler-${s}`}
             symbol={s}
+            activeCardTypes={cardTypesForSymbol}
             onQuoteReceived={stockDataCallbacks.onLiveQuoteUpdate}
             onStaticProfileUpdate={stockDataCallbacks.onProfileUpdate}
             onMarketStatusChange={handleMarketStatusChange}
             onFinancialStatementUpdate={
               stockDataCallbacks.onFinancialStatementUpdate as (
                 statement: FinancialStatementDBRow
+              ) => void
+            }
+            onRatiosTTMUpdate={
+              stockDataCallbacks.onRatiosTTMUpdate as (
+                ratios: RatiosTtmDBRow
+              ) => void
+            }
+            onDividendHistoryUpdate={
+              stockDataCallbacks.onDividendHistoryUpdate as (
+                dividend: DividendHistoryDBRow
+              ) => void
+            }
+            onRevenueSegmentationUpdate={
+              stockDataCallbacks.onRevenueSegmentationUpdate as (
+                segmentation: RevenueProductSegmentationDBRow
+              ) => void
+            }
+            onGradesHistoricalUpdate={
+              stockDataCallbacks.onGradesHistoricalUpdate as (
+                grades: GradesHistoricalDBRow
+              ) => void
+            }
+            onExchangeVariantsUpdate={
+              stockDataCallbacks.onExchangeVariantsUpdate as (
+                variant: ExchangeVariantsDBRow
               ) => void
             }
           />
@@ -276,7 +336,6 @@ export default function WorkspacePage() {
             </p>
             <AddCardForm
               onAddCard={addCardToWorkspace}
-              supportedSymbols={supportedSymbols}
               triggerButton={
                 <Button size="lg">
                   <PlusCircle className="mr-2 h-5 w-5" /> Add Your First Card

@@ -77,6 +77,10 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
         labelClassName = "text-sm font-medium text-muted-foreground",
         valueClassName = "text-sm font-semibold text-foreground"
       ) => {
+        // Don't render if value is null/undefined
+        if (value === null || value === undefined) {
+          return null;
+        }
 
         return (
           <DataRow
@@ -138,46 +142,44 @@ export const KeyRatiosCardContent: React.FC<KeyRatiosCardContentProps> =
             <ShadCardContent
               className={cn("p-0 flex-grow flex flex-col text-xs")}>
               <div className="space-y-1.5 pt-1.5">
-                <DataRow
-                  label="Data Last Updated:"
-                  value={
-                    staticData.lastUpdated
-                      ? new Date(staticData.lastUpdated).toLocaleString()
-                      : "N/A"
-                  }
-                  isMonetary={false}
-                  labelClassName="text-xs font-medium text-muted-foreground"
-                  valueClassName="text-xs font-semibold text-foreground"
-                  isSelectionMode={isSelectionMode}
-                  isSelected={isSelected(`${id}-last-updated`)}
-                  onSelect={() =>
-                    onSelect({
-                      sourceCardId: id,
-                      sourceCardSymbol: symbol,
-                      label: "Last Updated",
-                      value: staticData.lastUpdated
-                        ? new Date(staticData.lastUpdated).toLocaleString()
-                        : "N/A",
-                    })
-                  }
-                />
-                <DataRow
-                  label="Reporting Currency:"
-                  value={staticData.reportedCurrency || "N/A"}
-                  isMonetary={false}
-                  labelClassName="text-xs font-medium text-muted-foreground"
-                  valueClassName="text-xs font-semibold text-foreground"
-                  isSelectionMode={isSelectionMode}
-                  isSelected={isSelected(`${id}-currency`)}
-                  onSelect={() =>
-                    onSelect({
-                      sourceCardId: id,
-                      sourceCardSymbol: symbol,
-                      label: "Currency",
-                      value: staticData.reportedCurrency || "N/A",
-                    })
-                  }
-                />
+                {staticData.lastUpdated && (
+                  <DataRow
+                    label="Data Last Updated:"
+                    value={new Date(staticData.lastUpdated).toLocaleString()}
+                    isMonetary={false}
+                    labelClassName="text-xs font-medium text-muted-foreground"
+                    valueClassName="text-xs font-semibold text-foreground"
+                    isSelectionMode={isSelectionMode}
+                    isSelected={isSelected(`${id}-last-updated`)}
+                    onSelect={() =>
+                      onSelect({
+                        sourceCardId: id,
+                        sourceCardSymbol: symbol,
+                        label: "Last Updated",
+                        value: staticData.lastUpdated ? new Date(staticData.lastUpdated).toLocaleString() : "N/A",
+                      })
+                    }
+                  />
+                )}
+                {staticData.reportedCurrency && (
+                  <DataRow
+                    label="Reporting Currency:"
+                    value={staticData.reportedCurrency}
+                    isMonetary={false}
+                    labelClassName="text-xs font-medium text-muted-foreground"
+                    valueClassName="text-xs font-semibold text-foreground"
+                    isSelectionMode={isSelectionMode}
+                    isSelected={isSelected(`${id}-currency`)}
+                    onSelect={() =>
+                      onSelect({
+                        sourceCardId: id,
+                        sourceCardSymbol: symbol,
+                        label: "Currency",
+                        value: staticData.reportedCurrency,
+                      })
+                    }
+                  />
+                )}
               </div>
               <div className="mt-2 space-y-0.5">
                 <h4 className="text-xs font-semibold text-muted-foreground mb-1">

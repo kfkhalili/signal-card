@@ -64,11 +64,11 @@ CREATE TABLE IF NOT EXISTS "public"."ratios_ttm" (
     "fetched_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
 
-    CONSTRAINT "fk_ratios_ttm_symbol" FOREIGN KEY ("symbol") REFERENCES "public"."supported_symbols"("symbol") ON DELETE CASCADE
+    CONSTRAINT "fk_ratios_ttm_symbol" FOREIGN KEY ("symbol") REFERENCES "public"."profiles"("symbol") ON DELETE CASCADE
 );
 
 COMMENT ON TABLE "public"."ratios_ttm" IS 'Stores Trailing Twelve Months (TTM) financial ratios for symbols from FMP.';
-COMMENT ON COLUMN "public"."ratios_ttm"."symbol" IS 'Stock/crypto symbol. Primary Key, references supported_symbols.symbol.';
+COMMENT ON COLUMN "public"."ratios_ttm"."symbol" IS 'Stock/crypto symbol. Primary Key, references profiles.symbol.';
 COMMENT ON COLUMN "public"."ratios_ttm"."fetched_at" IS 'Timestamp of when this record was initially fetched.';
 COMMENT ON COLUMN "public"."ratios_ttm"."updated_at" IS 'Timestamp of when this record was last updated.';
 

@@ -2,7 +2,8 @@
 "use client";
 
 import React, { useMemo, useState, useEffect } from "react";
-import { MapContainer, TileLayer, Marker, Tooltip } from "react-leaflet";
+import { Option } from "effect";
+import { MapContainer, TileLayer, Marker, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { cn } from "@/lib/utils";
@@ -12,6 +13,7 @@ import { getFlagEmoji } from "@/lib/utils";
 export interface MapMarker {
   countryCode: string;
   label: string; // Exchange code, e.g., "NASDAQ"
+  countryName?: string | null; // Country name for tooltip, e.g., "United States"
 }
 
 interface WorldMapProps {
@@ -38,6 +40,111 @@ const createCustomIcon = () => {
 
 const customIcon = createCustomIcon();
 
+// Separate component for markers that uses useMap hook to ensure map context is available
+// CRITICAL: This component must only render when map is fully ready to prevent _leaflet_pos errors
+const MarkersLayer: React.FC<{ markers: { label: string; position: [number, number]; countryCode: string; countryName?: string | null }[] }> = ({ markers }) => {
+  const map = useMap();
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    if (!map) {
+      setIsReady(false);
+      return;
+    }
+
+    let isMounted = true;
+    let timer: NodeJS.Timeout | null = null;
+
+    // Wait for map to be fully ready
+    const checkReady = () => {
+      try {
+        const container = map.getContainer();
+        if (!container || !container.parentElement) {
+          return;
+        }
+
+        // Check if marker pane exists and is in the DOM
+        const markerPane = map.getPane('markerPane');
+        if (!markerPane || !markerPane.parentNode) {
+          return;
+        }
+
+        // Additional check: verify the pane has the expected structure
+        if (markerPane instanceof HTMLElement) {
+          if (isMounted) {
+            setIsReady(true);
+          }
+        }
+      } catch (error) {
+        console.warn('Error checking map readiness:', error);
+      }
+    };
+
+    // Use whenReady to ensure map is initialized
+    map.whenReady(() => {
+      if (!isMounted) return;
+
+      // Double-check after a small delay to ensure DOM is fully ready
+      timer = setTimeout(() => {
+        if (isMounted) {
+          checkReady();
+        }
+      }, 100);
+    });
+
+    return () => {
+      isMounted = false;
+      if (timer) {
+        clearTimeout(timer);
+      }
+      setIsReady(false);
+    };
+  }, [map]);
+
+  // Don't render anything until map is fully ready
+  if (!isReady || !map) {
+    return null;
+  }
+
+  // Final safety check before rendering markers
+  try {
+    const container = map.getContainer();
+    const markerPane = map.getPane('markerPane');
+
+    if (!container || !container.parentElement || !markerPane || !markerPane.parentNode) {
+      return null;
+    }
+  } catch (error) {
+    console.warn('Error in MarkersLayer safety check:', error);
+    return null;
+  }
+
+  return (
+    <>
+      {markers.map((marker) => (
+        <Marker
+          key={marker.label}
+          position={marker.position as L.LatLngExpression}
+          icon={customIcon}>
+          <Tooltip>
+            <span className="font-bold flex items-center">
+              <span className="mr-2">{getFlagEmoji(marker.countryCode)}</span>
+              <span>
+                {marker.label}
+                {marker.countryName && (
+                  <span className="block text-xs font-normal mt-1">
+                    {marker.countryName}
+                  </span>
+                )}
+              </span>
+            </span>
+          </Tooltip>
+        </Marker>
+      ))}
+    </>
+  );
+};
+
 // --- Coordinate Mapping ---
 const locationCoordinates: Record<string, [number, number]> = {
   NYSE: [40.7069, -74.0118],
@@ -62,6 +169,7 @@ const locationCoordinates: Record<string, [number, number]> = {
   LIS: [38.7223, -9.1393],
   PAR: [48.8566, 2.3522],
   XETRA: [50.1109, 8.6821],
+  FSX: [50.1109, 8.6821], // Frankfurt Stock Exchange (same location as XETRA)
   BER: [52.52, 13.405],
   DUS: [51.2277, 6.7735],
   HAM: [53.5511, 9.9937],
@@ -109,7 +217,8 @@ const locationCoordinates: Record<string, [number, number]> = {
 
 // --- Main Component ---
 export const WorldMap: React.FC<WorldMapProps> = React.memo(({ markers, className }) => {
-  const [map, setMap] = useState<L.Map | null>(null);
+  const [map, setMap] = useState<Option.Option<L.Map>>(Option.none());
+  const [isMapReady, setIsMapReady] = useState(false);
 
   const validMarkers = useMemo(
     () =>
@@ -125,38 +234,107 @@ export const WorldMap: React.FC<WorldMapProps> = React.memo(({ markers, classNam
     return L.latLngBounds(latLngs);
   }, [validMarkers]);
 
-  useEffect(() => {
-    if (map && mapBounds) {
-      map.fitBounds(mapBounds, { padding: [50, 50] });
-      // This can help if the map's container size changes during render
-      map.invalidateSize();
+  // Handle map initialization
+  // NOTE: React-Leaflet's MapContainer handles map cleanup automatically.
+  // We only need to track the map instance for our own state management.
+  const handleMapRef = React.useCallback((mapInstance: L.Map | null) => {
+    if (mapInstance) {
+      // Wait for map to be fully ready before setting state
+      mapInstance.whenReady(() => {
+        // Verify map container is still valid before setting state
+        const container = mapInstance.getContainer();
+        if (container && container.parentElement) {
+          setIsMapReady(true);
+          setMap(Option.some(mapInstance));
+        }
+      });
+    } else {
+      // Map is being unmounted - just reset our state
+      // React-Leaflet will handle the actual cleanup
+      setIsMapReady(false);
+      setMap(Option.none());
     }
-  }, [map, mapBounds]);
+  }, []);
+
+
+  useEffect(() => {
+    if (Option.isNone(map) || !isMapReady || !mapBounds) return;
+
+    // Check if map container is still valid
+    const mapInstance = map.value;
+    const container = mapInstance.getContainer();
+    if (!container || !container.parentElement) {
+      return;
+    }
+
+    let timeoutId: NodeJS.Timeout | null = null;
+    let rafId: number | null = null;
+
+    try {
+      // Use requestAnimationFrame to ensure DOM is ready
+      rafId = requestAnimationFrame(() => {
+        // Double-check map container is still valid
+        if (Option.isNone(map)) return;
+        const currentMapInstance = map.value;
+        const currentContainer = currentMapInstance.getContainer();
+        if (!currentContainer || !currentContainer.parentElement) {
+          return;
+        }
+
+        try {
+          // Invalidate size first to ensure container dimensions are correct
+          currentMapInstance.invalidateSize();
+
+          // Small delay to ensure invalidateSize has taken effect
+          timeoutId = setTimeout(() => {
+            if (Option.isNone(map) || !mapBounds) return;
+            const finalMapInstance = map.value;
+            const finalContainer = finalMapInstance.getContainer();
+            if (!finalContainer || !finalContainer.parentElement) {
+              return;
+            }
+            try {
+              finalMapInstance.fitBounds(mapBounds, { padding: [50, 50] });
+            } catch (error) {
+              console.warn("Error fitting map bounds:", error);
+            }
+          }, 100);
+        } catch (error) {
+          console.warn("Error invalidating map size:", error);
+        }
+      });
+    } catch (error) {
+      console.warn("Error in map update effect:", error);
+    }
+
+    // Cleanup function
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
+    };
+  }, [map, isMapReady, mapBounds]);
 
   // Memoize the layers to prevent re-creating them on every render
+  // Only render layers when map is ready to prevent Leaflet DOM access errors
   const displayLayers = useMemo(() => {
+    if (!isMapReady || Option.isNone(map)) {
+      return null;
+    }
+
     return (
       <>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        {validMarkers.map((marker) => (
-          <Marker
-            key={marker.label}
-            position={marker.position as L.LatLngExpression}
-            icon={customIcon}>
-            <Tooltip>
-              <span className="font-bold flex items-center">
-                <span className="mr-2">{getFlagEmoji(marker.countryCode)}</span>
-                {marker.label}
-              </span>
-            </Tooltip>
-          </Marker>
-        ))}
+        <MarkersLayer markers={validMarkers} />
       </>
     );
-  }, [validMarkers]);
+  }, [validMarkers, isMapReady, map]);
 
   return (
     <div
@@ -165,7 +343,7 @@ export const WorldMap: React.FC<WorldMapProps> = React.memo(({ markers, classNam
         className
       )}>
       <MapContainer
-        ref={setMap}
+        ref={handleMapRef}
         center={[20, 0]}
         zoom={2}
         bounds={mapBounds}
@@ -178,7 +356,7 @@ export const WorldMap: React.FC<WorldMapProps> = React.memo(({ markers, classNam
         zoomControl={false}
         scrollWheelZoom={true}
         dragging={true}>
-        {map ? displayLayers : null}
+        {displayLayers}
       </MapContainer>
     </div>
   );

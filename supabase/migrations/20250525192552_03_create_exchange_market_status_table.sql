@@ -29,3 +29,29 @@ COMMENT ON COLUMN "public"."exchange_market_status"."last_fetched_at" IS 'Timest
 -- The separate ALTER TABLE for PK is removed as it's defined inline above.
 -- ALTER TABLE ONLY "public"."exchange_market_status"
 --     ADD CONSTRAINT "exchange_market_status_pkey" PRIMARY KEY ("exchange_code");
+
+-- Enable RLS
+ALTER TABLE "public"."exchange_market_status" ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies
+DROP POLICY IF EXISTS "Allow public read-only access to exchange market status" ON "public"."exchange_market_status";
+CREATE POLICY "Allow public read-only access to exchange market status" ON "public"."exchange_market_status" FOR SELECT USING (true);
+
+-- Grants
+GRANT ALL ON TABLE "public"."exchange_market_status" TO "anon";
+GRANT ALL ON TABLE "public"."exchange_market_status" TO "authenticated";
+GRANT ALL ON TABLE "public"."exchange_market_status" TO "service_role";
+
+-- Enable Realtime
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables
+        WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'exchange_market_status'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.exchange_market_status;
+        RAISE NOTICE 'Table public.exchange_market_status added to publication supabase_realtime.';
+    ELSE
+        RAISE NOTICE 'Table public.exchange_market_status is already a member of publication supabase_realtime. Skipping ADD.';
+    END IF;
+END $$;

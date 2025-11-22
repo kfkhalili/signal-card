@@ -21,11 +21,11 @@ import {
 } from "@/components/game/cardUpdateHandler.types";
 import type { Database } from "@/lib/supabase/database.types";
 import type { ProfileDBRow } from "@/hooks/useStockData";
-import { applyProfileCoreUpdates } from "../cardUtils";
+import type { FinancialStatementDBRow as FinancialStatementDBRowFromRealtime } from "@/lib/supabase/realtime-service";
+import { applyProfileCoreUpdates, fetchProfileInfo } from "../cardUtils";
 
 type RevenueSegmentationDBRow =
   Database["public"]["Tables"]["revenue_product_segmentation"]["Row"];
-type ProfileDBRowFromSupabase = Database["public"]["Tables"]["profiles"]["Row"];
 
 class RevenueBreakdownCardError extends Error {
   constructor(message: string) {
@@ -55,59 +55,56 @@ async function fetchAndProcessRevenueBreakdown(
   supabase: CardInitializationContext["supabase"],
   activeCards?: DisplayableCard[]
 ) {
+  // Fetch profile info using shared utility
+  const profileInfoResult = await fetchProfileInfo(symbol, supabase, activeCards);
+  const baseProfileInfo = profileInfoResult.isOk()
+    ? profileInfoResult.value
+    : {
+        companyName: symbol,
+        displayCompanyName: symbol,
+        logoUrl: null,
+        websiteUrl: null,
+      };
+
+  // Fetch currency separately (needed for revenue breakdown card)
+  let currency: string | null = null;
   const profileCardForSymbol = activeCards?.find(
     (c) => c.symbol === symbol && c.type === "profile"
-  ) as ProfileDBRowFromSupabase | undefined;
-  let profileInfo = {
-    companyName: profileCardForSymbol?.company_name ?? symbol,
-    displayCompanyName:
-      profileCardForSymbol?.display_company_name ??
-      profileCardForSymbol?.company_name ??
-      symbol,
-    logoUrl: profileCardForSymbol?.image ?? null,
-    websiteUrl: profileCardForSymbol?.website ?? null,
-    currencySymbol:
-      profileCardForSymbol?.currency === "USD"
-        ? "$"
-        : profileCardForSymbol?.currency || "$",
-  };
-
-  if (!profileCardForSymbol) {
-    const profileResult = await fromPromise(
+  );
+  if (profileCardForSymbol && profileCardForSymbol.type === "profile" && "staticData" in profileCardForSymbol) {
+    currency = (profileCardForSymbol.staticData as { currency?: string | null }).currency ?? null;
+  } else {
+    const currencyResult = await fromPromise(
       supabase
         .from("profiles")
-        .select("company_name, display_company_name, image, currency, website")
+        .select("currency")
         .eq("symbol", symbol)
         .maybeSingle(),
       (e) =>
         new RevenueBreakdownCardError(
-          `Profile fetch failed: ${(e as Error).message}`
+          `Failed to fetch currency: ${(e as Error).message}`
         )
     );
-    if (profileResult.isOk() && profileResult.value.data) {
-      const profileData = profileResult.value.data;
-      profileInfo = {
-        companyName: profileData.company_name ?? symbol,
-        displayCompanyName:
-          profileData.display_company_name ??
-          profileData.company_name ??
-          symbol,
-        logoUrl: profileData.image ?? null,
-        websiteUrl: profileData.website ?? null,
-        currencySymbol:
-          profileData.currency === "USD" ? "$" : profileData.currency || "$",
-      };
-    } else if (profileResult.isErr()) {
-      console.warn(profileResult.error.message);
+    if (currencyResult.isOk() && currencyResult.value.data) {
+      currency = currencyResult.value.data.currency ?? null;
     }
   }
 
+  const profileInfo = {
+    ...baseProfileInfo,
+    currencySymbol: currency === "USD" ? "$" : currency || "$",
+  };
+
+  // Fetch segmentation data
+  // CRITICAL: Exclude sentinel records (fiscal_year: 1900, date: '1900-01-01')
   const segmentDataResult = await fromPromise(
     supabase
       .from("revenue_product_segmentation")
       .select("*")
       .eq("symbol", symbol)
       .eq("period", "FY")
+      .neq("fiscal_year", "1900") // Exclude sentinel records
+      .neq("date", "1900-01-01") // Additional check for sentinel records
       .order("date", { ascending: false })
       .limit(2),
     (e) =>
@@ -120,12 +117,85 @@ async function fetchAndProcessRevenueBreakdown(
     return err(segmentDataResult.error);
   }
 
-  const segmentDataRows = segmentDataResult.value.data || [];
+  // Filter out any sentinel records that might have slipped through
+  // fiscal_year is an integer, so check for number 1900
+  const segmentDataRows = (segmentDataResult.value.data || []).filter(
+    (row) => row.fiscal_year !== 1900 && row.date !== "1900-01-01"
+  );
+
+  // Fetch latest financial statement to get revenue for consistency with revenue card
+  const financialStatementResult = await fromPromise(
+    supabase
+      .from("financial_statements")
+      .select("income_statement_payload, date, period, fiscal_year")
+      .eq("symbol", symbol)
+      .order("date", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    (e) =>
+      new RevenueBreakdownCardError(
+        `Financial statement fetch failed: ${(e as Error).message}`
+      )
+  );
+
+  let revenueFromFinancialStatements: number | null = null;
+  if (financialStatementResult.isOk() && financialStatementResult.value.data) {
+    const incomePayload = financialStatementResult.value.data.income_statement_payload;
+    if (incomePayload && typeof incomePayload === 'object' && 'revenue' in incomePayload) {
+      const revenue = (incomePayload as { revenue?: number }).revenue;
+      if (typeof revenue === 'number') {
+        revenueFromFinancialStatements = revenue;
+      }
+    }
+  }
+
   return ok({
     profileInfo,
     latestRow: segmentDataRows.length > 0 ? segmentDataRows[0] : null,
     previousRow: segmentDataRows.length > 1 ? segmentDataRows[1] : null,
+    revenueFromFinancialStatements,
   });
+}
+
+function createEmptyRevenueBreakdownCard(
+  symbol: string,
+  existingCardId?: string,
+  existingCreatedAt?: number
+): RevenueBreakdownCardData & Pick<DisplayableCardState, "isFlipped"> {
+  const emptyStaticData: RevenueBreakdownCardStaticData = {
+    currencySymbol: "$",
+    latestPeriodLabel: "N/A",
+    previousPeriodLabel: null,
+  };
+
+  const emptyLiveData: RevenueBreakdownCardLiveData = {
+    totalRevenueLatestPeriod: null,
+    breakdown: [],
+    lastUpdated: null,
+  };
+
+  const cardBackData: BaseCardBackData = {
+    description: `Revenue breakdown by product/segment for ${symbol}.`,
+  };
+
+  const concreteCardData: RevenueBreakdownCardData = {
+    id: existingCardId || `revenuebreakdown-${symbol}-${Date.now()}`,
+    type: "revenuebreakdown",
+    symbol: symbol,
+    companyName: null,
+    displayCompanyName: null,
+    logoUrl: null,
+    createdAt: existingCreatedAt ?? Date.now(),
+    staticData: emptyStaticData,
+    liveData: emptyLiveData,
+    backData: cardBackData,
+    websiteUrl: null,
+  };
+
+  return {
+    ...concreteCardData,
+    isFlipped: false,
+  };
 }
 
 function constructRevenueBreakdownCardData(
@@ -139,6 +209,7 @@ function constructRevenueBreakdownCardData(
   },
   latestRow: RevenueSegmentationDBRow | null,
   previousRow: RevenueSegmentationDBRow | null,
+  revenueFromFinancialStatements: number | null = null,
   idOverride?: string | null,
   existingCreatedAt?: number | null
 ): RevenueBreakdownCardData | null {
@@ -148,10 +219,12 @@ function constructRevenueBreakdownCardData(
   const previousSegments = previousRow
     ? parseSegmentData(previousRow.data)
     : {};
-  const totalRevenueLatestPeriod = Object.values(latestSegments).reduce(
-    (sum, current) => sum + current,
-    0
-  );
+
+  // Use revenue from financial_statements if available (for consistency with revenue card)
+  // Otherwise, calculate from segmentation data
+  const totalRevenueLatestPeriod = revenueFromFinancialStatements !== null
+    ? revenueFromFinancialStatements
+    : Object.values(latestSegments).reduce((sum, current) => sum + current, 0);
 
   const breakdown: SegmentRevenueDataItem[] = Object.entries(latestSegments)
     .map(([segmentName, currentRevenue]) => {
@@ -164,8 +237,15 @@ function constructRevenueBreakdownCardData(
     })
     .sort((a, b) => b.currentRevenue - a.currentRevenue);
 
+  // Convert currency code to symbol (e.g., "USD" -> "$")
+  const getCurrencySymbol = (currency: string | null | undefined): string => {
+    if (!currency) return profileInfo.currencySymbol;
+    if (currency === "USD") return "$";
+    return currency; // For other currencies, use as-is (could be extended later)
+  };
+
   const staticData: RevenueBreakdownCardStaticData = {
-    currencySymbol: latestRow.reported_currency || profileInfo.currencySymbol,
+    currencySymbol: getCurrencySymbol(latestRow.reported_currency) || profileInfo.currencySymbol,
     latestPeriodLabel: `FY${latestRow.fiscal_year} ending ${latestRow.date}`,
     previousPeriodLabel: previousRow
       ? `FY${previousRow.fiscal_year} ending ${previousRow.date}`
@@ -188,9 +268,9 @@ function constructRevenueBreakdownCardData(
     id: idOverride || `revenuebreakdown-${symbol}-${Date.now()}`,
     type: "revenuebreakdown",
     symbol,
-    companyName: profileInfo.companyName ?? symbol,
+    companyName: profileInfo.companyName ?? null,
     displayCompanyName:
-      profileInfo.displayCompanyName ?? profileInfo.companyName ?? symbol,
+      profileInfo.displayCompanyName ?? profileInfo.companyName ?? null,
     logoUrl: profileInfo.logoUrl ?? null,
     websiteUrl: profileInfo.websiteUrl ?? null,
     createdAt: existingCreatedAt ?? Date.now(),
@@ -203,7 +283,6 @@ function constructRevenueBreakdownCardData(
 async function initializeRevenueBreakdownCard({
   symbol,
   supabase,
-  toast,
   activeCards,
 }: CardInitializationContext): Promise<
   Result<DisplayableCard, RevenueBreakdownCardError>
@@ -215,35 +294,23 @@ async function initializeRevenueBreakdownCard({
   );
 
   if (fetchDataResult.isErr()) {
-    if (toast)
-      toast({
-        title: "Error Initializing Revenue Breakdown",
-        description: fetchDataResult.error.message,
-        variant: "destructive",
-      });
     return err(fetchDataResult.error);
   }
 
-  const { profileInfo, latestRow, previousRow } = fetchDataResult.value;
+  const { profileInfo, latestRow, previousRow, revenueFromFinancialStatements } = fetchDataResult.value;
 
   if (!latestRow) {
-    if (toast)
-      toast({
-        title: "No Revenue Breakdown Data",
-        description: `No revenue segmentation data found for ${symbol}.`,
-      });
-    return err(
-      new RevenueBreakdownCardError(
-        `No revenue segmentation data found for ${symbol}.`
-      )
-    );
+    // No data found - return empty state card
+    const emptyCard = createEmptyRevenueBreakdownCard(symbol);
+    return ok(emptyCard);
   }
 
   const concreteCardData = constructRevenueBreakdownCardData(
     symbol,
     profileInfo,
     latestRow,
-    previousRow
+    previousRow,
+    revenueFromFinancialStatements
   );
   if (!concreteCardData) {
     // This case should be rare if latestRow is guaranteed, but it's a safe check.
@@ -265,7 +332,7 @@ const handleRevenueBreakdownProfileUpdate: CardUpdateHandler<
   RevenueBreakdownCardData,
   ProfileDBRow
 > = (currentCardData, profilePayload): RevenueBreakdownCardData => {
-  const { updatedCardData, coreDataChanged } = applyProfileCoreUpdates(
+  const { updatedCardData } = applyProfileCoreUpdates(
     currentCardData,
     profilePayload
   );
@@ -275,30 +342,197 @@ const handleRevenueBreakdownProfileUpdate: CardUpdateHandler<
     newBaseCurrency === "USD"
       ? "$"
       : newBaseCurrency || updatedCardData.staticData.currencySymbol;
-  const currencySymbolChanged =
-    updatedCardData.staticData.currencySymbol !== newCurrencySymbol;
+  // Always apply profile updates to ensure data propagates correctly
+  const finalCardData = {
+    ...updatedCardData,
+    staticData: {
+      ...updatedCardData.staticData,
+      currencySymbol: newCurrencySymbol,
+    },
+  };
 
-  if (coreDataChanged || currencySymbolChanged) {
-    const finalCardData = {
-      ...updatedCardData,
-      staticData: {
-        ...updatedCardData.staticData,
-        currencySymbol: newCurrencySymbol,
-      },
-    };
-
-    const newBackData: BaseCardBackData = {
-      description: `Revenue breakdown by product/segment for ${finalCardData.companyName} for ${finalCardData.staticData.latestPeriodLabel}, showing year-over-year changes.`,
-    };
-    return {
-      ...finalCardData,
-      backData: newBackData,
-    };
-  }
-  return currentCardData;
+  const newBackData: BaseCardBackData = {
+    description: `Revenue breakdown by product/segment for ${finalCardData.companyName} for ${finalCardData.staticData.latestPeriodLabel}, showing year-over-year changes.`,
+  };
+  return {
+    ...finalCardData,
+    backData: newBackData,
+  };
 };
 registerCardUpdateHandler(
   "revenuebreakdown",
   "STATIC_PROFILE_UPDATE",
   handleRevenueBreakdownProfileUpdate
+);
+
+const handleRevenueSegmentationUpdate: CardUpdateHandler<
+  RevenueBreakdownCardData,
+  RevenueSegmentationDBRow
+> = (
+  currentCardData,
+  updatedRow
+): RevenueBreakdownCardData => {
+  // CRITICAL: Ignore sentinel records (fiscal_year: 1900, date: '1900-01-01')
+  // fiscal_year is an integer, so check for number 1900
+  if (updatedRow.fiscal_year === 1900 || updatedRow.date === "1900-01-01") {
+    return currentCardData; // Don't process sentinel records
+  }
+
+  // If card is in empty state (latestPeriodLabel is "N/A"), always update
+  if (
+    currentCardData.staticData.latestPeriodLabel === "N/A" &&
+    updatedRow.date
+  ) {
+    const updatedSegments = parseSegmentData(updatedRow.data);
+    // Calculate revenue from segments as fallback, but preserve revenue from financial_statements if already set
+    const revenueFromSegments = Object.values(updatedSegments).reduce(
+      (sum, current) => sum + current,
+      0
+    );
+    // Use revenue from financial_statements if available, otherwise use calculated from segments
+    const totalRevenue = currentCardData.liveData.totalRevenueLatestPeriod !== null
+      ? currentCardData.liveData.totalRevenueLatestPeriod
+      : revenueFromSegments;
+
+    const breakdown: SegmentRevenueDataItem[] = Object.entries(
+      updatedSegments
+    ).map(([segmentName, currentRevenue]) => ({
+      segmentName,
+      currentRevenue,
+      previousRevenue: null,
+      yoyChange: null,
+    }));
+
+    return {
+      ...currentCardData,
+      liveData: {
+        totalRevenueLatestPeriod: totalRevenue,
+        breakdown: breakdown.sort((a, b) => b.currentRevenue - a.currentRevenue),
+        lastUpdated: updatedRow.updated_at || updatedRow.fetched_at,
+      },
+      staticData: {
+        currencySymbol: (() => {
+          const currency = updatedRow.reported_currency;
+          if (!currency) return currentCardData.staticData.currencySymbol;
+          if (currency === "USD") return "$";
+          return currency;
+        })(),
+        latestPeriodLabel: `FY${updatedRow.fiscal_year} ending ${updatedRow.date}`,
+        previousPeriodLabel: null,
+      },
+    };
+  }
+
+  // Check if the updated row is for the latest period (newer date)
+  const currentLatestDate = currentCardData.staticData.latestPeriodLabel
+    .split("ending ")[1]
+    ?.trim();
+  const updatedDate = updatedRow.date;
+
+  if (!currentLatestDate || !updatedDate) {
+    return currentCardData; // Can't compare, return unchanged
+  }
+
+  // If the updated row is for a newer or same period, update the card
+  if (updatedDate >= currentLatestDate) {
+    // Reconstruct the card data with the updated row as the latest
+    // For simplicity, we'll use just this row (previous will be the old latest)
+    const updatedSegments = parseSegmentData(updatedRow.data);
+    const previousSegments = parseSegmentData(
+      currentCardData.liveData.breakdown.reduce(
+        (acc, item) => {
+          acc[item.segmentName] = item.currentRevenue;
+          return acc;
+        },
+        {} as Record<string, number>
+      )
+    );
+
+    // Calculate revenue from segments as fallback, but preserve revenue from financial_statements if already set
+    const revenueFromSegments = Object.values(updatedSegments).reduce(
+      (sum, current) => sum + current,
+      0
+    );
+    // Use revenue from financial_statements if available, otherwise use calculated from segments
+    const totalRevenue = currentCardData.liveData.totalRevenueLatestPeriod !== null
+      ? currentCardData.liveData.totalRevenueLatestPeriod
+      : revenueFromSegments;
+
+    const breakdown: SegmentRevenueDataItem[] = Object.entries(
+      updatedSegments
+    ).map(([segmentName, currentRevenue]) => {
+      const previousRevenue = previousSegments[segmentName] ?? null;
+      let yoyChange: number | null = null;
+      if (previousRevenue !== null && previousRevenue !== 0) {
+        yoyChange = (currentRevenue - previousRevenue) / previousRevenue;
+      }
+      return { segmentName, currentRevenue, previousRevenue, yoyChange };
+    });
+
+    const updatedLiveData: RevenueBreakdownCardLiveData = {
+      totalRevenueLatestPeriod: totalRevenue,
+      breakdown: breakdown.sort((a, b) => b.currentRevenue - a.currentRevenue),
+      lastUpdated: updatedRow.updated_at || updatedRow.fetched_at,
+    };
+
+    const updatedStaticData: RevenueBreakdownCardStaticData = {
+      currencySymbol:
+        updatedRow.reported_currency || currentCardData.staticData.currencySymbol,
+      latestPeriodLabel: `FY${updatedRow.fiscal_year} ending ${updatedRow.date}`,
+      previousPeriodLabel: currentCardData.staticData.latestPeriodLabel,
+    };
+
+    return {
+      ...currentCardData,
+      liveData: updatedLiveData,
+      staticData: updatedStaticData,
+    };
+  }
+
+  return currentCardData; // Update is for an older period, no change needed
+};
+
+registerCardUpdateHandler(
+  "revenuebreakdown",
+  "REVENUE_SEGMENTATION_UPDATE",
+  handleRevenueSegmentationUpdate
+);
+
+const handleRevenueBreakdownFinancialStatementUpdate: CardUpdateHandler<
+  RevenueBreakdownCardData,
+  FinancialStatementDBRowFromRealtime
+> = (
+  currentCardData,
+  updatedFinancialStatement
+): RevenueBreakdownCardData => {
+  // Extract revenue from the financial statement
+  const incomePayload = updatedFinancialStatement.income_statement_payload;
+  let revenueFromFinancialStatements: number | null = null;
+
+  if (incomePayload && typeof incomePayload === 'object' && 'revenue' in incomePayload) {
+    const revenue = (incomePayload as { revenue?: number }).revenue;
+    if (typeof revenue === 'number') {
+      revenueFromFinancialStatements = revenue;
+    }
+  }
+
+  // Only update if we got a valid revenue value and it's different from current
+  if (revenueFromFinancialStatements !== null &&
+      revenueFromFinancialStatements !== currentCardData.liveData.totalRevenueLatestPeriod) {
+    return {
+      ...currentCardData,
+      liveData: {
+        ...currentCardData.liveData,
+        totalRevenueLatestPeriod: revenueFromFinancialStatements,
+      },
+    };
+  }
+
+  return currentCardData;
+};
+
+registerCardUpdateHandler(
+  "revenuebreakdown",
+  "FINANCIAL_STATEMENT_UPDATE",
+  handleRevenueBreakdownFinancialStatementUpdate
 );

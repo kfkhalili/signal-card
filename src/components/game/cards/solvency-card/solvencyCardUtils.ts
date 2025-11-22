@@ -23,17 +23,63 @@ import {
 import type { Database } from "@/lib/supabase/database.types";
 import type { FinancialStatementDBRow as FinancialStatementDBRowFromRealtime } from "@/lib/supabase/realtime-service";
 import type { ProfileDBRow } from "@/hooks/useStockData";
-import { applyProfileCoreUpdates } from "../cardUtils";
+import { applyProfileCoreUpdates, fetchProfileInfo } from "../cardUtils";
 
 type FinancialStatementDBRowFromSupabase =
   Database["public"]["Tables"]["financial_statements"]["Row"];
-type ProfileDBRowFromSupabase = Database["public"]["Tables"]["profiles"]["Row"];
 
 class SolvencyCardError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "SolvencyCardError";
   }
+}
+
+function createEmptySolvencyCard(
+  symbol: string,
+  existingCardId?: string,
+  existingCreatedAt?: number
+): SolvencyCardData & Pick<DisplayableCardState, "isFlipped"> {
+  const emptyStaticData: SolvencyCardStaticData = {
+    periodLabel: "N/A",
+    reportedCurrency: null,
+    filingDate: null,
+    acceptedDate: null,
+    statementDate: "N/A",
+    statementPeriod: "N/A",
+  };
+
+  const emptyLiveData: SolvencyCardLiveData = {
+    totalAssets: null,
+    cashAndShortTermInvestments: null,
+    totalCurrentLiabilities: null,
+    shortTermDebt: null,
+    longTermDebt: null,
+    freeCashFlow: null,
+  };
+
+  const cardBackData: BaseCardBackData = {
+    description: `Key solvency metrics for ${symbol}. Includes assets, liabilities, debt, and cash flow.`,
+  };
+
+  const concreteCardData: SolvencyCardData = {
+    id: existingCardId || `solvency-${symbol}-${Date.now()}`,
+    type: "solvency",
+    symbol: symbol,
+    companyName: null,
+    displayCompanyName: null,
+    logoUrl: null,
+    createdAt: existingCreatedAt ?? Date.now(),
+    staticData: emptyStaticData,
+    liveData: emptyLiveData,
+    backData: cardBackData,
+    websiteUrl: null,
+  };
+
+  return {
+    ...concreteCardData,
+    isFlipped: false,
+  };
 }
 
 function constructSolvencyCardData(
@@ -110,9 +156,9 @@ function constructSolvencyCardData(
       `solvency-${dbRow.symbol}-${dbRow.date}-${dbRow.period}-${Date.now()}`,
     type: "solvency",
     symbol: dbRow.symbol,
-    companyName: profileInfo.companyName ?? dbRow.symbol,
+    companyName: profileInfo.companyName ?? null,
     displayCompanyName:
-      profileInfo.displayCompanyName ?? profileInfo.companyName ?? dbRow.symbol,
+      profileInfo.displayCompanyName ?? profileInfo.companyName ?? null,
     logoUrl: profileInfo.logoUrl ?? null,
     websiteUrl: profileInfo.websiteUrl ?? null,
     createdAt: existingCreatedAt ?? Date.now(),
@@ -125,53 +171,20 @@ function constructSolvencyCardData(
 async function initializeSolvencyCard({
   symbol,
   supabase,
-  toast,
   activeCards,
 }: CardInitializationContext): Promise<
   Result<DisplayableCard, SolvencyCardError>
 > {
-  const profileCardForSymbol = activeCards?.find(
-    (c) => c.symbol === symbol && c.type === "profile"
-  ) as ProfileDBRowFromSupabase | undefined;
-
-  let fetchedProfileInfo = {
-    companyName: profileCardForSymbol?.company_name ?? symbol,
-    displayCompanyName:
-      profileCardForSymbol?.display_company_name ??
-      profileCardForSymbol?.company_name ??
-      symbol,
-    logoUrl: profileCardForSymbol?.image ?? null,
-    websiteUrl: profileCardForSymbol?.website ?? null,
-  };
-
-  if (!profileCardForSymbol) {
-    const profileResult = await fromPromise(
-      supabase
-        .from("profiles")
-        .select("company_name, display_company_name, image, website")
-        .eq("symbol", symbol)
-        .maybeSingle(),
-      (e) =>
-        new SolvencyCardError(
-          `Failed to fetch profile: ${(e as Error).message}`
-        )
-    );
-
-    if (profileResult.isOk() && profileResult.value.data) {
-      const profileData = profileResult.value.data as ProfileDBRowFromSupabase;
-      fetchedProfileInfo = {
-        companyName: profileData.company_name ?? symbol,
-        displayCompanyName:
-          profileData.display_company_name ??
-          profileData.company_name ??
-          symbol,
-        logoUrl: profileData.image ?? null,
-        websiteUrl: profileData.website ?? null,
+  // Fetch profile info using shared utility
+  const profileInfoResult = await fetchProfileInfo(symbol, supabase, activeCards);
+  const fetchedProfileInfo = profileInfoResult.isOk()
+    ? profileInfoResult.value
+    : {
+        companyName: symbol,
+        displayCompanyName: symbol,
+        logoUrl: null,
+        websiteUrl: null,
       };
-    } else if (profileResult.isErr()) {
-      console.warn(profileResult.error.message);
-    }
-  }
 
   const statementResult = await fromPromise(
     supabase
@@ -209,16 +222,22 @@ async function initializeSolvencyCard({
     return ok({ ...concreteCardData, ...cardState });
   }
 
-  if (toast) {
-    toast({
-      title: "Statement Not Found",
-      description: `No financial statements currently available for ${symbol} to create a Solvency Card.`,
-      variant: "default",
-    });
-  }
-  return err(
-    new SolvencyCardError(`No financial statements found for ${symbol}.`)
-  );
+  // No data found - return empty state card
+  const emptyCard = createEmptySolvencyCard(symbol);
+  // Apply profile info to empty card if available
+  // Only set companyName if it's not the symbol fallback (to avoid showing symbol in parenthesis)
+  const emptyCardWithProfile: SolvencyCardData & Pick<DisplayableCardState, "isFlipped"> = {
+    ...emptyCard,
+    companyName: fetchedProfileInfo.companyName && fetchedProfileInfo.companyName !== symbol
+      ? fetchedProfileInfo.companyName
+      : null,
+    displayCompanyName: fetchedProfileInfo.displayCompanyName && fetchedProfileInfo.displayCompanyName !== symbol
+      ? fetchedProfileInfo.displayCompanyName
+      : null,
+    logoUrl: fetchedProfileInfo.logoUrl ?? null,
+    websiteUrl: fetchedProfileInfo.websiteUrl ?? null,
+  };
+  return ok(emptyCardWithProfile);
 }
 
 registerCardInitializer("solvency", initializeSolvencyCard);
@@ -228,9 +247,7 @@ const handleSolvencyCardStatementUpdate: CardUpdateHandler<
   FinancialStatementDBRowFromRealtime
 > = (
   currentSolvencyCardData,
-  newFinancialStatementRow,
-  _currentDisplayableCard,
-  context
+  newFinancialStatementRow
 ): SolvencyCardData => {
   const currentStatementDateStr =
     currentSolvencyCardData.staticData.statementDate;
@@ -238,6 +255,24 @@ const handleSolvencyCardStatementUpdate: CardUpdateHandler<
 
   if (!newStatementDateStr || !newFinancialStatementRow.period) {
     return currentSolvencyCardData;
+  }
+
+  // If card is in empty state (N/A), always update
+  if (
+    currentStatementDateStr === "N/A" ||
+    currentSolvencyCardData.staticData.statementPeriod === "N/A"
+  ) {
+    return constructSolvencyCardData(
+      newFinancialStatementRow,
+      {
+        companyName: currentSolvencyCardData.companyName,
+        displayCompanyName: currentSolvencyCardData.displayCompanyName,
+        logoUrl: currentSolvencyCardData.logoUrl,
+        websiteUrl: currentSolvencyCardData.websiteUrl,
+      },
+      currentSolvencyCardData.id,
+      currentSolvencyCardData.createdAt
+    );
   }
 
   const currentStatementDate = new Date(currentStatementDateStr);
@@ -293,14 +328,6 @@ const handleSolvencyCardStatementUpdate: CardUpdateHandler<
   }
 
   if (shouldUpdate) {
-    if (context.toast) {
-      context.toast({
-        title: `Solvency Data Updated: ${newFinancialStatementRow.symbol}`,
-        description: `New statement for period ${
-          newFinancialStatementRow.period
-        } ${newFinancialStatementRow.fiscal_year || ""} applied.`,
-      });
-    }
     return constructSolvencyCardData(
       newFinancialStatementRow,
       {
@@ -325,25 +352,23 @@ const handleSolvencyCardProfileUpdate: CardUpdateHandler<
   SolvencyCardData,
   ProfileDBRow
 > = (currentSolvencyCardData, profilePayload): SolvencyCardData => {
-  const { updatedCardData, coreDataChanged } = applyProfileCoreUpdates(
+  const { updatedCardData } = applyProfileCoreUpdates(
     currentSolvencyCardData,
     profilePayload
   );
 
-  if (coreDataChanged) {
-    const newBackDataDescription: BaseCardBackData = {
-      description: `Key solvency metrics for ${updatedCardData.companyName} (${
-        updatedCardData.staticData.periodLabel
-      }, ending ${
-        updatedCardData.staticData.statementDate || "N/A"
-      }). Includes assets, liabilities, debt, and cash flow.`,
-    };
-    return {
-      ...updatedCardData,
-      backData: newBackDataDescription,
-    };
-  }
-  return currentSolvencyCardData;
+  // Always apply profile updates to ensure data propagates correctly
+  const newBackDataDescription: BaseCardBackData = {
+    description: `Key solvency metrics for ${updatedCardData.companyName} (${
+      updatedCardData.staticData.periodLabel
+    }, ending ${
+      updatedCardData.staticData.statementDate || "N/A"
+    }). Includes assets, liabilities, debt, and cash flow.`,
+  };
+  return {
+    ...updatedCardData,
+    backData: newBackDataDescription,
+  };
 };
 registerCardUpdateHandler(
   "solvency",

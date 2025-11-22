@@ -25,9 +25,12 @@ export const LineChartComponent: React.FC<LineChartComponentProps> = ({
   yAxisKey,
   currencySymbol = "$",
 }) => {
+  // Create a key based on data to force re-render when data changes
+  const dataKey = JSON.stringify(data);
+
   return (
     <div className="h-20 w-full">
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" key={dataKey}>
         <LineChart
           data={data}
           margin={{ top: 5, right: 30, left: 5, bottom: -10 }}>

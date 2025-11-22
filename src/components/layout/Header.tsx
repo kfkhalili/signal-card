@@ -2,6 +2,7 @@
 "use client";
 
 import React,  { useState, useEffect } from "react";
+import { Option } from "effect";
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,6 +11,7 @@ import { LogOut, LayoutDashboard, Loader2, AlertTriangle, Compass } from "lucide
 import Avatar from "@/components/ui/Avatar";
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { Database } from '@/lib/supabase/database.types'
+import { fromPromise } from "neverthrow";
 
 type Profile = Database['public']['Tables']['user_profiles']['Row'];
 
@@ -36,23 +38,36 @@ const NavLinkItem: React.FC<{
 
 const Header: React.FC = () => {
   const { user, signOut, isLoading, clientInitError } = useAuth();
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profile, setProfile] = useState<Option.Option<Profile>>(Option.none());
   const supabase = createSupabaseBrowserClient();
 
   useEffect(() => {
     if (user && supabase) {
       const fetchProfile = async () => {
-        const { data, error } = await supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
+        const profileResult = await fromPromise(
+          supabase
+            .from('user_profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single(),
+          (e) => new Error(`Failed to fetch profile for header: ${(e as Error).message}`)
+        );
 
-        if (error) {
-          console.error('Error fetching profile for header:', error);
-        } else {
-          setProfile(data);
-        }
+        profileResult.match(
+          (response) => {
+            const { data, error } = response;
+
+            if (error) {
+              console.error('Error fetching profile for header:', error);
+            } else {
+              setProfile(Option.fromNullable(data));
+            }
+          },
+          (err) => {
+            // Handle Result error (network/exception errors)
+            console.error('Error fetching profile for header:', err);
+          }
+        );
       };
       fetchProfile();
     }
@@ -93,32 +108,30 @@ const Header: React.FC = () => {
           {!clientInitError && !isLoading && user && (
             <>
               <NavLinkItem
-                href="/workspace"
-                title="Workspace"
-                icon={LayoutDashboard}
-                text="Workspace"
-              />
-              {/* --- NEW LINK ADDED HERE --- */}
-              <NavLinkItem
                 href="/compass"
                 title="Market Compass"
                 icon={Compass}
                 text="Compass"
               />
-              {/* ------------------------- */}
+              <NavLinkItem
+                href="/workspace"
+                title="Workspace"
+                icon={LayoutDashboard}
+                text="Workspace"
+              />
               <Link href="/profile" title="Your Profile" className="flex items-center space-x-2 p-1 rounded-md hover:bg-muted transition-colors">
-                {profile && (
+                {Option.isSome(profile) && (
                     <Avatar
-                        src={profile.avatar_url}
-                        alt={profile.full_name || profile.username || 'User Avatar'}
+                        src={profile.value.avatar_url}
+                        alt={profile.value.full_name || profile.value.username || 'User Avatar'}
                         size={30}
                     />
                 )}
-                {profile?.username && (
+                {Option.isSome(profile) && profile.value.username && (
                   <span
                     className="text-xs sm:text-sm text-muted-foreground hidden md:inline truncate max-w-[100px] lg:max-w-[150px]"
-                    title={profile.username}>
-                    @{profile.username}
+                    title={profile.value.username}>
+                    @{profile.value.username}
                   </span>
                 )}
               </Link>

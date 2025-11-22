@@ -22,11 +22,10 @@ import {
 } from "@/components/game/cardUpdateHandler.types";
 import type { Database } from "@/lib/supabase/database.types";
 import type { ProfileDBRow } from "@/hooks/useStockData";
-import { applyProfileCoreUpdates } from "../cardUtils";
+import { applyProfileCoreUpdates, fetchProfileInfo } from "../cardUtils";
 
 type DividendHistoryDBRow =
   Database["public"]["Tables"]["dividend_history"]["Row"];
-type ProfileDBRowFromSupabase = Database["public"]["Tables"]["profiles"]["Row"];
 
 class DividendsHistoryError extends Error {
   constructor(message: string) {
@@ -136,47 +135,45 @@ async function fetchAndProcessDividendsData(
   supabase: CardInitializationContext["supabase"],
   activeCards?: DisplayableCard[]
 ) {
+  // Fetch profile info using shared utility
+  const profileInfoResult = await fetchProfileInfo(symbol, supabase, activeCards);
+  const baseProfileInfo = profileInfoResult.isOk()
+    ? profileInfoResult.value
+    : {
+        companyName: symbol,
+        displayCompanyName: symbol,
+        logoUrl: null,
+        websiteUrl: null,
+      };
+
+  // Fetch currency separately (needed for dividends history card)
+  let reportedCurrency: string | null = null;
   const profileCardForSymbol = activeCards?.find(
     (c) => c.symbol === symbol && c.type === "profile"
-  ) as ProfileDBRowFromSupabase | undefined;
-  let profileInfo = {
-    companyName: profileCardForSymbol?.company_name ?? symbol,
-    displayCompanyName:
-      profileCardForSymbol?.display_company_name ??
-      profileCardForSymbol?.company_name ??
-      symbol,
-    logoUrl: profileCardForSymbol?.image ?? null,
-    websiteUrl: profileCardForSymbol?.website ?? null,
-    reportedCurrency: profileCardForSymbol?.currency ?? null,
-  };
-  if (!profileCardForSymbol) {
-    const profileResult = await fromPromise(
+  );
+  if (profileCardForSymbol && profileCardForSymbol.type === "profile" && "staticData" in profileCardForSymbol) {
+    reportedCurrency = (profileCardForSymbol.staticData as { currency?: string | null }).currency ?? null;
+  } else {
+    const currencyResult = await fromPromise(
       supabase
         .from("profiles")
-        .select("company_name, display_company_name, image, currency, website")
+        .select("currency")
         .eq("symbol", symbol)
         .maybeSingle(),
       (e) =>
         new DividendsHistoryError(
-          `Profile fetch failed: ${(e as Error).message}`
+          `Failed to fetch currency: ${(e as Error).message}`
         )
     );
-    if (profileResult.isOk() && profileResult.value.data) {
-      const profileData = profileResult.value.data;
-      profileInfo = {
-        companyName: profileData.company_name ?? symbol,
-        displayCompanyName:
-          profileData.display_company_name ??
-          profileData.company_name ??
-          symbol,
-        logoUrl: profileData.image ?? null,
-        websiteUrl: profileData.website ?? null,
-        reportedCurrency: profileData.currency ?? null,
-      };
-    } else if (profileResult.isErr()) {
-      console.warn(profileResult.error.message);
+    if (currencyResult.isOk() && currencyResult.value.data) {
+      reportedCurrency = currencyResult.value.data.currency ?? null;
     }
   }
+
+  const profileInfo = {
+    ...baseProfileInfo,
+    reportedCurrency,
+  };
 
   const latestDividendResult = await fromPromise(
     supabase
@@ -214,6 +211,47 @@ async function fetchAndProcessDividendsData(
     latestDividendRow: latestDividendResult.value.data,
     historicalRows: historicalResult.value.data || [],
   });
+}
+
+function createEmptyDividendsHistoryCard(
+  symbol: string,
+  existingCardId?: string,
+  existingCreatedAt?: number
+): DividendsHistoryCardData & Pick<DisplayableCardState, "isFlipped"> {
+  const emptyStaticData: DividendsHistoryCardStaticData = {
+    reportedCurrency: null,
+    typicalFrequency: null,
+  };
+
+  const emptyLiveData: DividendsHistoryCardLiveData = {
+    latestDividend: null,
+    annualDividendFigures: [],
+    lastFullYearDividendGrowthYoY: null,
+    lastUpdated: null,
+  };
+
+  const cardBackData: BaseCardBackData = {
+    description: `Dividend history and distribution information for ${symbol}.`,
+  };
+
+  const concreteCardData: DividendsHistoryCardData = {
+    id: existingCardId || `dividendshistory-${symbol}-${Date.now()}`,
+    type: "dividendshistory",
+    symbol: symbol,
+    companyName: null,
+    displayCompanyName: null,
+    logoUrl: null,
+    createdAt: existingCreatedAt ?? Date.now(),
+    staticData: emptyStaticData,
+    liveData: emptyLiveData,
+    backData: cardBackData,
+    websiteUrl: null,
+  };
+
+  return {
+    ...concreteCardData,
+    isFlipped: false,
+  };
 }
 
 function constructDividendsHistoryCardData(
@@ -288,9 +326,9 @@ function constructDividendsHistoryCardData(
     id: idOverride || `dividendshistory-${symbol}-${Date.now()}`,
     type: "dividendshistory",
     symbol,
-    companyName: profileInfo.companyName ?? symbol,
+    companyName: profileInfo.companyName ?? null,
     displayCompanyName:
-      profileInfo.displayCompanyName ?? profileInfo.companyName ?? symbol,
+      profileInfo.displayCompanyName ?? profileInfo.companyName ?? null,
     logoUrl: profileInfo.logoUrl ?? null,
     websiteUrl: profileInfo.websiteUrl ?? null,
     createdAt: existingCreatedAt ?? Date.now(),
@@ -303,7 +341,6 @@ function constructDividendsHistoryCardData(
 async function initializeDividendsHistoryCard({
   symbol,
   supabase,
-  toast,
   activeCards,
 }: CardInitializationContext): Promise<
   Result<DisplayableCard, DividendsHistoryError>
@@ -314,12 +351,6 @@ async function initializeDividendsHistoryCard({
     activeCards
   );
   if (fetchDataResult.isErr()) {
-    if (toast)
-      toast({
-        title: "Error Initializing Dividends History",
-        description: fetchDataResult.error.message,
-        variant: "destructive",
-      });
     return err(fetchDataResult.error);
   }
 
@@ -327,15 +358,9 @@ async function initializeDividendsHistoryCard({
     fetchDataResult.value;
 
   if (!latestDividendRow && historicalRows.length === 0) {
-    if (toast)
-      toast({
-        title: "No Dividend Data",
-        description: `No dividend history found for ${symbol}.`,
-        variant: "default",
-      });
-    return err(
-      new DividendsHistoryError(`No dividend data found for ${symbol}.`)
-    );
+    // No data found - return empty state card
+    const emptyCard = createEmptyDividendsHistoryCard(symbol);
+    return ok(emptyCard);
   }
 
   const cardData = constructDividendsHistoryCardData(
@@ -357,10 +382,44 @@ const handleSingleDividendRowUpdate: CardUpdateHandler<
   DividendHistoryDBRow
 > = (
   currentCardData,
-  newDividendRow,
-  _currentDisplayableCard,
-  context
+  newDividendRow
 ): DividendsHistoryCardData => {
+  // If card is in empty state (latestDividend is null), always update
+  if (!currentCardData.liveData.latestDividend && newDividendRow.date) {
+    const newLatestDividendInfo: LatestDividendInfo = {
+      amount: newDividendRow.dividend,
+      adjAmount: newDividendRow.adj_dividend,
+      exDividendDate: newDividendRow.date,
+      paymentDate: newDividendRow.payment_date,
+      declarationDate: newDividendRow.declaration_date,
+      yieldAtDistribution: newDividendRow.yield,
+      frequency: newDividendRow.frequency,
+    };
+    const currentUtcYear = new Date().getUTCFullYear();
+    const nextYearEstimateValue = calculateNextYearEstimate(newLatestDividendInfo);
+    const annualDividendFigures: AnnualDividendTotal[] = [];
+    if (nextYearEstimateValue !== null) {
+      annualDividendFigures.push({
+        year: currentUtcYear + 1,
+        totalDividend: nextYearEstimateValue,
+        isEstimate: true,
+      });
+    }
+    return {
+      ...currentCardData,
+      liveData: {
+        latestDividend: newLatestDividendInfo,
+        annualDividendFigures,
+        lastFullYearDividendGrowthYoY: null,
+        lastUpdated: newDividendRow.updated_at || newDividendRow.fetched_at || new Date().toISOString(),
+      },
+      staticData: {
+        ...currentCardData.staticData,
+        typicalFrequency: newDividendRow.frequency || currentCardData.staticData.typicalFrequency,
+      },
+    };
+  }
+
   const updatedLiveData = { ...currentCardData.liveData };
   let hasChanged = false;
   const currentUtcYear = new Date().getUTCFullYear();
@@ -430,12 +489,6 @@ const handleSingleDividendRowUpdate: CardUpdateHandler<
   }
 
   if (hasChanged) {
-    if (context.toast) {
-      context.toast({
-        title: "Dividend Info Updated",
-        description: `Latest dividend for ${currentCardData.symbol} processed for ${newDividendRow.date}. Next year estimate may have updated.`,
-      });
-    }
     return {
       ...currentCardData,
       liveData: updatedLiveData,
@@ -456,21 +509,19 @@ const handleDividendsHistoryProfileUpdate: CardUpdateHandler<
   DividendsHistoryCardData,
   ProfileDBRow
 > = (currentCardData, profilePayload): DividendsHistoryCardData => {
-  const { updatedCardData, coreDataChanged } = applyProfileCoreUpdates(
+  const { updatedCardData } = applyProfileCoreUpdates(
     currentCardData,
     profilePayload
   );
 
-  if (coreDataChanged) {
-    const newBackDataDescription: BaseCardBackData = {
-      description: `Historical dividend payments and trends for ${updatedCardData.companyName}, including recent payments and annual totals. Next year estimate based on latest payment.`,
-    };
-    return {
-      ...updatedCardData,
-      backData: newBackDataDescription,
-    };
-  }
-  return currentCardData;
+  // Always apply profile updates to ensure data propagates correctly
+  const newBackDataDescription: BaseCardBackData = {
+    description: `Historical dividend payments and trends for ${updatedCardData.companyName}, including recent payments and annual totals. Next year estimate based on latest payment.`,
+  };
+  return {
+    ...updatedCardData,
+    backData: newBackDataDescription,
+  };
 };
 registerCardUpdateHandler(
   "dividendshistory",

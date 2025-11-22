@@ -3,7 +3,8 @@
 CREATE OR REPLACE FUNCTION public.upsert_profile(profile_data jsonb)
 RETURNS void
 LANGUAGE plpgsql
-SECURITY DEFINER -- Allows the function to run with the permissions of the definer
+SECURITY DEFINER
+SET search_path = public, extensions
 AS $$
 BEGIN
   INSERT INTO public.profiles (

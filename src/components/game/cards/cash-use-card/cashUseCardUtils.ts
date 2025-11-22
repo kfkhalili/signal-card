@@ -19,13 +19,11 @@ import {
   registerCardUpdateHandler,
   type CardUpdateHandler,
 } from "@/components/game/cardUpdateHandler.types";
-import type { Database, Json } from "@/lib/supabase/database.types";
+import type { Json } from "@/lib/supabase/database.types";
 import type { FinancialStatementDBRow as FinancialStatementDBRowFromRealtime } from "@/lib/supabase/realtime-service";
 import type { ProfileDBRow as ProfileDBRowFromHook } from "@/hooks/useStockData";
-import { applyProfileCoreUpdates } from "../cardUtils";
+import { applyProfileCoreUpdates, fetchProfileInfo } from "../cardUtils";
 import { safeJsonParse } from "@/lib/utils";
-
-type ProfileDBRowFromSupabase = Database["public"]["Tables"]["profiles"]["Row"];
 
 class CashUseCardError extends Error {
   constructor(message: string) {
@@ -116,6 +114,52 @@ function processFinancialRecords<
   };
 }
 
+function createEmptyCashUseCard(
+  symbol: string,
+  existingCardId?: string,
+  existingCreatedAt?: number
+): CashUseCardData & Pick<DisplayableCardState, "isFlipped"> {
+  const emptyStaticData: CashUseCardStaticData = {
+    reportedCurrency: null,
+    latestStatementDate: null,
+    latestStatementPeriod: null,
+  };
+
+  const emptyLiveData: CashUseCardLiveData = {
+    weightedAverageShsOut: null,
+    outstandingShares_annual_data: [],
+    currentTotalDebt: null,
+    totalDebt_annual_data: [],
+    currentFreeCashFlow: null,
+    freeCashFlow_annual_data: [],
+    currentNetDividendsPaid: null,
+    netDividendsPaid_annual_data: [],
+  };
+
+  const cardBackData: BaseCardBackData = {
+    description: `Cash use analysis for ${symbol}. Shows how the company allocates its free cash flow.`,
+  };
+
+  const concreteCardData: CashUseCardData = {
+    id: existingCardId || `cashuse-${symbol}-${Date.now()}`,
+    type: "cashuse",
+    symbol: symbol,
+    companyName: null,
+    displayCompanyName: null,
+    logoUrl: null,
+    createdAt: existingCreatedAt ?? Date.now(),
+    staticData: emptyStaticData,
+    liveData: emptyLiveData,
+    backData: cardBackData,
+    websiteUrl: null,
+  };
+
+  return {
+    ...concreteCardData,
+    isFlipped: false,
+  };
+}
+
 function constructCashUseCardData(
   symbol: string,
   profileInfo: {
@@ -165,9 +209,9 @@ function constructCashUseCardData(
     id: idOverride || `cashuse-${symbol}-${Date.now()}`,
     type: "cashuse",
     symbol,
-    companyName: profileInfo.companyName ?? symbol,
+    companyName: profileInfo.companyName ?? null,
     displayCompanyName:
-      profileInfo.displayCompanyName ?? profileInfo.companyName ?? symbol,
+      profileInfo.displayCompanyName ?? profileInfo.companyName ?? null,
     logoUrl: profileInfo.logoUrl ?? null,
     websiteUrl: profileInfo.websiteUrl ?? null,
     createdAt: existingCreatedAt ?? Date.now(),
@@ -184,42 +228,16 @@ async function fetchAndProcessCashUseData(
 ): Promise<
   Result<ReturnType<typeof constructCashUseCardData>, CashUseCardError>
 > {
-  const profileCardForSymbol = activeCards?.find(
-    (c) => c.symbol === symbol && c.type === "profile"
-  ) as ProfileDBRowFromSupabase | undefined;
-  let fetchedProfileInfo = {
-    companyName: profileCardForSymbol?.company_name ?? symbol,
-    displayCompanyName:
-      profileCardForSymbol?.display_company_name ??
-      profileCardForSymbol?.company_name ??
-      symbol,
-    logoUrl: profileCardForSymbol?.image ?? null,
-    websiteUrl: profileCardForSymbol?.website ?? null,
-  };
-  if (!profileCardForSymbol) {
-    const profileResult = await fromPromise(
-      supabase
-        .from("profiles")
-        .select("company_name, display_company_name, image, website")
-        .eq("symbol", symbol)
-        .maybeSingle(),
-      (e) =>
-        new CashUseCardError(`Profile fetch failed: ${(e as Error).message}`)
-    );
-    if (profileResult.isOk() && profileResult.value.data) {
-      fetchedProfileInfo = {
-        companyName: profileResult.value.data.company_name ?? symbol,
-        displayCompanyName:
-          profileResult.value.data.display_company_name ??
-          profileResult.value.data.company_name ??
-          symbol,
-        logoUrl: profileResult.value.data.image ?? null,
-        websiteUrl: profileResult.value.data.website ?? null,
+  // Fetch profile info using shared utility
+  const profileInfoResult = await fetchProfileInfo(symbol, supabase, activeCards);
+  const fetchedProfileInfo = profileInfoResult.isOk()
+    ? profileInfoResult.value
+    : {
+        companyName: symbol,
+        displayCompanyName: symbol,
+        logoUrl: null,
+        websiteUrl: null,
       };
-    } else if (profileResult.isErr()) {
-      console.warn(profileResult.error.message);
-    }
-  }
 
   const fsResult = await fromPromise(
     supabase
@@ -311,6 +329,7 @@ async function fetchAndProcessCashUseData(
     freeCashFlowData.latest === null &&
     netDividendsPaidData.latest === null
   ) {
+    // No data found - return error that will be handled by caller
     return err(new CashUseCardError("No financial data found."));
   }
 
@@ -330,7 +349,6 @@ async function fetchAndProcessCashUseData(
 async function initializeCashUseCard({
   symbol,
   supabase,
-  toast,
   activeCards,
 }: CardInitializationContext): Promise<
   Result<DisplayableCard, CashUseCardError>
@@ -341,6 +359,40 @@ async function initializeCashUseCard({
     activeCards
   );
 
+  if (result.isErr()) {
+    const error = result.error;
+    if (error.message === "No financial data found.") {
+      // No data found - return empty state card
+      // Fetch profile info to apply to empty card using shared utility
+      const profileInfoResult = await fetchProfileInfo(symbol, supabase, activeCards);
+      const fetchedProfileInfo = profileInfoResult.isOk()
+        ? profileInfoResult.value
+        : {
+            companyName: symbol,
+            displayCompanyName: symbol,
+            logoUrl: null,
+            websiteUrl: null,
+          };
+
+      const emptyCard = createEmptyCashUseCard(symbol);
+      // Apply profile info to empty card
+      // Only set companyName if it's not the symbol fallback (to avoid showing symbol in parenthesis)
+      const emptyCardWithProfile: CashUseCardData & Pick<DisplayableCardState, "isFlipped"> = {
+        ...emptyCard,
+        companyName: fetchedProfileInfo.companyName !== symbol
+          ? fetchedProfileInfo.companyName
+          : symbol,
+        displayCompanyName: fetchedProfileInfo.displayCompanyName && fetchedProfileInfo.displayCompanyName !== symbol
+          ? fetchedProfileInfo.displayCompanyName
+          : null,
+        logoUrl: fetchedProfileInfo.logoUrl ?? null,
+        websiteUrl: fetchedProfileInfo.websiteUrl ?? null,
+      };
+      return ok(emptyCardWithProfile);
+    }
+    return err(error);
+  }
+
   return result
     .andThen((cardData) => {
       const cardState: Pick<DisplayableCardState, "isFlipped"> = {
@@ -349,13 +401,6 @@ async function initializeCashUseCard({
       return ok({ ...cardData, ...cardState });
     })
     .mapErr((error) => {
-      if (toast) {
-        toast({
-          title: "Cash Use Card Error",
-          description: `Could not fetch necessary data for ${symbol}: ${error.message}`,
-          variant: "destructive",
-        });
-      }
       return error;
     });
 }
@@ -367,9 +412,7 @@ const handleCashUseCardFinancialStatementUpdate: CardUpdateHandler<
   FinancialStatementDBRowFromRealtime
 > = (
   currentCashUseCardData,
-  newFinancialStatementRow,
-  _currentDisplayableCard,
-  context
+  newFinancialStatementRow
 ): CashUseCardData => {
   const newWeightedAverageShsOut = safeJsonParseWithField<number | null>(
     newFinancialStatementRow.income_statement_payload,
@@ -398,6 +441,49 @@ const handleCashUseCardFinancialStatementUpdate: CardUpdateHandler<
   const newDate = newFinancialStatementRow.date;
   const newPeriod = newFinancialStatementRow.period;
   const newReportedCurrency = newFinancialStatementRow.reported_currency;
+
+  // If card is in empty state (latestStatementDate is null), always update
+  if (!currentCashUseCardData.staticData.latestStatementDate && newDate) {
+    // Reconstruct the card from the financial statement
+    // Create a single-record structure to process
+    const singleRecord = {
+      date: newDate,
+      period: newPeriod ?? undefined,
+      fiscal_year: newFinancialStatementRow.fiscal_year ?? undefined,
+      weightedAverageShsOut_value: newWeightedAverageShsOut,
+      totalDebt_value: newTotalDebt,
+      freeCashFlow_value: newFreeCashFlow,
+      netDividendsPaid_value: newNetDividendsPaid,
+    };
+
+    const sharesData = processFinancialRecords([singleRecord], "weightedAverageShsOut_value");
+    const totalDebtData = processFinancialRecords([singleRecord], "totalDebt_value");
+    const freeCashFlowData = processFinancialRecords([singleRecord], "freeCashFlow_value");
+    const netDividendsPaidData = processFinancialRecords([singleRecord], "netDividendsPaid_value");
+
+    const latestFinancialStatementInfo = {
+      reportedCurrency: newReportedCurrency,
+      statementDate: newDate,
+      statementPeriod: newPeriod,
+    };
+
+    return constructCashUseCardData(
+      currentCashUseCardData.symbol,
+      {
+        companyName: currentCashUseCardData.companyName,
+        displayCompanyName: currentCashUseCardData.displayCompanyName,
+        logoUrl: currentCashUseCardData.logoUrl,
+        websiteUrl: currentCashUseCardData.websiteUrl,
+      },
+      sharesData,
+      totalDebtData,
+      freeCashFlowData,
+      netDividendsPaidData,
+      latestFinancialStatementInfo,
+      currentCashUseCardData.id,
+      currentCashUseCardData.createdAt
+    );
+  }
 
   let hasChanged = false;
   const updatedLiveData = { ...currentCashUseCardData.liveData };
@@ -466,14 +552,6 @@ const handleCashUseCardFinancialStatementUpdate: CardUpdateHandler<
   }
 
   if (hasChanged) {
-    if (context.toast) {
-      context.toast({
-        title: `Cash Use Figures Updated: ${currentCashUseCardData.symbol}`,
-        description: `Latest statement data (${
-          newPeriod ?? "N/A"
-        } ${newDate}) applied. Annual charts are based on initial card data.`,
-      });
-    }
     const newBackDataDescription = `Cash usage metrics for ${
       currentCashUseCardData.companyName || currentCashUseCardData.symbol
     }. Financial data from ${updatedStaticData.latestStatementDate || "N/A"} (${
@@ -501,37 +579,26 @@ const handleCashUseCardProfileUpdate: CardUpdateHandler<
   ProfileDBRowFromHook
 > = (
   currentCashUseCardData,
-  profilePayload,
-  _currentDisplayableCard,
-  context
+  profilePayload
 ): CashUseCardData => {
-  const { updatedCardData, coreDataChanged } = applyProfileCoreUpdates(
+  const { updatedCardData } = applyProfileCoreUpdates(
     currentCashUseCardData,
     profilePayload
   );
 
-  if (coreDataChanged) {
-    if (context.toast) {
-      context.toast({
-        title: "Profile Info Updated",
-        description: `Company details for ${currentCashUseCardData.symbol} card refreshed.`,
-      });
-    }
+  // Always apply profile updates to ensure data propagates correctly
+  const newBackDataDescription = `Cash usage metrics for ${
+    updatedCardData.companyName
+  }. Financial data from ${
+    updatedCardData.staticData.latestStatementDate || "N/A"
+  } (${updatedCardData.staticData.latestStatementPeriod || "N/A"}).`;
 
-    const newBackDataDescription = `Cash usage metrics for ${
-      updatedCardData.companyName
-    }. Financial data from ${
-      updatedCardData.staticData.latestStatementDate || "N/A"
-    } (${updatedCardData.staticData.latestStatementPeriod || "N/A"}).`;
-
-    return {
-      ...updatedCardData,
-      backData: {
-        description: newBackDataDescription,
-      },
-    };
-  }
-  return currentCashUseCardData;
+  return {
+    ...updatedCardData,
+    backData: {
+      description: newBackDataDescription,
+    },
+  };
 };
 
 registerCardUpdateHandler(

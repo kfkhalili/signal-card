@@ -222,6 +222,7 @@ const BaseCard: React.FC<BaseCardProps> = ({
 
   const secureLogoUrl = createSecureImageUrl(logoUrl);
 
+  // Only render logo if logoUrl exists - no placeholder
   const logoImageElement = logoUrl ? (
     <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 relative shrink-0">
       <Image
@@ -237,32 +238,32 @@ const BaseCard: React.FC<BaseCardProps> = ({
         priority={false}
       />
     </div>
-  ) : (
-    <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 shrink-0 bg-muted rounded-full flex items-center justify-center text-muted-foreground text-sm">
-      {sourceCardSymbol ? sourceCardSymbol.charAt(0) : "?"}
-    </div>
-  );
+  ) : null;
 
-  const clickableLogoElement = websiteUrl ? (
-    <ClickableDataItem
-      isInteractive={true}
-      onClickHandler={handleLogoClick}
-      baseClassName="cursor-pointer hover:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-full"
-      aria-label={`Visit ${companyName || sourceCardSymbol} website`}
-      data-interactive-child="true"
-      title={`Visit ${companyName || sourceCardSymbol} website`}
-      role="link">
-      {logoImageElement}
-    </ClickableDataItem>
-  ) : (
-    logoImageElement
-  );
+  const clickableLogoElement = logoImageElement ? (
+    websiteUrl ? (
+      <ClickableDataItem
+        isInteractive={true}
+        onClickHandler={handleLogoClick}
+        baseClassName="cursor-pointer hover:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-full"
+        aria-label={`Visit ${companyName || sourceCardSymbol} website`}
+        data-interactive-child="true"
+        title={`Visit ${companyName || sourceCardSymbol} website`}
+        role="link">
+        {logoImageElement}
+      </ClickableDataItem>
+    ) : (
+      logoImageElement
+    )
+  ) : null;
 
   const identityHeaderContent = (
     <>
-      <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0 mr-2 sm:mr-3 self-start">
-        {clickableLogoElement}
-      </div>
+      {logoImageElement && (
+        <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0 mr-2 sm:mr-3 self-start">
+          {clickableLogoElement}
+        </div>
+      )}
       <ClickableDataItem
         isInteractive={true}
         onClickHandler={handleHeaderTextClick}

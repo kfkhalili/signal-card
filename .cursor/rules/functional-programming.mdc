@@ -1,0 +1,332 @@
+---
+description: Functional programming paradigm with Effect (Option types) and neverthrow (Result types) libraries
+globs: **/*.ts, **/*.tsx
+---
+
+# Functional Programming with Effect and neverthrow
+
+## Library Separation
+
+This project uses two complementary functional programming libraries for different concerns:
+
+- **Effect's `Option<T>`**: For **optional/missing values** (not errors)
+  - `Some(value)` = value exists
+  - `None` = value doesn't exist (this is NOT an error, just absence)
+  - Use when: data might not exist, but that's expected/normal
+  - Example: Profile might not exist in database yet (empty state, not an error)
+
+- **neverthrow's `Result<T, E>`**: For **error handling** (operation failures)
+  - `Ok(value)` = operation succeeded
+  - `Err(error)` = operation failed (network error, auth error, etc.)
+  - Use when: operations can fail and need error handling
+  - Example: Database query failed due to network issue (actual error)
+
+**Key Distinction:**
+- `Option` = "Is there a value?" (absence is valid, not an error)
+- `Result` = "Did the operation succeed?" (failure is an error)
+
+**They work together:** `Result<Option<T>, Error>`
+- `Result` handles: "Did the database query succeed or fail?" (errors)
+- `Option` handles: "Is there data in the successful result?" (optional data)
+- This separates error handling from optional data handling
+
+## Core Principles
+
+### Use Functional Programming Paradigm
+- **Prefer immutability**: Never mutate data structures directly
+- **Use pure functions**: Functions should have no side effects when possible
+- **Compose functions**: Build complex behavior from simple, composable functions
+- **Avoid null/undefined**: Use `Option` types instead of nullable values
+- **Handle errors functionally**: Use `Result<T, E>` types from neverthrow instead of throwing exceptions
+- **Separate data from behavior**: Data structures should be plain objects/interfaces, behavior in functions
+
+### Effect Library Usage
+
+#### When to Use Effect (Option Types Only)
+- **Option types**: Always use `Option<T>` instead of `T | null` or `T | undefined`
+- **NOT for error handling**: Effect's `Either` is not used; use neverthrow's `Result<T, E>` for errors
+- **Composition**: Use Effect's combinators (pipe, map, flatMap) for chaining Option operations
+- **Type safety**: Leverage Effect's type system to eliminate null checks
+- **Remember**: `Option` is for optional/missing values (not errors), `Result` is for error handling
+
+#### Option Type Pattern
+
+**NEVER use null or undefined for optional values:**
+```typescript
+// ❌ BAD: Using null
+function fetchData(): Promise<Data | null> {
+  // ...
+}
+
+// ✅ GOOD: Using Option
+import { Option } from "effect";
+
+function fetchData(): Promise<Result<Option.Option<Data>, Error>> {
+  // ...
+}
+```
+
+**Checking for values:**
+```typescript
+// ❌ BAD: Null checks
+if (data !== null) {
+  useData(data);
+}
+
+// ✅ GOOD: Option checks
+if (Option.isSome(data)) {
+  useData(data.value);
+}
+```
+
+**Extracting values:**
+```typescript
+// ❌ BAD: Optional chaining with fallback
+const name = profile?.name || "Unknown";
+
+// ✅ GOOD: Option with getOrElse
+const name = Option.getOrElse(profile, () => ({ name: "Unknown" })).name;
+// Or using match
+const name = Option.match(profile, {
+  onNone: () => "Unknown",
+  onSome: (p) => p.name
+});
+```
+
+#### State Management with Option
+
+**React state:**
+```typescript
+// ❌ BAD: Nullable state
+const [data, setData] = useState<Data | null>(null);
+
+// ✅ GOOD: Option state
+import { Option } from "effect";
+const [data, setData] = useState<Option.Option<Data>>(Option.none());
+```
+
+**Updating state:**
+```typescript
+// ❌ BAD: Setting null
+setData(null);
+
+// ✅ GOOD: Setting None
+setData(Option.none());
+
+// ❌ BAD: Setting value
+setData(value);
+
+// ✅ GOOD: Setting Some
+setData(Option.some(value));
+```
+
+#### Result Type Integration
+
+**Combining Result and Option:**
+```typescript
+import { Result } from "neverthrow";
+import { Option } from "effect";
+
+// Fetch functions should return Result<Option<T>, Error>
+async function fetchProfile(
+  supabase: SupabaseClient,
+  symbol: string
+): Promise<Result<Option<ProfileDBRow>, Error>> {
+  const result = await fromPromise(
+    supabase.from("profiles").select("*").eq("symbol", symbol).maybeSingle(),
+    (e) => e as Error
+  );
+  return result.map((response) =>
+    response.data ? Option.some(response.data) : Option.none()
+  );
+}
+```
+
+**Handling Result<Option<T>>:**
+```typescript
+const profileResult = await fetchProfile(supabase, symbol);
+
+profileResult.match(
+  (profileOption) => {
+    // Option<ProfileDBRow> - Some(data) or None
+    setProfileData(profileOption);
+    if (Option.isSome(profileOption)) {
+      // Use profileOption.value
+      onProfileUpdate(profileOption.value);
+    }
+  },
+  (error) => {
+    // Actual error (network, auth, etc.)
+    console.error("Error fetching profile:", error);
+  }
+);
+```
+
+#### Empty States are Valid States
+
+**Philosophy:**
+- Empty state (`None`) is NOT an error condition
+- Empty state is a valid, first-class value in the type system
+- UI should render empty states gracefully without error messages
+- Backend self-healing will populate data when available
+- If data never arrives (doesn't exist in API), empty state remains - this is correct
+
+**Implementation:**
+```typescript
+// ❌ BAD: Treating empty as error
+if (!data) {
+  throw new Error("Data not found");
+}
+
+// ✅ GOOD: Treating empty as valid state
+if (Option.isNone(data)) {
+  // Render empty state UI - this is the correct behavior
+  return <EmptyState />;
+}
+```
+
+#### Error Handling Pattern
+
+**Never suppress or silence errors - handle them functionally:**
+```typescript
+// ❌ BAD: Suppressing errors
+try {
+  const data = await fetch();
+} catch (e) {
+  // Silently ignore
+}
+
+// ✅ GOOD: Functional error handling
+const result = await fromPromise(fetch(), (e) => e as Error);
+result.match(
+  (data) => {
+    // Success path
+  },
+  (error) => {
+    // Error path - log actual errors (network, auth, etc.)
+    // Empty states (None) are NOT errors
+    console.error("Actual error:", error);
+  }
+);
+```
+
+#### Function Composition
+
+**Use Effect combinators for composition:**
+```typescript
+import { Option, pipe } from "effect";
+
+// ❌ BAD: Nested conditionals
+function getDisplayName(profile: Profile | null): string {
+  if (profile) {
+    if (profile.displayName) {
+      return profile.displayName;
+    }
+    return profile.name || "Unknown";
+  }
+  return "Unknown";
+}
+
+// ✅ GOOD: Functional composition
+function getDisplayName(profile: Option<Profile>): string {
+  return pipe(
+    profile,
+    Option.flatMap((p) => Option.fromNullable(p.displayName)),
+    Option.orElse(() => pipe(profile, Option.map((p) => p.name))),
+    Option.getOrElse(() => "Unknown")
+  );
+}
+```
+
+## Rules
+
+1. **Always use `Option<T>` instead of `T | null` or `T | undefined`**
+2. **Never use null or undefined for optional values**
+3. **Use `Option.isSome()` and `Option.isNone()` for checks, never `!== null`**
+4. **Use `Option.some(value)` and `Option.none()` instead of setting values to null**
+5. **Empty states are valid states - render them gracefully, don't throw errors**
+6. **Combine `Result` (neverthrow) with `Option` (Effect) for async operations**
+7. **Use functional composition over imperative conditionals**
+8. **Never suppress errors - handle them functionally with Result types**
+9. **State should be `Option<T>`, not `T | null`**
+10. **Use Effect's combinators (pipe, map, flatMap, etc.) for data transformations**
+11. **NEVER use `any` type** - Use `unknown` with type guards, or proper types from libraries (see `typescript.mdc` for details)
+
+## Migration Guide
+
+When refactoring existing code:
+
+1. Replace `T | null` types with `Option<T>`
+2. Replace `useState<T | null>(null)` with `useState<Option<T>>(Option.none())`
+3. Replace `if (value !== null)` with `if (Option.isSome(value))`
+4. Replace `value?.property` with `Option.isSome(value) ? value.value.property : defaultValue`
+5. Replace `setValue(null)` with `setValue(Option.none())`
+6. Replace `setValue(data)` with `setValue(Option.some(data))`
+7. Update fetch functions to return `Result<Option<T>, Error>`
+8. Update error handling to distinguish between actual errors and empty states
+
+## Examples
+
+### Fetch Function Pattern
+```typescript
+import { Result, fromPromise } from "neverthrow";
+import { Option } from "effect";
+
+async function fetchInitialData(
+  supabase: SupabaseClient<Database>,
+  symbol: string
+): Promise<Result<Option.Option<DataDBRow>, Error>> {
+  const result = await fromPromise(
+    supabase
+      .from("table")
+      .select("*")
+      .eq("symbol", symbol)
+      .maybeSingle(),
+    (e) => e as Error
+  );
+  return result.map((response) =>
+    response.data ? Option.some(response.data) : Option.none()
+  );
+}
+```
+
+### React Hook Pattern
+```typescript
+import { Option } from "effect";
+
+export function useData(symbol: string) {
+  const [data, setData] = useState<Option.Option<DataDBRow>>(Option.none());
+
+  useEffect(() => {
+    fetchInitialData(supabase, symbol).match(
+      (dataOption) => {
+        setData(dataOption);
+        if (Option.isSome(dataOption)) {
+          // Use dataOption.value
+        }
+      },
+      (error) => {
+        // Actual error - log it
+        console.error("Error:", error);
+      }
+    );
+  }, [symbol]);
+
+  return data;
+}
+```
+
+### Conditional Rendering Pattern
+```typescript
+// ❌ BAD
+{data && <Component data={data} />}
+
+// ✅ GOOD
+{Option.match(data, {
+  onNone: () => <EmptyState />,
+  onSome: (value) => <Component data={value} />
+})}
+
+// Or with isSome check
+{Option.isSome(data) ? <Component data={data.value} /> : <EmptyState />}
+```

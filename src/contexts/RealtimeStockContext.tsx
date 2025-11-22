@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { Option } from "effect";
 import { useAuth } from "./AuthContext";
 import { RealtimeStockManager } from "@/lib/supabase/realtime-stock-manager";
 
@@ -20,13 +21,15 @@ const RealtimeStockContext = createContext<RealtimeStockContextType | undefined>
 
 export function RealtimeStockProvider({ children }: { children: ReactNode }) {
   const { supabase } = useAuth();
-  const [manager, setManager] = useState<RealtimeStockManager | null>(null);
+  const [manager, setManager] = useState<Option.Option<RealtimeStockManager>>(Option.none());
 
   useEffect(() => {
     let newManager: RealtimeStockManager | null = null;
     if (supabase) {
       newManager = RealtimeStockManager.getInstance(supabase);
-      setManager(newManager);
+      setManager(Option.some(newManager));
+    } else {
+      setManager(Option.none());
     }
 
     return () => {
@@ -35,7 +38,9 @@ export function RealtimeStockProvider({ children }: { children: ReactNode }) {
   }, [supabase]);
 
   return (
-    <RealtimeStockContext.Provider value={{ manager }}>
+    <RealtimeStockContext.Provider
+      // Convert Option<T> to T | null for backward compatibility
+      value={{ manager: Option.isSome(manager) ? manager.value : null }}>
       {children}
     </RealtimeStockContext.Provider>
   );

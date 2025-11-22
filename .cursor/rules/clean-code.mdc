@@ -1,6 +1,6 @@
 ---
 description: Guidelines for writing clean, maintainable, and human-readable code. Apply these rules when writing or reviewing code to ensure consistency and quality.
-globs: 
+globs:
 ---
 # Clean Code Guidelines
 
@@ -15,9 +15,12 @@ globs:
 - Avoid abbreviations unless they're universally understood
 
 ## Smart Comments
-- Don't comment on what the code does - make the code self-documenting
-- Use comments to explain why something is done a certain way
+- **Focus on WHY, not WHAT** - The WHY is more important than WHAT
+- Don't comment on what the code does - make the code self-documenting through clear naming
+- Use comments to explain **why** something is done a certain way, not what it does
+- Document the reasoning, business logic, trade-offs, and non-obvious decisions
 - Document APIs, complex algorithms, and non-obvious side effects
+- Explain context, constraints, and historical decisions that affect the code
 
 ## Single Responsibility
 - Each function should do exactly one thing
@@ -52,4 +55,4 @@ globs:
 ## Version Control
 - Write clear commit messages
 - Make small, focused commits
-- Use meaningful branch names 
+- Use meaningful branch names

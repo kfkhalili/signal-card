@@ -25,21 +25,22 @@ END $$;
 
 DO $$
 BEGIN
+  -- Exchange market status needs hourly updates to reflect accurate market open/closed status
   IF NOT EXISTS (
-    SELECT 1 FROM cron.job WHERE jobname = 'daily-fetch-fmp-all-exchange-market-status'
+    SELECT 1 FROM cron.job WHERE jobname = 'hourly-fetch-fmp-all-exchange-market-status'
   ) THEN
     PERFORM cron.schedule(
-      'daily-fetch-fmp-all-exchange-market-status',
-      '0 0 * * *', -- every day at midnight
+      'hourly-fetch-fmp-all-exchange-market-status',
+      '0 * * * *', -- At minute 0 of every hour (top of the hour)
       $cron$
-      select
+      SELECT
         net.http_post(
-            url:= (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/fetch-fmp-all-exchange-market-status',
-            headers:=jsonb_build_object(
-              'Content-type', 'application/json',
-              'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'anon_key')
-            )
-        ) as request_id;
+          url := (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'project_url') || '/functions/v1/fetch-fmp-all-exchange-market-status',
+          headers := jsonb_build_object(
+            'Content-Type', 'application/json',
+            'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'anon_key')
+          )
+        ) AS request_id;
       $cron$
     );
   END IF;
@@ -56,7 +57,7 @@ BEGIN
       $cron$
       SELECT
         net.http_post(
-            url := (select decrypted_secret from vault.decrypted_secrets where name = 'latest_project_url') || '/fetch-fmp-financial-statements',
+            url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/fetch-fmp-financial-statements',
             headers := jsonb_build_object(
               'Content-Type', 'application/json',
               'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'anon_key')
@@ -79,7 +80,7 @@ BEGIN
       $cron$
       SELECT
         net.http_post(
-            url := (select decrypted_secret from vault.decrypted_secrets where name = 'latest_project_url') || '/fetch-fmp-profiles',
+            url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/fetch-fmp-profiles',
             headers := jsonb_build_object(
               'Content-Type', 'application/json',
               'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'anon_key')
@@ -102,7 +103,7 @@ BEGIN
       $cron$
       SELECT
         net.http_post(
-            url := (select decrypted_secret from vault.decrypted_secrets where name = 'latest_project_url') || '/fetch-fmp-shares-float',
+            url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/fetch-fmp-shares-float',
             headers := jsonb_build_object(
               'Content-Type', 'application/json',
               'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'anon_key')
@@ -125,7 +126,7 @@ BEGIN
       $cron$
       SELECT
         net.http_post(
-            url := (select decrypted_secret from vault.decrypted_secrets where name = 'latest_project_url') || '/fetch-fmp-ratios-ttm',
+            url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/fetch-fmp-ratios-ttm',
             headers := jsonb_build_object(
               'Content-Type', 'application/json',
               'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'anon_key')
@@ -148,7 +149,7 @@ BEGIN
       $cron$
       SELECT
         net.http_post(
-            url := (select decrypted_secret from vault.decrypted_secrets where name = 'latest_project_url') || '/fetch-fmp-dividend-history',
+            url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/fetch-fmp-dividend-history',
             headers := jsonb_build_object(
               'Content-Type', 'application/json',
               'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'anon_key')
@@ -171,7 +172,7 @@ BEGIN
       $cron$
       SELECT
         net.http_post(
-            url := (select decrypted_secret from vault.decrypted_secrets where name = 'latest_project_url') || '/fetch-fmp-revenue-segmentation',
+            url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/fetch-fmp-revenue-segmentation',
             headers := jsonb_build_object(
               'Content-Type', 'application/json',
               'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'anon_key')
@@ -194,7 +195,7 @@ BEGIN
       $cron$
       SELECT
         net.http_post(
-            url := (select decrypted_secret from vault.decrypted_secrets where name = 'latest_project_url') || '/fetch-fmp-grades-historical',
+            url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/fetch-fmp-grades-historical',
             headers := jsonb_build_object(
               'Content-Type', 'application/json',
               'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'anon_key')
@@ -217,7 +218,7 @@ BEGIN
       $cron$
       SELECT
         net.http_post(
-            url := (select decrypted_secret from vault.decrypted_secrets where name = 'latest_project_url') || '/fetch-fmp-exchange-variants',
+            url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/fetch-fmp-exchange-variants',
             headers := jsonb_build_object(
               'Content-Type', 'application/json',
               'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'anon_key')
@@ -240,7 +241,7 @@ BEGIN
       $cron$
       SELECT
         net.http_post(
-            url := (select decrypted_secret from vault.decrypted_secrets where name = 'latest_project_url') || '/fetch-exchange-rates',
+            url := (select decrypted_secret from vault.decrypted_secrets where name = 'project_url') || '/functions/v1/fetch-exchange-rates',
             headers := jsonb_build_object(
               'Content-Type', 'application/json',
               'Authorization', 'Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'anon_key')

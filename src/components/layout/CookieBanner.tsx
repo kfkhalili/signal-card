@@ -1,39 +1,41 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Option } from "effect";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 const COOKIE_CONSENT_KEY = "tickered_cookie_consent";
 
 export function CookieBanner() {
-  const [consent, setConsent] = useState<boolean | null>(null);
+  const [consent, setConsent] = useState<Option.Option<boolean>>(Option.none());
 
   useEffect(() => {
     try {
       const storedConsent = localStorage.getItem(COOKIE_CONSENT_KEY);
       if (storedConsent) {
-        setConsent(JSON.parse(storedConsent));
+        setConsent(Option.some(JSON.parse(storedConsent)));
       } else {
-        setConsent(false);
+        setConsent(Option.some(false));
       }
     } catch {
       // If localStorage is not available (e.g., SSR or private browsing)
       // we can default to not showing the banner until client-side hydration.
-      setConsent(false);
+      setConsent(Option.some(false));
     }
   }, []);
 
   const handleAccept = () => {
     try {
       localStorage.setItem(COOKIE_CONSENT_KEY, JSON.stringify(true));
-      setConsent(true);
+      setConsent(Option.some(true));
     } catch (error) {
       console.error("Failed to save cookie consent:", error);
     }
   };
 
-  if (consent === null || consent === true) {
+  // Show banner only if consent is Some(false) (user hasn't accepted)
+  if (Option.isNone(consent) || (Option.isSome(consent) && consent.value === true)) {
     return null;
   }
 

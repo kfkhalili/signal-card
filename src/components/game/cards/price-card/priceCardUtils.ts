@@ -105,11 +105,11 @@ function createDisplayablePriceCard(
     type: "price",
     symbol: leanQuote.symbol,
     createdAt: Date.now(),
-    companyName: profileContext?.company_name ?? leanQuote.symbol,
+    companyName: profileContext?.company_name ?? null,
     displayCompanyName:
       profileContext?.display_company_name ??
       profileContext?.company_name ??
-      leanQuote.symbol,
+      null,
     logoUrl: profileContext?.image ?? null,
     websiteUrl: profileContext?.website ?? null,
     staticData,
@@ -126,7 +126,6 @@ function createDisplayablePriceCard(
 async function initializePriceCard({
   symbol,
   supabase,
-  toast,
   activeCards,
 }: CardInitializationContext): Promise<
   Result<DisplayableCard, PriceCardError>
@@ -175,21 +174,36 @@ async function initializePriceCard({
     };
   } else {
     // If no profile card exists, fetch the necessary info from the DB
-    const { data, error } = await supabase
-      .from("profiles")
-      .select(
-        "company_name, display_company_name, image, exchange, website, currency"
-      )
-      .eq("symbol", symbol)
-      .maybeSingle();
+    const profileResult = await fromPromise(
+      supabase
+        .from("profiles")
+        .select(
+          "company_name, display_company_name, image, exchange, website, currency"
+        )
+        .eq("symbol", symbol)
+        .maybeSingle(),
+      (e) => new Error(`Failed to fetch profile for ${symbol}: ${(e as Error).message}`)
+    );
 
-    if (error) {
-      console.warn(
-        `Could not fetch profile context for ${symbol}: ${error.message}`
-      );
-    } else if (data) {
-      profileContext = data;
-    }
+    profileResult.match(
+      (response) => {
+        const { data, error } = response;
+
+        if (error) {
+          console.warn(
+            `Could not fetch profile context for ${symbol}: ${error.message}`
+          );
+        } else if (data) {
+          profileContext = data;
+        }
+      },
+      (err) => {
+        // Handle Result error (network/exception errors)
+        console.warn(
+          `Could not fetch profile context for ${symbol}: ${err.message}`
+        );
+      }
+    );
   }
 
   if (quoteDataFromDB) {
@@ -232,13 +246,6 @@ async function initializePriceCard({
     true
   );
 
-  if (toast) {
-    toast({
-      title: "Price Card Added (Shell)",
-      description: `Awaiting live data for ${symbol}.`,
-      variant: "default",
-    });
-  }
   return ok(shellDisplayableCard);
 }
 
@@ -285,31 +292,26 @@ const handlePriceCardProfileUpdate: CardUpdateHandler<
   PriceCardData,
   ProfileDBRow
 > = (currentPriceCardData, profilePayload): PriceCardData => {
-  const { updatedCardData, coreDataChanged } = applyProfileCoreUpdates(
+  const { updatedCardData } = applyProfileCoreUpdates(
     currentPriceCardData,
     profilePayload
   );
 
-  const currencyChanged =
-    currentPriceCardData.staticData.currency !== profilePayload.currency;
+  // Always apply profile updates to ensure data propagates correctly
+  const companyNameForDesc =
+    updatedCardData.companyName ?? updatedCardData.symbol;
+  const newBackData: BaseCardBackData = {
+    description: `Market price information for ${companyNameForDesc}. Includes daily and historical price points, volume, and key moving averages.`,
+  };
 
-  if (coreDataChanged || currencyChanged) {
-    const companyNameForDesc =
-      updatedCardData.companyName ?? updatedCardData.symbol;
-    const newBackData: BaseCardBackData = {
-      description: `Market price information for ${companyNameForDesc}. Includes daily and historical price points, volume, and key moving averages.`,
-    };
-    return {
-      ...updatedCardData,
-      staticData: {
-        ...updatedCardData.staticData,
-        currency: profilePayload.currency ?? "USD",
-      },
-      backData: newBackData,
-    };
-  }
-
-  return currentPriceCardData;
+  return {
+    ...updatedCardData,
+    staticData: {
+      ...updatedCardData.staticData,
+      currency: profilePayload.currency ?? "USD",
+    },
+    backData: newBackData,
+  };
 };
 
 registerCardUpdateHandler(

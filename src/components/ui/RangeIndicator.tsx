@@ -112,7 +112,9 @@ export const RangeIndicator: React.FC<RangeIndicatorProps> = ({
     <div className={cn(containerClassName)}>
       <div className={cn("flex justify-between mb-1", labelClassName)}>
         <ClickableDataItem
-          title={lowValueForTitle != null ? lowValueForTitle.toFixed(2) : "N/A"}
+          title={
+            lowValueForTitle != null ? lowValueForTitle.toFixed(2) : undefined
+          }
           isInteractive={!!onLowLabelClick}
           onClickHandler={onLowLabelClick}
           baseClassName="p-0.5 rounded-sm relative"
@@ -125,7 +127,7 @@ export const RangeIndicator: React.FC<RangeIndicatorProps> = ({
         </ClickableDataItem>
         <ClickableDataItem
           title={
-            highValueForTitle != null ? highValueForTitle.toFixed(2) : "N/A"
+            highValueForTitle != null ? highValueForTitle.toFixed(2) : undefined
           }
           isInteractive={!!onHighLabelClick}
           onClickHandler={onHighLabelClick}

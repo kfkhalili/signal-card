@@ -1,5 +1,4 @@
 // src/components/game/cardUpdateHandler.types.ts
-import type { ToastFunctionType } from "@/hooks/use-toast";
 import type {
   DisplayableCard,
   ConcreteCardData,
@@ -16,14 +15,15 @@ export type CardUpdateEventType =
   | "FINANCIAL_STATEMENT_UPDATE"
   | "SHARES_FLOAT_UPDATE"
   | "RATIOS_TTM_UPDATE"
-  | "DIVIDEND_ROW_UPDATE";
+  | "DIVIDEND_ROW_UPDATE"
+  | "REVENUE_SEGMENTATION_UPDATE"
+  | "GRADES_HISTORICAL_UPDATE"
+  | "EXCHANGE_VARIANTS_UPDATE";
 
 /**
  * Context provided to card update handler functions.
  */
-export interface CardUpdateContext {
-  toast: ToastFunctionType;
-}
+export type CardUpdateContext = Record<string, never>;
 
 /**
  * Defines the signature for a function that handles a specific type of data update
@@ -35,8 +35,8 @@ export type CardUpdateHandler<
 > = (
   currentCardConcreteData: TCardData,
   updatePayload: TUpdatePayload,
-  currentDisplayableCard: DisplayableCard,
-  context: CardUpdateContext
+  _currentDisplayableCard?: DisplayableCard,
+  _context?: CardUpdateContext
 ) => TCardData;
 
 // --- Registry Implementation ---

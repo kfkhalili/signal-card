@@ -109,12 +109,14 @@ async function fetchAndProcessSymbolQuote(
         quoteData.changesPercentage ?? quoteData.changePercentage ?? null,
       day_change:
         typeof quoteData.change === "number" ? quoteData.change : null,
-      volume: typeof quoteData.volume === "number" ? quoteData.volume : null,
+      // CRITICAL: Truncate bigint values (volume, market_cap) to integers
+      // FMP API sometimes returns decimals like "3955124346827.0005" which breaks bigint columns
+      volume: typeof quoteData.volume === "number" ? Math.trunc(quoteData.volume) : null,
       day_low: typeof quoteData.dayLow === "number" ? quoteData.dayLow : null,
       day_high:
         typeof quoteData.dayHigh === "number" ? quoteData.dayHigh : null,
       market_cap:
-        typeof quoteData.marketCap === "number" ? quoteData.marketCap : null,
+        typeof quoteData.marketCap === "number" ? Math.trunc(quoteData.marketCap) : null,
       day_open: typeof quoteData.open === "number" ? quoteData.open : null,
       previous_close:
         typeof quoteData.previousClose === "number"

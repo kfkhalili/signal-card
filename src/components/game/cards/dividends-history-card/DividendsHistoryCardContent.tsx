@@ -106,29 +106,29 @@ export const DividendsHistoryCardContent: React.FC<DividendsHistoryCardContentPr
             className="pointer-events-auto flex flex-col h-full justify-between">
             <ShadCardContent className={cn("p-0 flex-grow text-xs")}>
               <div className="space-y-1 pt-1.5">
-                <DataRow
-                  label="Last Dividend"
-                  value={latestDividend?.amount}
-                  currency={currency}
-                  isMonetary={true}
-                  labelClassName="text-xs font-medium text-muted-foreground"
-                  valueClassName="text-xs font-semibold text-foreground"
-                  title={`Latest Dividend: ${
-                    latestDividend?.amount?.toFixed(4) || "N/A"
-                  } ${currency || ""}`}
-                  isSelectionMode={isSelectionMode}
-                  isSelected={isSelected(`${id}-last-dividend`)}
-                  onSelect={() =>
-                    onSelect({
-                      sourceCardId: id,
-                      sourceCardSymbol: symbol,
-                      label: "Last Dividend",
-                      value: latestDividend?.amount,
-                      isMonetary: true,
-                      currency: currency,
-                    })
-                  }
-                />
+                {latestDividend?.amount != null && (
+                  <DataRow
+                    label="Last Dividend"
+                    value={latestDividend.amount}
+                    currency={currency}
+                    isMonetary={true}
+                    labelClassName="text-xs font-medium text-muted-foreground"
+                    valueClassName="text-xs font-semibold text-foreground"
+                    title={`Latest Dividend: ${latestDividend.amount.toFixed(4)} ${currency || ""}`}
+                    isSelectionMode={isSelectionMode}
+                    isSelected={isSelected(`${id}-last-dividend`)}
+                    onSelect={() =>
+                      onSelect({
+                        sourceCardId: id,
+                        sourceCardSymbol: symbol,
+                        label: "Last Dividend",
+                        value: latestDividend.amount,
+                        isMonetary: true,
+                        currency: currency,
+                      })
+                    }
+                  />
+                )}
                 {latestDividend?.adjAmount &&
                   latestDividend.adjAmount !== latestDividend.amount && (
                     <DataRow
@@ -155,98 +155,103 @@ export const DividendsHistoryCardContent: React.FC<DividendsHistoryCardContentPr
                       }
                     />
                   )}
-                <DataRow
-                  label="Ex-Date"
-                  value={latestDividend?.exDividendDate}
-                  labelClassName="text-xs font-medium text-muted-foreground"
-                  valueClassName="text-xs font-semibold text-foreground"
-                  isSelectionMode={isSelectionMode}
-                  isSelected={isSelected(`${id}-ex-date`)}
-                  onSelect={() =>
-                    onSelect({
-                      sourceCardId: id,
-                      sourceCardSymbol: symbol,
-                      label: "Ex-Date",
-                      value: latestDividend?.exDividendDate || "N/A",
-                    })
-                  }
-                />
-                <DataRow
-                  label="Payment Date"
-                  value={latestDividend?.paymentDate || "N/A"}
-                  labelClassName="text-xs font-medium text-muted-foreground"
-                  valueClassName="text-xs font-semibold text-foreground"
-                  isSelectionMode={isSelectionMode}
-                  isSelected={isSelected(`${id}-payment-date`)}
-                  onSelect={() =>
-                    onSelect({
-                      sourceCardId: id,
-                      sourceCardSymbol: symbol,
-                      label: "Payment Date",
-                      value: latestDividend?.paymentDate || "N/A",
-                    })
-                  }
-                />
-                <DataRow
-                  label="Declaration Date"
-                  value={latestDividend?.declarationDate || "N/A"}
-                  labelClassName="text-xs font-medium text-muted-foreground"
-                  valueClassName="text-xs font-semibold text-foreground"
-                  isSelectionMode={isSelectionMode}
-                  isSelected={isSelected(`${id}-declaration-date`)}
-                  onSelect={() =>
-                    onSelect({
-                      sourceCardId: id,
-                      sourceCardSymbol: symbol,
-                      label: "Declaration Date",
-                      value: latestDividend?.declarationDate || "N/A",
-                    })
-                  }
-                />
-                <DataRow
-                  label="Yield (at dist.)"
-                  value={latestDividend?.yieldAtDistribution}
-                  isValueAsPercentage={true}
-                  precision={2}
-                  labelClassName="text-xs font-medium text-muted-foreground"
-                  valueClassName="text-xs font-semibold text-foreground"
-                  title={
-                    latestDividend &&
-                    latestDividend.yieldAtDistribution !== null
-                      ? `Yield at distribution: ${(
-                          latestDividend.yieldAtDistribution * 100
-                        ).toFixed(2)}%`
-                      : "Yield at distribution: N/A"
-                  }
-                  isSelectionMode={isSelectionMode}
-                  isSelected={isSelected(`${id}-yield-at-dist`)}
-                  onSelect={() =>
-                    onSelect({
-                      sourceCardId: id,
-                      sourceCardSymbol: symbol,
-                      label: "Yield (at dist.)",
-                      value: latestDividend?.yieldAtDistribution,
-                      isValueAsPercentage: true,
-                    })
-                  }
-                />
-                <DataRow
-                  label="Typical Frequency"
-                  value={staticData.typicalFrequency || "N/A"}
-                  isInteractive={false}
-                  labelClassName="text-xs font-medium text-muted-foreground"
-                  valueClassName="text-xs font-semibold text-foreground"
-                  isSelectionMode={isSelectionMode}
-                  isSelected={isSelected(`${id}-frequency`)}
-                  onSelect={() =>
-                    onSelect({
-                      sourceCardId: id,
-                      sourceCardSymbol: symbol,
-                      label: "Frequency",
-                      value: staticData.typicalFrequency || "N/A",
-                    })
-                  }
-                />
+                {latestDividend?.exDividendDate && (
+                  <DataRow
+                    label="Ex-Date"
+                    value={latestDividend.exDividendDate}
+                    labelClassName="text-xs font-medium text-muted-foreground"
+                    valueClassName="text-xs font-semibold text-foreground"
+                    isSelectionMode={isSelectionMode}
+                    isSelected={isSelected(`${id}-ex-date`)}
+                    onSelect={() =>
+                      onSelect({
+                        sourceCardId: id,
+                        sourceCardSymbol: symbol,
+                        label: "Ex-Date",
+                        value: latestDividend.exDividendDate,
+                      })
+                    }
+                  />
+                )}
+                {latestDividend?.paymentDate && (
+                  <DataRow
+                    label="Payment Date"
+                    value={latestDividend.paymentDate}
+                    labelClassName="text-xs font-medium text-muted-foreground"
+                    valueClassName="text-xs font-semibold text-foreground"
+                    isSelectionMode={isSelectionMode}
+                    isSelected={isSelected(`${id}-payment-date`)}
+                    onSelect={() =>
+                      onSelect({
+                        sourceCardId: id,
+                        sourceCardSymbol: symbol,
+                        label: "Payment Date",
+                        value: latestDividend.paymentDate,
+                      })
+                    }
+                  />
+                )}
+                {latestDividend?.declarationDate && (
+                  <DataRow
+                    label="Declaration Date"
+                    value={latestDividend.declarationDate}
+                    labelClassName="text-xs font-medium text-muted-foreground"
+                    valueClassName="text-xs font-semibold text-foreground"
+                    isSelectionMode={isSelectionMode}
+                    isSelected={isSelected(`${id}-declaration-date`)}
+                    onSelect={() =>
+                      onSelect({
+                        sourceCardId: id,
+                        sourceCardSymbol: symbol,
+                        label: "Declaration Date",
+                        value: latestDividend.declarationDate,
+                      })
+                    }
+                  />
+                )}
+                {latestDividend?.yieldAtDistribution != null && (
+                  <DataRow
+                    label="Yield (at dist.)"
+                    value={latestDividend.yieldAtDistribution}
+                    isValueAsPercentage={true}
+                    precision={2}
+                    labelClassName="text-xs font-medium text-muted-foreground"
+                    valueClassName="text-xs font-semibold text-foreground"
+                    title={`Yield at distribution: ${(
+                      latestDividend.yieldAtDistribution * 100
+                    ).toFixed(2)}%`}
+                    isSelectionMode={isSelectionMode}
+                    isSelected={isSelected(`${id}-yield-at-dist`)}
+                    onSelect={() =>
+                      onSelect({
+                        sourceCardId: id,
+                        sourceCardSymbol: symbol,
+                        label: "Yield (at dist.)",
+                        value: latestDividend.yieldAtDistribution,
+                        isValueAsPercentage: true,
+                      })
+                    }
+                  />
+                )}
+                {staticData.typicalFrequency && (
+                  <DataRow
+                    label="Typical Frequency"
+                    value={staticData.typicalFrequency}
+                    isInteractive={false}
+                    labelClassName="text-xs font-medium text-muted-foreground"
+                    valueClassName="text-xs font-semibold text-foreground"
+                    isSelectionMode={isSelectionMode}
+                    isSelected={isSelected(`${id}-frequency`)}
+                    onSelect={() =>
+                      onSelect({
+                        sourceCardId: id,
+                        sourceCardSymbol: symbol,
+                        label: "Frequency",
+                        value: staticData.typicalFrequency,
+                      })
+                    }
+                  />
+                )}
               </div>
             </ShadCardContent>
           </div>
@@ -285,34 +290,32 @@ export const DividendsHistoryCardContent: React.FC<DividendsHistoryCardContentPr
                     No annual dividend data to display.
                   </p>
                 )}
-                <div className="mt-2">
-                  <DataRow
-                    label="Growth (YoY)"
-                    value={lastFullYearDividendGrowthYoY}
-                    isValueAsPercentage={true}
-                    precision={2}
-                    labelClassName="text-sm font-medium text-muted-foreground"
-                    valueClassName="text-sm font-semibold text-foreground"
-                    title={
-                      lastFullYearDividendGrowthYoY !== null
-                        ? `Last full year total dividend growth YoY: ${(
-                            lastFullYearDividendGrowthYoY * 100
-                          ).toFixed(2)}%`
-                        : "Last full year total dividend growth YoY: N/A"
-                    }
-                    isSelectionMode={isSelectionMode}
-                    isSelected={isSelected(`${id}-growth-yoy`)}
-                    onSelect={() =>
-                      onSelect({
-                        sourceCardId: id,
-                        sourceCardSymbol: symbol,
-                        label: "Dividend Growth (YoY)",
-                        value: lastFullYearDividendGrowthYoY,
-                        isValueAsPercentage: true,
-                      })
-                    }
-                  />
-                </div>
+                {lastFullYearDividendGrowthYoY != null && (
+                  <div className="mt-2">
+                    <DataRow
+                      label="Growth (YoY)"
+                      value={lastFullYearDividendGrowthYoY}
+                      isValueAsPercentage={true}
+                      precision={2}
+                      labelClassName="text-sm font-medium text-muted-foreground"
+                      valueClassName="text-sm font-semibold text-foreground"
+                      title={`Last full year total dividend growth YoY: ${(
+                        lastFullYearDividendGrowthYoY * 100
+                      ).toFixed(2)}%`}
+                      isSelectionMode={isSelectionMode}
+                      isSelected={isSelected(`${id}-growth-yoy`)}
+                      onSelect={() =>
+                        onSelect({
+                          sourceCardId: id,
+                          sourceCardSymbol: symbol,
+                          label: "Dividend Growth (YoY)",
+                          value: lastFullYearDividendGrowthYoY,
+                          isValueAsPercentage: true,
+                        })
+                      }
+                    />
+                  </div>
+                )}
               </div>
             </ShadCardContent>
           </div>

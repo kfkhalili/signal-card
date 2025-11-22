@@ -2,6 +2,7 @@
 "use client";
 
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { fromPromise } from "neverthrow";
 import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
@@ -74,9 +75,16 @@ export default function AuthForm() {
     );
 
     const checkSession = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const userResult = await fromPromise(
+        supabase.auth.getUser(),
+        (e) => new Error(`Failed to get user: ${(e as Error).message}`)
+      );
+
+      const user = userResult.match(
+        (response) => response.data.user,
+        () => null
+      );
+
       if (user) {
         const nextUrl = searchParams.get("next") || "/";
         router.push(nextUrl);

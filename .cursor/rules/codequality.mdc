@@ -1,6 +1,6 @@
 ---
 description: Code Quality Guidelines
-globs: 
+globs:
 ---
 # Code Quality Guidelines
 
@@ -14,13 +14,15 @@ Make changes file by file and give me a chance to spot mistakes.
 Never use apologies.
 
 ## No Understanding Feedback
-Avoid giving feedback about understanding in comments or documentation.
+Avoid giving conversational feedback about understanding (e.g., "I understand", "Got it").
+**Note:** This does NOT apply to code comments or documentation - code should be well-documented per `clean-code.mdc` guidelines.
 
 ## No Whitespace Suggestions
 Don't suggest whitespace changes.
 
 ## No Summaries
-Don't summarize changes made.
+Don't provide conversational summaries of changes made (e.g., "I've updated X, Y, and Z").
+**Note:** Code comments and documentation that explain what code does are encouraged per `clean-code.mdc` guidelines.
 
 ## No Inventions
 Don't invent changes other than what's explicitly requested.

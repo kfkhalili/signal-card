@@ -13,7 +13,7 @@ export default function LandingPage() {
 
   useEffect(() => {
     if (!isLoading && user) {
-      router.push("/workspace");
+      router.push("/compass");
     }
   }, [user, isLoading, router]);
 

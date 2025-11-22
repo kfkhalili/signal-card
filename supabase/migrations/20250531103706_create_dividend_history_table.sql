@@ -14,11 +14,11 @@ CREATE TABLE IF NOT EXISTS "public"."dividend_history" (
     "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
 
     PRIMARY KEY ("symbol", "date"),
-    CONSTRAINT "fk_dividend_history_symbol" FOREIGN KEY ("symbol") REFERENCES "public"."supported_symbols"("symbol") ON DELETE CASCADE
+    CONSTRAINT "fk_dividend_history_symbol" FOREIGN KEY ("symbol") REFERENCES "public"."profiles"("symbol") ON DELETE CASCADE
 );
 
 COMMENT ON TABLE "public"."dividend_history" IS 'Stores historical dividend data for symbols from FMP.';
-COMMENT ON COLUMN "public"."dividend_history"."symbol" IS 'Stock/crypto symbol. Part of composite PK, references supported_symbols.symbol.';
+COMMENT ON COLUMN "public"."dividend_history"."symbol" IS 'Stock/crypto symbol. Part of composite PK, references profiles.symbol.';
 COMMENT ON COLUMN "public"."dividend_history"."date" IS 'The date the dividend was effective or announced (maps to "date" from FMP). Part of composite PK.';
 COMMENT ON COLUMN "public"."dividend_history"."record_date" IS 'The record date for the dividend.';
 COMMENT ON COLUMN "public"."dividend_history"."payment_date" IS 'The payment date for the dividend.';

@@ -8,7 +8,7 @@ type ExchangeStatus =
 
 export class RealtimeStockManager extends EventEmitter {
   private supabase: SupabaseClient<Database>;
-  private quoteChannel: RealtimeChannel | null = null;
+  private quoteChannels = new Map<string, RealtimeChannel>();
   private exchangeStatusChannel: RealtimeChannel | null = null;
   private subscribedSymbols = new Set<string>();
   private subscribedExchanges = new Set<string>();
@@ -74,40 +74,55 @@ export class RealtimeStockManager extends EventEmitter {
   }
 
   private updateSubscription() {
-    if (this.quoteChannel) {
-      this.quoteChannel.unsubscribe();
-      this.quoteChannel = null;
+    // Remove channels for symbols that are no longer subscribed
+    for (const [symbol, channel] of this.quoteChannels.entries()) {
+      if (!this.subscribedSymbols.has(symbol)) {
+        channel.unsubscribe();
+        this.quoteChannels.delete(symbol);
+      }
     }
 
-    if (this.subscribedSymbols.size === 0) return;
+    // Add channels for newly subscribed symbols
+    for (const symbol of this.subscribedSymbols) {
+      if (this.quoteChannels.has(symbol)) continue; // Already subscribed
 
-    const symbols = Array.from(this.subscribedSymbols);
-    const channelName = `live-quotes-for-workspace`;
+      const channelName = `live-quote-${symbol.toLowerCase().replace(/[^a-z0-9_.-]/gi, "-")}`;
+      const filter = `symbol=eq.${symbol}`;
 
-    this.quoteChannel = this.supabase.channel(channelName, {
-      config: { broadcast: { ack: true } },
-    });
-
-    this.quoteChannel
-      .on<LiveQuote>(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "live_quote_indicators",
-          filter: `symbol=in.(${symbols.join(",")})`,
-        },
-        (payload) => {
-          this.emit("quote", payload.new);
-        }
-      )
-      .subscribe((status, err) => {
-        if (status === "SUBSCRIBED") {
-          console.log(`[RealtimeStockManager] Subscribed to ${symbols.length} symbols`);
-        } else if (status === "CHANNEL_ERROR" && err) {
-            console.error("[RealtimeStockManager] Channel error:", err);
-        }
+      const channel = this.supabase.channel(channelName, {
+        config: { broadcast: { ack: true } },
       });
+
+      // Subscribe to both INSERT and UPDATE events with symbol-specific filter
+      channel
+        .on<LiveQuote>(
+          "postgres_changes",
+          {
+            event: "*", // Listen to both INSERT and UPDATE
+            schema: "public",
+            table: "live_quote_indicators",
+            filter: filter, // Symbol-specific filter for realtime.subscription tracking
+          },
+          (payload) => {
+            // Use payload.new for both INSERT and UPDATE
+            if (payload.new) {
+              this.emit("quote", payload.new);
+            } else if (payload.old && payload.eventType === "UPDATE") {
+              // Fallback: if new is missing, try old (shouldn't happen but be safe)
+              console.warn(
+                `[RealtimeStockManager] UPDATE event missing payload.new, using payload.old`
+              );
+            }
+          }
+        )
+        .subscribe((status, err) => {
+          if (status === "CHANNEL_ERROR" && err) {
+            console.error(`[RealtimeStockManager] Channel error for ${symbol}:`, err);
+          }
+        });
+
+      this.quoteChannels.set(symbol, channel);
+    }
   }
 
   private updateExchangeSubscription() {
@@ -119,12 +134,16 @@ export class RealtimeStockManager extends EventEmitter {
     if (this.subscribedExchanges.size === 0) return;
 
     const exchanges = Array.from(this.subscribedExchanges);
+    const exchangesSet = new Set(exchanges); // For fast lookup
     const channelName = `exchange-status-for-workspace`;
 
     this.exchangeStatusChannel = this.supabase.channel(channelName, {
       config: { broadcast: { ack: true } },
     });
 
+    // Subscribe to all exchange status updates
+    // Note: Supabase Realtime doesn't support 'in' filter syntax,
+    // so we subscribe to all updates and filter client-side
     this.exchangeStatusChannel
       .on<ExchangeStatus>(
         "postgres_changes",
@@ -132,18 +151,23 @@ export class RealtimeStockManager extends EventEmitter {
           event: "UPDATE",
           schema: "public",
           table: "exchange_market_status",
-          filter: `exchange_code=in.(${exchanges.join(",")})`,
+          // No filter - we'll filter client-side since 'in' syntax isn't supported
         },
         (payload) => {
-          this.emit("exchange_status", payload.new);
+          const exchangeCode = payload.new && 'exchange_code' in payload.new ? payload.new.exchange_code : null;
+
+          // Filter client-side: only emit if exchange is in our subscribed list
+          if (!exchangeCode || !exchangesSet.has(exchangeCode)) {
+            return;
+          }
+
+          if (payload.new) {
+            this.emit("exchange_status", payload.new);
+          }
         }
       )
       .subscribe((status, err) => {
-        if (status === "SUBSCRIBED") {
-          console.log(
-            `[RealtimeStockManager] Subscribed to ${exchanges.length} exchange statuses`
-          );
-        } else if (status === "CHANNEL_ERROR" && err) {
+        if (status === "CHANNEL_ERROR" && err) {
           console.error(
             "[RealtimeStockManager] Exchange status channel error:",
             err
@@ -153,6 +177,12 @@ export class RealtimeStockManager extends EventEmitter {
   }
 
   private resubscribe() {
+    // Unsubscribe all quote channels and re-subscribe
+    for (const channel of this.quoteChannels.values()) {
+      channel.unsubscribe();
+    }
+    this.quoteChannels.clear();
+
     if (this.subscribedSymbols.size > 0) {
       this.updateSubscription();
     }
@@ -166,10 +196,12 @@ export class RealtimeStockManager extends EventEmitter {
   }
 
   public destroy() {
-    if (this.quoteChannel) {
-      this.quoteChannel.unsubscribe();
-      this.quoteChannel = null;
+    // Unsubscribe all quote channels
+    for (const channel of this.quoteChannels.values()) {
+      channel.unsubscribe();
     }
+    this.quoteChannels.clear();
+
     if (this.exchangeStatusChannel) {
       this.exchangeStatusChannel.unsubscribe();
       this.exchangeStatusChannel = null;
@@ -183,6 +215,6 @@ export class RealtimeStockManager extends EventEmitter {
     this.subscribedSymbols.clear();
     this.subscribedExchanges.clear();
     RealtimeStockManager.instance = null;
-    console.log("[RealtimeStockManager] Destroyed.");
+    // Cleanup complete
   }
 }

@@ -1,0 +1,213 @@
+---
+description: Test-Driven Refactoring (TDR) strategy for safely refactoring code to comply with functional programming rules
+globs: **/*.ts, **/*.tsx
+---
+
+# Test-Driven Refactoring Strategy
+
+## Philosophy
+
+**Always write tests BEFORE refactoring** to capture current behavior, then refactor with confidence. This protects the codebase from regressions.
+
+## Core Principles
+
+1. **Write tests first** - Capture current behavior before changing code
+2. **Run tests after each change** - Ensure nothing breaks
+3. **Incremental changes** - One file/function at a time
+4. **Regression protection** - Tests prevent future breaks
+
+## Refactoring Types & Test Strategies
+
+### 1. Converting `useState<... | null>` to `Option<T>`
+
+**Test Strategy:**
+- Test that state initializes with `Option.none()`
+- Test that state updates to `Option.some(value)`
+- Test that `Option.isSome()` and `Option.isNone()` checks work
+- Test edge cases (empty states, loading states)
+
+**Example:**
+```typescript
+// Before refactoring: expect(result.current.data).toBeNull();
+// After refactoring:
+expect(Option.isNone(result.current.data)).toBe(true);
+
+// When data arrives:
+expect(Option.isSome(result.current.data)).toBe(true);
+if (Option.isSome(result.current.data)) {
+  expect(result.current.data.value).toBeTruthy();
+}
+```
+
+### 2. Converting Supabase Queries to Result Types
+
+**Test Strategy:**
+- Test successful queries return `Ok(value)`
+- Test error cases return `Err(error)`
+- Mock Supabase client responses
+- Test error handling with `.match()`
+
+**Example:**
+```typescript
+// After refactoring, function should return Result<T, Error>
+const result = await checkFeatureFlag('test_flag');
+
+// Test success:
+expect(result.isOk()).toBe(true);
+if (result.isOk()) {
+  expect(result.value).toBe(true);
+}
+
+// Test error:
+expect(result.isErr()).toBe(true);
+if (result.isErr()) {
+  expect(result.error.message).toContain('error');
+}
+```
+
+### 3. Converting `.catch()` to Result Types
+
+**Test Strategy:**
+- Test that errors are converted to Result
+- Test that cleanup still happens on errors
+- Use `fromPromise()` to wrap async operations
+
+**Example:**
+```typescript
+// Before: promise.catch((error) => console.error(error));
+// After:
+const result = await fromPromise(promise, (e) => e as Error);
+result.match(
+  (data) => { /* success */ },
+  (error) => { /* error handling */ }
+);
+```
+
+### 4. Converting `throw` to Result Types
+
+**Test Strategy:**
+- Test that functions return Result instead of throwing
+- Test error cases return `Err`
+- Test success cases return `Ok`
+
+**Example:**
+```typescript
+// Before: throw new Error('Failed');
+// After: return err(new Error('Failed'));
+
+// Test:
+const result = await functionThatReturnsResult();
+expect(result.isErr()).toBe(true);
+if (result.isErr()) {
+  expect(result.error.message).toBe('Failed');
+}
+```
+
+## Test Execution Workflow
+
+### Step 1: Create Baseline Tests
+```bash
+npm test  # Establish baseline
+npm run test:coverage  # Check current coverage
+```
+
+### Step 2: Write Tests for Target File
+- Create test file: `src/path/__tests__/filename.refactor.test.ts`
+- Write tests that capture CURRENT behavior (should pass with existing code)
+
+### Step 3: Refactor Incrementally
+- Make small changes
+- Run tests after each change: `npm test -- --watch src/path/__tests__/filename.refactor.test.ts`
+
+### Step 4: Update Tests
+- Update tests to use Result/Option assertions
+- All tests should still pass
+
+### Step 5: Verify
+```bash
+npm test  # Full suite - no regressions
+npm run test:coverage  # Coverage should maintain or improve
+npm run typecheck  # No TypeScript errors
+```
+
+## Test File Organization
+
+```
+src/
+├── lib/
+│   ├── feature-flags.ts
+│   └── __tests__/
+│       └── feature-flags.refactor.test.ts
+├── hooks/
+│   ├── useStockData.ts
+│   └── __tests__/
+│       └── useStockData.refactor.test.tsx
+```
+
+## Mocking Strategy
+
+**Mock Supabase Client:**
+```typescript
+const createMockSupabaseClient = (shouldError = false) => {
+  return {
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          maybeSingle: vi.fn(async () => {
+            if (shouldError) {
+              return { data: null, error: { message: 'Database error' } };
+            }
+            return { data: { enabled: true }, error: null };
+          }),
+        })),
+      })),
+    })),
+  } as unknown as SupabaseClient;
+};
+```
+
+## Test Checklist
+
+- [ ] Write tests for current behavior (should pass)
+- [ ] Refactor code to use Result/Option types
+- [ ] Update tests to use Result/Option assertions
+- [ ] Run tests - all should pass
+- [ ] Run full test suite - no regressions
+- [ ] Check test coverage - should maintain or improve
+- [ ] Run `npm run typecheck` - no TypeScript errors
+- [ ] Manual testing - verify in browser
+
+## Quick Reference Commands
+
+```bash
+# Run all tests
+npm test
+
+# Run specific test file
+npm test -- src/lib/__tests__/feature-flags.refactor.test.ts
+
+# Watch mode (auto-rerun on changes)
+npm run test:watch
+
+# Coverage
+npm run test:coverage
+
+# Type checking
+npm run typecheck
+```
+
+## Best Practices
+
+1. ✅ **One file at a time** - Don't refactor multiple files simultaneously
+2. ✅ **Small changes** - Make incremental improvements
+3. ✅ **Test first** - Write tests before refactoring
+4. ✅ **Run tests often** - After each small change
+5. ✅ **Keep tests passing** - Never commit failing tests
+6. ✅ **Update call sites** - Update all places that use refactored code
+7. ✅ **Type check** - Run `npm run typecheck` before committing
+
+## Resources
+
+- [Jest Documentation](https://jestjs.io/docs/getting-started)
+- [neverthrow Documentation](https://github.com/supermacro/neverthrow)
+- [Effect Documentation](https://effect.website/docs/guides/essentials/option)

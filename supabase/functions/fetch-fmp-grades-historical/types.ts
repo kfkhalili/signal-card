@@ -18,7 +18,8 @@ export interface SupabaseGradesHistoricalRecord {
   analyst_ratings_hold: number | null;
   analyst_ratings_sell: number | null;
   analyst_ratings_strong_sell: number | null;
-  // fetched_at and updated_at are handled by DB
+  fetched_at?: string; // Optional: can be set explicitly for sentinel records
+  // updated_at is handled by DB defaults/triggers
 }
 
 export interface SupportedSymbol {

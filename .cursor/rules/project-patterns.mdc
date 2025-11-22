@@ -280,23 +280,36 @@ const memoizedCallback = useCallback(() => {
 - **Route handler client**: Use `createSupabaseRouteHandlerClient()` for API routes
 
 #### Query Patterns
-- Always handle errors from Supabase queries
+- **Always use `fromPromise()` and Result types** for Supabase queries
 - Use TypeScript types from `@/lib/supabase/database.types`
-- Prefer explicit error handling over throwing
+- Never use direct `const { data, error } = await supabase` pattern
+- See `database.mdc` for detailed query patterns
 
 ```typescript
-const { data, error } = await supabase
-  .from("table_name")
-  .select("*")
-  .eq("column", "value");
+import { fromPromise, Result } from "neverthrow";
+import { Option } from "effect";
 
-if (error) {
-  return err(new Error(error.message));
+// ✅ GOOD: Using fromPromise for async Supabase queries
+async function fetchData(
+  supabase: SupabaseClient,
+  symbol: string
+): Promise<Result<Option.Option<DataDBRow>, Error>> {
+  const result = await fromPromise(
+    supabase
+      .from("table_name")
+      .select("*")
+      .eq("column", "value")
+      .maybeSingle(),
+    (e) => e as Error
+  );
+  return result.map((response) =>
+    response.data ? Option.some(response.data) : Option.none()
+  );
 }
-if (!data || data.length === 0) {
-  return err(new Error("No data found"));
-}
-return ok(data);
+
+// ❌ BAD: Direct query pattern (don't use this)
+// const { data, error } = await supabase.from("table_name").select("*");
+// if (error) { return err(new Error(error.message)); }
 ```
 
 #### Real-time Subscription Pattern
@@ -324,16 +337,33 @@ useEffect(() => {
 }, [symbol, supabase]);
 ```
 
+### Supabase Operations
+
+#### Always Use MCP for Supabase
+- **ALWAYS use MCP tools** for all Supabase operations (deployments, SQL queries, migrations, etc.)
+- **NEVER use CLI commands** like `supabase functions deploy` or `supabase db push`
+- **NEVER use direct API calls** when MCP tools are available
+- MCP tools provide better error handling, logging, and integration with the codebase
+
+**Examples:**
+- ✅ Use `mcp_supabase-tickered_deploy_edge_function` for Edge Function deployments
+- ✅ Use `mcp_supabase-tickered_execute_sql` for SQL queries
+- ✅ Use `mcp_supabase-tickered_apply_migration` for database migrations
+- ✅ Use `mcp_supabase-tickered_get_logs` for viewing logs
+- ❌ Don't use `supabase functions deploy` CLI command
+- ❌ Don't use `supabase db push` CLI command
+
 ### Edge Function Patterns
 
 #### Standard Structure
+**Note:** Edge Functions run in Deno runtime. Use `fromPromise()` from neverthrow for Supabase queries to maintain consistency with the codebase. Import neverthrow using npm specifier: `import { fromPromise } from "npm:neverthrow@8.2.0";`
+
 ```typescript
 // supabase/functions/[function-name]/index.ts
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "@supabase/supabase-js";
+import { fromPromise } from "npm:neverthrow@8.2.0";
+import { CORS_HEADERS } from "../_shared/auth.ts";
 
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight
@@ -342,14 +372,41 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    // Validate environment variables
+    // Validate environment variables (throwing is acceptable for initialization errors)
     const apiKey = Deno.env.get("FMP_API_KEY");
     if (!apiKey) {
       throw new Error("FMP_API_KEY not set");
     }
 
-    // Function logic
-    const result = await fetchData();
+    // Supabase queries should use fromPromise() for consistency
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error("Supabase environment variables not set");
+    }
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Example: Using fromPromise for Supabase query
+    const queryResult = await fromPromise(
+      supabase.from("table_name").select("*").eq("column", "value"),
+      (e) => e as Error
+    );
+
+    const queryResponse = queryResult.match(
+      (response) => {
+        const { data, error } = response;
+        if (error) {
+          throw new Error(`Database error: ${error.message}`);
+        }
+        return data;
+      },
+      (error) => {
+        throw new Error(`Query failed: ${error.message}`);
+      }
+    );
+
+    // Function logic using queryResponse
+    const result = await processData(queryResponse);
 
     return new Response(JSON.stringify(result), {
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
@@ -358,7 +415,7 @@ Deno.serve(async (req: Request) => {
   } catch (error) {
     console.error("[function-name] Error:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       {
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
         status: 500,
@@ -490,7 +547,9 @@ const handleClick = () => {
 
 #### Code Comments
 - Use JSDoc for exported functions and types
-- Explain **why**, not **what** (code should be self-documenting)
+- **Focus on WHY, not WHAT** - The WHY is more important than WHAT
+- Explain **why** something is done a certain way, not what it does (code should be self-documenting)
+- Document the reasoning, business logic, trade-offs, and non-obvious decisions
 - Document complex algorithms and business logic
 
 ```typescript

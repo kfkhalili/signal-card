@@ -4,7 +4,6 @@
 import React, { useCallback, useState } from "react";
 import type { DisplayableCard } from "./types";
 import { ActiveCards as ActiveCardsPresentational } from "./ActiveCards";
-import { useToast as useAppToast } from "@/hooks/use-toast";
 import type { OnGenericInteraction } from "./cards/base-card/base-card.types";
 import type { SelectedDataItem } from "@/hooks/useWorkspaceManager";
 import { DragEndEvent } from "@dnd-kit/core";
@@ -28,7 +27,6 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
   selectedDataItems,
   onToggleItemSelection,
 }) => {
-  const { toast } = useAppToast();
 
   const [cardIdToConfirmDelete, setCardIdToConfirmDelete] = useState<
     string | null
@@ -43,10 +41,9 @@ const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
       setActiveCards((prevCards) =>
         prevCards.filter((card) => card.id !== cardIdToConfirmDelete)
       );
-      setTimeout(() => toast({ title: "Card Removed" }), 0);
       setCardIdToConfirmDelete(null);
     }
-  }, [cardIdToConfirmDelete, toast, setActiveCards]);
+  }, [cardIdToConfirmDelete, setActiveCards]);
 
   const cancelDeletion = useCallback((): void => {
     setCardIdToConfirmDelete(null);

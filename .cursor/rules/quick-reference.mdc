@@ -9,20 +9,22 @@ globs:
 
 ### Adding a New Card Type (Quick Checklist)
 
-1. ✅ Add card type to `CardType` union in `base-card.types.ts`
+**Note:** See `project-patterns.mdc` for detailed patterns and code examples.
+
+1. ✅ Add to `CardType` union in `src/components/game/cards/base-card/base-card.types.ts`
 2. ✅ Create directory: `src/components/game/cards/[card-name]/`
-3. ✅ Create `[card-name].types.ts` with `[CardName]CardData`, `[CardName]CardStaticData`, `[CardName]CardLiveData`
-4. ✅ Create `[CardName]Content.tsx` (face content UI component)
-5. ✅ Create `[CardName]Container.tsx` (wraps Content in BaseCard)
-6. ✅ Create `[card-name]Utils.ts` with initializer function
-7. ✅ Create `[card-name]Rehydrator.ts` with rehydrator function
-8. ✅ Register initializer in `src/components/game/cards/initializers.ts`
-9. ✅ Register renderer in `src/components/game/cards/rendererRegistryInitializer.tsx`
+3. ✅ Define card types in `[card-name].types.ts` (`[CardName]CardData`, `[CardName]CardStaticData`, `[CardName]CardLiveData`)
+4. ✅ Implement initializer in `[card-name]Utils.ts`
+5. ✅ Register initializer in `src/components/game/cards/initializers.ts`
+6. ✅ Create Content component `[CardName]Content.tsx` (face content)
+7. ✅ Create Container component `[CardName]Container.tsx` (wraps Content in BaseCard)
+8. ✅ Register renderer in `src/components/game/cards/rendererRegistryInitializer.tsx`
+9. ✅ Implement rehydrator in `[card-name]Rehydrator.ts`
 10. ✅ Register rehydrator in `src/components/game/cards/rehydrators.ts`
-11. ✅ Add update handler in `[card-name]Utils.ts` if needed for real-time updates
+11. ✅ Implement update handler in `[card-name]Utils.ts` if card needs real-time updates
 12. ✅ Register update handler in `src/components/game/cards/updateHandlerInitializer.ts`
-13. ✅ Add to `ConcreteCardData` union in `src/components/game/types.ts`
-14. ✅ Add card option to `AddCardForm.tsx` UI
+13. ✅ Update `ConcreteCardData` union in `src/components/game/types.ts`
+14. ✅ Add to `AddCardForm.tsx` UI for user selection
 15. ✅ Create `[CardName].stories.tsx` for Storybook
 
 ### Custom Hook Pattern
@@ -89,29 +91,44 @@ export function useContextHook(): ContextValue {
 
 ### Supabase Query Pattern
 
+**Always use `fromPromise()` and Result types** - see `database.mdc` for detailed patterns.
+
 ```typescript
-import { ok, err, Result } from "neverthrow";
+import { fromPromise, Result } from "neverthrow";
+import { Option } from "effect";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+// ✅ GOOD: Using fromPromise for async Supabase queries
 async function fetchData(
   supabase: SupabaseClient,
   symbol: string
-): Promise<Result<Data[], Error>> {
-  const { data, error } = await supabase
-    .from("table_name")
-    .select("*")
-    .eq("symbol", symbol);
-
-  if (error) {
-    return err(new Error(error.message));
-  }
-
-  if (!data || data.length === 0) {
-    return err(new Error("No data found"));
-  }
-
-  return ok(data);
+): Promise<Result<Option.Option<DataDBRow>, Error>> {
+  const result = await fromPromise(
+    supabase
+      .from("table_name")
+      .select("*")
+      .eq("symbol", symbol)
+      .maybeSingle(),
+    (e) => e as Error
+  );
+  return result.map((response) =>
+    response.data ? Option.some(response.data) : Option.none()
+  );
 }
+
+// Usage:
+const dataResult = await fetchData(supabase, "AAPL");
+dataResult.match(
+  (dataOption) => {
+    if (Option.isSome(dataOption)) {
+      // Use dataOption.value
+    }
+  },
+  (error) => {
+    // Handle error
+    console.error(error);
+  }
+);
 ```
 
 ### Real-time Subscription Pattern
@@ -302,33 +319,34 @@ export function [CardName]Content({
 
 ### Edge Function Template
 
+**Note:** Edge Functions run in Deno runtime. Use `fromPromise()` from neverthrow for Supabase queries to maintain consistency. Import using: `import { fromPromise } from "npm:neverthrow@8.2.0";`
+
 ```typescript
 // supabase/functions/[function-name]/index.ts
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "@supabase/supabase-js";
+import { fromPromise } from "npm:neverthrow@8.2.0";
+import { CORS_HEADERS } from "../_shared/auth.ts";
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
-
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: CORS_HEADERS });
   }
 
   try {
-    // Validate environment variables
+    // Validate environment variables (throwing is acceptable for initialization errors)
     const apiKey = Deno.env.get("FMP_API_KEY");
     if (!apiKey) {
       throw new Error("FMP_API_KEY not set");
     }
 
     // Get Supabase client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error("Supabase environment variables not set");
+    }
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Parse request
@@ -347,14 +365,24 @@ serve(async (req: Request) => {
 
     const data = await response.json();
 
-    // Upsert to database
-    const { error: dbError } = await supabase
-      .from("table_name")
-      .upsert(data, { onConflict: "symbol" });
+    // Upsert to database using fromPromise() for consistency
+    const upsertResult = await fromPromise(
+      supabase.from("table_name").upsert(data, { onConflict: "symbol" }),
+      (e) => e as Error
+    );
 
-    if (dbError) {
-      throw new Error(`Database error: ${dbError.message}`);
-    }
+    const upsertResponse = upsertResult.match(
+      (response) => {
+        const { error } = response;
+        if (error) {
+          throw new Error(`Database error: ${error.message}`);
+        }
+        return response;
+      },
+      (error) => {
+        throw new Error(`Database error: ${error.message}`);
+      }
+    );
 
     return new Response(
       JSON.stringify({ success: true }),
@@ -366,7 +394,7 @@ serve(async (req: Request) => {
   } catch (error) {
     console.error("[function-name] Error:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       {
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
         status: 500,

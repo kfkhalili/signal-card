@@ -47,6 +47,16 @@ const MetricDisplayWithChart: React.FC<MetricDisplayWithChartProps> = ({
   onSelect,
   exchangeRates,
 }) => {
+  // Don't render if value is null/undefined and no annual data
+  if (
+    (currentValue === null ||
+      currentValue === undefined ||
+      Number.isNaN(currentValue)) &&
+    (!annualData || annualData.length === 0)
+  ) {
+    return null;
+  }
+
   const formattedValue =
     currentValue === null ||
     currentValue === undefined ||
@@ -104,6 +114,7 @@ const MetricDisplayWithChart: React.FC<MetricDisplayWithChartProps> = ({
         </span>
       </ClickableDataItem>
       <LineChartComponent
+        key={`${label}-${chartData.length}-${chartData.map(d => d.value).join('-')}`}
         data={chartData}
         xAxisKey="name"
         yAxisKey="value"
@@ -305,6 +316,24 @@ export const CashUseCardContent: React.FC<CashUseCardContentProps> = React.memo(
         </div>
       );
     }
+  },
+  (prevProps, nextProps) => {
+    // Custom comparison to ensure re-render when card data changes
+    // Compare key fields that affect rendering
+    return (
+      prevProps.cardData.id === nextProps.cardData.id &&
+      prevProps.cardData.liveData.currentTotalDebt === nextProps.cardData.liveData.currentTotalDebt &&
+      prevProps.cardData.liveData.currentFreeCashFlow === nextProps.cardData.liveData.currentFreeCashFlow &&
+      prevProps.cardData.liveData.weightedAverageShsOut === nextProps.cardData.liveData.weightedAverageShsOut &&
+      prevProps.cardData.liveData.currentNetDividendsPaid === nextProps.cardData.liveData.currentNetDividendsPaid &&
+      JSON.stringify(prevProps.cardData.liveData.totalDebt_annual_data) === JSON.stringify(nextProps.cardData.liveData.totalDebt_annual_data) &&
+      JSON.stringify(prevProps.cardData.liveData.freeCashFlow_annual_data) === JSON.stringify(nextProps.cardData.liveData.freeCashFlow_annual_data) &&
+      JSON.stringify(prevProps.cardData.liveData.outstandingShares_annual_data) === JSON.stringify(nextProps.cardData.liveData.outstandingShares_annual_data) &&
+      JSON.stringify(prevProps.cardData.liveData.netDividendsPaid_annual_data) === JSON.stringify(nextProps.cardData.liveData.netDividendsPaid_annual_data) &&
+      prevProps.isBackFace === nextProps.isBackFace &&
+      prevProps.isSelectionMode === nextProps.isSelectionMode &&
+      prevProps.selectedDataItems.length === nextProps.selectedDataItems.length
+    );
   }
 );
 
