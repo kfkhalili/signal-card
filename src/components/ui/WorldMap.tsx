@@ -41,41 +41,81 @@ const createCustomIcon = () => {
 const customIcon = createCustomIcon();
 
 // Separate component for markers that uses useMap hook to ensure map context is available
+// CRITICAL: This component must only render when map is fully ready to prevent _leaflet_pos errors
 const MarkersLayer: React.FC<{ markers: { label: string; position: [number, number]; countryCode: string; countryName?: string | null }[] }> = ({ markers }) => {
   const map = useMap();
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    // Wait for map to be fully initialized before rendering markers
-    if (map) {
-      let timer: NodeJS.Timeout | null = null;
-      
-      map.whenReady(() => {
-        // Additional small delay to ensure panes are ready
-        timer = setTimeout(() => {
-          const container = map.getContainer();
-          if (container && container.parentElement) {
-            // Check if marker pane exists
-            const markerPane = map.getPane('markerPane');
-            if (markerPane) {
-              setIsReady(true);
-            }
-          }
-        }, 50);
-      });
-      
-      return () => {
-        if (timer) {
-          clearTimeout(timer);
-        }
-        setIsReady(false);
-      };
-    } else {
+    if (!map) {
       setIsReady(false);
+      return;
     }
+
+    let isMounted = true;
+    let timer: NodeJS.Timeout | null = null;
+
+    // Wait for map to be fully ready
+    const checkReady = () => {
+      try {
+        const container = map.getContainer();
+        if (!container || !container.parentElement) {
+          return;
+        }
+
+        // Check if marker pane exists and is in the DOM
+        const markerPane = map.getPane('markerPane');
+        if (!markerPane || !markerPane.parentNode) {
+          return;
+        }
+
+        // Additional check: verify the pane has the expected structure
+        if (markerPane instanceof HTMLElement) {
+          if (isMounted) {
+            setIsReady(true);
+          }
+        }
+      } catch (error) {
+        console.warn('Error checking map readiness:', error);
+      }
+    };
+
+    // Use whenReady to ensure map is initialized
+    map.whenReady(() => {
+      if (!isMounted) return;
+      
+      // Double-check after a small delay to ensure DOM is fully ready
+      timer = setTimeout(() => {
+        if (isMounted) {
+          checkReady();
+        }
+      }, 100);
+    });
+
+    return () => {
+      isMounted = false;
+      if (timer) {
+        clearTimeout(timer);
+      }
+      setIsReady(false);
+    };
   }, [map]);
 
-  if (!isReady) {
+  // Don't render anything until map is fully ready
+  if (!isReady || !map) {
+    return null;
+  }
+
+  // Final safety check before rendering markers
+  try {
+    const container = map.getContainer();
+    const markerPane = map.getPane('markerPane');
+    
+    if (!container || !container.parentElement || !markerPane || !markerPane.parentNode) {
+      return null;
+    }
+  } catch (error) {
+    console.warn('Error in MarkersLayer safety check:', error);
     return null;
   }
 

@@ -200,7 +200,7 @@ export const ExchangeVariantsCardContent: React.FC<ExchangeVariantsCardContentPr
             onClick={(e) => e.stopPropagation()}
           >
             <DynamicWorldMap
-              key={JSON.stringify(mapMarkers)}
+              key={`${symbol}-exchange-variants-map`}
               markers={mapMarkers}
               className="absolute inset-0"
             />
