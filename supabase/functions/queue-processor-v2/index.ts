@@ -29,6 +29,8 @@ import { fetchDividendHistoryLogic } from '../lib/fetch-fmp-dividend-history.ts'
 import { fetchRevenueProductSegmentationLogic } from '../lib/fetch-fmp-revenue-product-segmentation.ts';
 import { fetchGradesHistoricalLogic } from '../lib/fetch-fmp-grades-historical.ts';
 import { fetchExchangeVariantsLogic } from '../lib/fetch-fmp-exchange-variants.ts';
+import { fetchInsiderTradingStatisticsLogic } from '../lib/fetch-fmp-insider-trading-statistics.ts';
+import { fetchInsiderTransactionsLogic } from '../lib/fetch-fmp-insider-transactions.ts';
 // All card data types have been migrated to the queue system
 
 interface QueueJob {
@@ -369,6 +371,10 @@ async function processJob(
       return await fetchGradesHistoricalLogic(job, supabase);
     case 'exchange-variants':
       return await fetchExchangeVariantsLogic(job, supabase);
+    case 'insider-trading-statistics':
+      return await fetchInsiderTradingStatisticsLogic(job, supabase);
+    case 'insider-transactions':
+      return await fetchInsiderTransactionsLogic(job, supabase);
     default:
       return {
         success: false,

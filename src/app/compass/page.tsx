@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useLeaderboardStore } from "@/stores/compassStore";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDebounce } from "use-debounce";
@@ -341,7 +342,11 @@ export default function CompassPage() {
                       {/* Company Name and Symbol */}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-base truncate">
+                          <Link
+                            href={`/symbol/${item.symbol}`}
+                            className="font-semibold text-base truncate hover:text-primary transition-colors"
+                            title={`View detailed analysis for ${item.symbol}`}
+                          >
                             {companyName ? (
                               <>
                                 {companyName} <span className="text-muted-foreground font-normal">({item.symbol})</span>
@@ -349,7 +354,7 @@ export default function CompassPage() {
                             ) : (
                               item.symbol
                             )}
-                          </h3>
+                          </Link>
                           {isTop3 && (
                             <TrendingUp className="h-4 w-4 text-primary shrink-0" />
                           )}

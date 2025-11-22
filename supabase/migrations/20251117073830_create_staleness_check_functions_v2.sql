@@ -68,8 +68,10 @@ BEGIN
       -- CRITICAL: For exchange-variants (and other tables with multiple records per symbol),
       -- use MAX(timestamp_column) to get the most recent fetch time
       -- This ensures sentinel records work correctly
-      IF reg_row.data_type = 'exchange-variants' THEN
-        -- Use MAX to get the most recent fetched_at across all variants for this symbol
+      IF reg_row.data_type = 'exchange-variants' OR reg_row.data_type = 'insider-trading-statistics' OR reg_row.data_type = 'insider-transactions' THEN
+        -- Use MAX to get the most recent fetched_at across all records for this symbol
+        -- exchange-variants: multiple variants per symbol
+        -- insider-trading-statistics: multiple quarters per symbol
         sql_text := format(
           'SELECT %I(MAX(t.%I), %L::INTEGER) FROM %I t WHERE t.%I = %L',
           reg_row.staleness_function,

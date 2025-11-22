@@ -289,5 +289,89 @@ INSERT INTO public.data_type_registry_v2 (
   estimated_data_size_bytes = EXCLUDED.estimated_data_size_bytes,
   updated_at = NOW();
 
+-- Insider trading statistics data type
+-- CRITICAL: Insider trading data is updated quarterly, so use 7-day TTL (10080 minutes)
+INSERT INTO public.data_type_registry_v2 (
+  data_type,
+  table_name,
+  timestamp_column,
+  staleness_function,
+  default_ttl_minutes,
+  edge_function_name,
+  refresh_strategy,
+  refresh_schedule,
+  priority,
+  estimated_data_size_bytes,
+  symbol_column,
+  source_timestamp_column
+) VALUES (
+  'insider-trading-statistics',
+  'insider_trading_statistics',
+  'fetched_at',
+  'is_insider_trading_statistics_stale_v2',
+  10080, -- 7 days TTL (insider trading data is updated quarterly)
+  'queue-processor-v2',
+  'on-demand',
+  NULL, -- No scheduled refresh (on-demand only)
+  0, -- Default priority (will be overridden by viewer count)
+  15000, -- Estimated 15KB per response (multiple quarterly records)
+  'symbol',
+  NULL -- No source timestamp column in FMP API
+) ON CONFLICT (data_type) DO UPDATE SET
+  table_name = EXCLUDED.table_name,
+  timestamp_column = EXCLUDED.timestamp_column,
+  staleness_function = EXCLUDED.staleness_function,
+  default_ttl_minutes = EXCLUDED.default_ttl_minutes,
+  edge_function_name = EXCLUDED.edge_function_name,
+  refresh_strategy = EXCLUDED.refresh_strategy,
+  refresh_schedule = EXCLUDED.refresh_schedule,
+  priority = EXCLUDED.priority,
+  estimated_data_size_bytes = EXCLUDED.estimated_data_size_bytes,
+  symbol_column = EXCLUDED.symbol_column,
+  source_timestamp_column = EXCLUDED.source_timestamp_column,
+  updated_at = NOW();
+
+-- Insider transactions data type
+-- CRITICAL: Insider transactions are filed daily, so use 24-hour TTL (1440 minutes)
+INSERT INTO public.data_type_registry_v2 (
+  data_type,
+  table_name,
+  timestamp_column,
+  staleness_function,
+  default_ttl_minutes,
+  edge_function_name,
+  refresh_strategy,
+  refresh_schedule,
+  priority,
+  estimated_data_size_bytes,
+  symbol_column,
+  source_timestamp_column
+) VALUES (
+  'insider-transactions',
+  'insider_transactions',
+  'fetched_at',
+  'is_insider_transactions_stale_v2',
+  1440, -- 24 hours TTL (insider transactions are filed daily)
+  'queue-processor-v2',
+  'on-demand',
+  NULL, -- No scheduled refresh (on-demand only)
+  0, -- Default priority (will be overridden by viewer count)
+  200000, -- Estimated 200KB per response (500 transactions × ~400 bytes each)
+  'symbol',
+  NULL -- No source timestamp column in FMP API
+) ON CONFLICT (data_type) DO UPDATE SET
+  table_name = EXCLUDED.table_name,
+  timestamp_column = EXCLUDED.timestamp_column,
+  staleness_function = EXCLUDED.staleness_function,
+  default_ttl_minutes = EXCLUDED.default_ttl_minutes,
+  edge_function_name = EXCLUDED.edge_function_name,
+  refresh_strategy = EXCLUDED.refresh_strategy,
+  refresh_schedule = EXCLUDED.refresh_schedule,
+  priority = EXCLUDED.priority,
+  estimated_data_size_bytes = EXCLUDED.estimated_data_size_bytes,
+  symbol_column = EXCLUDED.symbol_column,
+  source_timestamp_column = EXCLUDED.source_timestamp_column,
+  updated_at = NOW();
+
 COMMENT ON TABLE public.data_type_registry_v2 IS 'Single source of truth for all data types. Adding new types requires zero code changes.';
 
