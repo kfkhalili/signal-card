@@ -7,7 +7,10 @@
 -- CRITICAL: Runs recover_stuck_jobs as first action (proactive self-healing)
 -- CRITICAL: Uses advisory lock to prevent cron pile-ups
 CREATE OR REPLACE FUNCTION public.invoke_processor_if_healthy_v2()
-RETURNS void AS $$
+RETURNS void
+LANGUAGE plpgsql
+SET search_path = public, extensions
+AS $$
 DECLARE
   recent_failures INTEGER;
   lock_acquired BOOLEAN;
@@ -68,7 +71,7 @@ BEGIN
   -- Always release lock
   PERFORM pg_advisory_unlock(44);
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 COMMENT ON FUNCTION public.invoke_processor_if_healthy_v2 IS 'Invokes processor with circuit breaker. Runs recover_stuck_jobs proactively. Uses advisory lock to prevent cron pile-ups.';
 
@@ -78,7 +81,10 @@ CREATE OR REPLACE FUNCTION public.invoke_processor_loop_v2(
   p_max_iterations INTEGER DEFAULT 5,
   p_iteration_delay_seconds INTEGER DEFAULT 12
 )
-RETURNS INTEGER AS $$
+RETURNS INTEGER
+LANGUAGE plpgsql
+SET search_path = public, extensions
+AS $$
 DECLARE
   iteration_count INTEGER := 0;
   jobs_processed INTEGER := 0;
@@ -98,7 +104,7 @@ BEGIN
 
   RETURN iteration_count;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 COMMENT ON FUNCTION public.invoke_processor_loop_v2 IS 'Loops processor invocations. Loop is in SQL, Edge Function is stateless. 3 iterations with 2-second delay to maximize throughput while respecting API call limits (300 calls/minute).';
 

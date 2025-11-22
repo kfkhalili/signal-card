@@ -11,7 +11,11 @@ RETURNS TABLE (
   completed_count BIGINT,
   failed_count BIGINT,
   alert_status TEXT
-) AS $$
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
 DECLARE
   v_success_rate NUMERIC;
   v_completed BIGINT;
@@ -35,7 +39,7 @@ BEGIN
       ELSE 'healthy'
     END;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 COMMENT ON FUNCTION public.check_queue_success_rate_alert() IS 'Checks queue success rate over last 24 hours. Returns alert_status = alert if <90%';
 
@@ -48,7 +52,11 @@ RETURNS TABLE (
   usage_percent NUMERIC,
   total_bytes BIGINT,
   alert_status TEXT
-) AS $$
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
 DECLARE
   v_usage_percent NUMERIC;
   v_total_bytes BIGINT;
@@ -70,7 +78,7 @@ BEGIN
       ELSE 'healthy'
     END;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 COMMENT ON FUNCTION public.check_quota_usage_alert() IS 'Checks quota usage over rolling 30 days. Returns alert_status = alert if >80%';
 
@@ -83,7 +91,11 @@ RETURNS TABLE (
   stuck_count BIGINT,
   affected_data_types BIGINT,
   alert_status TEXT
-) AS $$
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
 DECLARE
   v_stuck_count BIGINT;
   v_affected_types BIGINT;
@@ -104,7 +116,7 @@ BEGIN
       ELSE 'healthy'
     END;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 COMMENT ON FUNCTION public.check_stuck_jobs_alert() IS 'Checks for stuck jobs (processing >10 minutes). Returns alert_status = alert if >10 jobs';
 

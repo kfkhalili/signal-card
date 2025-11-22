@@ -6,7 +6,10 @@
 -- CRITICAL: Advisory lock prevents cron pile-ups
 
 CREATE OR REPLACE FUNCTION public.queue_scheduled_refreshes_v2()
-RETURNS INTEGER AS $$
+RETURNS INTEGER
+LANGUAGE plpgsql
+SET search_path = public, extensions
+AS $$
 DECLARE
   queue_depth INTEGER;
   max_queue_depth INTEGER := 1000;
@@ -82,7 +85,7 @@ BEGIN
       RAISE;
   END;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 COMMENT ON FUNCTION public.queue_scheduled_refreshes_v2 IS 'Queues scheduled refreshes. Throttled by queue depth. Uses TABLESAMPLE for scale. Priority hardcoded to -1.';
 

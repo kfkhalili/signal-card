@@ -12,7 +12,10 @@ CREATE OR REPLACE FUNCTION public.queue_refresh_if_not_exists_v2(
   p_priority INTEGER,
   p_estimated_size_bytes BIGINT DEFAULT 0
 )
-RETURNS UUID AS $$
+RETURNS UUID
+LANGUAGE plpgsql
+SET search_path = public, extensions
+AS $$
 DECLARE
   job_id UUID;
   existing_job_id UUID;
@@ -61,7 +64,7 @@ BEGIN
 
   RETURN job_id;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 COMMENT ON FUNCTION public.queue_refresh_if_not_exists_v2 IS 'Idempotently queues a refresh job. Financial-statements jobs automatically get priority 500 (unless UI job with priority 1000). If job exists (pending/processing), updates priority to promote it (UI/heartbeat jobs take precedence). If job does not exist, inserts new job. Uses GREATEST to only raise priority, never lower it.';
 

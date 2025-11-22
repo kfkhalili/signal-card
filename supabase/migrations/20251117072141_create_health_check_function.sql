@@ -6,7 +6,11 @@
 -- CRITICAL: SECURITY DEFINER required - function needs to query pg_cron schema
 -- which is not accessible to regular users
 CREATE OR REPLACE FUNCTION public.check_cron_job_health(p_critical_jobs TEXT[])
-RETURNS TABLE(jobname TEXT, last_run TIMESTAMP WITH TIME ZONE) AS $$
+RETURNS TABLE(jobname TEXT, last_run TIMESTAMP WITH TIME ZONE)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
 BEGIN
   RETURN QUERY
   SELECT
@@ -17,7 +21,7 @@ BEGIN
   WHERE j.jobname = ANY(p_critical_jobs)
   GROUP BY j.jobname;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 COMMENT ON FUNCTION public.check_cron_job_health IS 'Returns the last execution time for each critical cron job. Used by health-check Edge Function for external monitoring.';
 

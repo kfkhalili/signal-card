@@ -9,7 +9,11 @@ CREATE OR REPLACE FUNCTION public.check_and_queue_stale_batch_v2(
   p_data_types TEXT[],
   p_priority INTEGER
 )
-RETURNS void AS $$
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
 DECLARE
   reg_row RECORD;
   is_stale BOOLEAN;
@@ -119,7 +123,7 @@ BEGIN
     END;
   END LOOP;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 COMMENT ON FUNCTION public.check_and_queue_stale_batch_v2 IS 'Event-driven staleness checker. Called by trigger on subscription creation and can be called directly. For exchange-variants, uses MAX(fetched_at) to handle multiple records per symbol. Uses SECURITY DEFINER to access data tables. Fail-safe to stale. For quote data type: always creates job if data missing (even if exchange closed), only checks exchange status if data exists.';
 

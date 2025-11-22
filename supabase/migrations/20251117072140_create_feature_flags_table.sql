@@ -19,20 +19,27 @@ CREATE INDEX IF NOT EXISTS idx_feature_flags_enabled ON public.feature_flags(ena
 
 -- Helper function to check if a feature is enabled
 CREATE OR REPLACE FUNCTION public.is_feature_enabled(p_flag_name TEXT)
-RETURNS BOOLEAN AS $$
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SET search_path = public, extensions
+AS $$
   SELECT enabled FROM public.feature_flags WHERE flag_name = p_flag_name;
-$$ LANGUAGE sql STABLE;
+$$;
 
 COMMENT ON FUNCTION public.is_feature_enabled IS 'Helper function to check if a feature flag is enabled. Returns false if flag does not exist.';
 
 -- Auto-update updated_at timestamp
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public, extensions
+AS $$
 BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 CREATE TRIGGER update_feature_flags_updated_at
   BEFORE UPDATE ON public.feature_flags

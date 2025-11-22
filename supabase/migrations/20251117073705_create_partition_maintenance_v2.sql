@@ -6,7 +6,10 @@
 -- CRITICAL: Truncates completed/failed partitions weekly to prevent infinite bloat
 -- CRITICAL: Uses lock_timeout and exception handling for polite operation
 CREATE OR REPLACE FUNCTION public.maintain_queue_partitions_v2()
-RETURNS void AS $$
+RETURNS void
+LANGUAGE plpgsql
+SET search_path = public, extensions
+AS $$
 BEGIN
   -- CRITICAL: Set short lock timeout (1 second)
   -- This prevents "stop-the-world" deadlocks with active processors
@@ -32,9 +35,9 @@ BEGIN
       RAISE WARNING 'Could not truncate failed partition: lock not available (processors may be active)';
     WHEN OTHERS THEN
       RAISE WARNING 'Error truncating failed partition: %', SQLERRM;
-  END;
+    END;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 COMMENT ON FUNCTION public.maintain_queue_partitions_v2 IS 'Maintains queue partitions by truncating completed/failed partitions. Uses polite lock timeout to prevent deadlocks.';
 

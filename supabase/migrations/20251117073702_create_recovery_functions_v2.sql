@@ -5,7 +5,10 @@
 -- Function to recover stuck jobs (poisoned batch recovery)
 -- CRITICAL: Uses FOR UPDATE SKIP LOCKED to prevent deadlocks with concurrent complete_queue_job calls
 CREATE OR REPLACE FUNCTION public.recover_stuck_jobs_v2()
-RETURNS INTEGER AS $$
+RETURNS INTEGER
+LANGUAGE plpgsql
+SET search_path = public, extensions
+AS $$
 DECLARE
   stuck_job_count INTEGER := 0;
   recovered_count INTEGER := 0;
@@ -36,7 +39,7 @@ BEGIN
 
   RETURN recovered_count;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 COMMENT ON FUNCTION public.recover_stuck_jobs_v2 IS 'Recovers jobs stuck in processing state for more than 5 minutes. Uses FOR UPDATE SKIP LOCKED to prevent deadlocks.';
 

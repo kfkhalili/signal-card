@@ -6,7 +6,11 @@ CREATE OR REPLACE FUNCTION public.is_quote_stale_v2(
   p_fetched_at TIMESTAMPTZ,
   p_ttl_minutes INTEGER
 )
-RETURNS BOOLEAN AS $$
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+STABLE
+SET search_path = public, extensions
+AS $$
 BEGIN
   -- CRITICAL: Validate TTL is positive
   IF p_ttl_minutes IS NULL OR p_ttl_minutes <= 0 THEN
@@ -16,7 +20,7 @@ BEGIN
   -- Check if quote is stale
   RETURN p_fetched_at IS NULL OR p_fetched_at < NOW() - (p_ttl_minutes || ' minutes')::INTERVAL;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$;
 
 COMMENT ON FUNCTION public.is_quote_stale_v2 IS 'Quote-specific staleness check. Returns true if quote is stale. Uses fetched_at column. TTL must be explicitly provided (no default).';
 

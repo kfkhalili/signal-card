@@ -19,7 +19,11 @@ END $$;
 CREATE OR REPLACE FUNCTION public.is_quota_exceeded_v2(
   p_safety_buffer NUMERIC DEFAULT 0.95
 )
-RETURNS BOOLEAN AS $$
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+STABLE
+SET search_path = public, extensions
+AS $$
 DECLARE
   quota_limit_bytes BIGINT;
   current_usage_bytes BIGINT;
@@ -39,7 +43,7 @@ BEGIN
   -- Return true if usage exceeds buffered quota
   RETURN current_usage_bytes >= buffered_quota_bytes;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$;
 
 COMMENT ON FUNCTION public.is_quota_exceeded_v2 IS 'Checks if data quota is exceeded. Uses rolling 30-day window and safety buffer (default 95%) to prevent overshoot.';
 
@@ -51,7 +55,11 @@ RETURNS TABLE(
   buffered_quota_bytes BIGINT,
   usage_percentage NUMERIC,
   days_remaining INTEGER
-) AS $$
+)
+LANGUAGE plpgsql
+STABLE
+SET search_path = public, extensions
+AS $$
 DECLARE
   quota_limit BIGINT;
   current_usage BIGINT;
@@ -85,7 +93,113 @@ BEGIN
       ELSE 30
     END AS days_remaining;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$;
 
 COMMENT ON FUNCTION public.get_quota_usage_v2 IS 'Returns current quota usage statistics for monitoring and alerting.';
+
+-- Function to increment API calls (no-op: calls already reserved)
+-- CRITICAL: This is a no-op function for backward compatibility
+-- API calls are already reserved and counted in reserve_api_calls
+CREATE OR REPLACE FUNCTION public.increment_api_calls(p_api_calls_made INTEGER)
+RETURNS void
+LANGUAGE plpgsql
+SET search_path = public, extensions
+AS $$
+BEGIN
+  NULL; -- No-op: Calls were already reserved and counted
+END;
+$$;
+
+COMMENT ON FUNCTION public.increment_api_calls IS 'No-op function for backward compatibility. API calls are already reserved and counted in reserve_api_calls.';
+
+-- Function to reserve API calls (rate limiting)
+-- CRITICAL: Atomic reservation prevents exceeding 300 calls/minute limit
+CREATE OR REPLACE FUNCTION public.reserve_api_calls(
+  p_api_calls_to_reserve INTEGER,
+  p_max_api_calls_per_minute INTEGER DEFAULT 300
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SET search_path = public, extensions
+AS $$
+DECLARE
+  current_minute TIMESTAMPTZ;
+  current_calls INTEGER;
+BEGIN
+  current_minute := date_trunc('minute', NOW());
+
+  INSERT INTO public.api_calls_rate_tracker (minute_bucket, api_calls_made)
+  VALUES (current_minute, 0)
+  ON CONFLICT (minute_bucket) DO NOTHING;
+
+  SELECT api_calls_made INTO current_calls
+  FROM public.api_calls_rate_tracker
+  WHERE minute_bucket = current_minute
+  FOR UPDATE;
+
+  IF current_calls + p_api_calls_to_reserve > p_max_api_calls_per_minute THEN
+    RETURN FALSE;
+  END IF;
+
+  UPDATE public.api_calls_rate_tracker
+  SET api_calls_made = api_calls_made + p_api_calls_to_reserve,
+      updated_at = NOW()
+  WHERE minute_bucket = current_minute;
+
+  RETURN TRUE;
+END;
+$$;
+
+COMMENT ON FUNCTION public.reserve_api_calls IS 'Atomically reserves API calls. Returns false if reservation would exceed rate limit.';
+
+-- Function to release API calls reservation
+CREATE OR REPLACE FUNCTION public.release_api_calls_reservation(p_api_calls_to_release INTEGER)
+RETURNS void
+LANGUAGE plpgsql
+SET search_path = public, extensions
+AS $$
+DECLARE
+  current_minute TIMESTAMPTZ;
+BEGIN
+  current_minute := date_trunc('minute', NOW());
+
+  UPDATE public.api_calls_rate_tracker
+  SET api_calls_made = GREATEST(0, api_calls_made - p_api_calls_to_release),
+      updated_at = NOW()
+  WHERE minute_bucket = current_minute;
+END;
+$$;
+
+COMMENT ON FUNCTION public.release_api_calls_reservation IS 'Releases previously reserved API calls.';
+
+-- Function to check if processing should stop (rate limiting)
+CREATE OR REPLACE FUNCTION public.should_stop_processing_api_calls(
+  p_api_calls_to_reserve INTEGER,
+  p_max_api_calls_per_minute INTEGER DEFAULT 300,
+  p_safety_buffer INTEGER DEFAULT 5
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+STABLE
+SET search_path = public, extensions
+AS $$
+DECLARE
+  current_minute TIMESTAMPTZ;
+  current_calls INTEGER;
+BEGIN
+  current_minute := date_trunc('minute', NOW());
+
+  SELECT api_calls_made INTO current_calls
+  FROM public.api_calls_rate_tracker
+  WHERE minute_bucket = current_minute;
+
+  IF current_calls IS NULL THEN
+    RETURN FALSE;
+  END IF;
+
+  RETURN (current_calls + p_api_calls_to_reserve >= p_max_api_calls_per_minute - p_safety_buffer);
+END;
+$$;
+
+COMMENT ON FUNCTION public.should_stop_processing_api_calls IS 'Checks if processing should stop to avoid exceeding rate limit. Includes safety buffer.';
 
