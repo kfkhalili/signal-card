@@ -50,7 +50,7 @@ END $$;
 -- CRITICAL: Proactive recovery (runs recover_stuck_jobs as first action)
 -- CRITICAL: Advisory lock prevents cron pile-ups
 -- CRITICAL: SQL-side loop (Edge Function is stateless - processes one batch and exits)
--- CRITICAL: Optimized for faster processing (2 iterations, 5s delay = ~10-15 seconds max)
+-- CRITICAL: Optimized for faster processing (3 iterations, 2s delay = ~6-9 seconds max)
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -61,7 +61,7 @@ BEGIN
       '* * * * *', -- Every minute
       $$
       SELECT invoke_processor_loop_v2(
-        p_max_iterations := 5,
+        p_max_iterations := 3,
         p_iteration_delay_seconds := 2
       );
       $$

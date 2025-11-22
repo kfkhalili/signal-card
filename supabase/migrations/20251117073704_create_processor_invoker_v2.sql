@@ -100,5 +100,5 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-COMMENT ON FUNCTION public.invoke_processor_loop_v2 IS 'Loops processor invocations. Loop is in SQL, Edge Function is stateless. Optimized for faster processing (5 iterations, 2s delay = ~150 jobs per minute).';
+COMMENT ON FUNCTION public.invoke_processor_loop_v2 IS 'Loops processor invocations. Loop is in SQL, Edge Function is stateless. 3 iterations with 2-second delay to maximize throughput while respecting API call limits (300 calls/minute).';
 

@@ -117,9 +117,8 @@ RETURNS void AS $$
 DECLARE
   job_data_type TEXT;
   expected_api_calls INTEGER;
-  actual_api_calls INTEGER;
 BEGIN
-  -- Get job data type and expected API calls
+  -- Get job data type
   SELECT data_type INTO job_data_type
   FROM public.api_call_queue_v2
   WHERE id = p_job_id;
@@ -129,13 +128,10 @@ BEGIN
     RETURN;
   END IF;
 
-  -- Get expected API calls from registry (fallback to provided value or 1)
+  -- Get expected API calls from registry (for validation/logging)
   SELECT api_calls_per_job INTO expected_api_calls
   FROM public.data_type_registry_v2
   WHERE data_type = job_data_type;
-
-  -- Use provided value if available, otherwise use expected from registry, otherwise 1
-  actual_api_calls := COALESCE(p_api_calls_made, expected_api_calls, 1);
 
   -- Update job status
   UPDATE public.api_call_queue_v2
@@ -155,15 +151,12 @@ BEGIN
   INSERT INTO public.api_data_usage_v2 (data_size_bytes, job_id)
   VALUES (p_data_size_bytes, p_job_id);
 
-  -- CRITICAL: API calls were already incremented in check_and_increment_api_calls
+  -- CRITICAL: API calls were already reserved and counted in reserve_api_calls
   -- No need to increment again here - the counter is already correct
+  -- The p_api_calls_made parameter is for logging/validation only
 
   -- OPTIMIZATION: Auto-correct estimated_data_size_bytes (statistical sampling)
   -- Use random() < 0.01 instead of COUNT(*) for O(1) performance
-  SELECT data_type INTO job_data_type
-  FROM public.api_call_queue_v2
-  WHERE id = p_job_id;
-
   -- Statistical sampling: ~1% of jobs (equivalent to every 100th job on average)
   IF random() < 0.01 THEN
     UPDATE public.data_type_registry_v2
@@ -178,7 +171,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-COMMENT ON FUNCTION public.complete_queue_job_v2 IS 'Marks a job as completed and tracks data usage. Auto-corrects registry estimates using statistical sampling.';
+COMMENT ON FUNCTION public.complete_queue_job_v2 IS 'Marks a job as completed and tracks data usage. API calls are already tracked in reserve_api_calls. Auto-corrects registry estimates using statistical sampling.';
 
 -- Function to set max_retries when creating UI jobs
 -- CRITICAL: UI jobs (priority 1000) must never fail - users are actively waiting for data

@@ -61,16 +61,32 @@ BEGIN
 
     -- FAULT TOLERANCE: Wrap in exception handler so one bad data type doesn't break the batch
     BEGIN
-      -- Dynamically check staleness for this symbol
-      sql_text := format(
-        'SELECT %I(t.%I, %L::INTEGER) FROM %I t WHERE t.%I = %L',
-        reg_row.staleness_function,
-        reg_row.timestamp_column,
-        reg_row.default_ttl_minutes,
-        reg_row.table_name,
-        reg_row.symbol_column,
-        p_symbol
-      );
+      -- CRITICAL: For exchange-variants (and other tables with multiple records per symbol),
+      -- use MAX(timestamp_column) to get the most recent fetch time
+      -- This ensures sentinel records work correctly
+      IF reg_row.data_type = 'exchange-variants' THEN
+        -- Use MAX to get the most recent fetched_at across all variants for this symbol
+        sql_text := format(
+          'SELECT %I(MAX(t.%I), %L::INTEGER) FROM %I t WHERE t.%I = %L',
+          reg_row.staleness_function,
+          reg_row.timestamp_column,
+          reg_row.default_ttl_minutes,
+          reg_row.table_name,
+          reg_row.symbol_column,
+          p_symbol
+        );
+      ELSE
+        -- For other data types, use the standard query (assumes one record per symbol)
+        sql_text := format(
+          'SELECT %I(t.%I, %L::INTEGER) FROM %I t WHERE t.%I = %L',
+          reg_row.staleness_function,
+          reg_row.timestamp_column,
+          reg_row.default_ttl_minutes,
+          reg_row.table_name,
+          reg_row.symbol_column,
+          p_symbol
+        );
+      END IF;
 
       EXECUTE sql_text INTO is_stale;
 
@@ -105,5 +121,5 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-COMMENT ON FUNCTION public.check_and_queue_stale_batch_v2 IS 'Event-driven staleness checker. Called on user subscribe. Uses SECURITY DEFINER to access data tables. Fail-safe to stale. For quote data type: always creates job if data missing (even if exchange closed), only checks exchange status if data exists.';
+COMMENT ON FUNCTION public.check_and_queue_stale_batch_v2 IS 'Event-driven staleness checker. Called on user subscribe. For exchange-variants, uses MAX(fetched_at) to handle multiple records per symbol. Uses SECURITY DEFINER to access data tables. Fail-safe to stale. For quote data type: always creates job if data missing (even if exchange closed), only checks exchange status if data exists.';
 
