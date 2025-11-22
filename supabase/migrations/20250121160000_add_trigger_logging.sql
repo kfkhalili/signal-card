@@ -11,7 +11,7 @@ DECLARE
 BEGIN
   -- LOG: Trigger fired
   RAISE NOTICE 'Trigger fired for subscription %: entity=%, filters=%', NEW.id, NEW.entity::text, NEW.filters::text;
-  
+
   -- Extract symbol from filters
   v_symbol := SUBSTRING(NEW.filters::text FROM 'symbol,eq,([^)]+)');
   RAISE NOTICE 'Extracted symbol: %', v_symbol;
