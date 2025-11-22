@@ -50,6 +50,26 @@ WHERE
 
 **Result:** Jobs created every minute because there's always at least one old variant row.
 
+**Why Old Rows Exist:** The FMP API can stop returning certain variants over time. For example:
+- `APC.F` on `XETRA` exchange was returned on 2025-11-18
+- FMP stopped returning this variant in later API calls
+- The old row (`APC.F` + `XETRA`) remains in the database with stale `fetched_at`
+- New upserts only update variants that ARE in the API response
+- Orphaned rows (no longer returned by API) never get updated
+
+**The Real Issue:** Orphaned rows from variants that FMP no longer returns, not a bug in the upsert logic.
+
+**Why This Happens:**
+- The upsert uses `onConflict: 'symbol_variant,exchange_short_name'`
+- If FMP stops returning a variant, it's not in the `recordsToUpsert` array
+- The old row in the database never gets updated (no conflict to resolve)
+- The old row remains with its old `fetched_at` timestamp forever
+
+**The Fix (MAX) is Still Correct:**
+- We should check staleness based on the **most recent** data that WAS successfully fetched
+- If the most recent fetch was fresh, we don't need to re-fetch
+- Orphaned rows are a separate data cleanup issue (could be handled by deleting rows not in the latest API response)
+
 ---
 
 ## The Solution: MAX(fetched_at)
