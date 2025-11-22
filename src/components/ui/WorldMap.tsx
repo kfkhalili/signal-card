@@ -148,6 +148,44 @@ export const WorldMap: React.FC<WorldMapProps> = React.memo(({ markers, classNam
     }
   }, []);
 
+  // Cleanup effect: properly destroy map instance on unmount
+  // This prevents Leaflet from trying to access DOM elements that have been removed
+  useEffect(() => {
+    return () => {
+      if (Option.isSome(map)) {
+        try {
+          const mapInstance = map.value;
+          const container = mapInstance.getContainer();
+          
+          // Only cleanup if container still exists
+          if (container && container.parentElement) {
+            // Remove all layers before destroying
+            mapInstance.eachLayer((layer) => {
+              try {
+                // Check if layer has a DOM element before removing
+                if (layer instanceof L.Marker) {
+                  const el = layer.getElement();
+                  if (el && el.parentNode) {
+                    mapInstance.removeLayer(layer);
+                  }
+                } else {
+                  mapInstance.removeLayer(layer);
+                }
+              } catch {
+                // Ignore errors during cleanup
+              }
+            });
+            
+            // Remove the map instance
+            mapInstance.remove();
+          }
+        } catch {
+          // Ignore errors during cleanup - map may already be destroyed
+        }
+      }
+    };
+  }, [map]);
+
   useEffect(() => {
     if (Option.isNone(map) || !isMapReady || !mapBounds) return;
 
@@ -210,7 +248,12 @@ export const WorldMap: React.FC<WorldMapProps> = React.memo(({ markers, classNam
   }, [map, isMapReady, mapBounds]);
 
   // Memoize the layers to prevent re-creating them on every render
+  // Only render layers when map is ready to prevent Leaflet DOM access errors
   const displayLayers = useMemo(() => {
+    if (!isMapReady || Option.isNone(map)) {
+      return null;
+    }
+
     return (
       <>
         <TileLayer
@@ -239,7 +282,7 @@ export const WorldMap: React.FC<WorldMapProps> = React.memo(({ markers, classNam
         ))}
       </>
     );
-  }, [validMarkers]);
+  }, [validMarkers, isMapReady, map]);
 
   return (
     <div
@@ -261,7 +304,7 @@ export const WorldMap: React.FC<WorldMapProps> = React.memo(({ markers, classNam
         zoomControl={false}
         scrollWheelZoom={true}
         dragging={true}>
-        {isMapReady && map ? displayLayers : null}
+        {displayLayers}
       </MapContainer>
     </div>
   );
