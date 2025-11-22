@@ -36,11 +36,10 @@ This directory contains the canonical architecture and operational documentation
 
 ### Development Guidelines
 
-- **[MIGRATION-PRINCIPLES.md](./MIGRATION-PRINCIPLES.md)** - Guidelines for database migrations
-  - What should be in migrations
-  - What should NOT be in migrations
-  - Migration naming conventions
-  - Verification checklist
+- **Migration Principles** - Covered in `.cursor/rules/migrations-vs-direct-operations.mdc`
+  - Automatically enforced via cursor rules
+  - What should be in migrations vs direct SQL operations
+  - Decision tree and examples
 
 
 ### Monitoring & Operations
@@ -85,7 +84,7 @@ This directory contains the canonical architecture and operational documentation
 
 **Troubleshooting?** Check [OPERATIONAL_RUNBOOK.md](./OPERATIONAL_RUNBOOK.md) for procedures and [MASTER-ARCHITECTURE.md](./MASTER-ARCHITECTURE.md) for system details. For historical error analysis, see [archived/historical-analysis/](./archived/historical-analysis/).
 
-**Creating migrations?** Follow [MIGRATION-PRINCIPLES.md](./MIGRATION-PRINCIPLES.md).
+**Creating migrations?** Follow the migration principles in `.cursor/rules/migrations-vs-direct-operations.mdc` (automatically enforced).
 
 **Setting up monitoring?** See [UPTIMEROBOT_SETUP_GUIDE.md](./UPTIMEROBOT_SETUP_GUIDE.md) for complete monitoring setup.
 
