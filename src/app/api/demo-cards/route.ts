@@ -43,6 +43,113 @@ const hasValidSupabaseLogo = (logoUrl: string | null | undefined): boolean => {
   return logoUrl.includes("supabase.co/storage/v1/object/public/profile-images/");
 };
 
+/**
+ * Checks if a card has meaningful data to display (not an empty state card).
+ * Returns true if the card has the core data required for its type.
+ */
+const hasCardData = (card: DisplayableCard): boolean => {
+  switch (card.type) {
+    case "price": {
+      // Price card needs at least a price value
+      const priceCard = card as import("@/components/game/cards/price-card/price-card.types").PriceCardData;
+      return priceCard.liveData.price !== null && priceCard.liveData.price !== undefined;
+    }
+
+    case "profile": {
+      // Profile card needs at least some static data (not just symbol)
+      // Check if it has meaningful profile data beyond just the symbol
+      const profileCard = card as import("@/components/game/cards/profile-card/profile-card.types").ProfileCardData;
+      return (
+        profileCard.staticData.sector !== null ||
+        profileCard.staticData.industry !== null ||
+        profileCard.staticData.exchange !== null ||
+        profileCard.staticData.description !== null
+      );
+    }
+
+    case "revenue": {
+      // Revenue card needs financial statement data
+      const revenueCard = card as import("@/components/game/cards/revenue-card/revenue-card.types").RevenueCardData;
+      return (
+        revenueCard.liveData.revenue !== null &&
+        revenueCard.liveData.revenue !== undefined
+      );
+    }
+
+    case "solvency": {
+      // Solvency card needs financial statement data
+      const solvencyCard = card as import("@/components/game/cards/solvency-card/solvency-card.types").SolvencyCardData;
+      return (
+        solvencyCard.liveData.totalAssets !== null &&
+        solvencyCard.liveData.totalAssets !== undefined
+      );
+    }
+
+    case "cashuse": {
+      // Cash use card needs financial statement data
+      const cashUseCard = card as import("@/components/game/cards/cash-use-card/cash-use-card.types").CashUseCardData;
+      return (
+        cashUseCard.liveData.currentFreeCashFlow !== null ||
+        cashUseCard.liveData.currentTotalDebt !== null ||
+        cashUseCard.liveData.weightedAverageShsOut !== null
+      );
+    }
+
+    case "keyratios": {
+      // Key ratios card needs ratios data
+      const keyRatiosCard = card as import("@/components/game/cards/key-ratios-card/key-ratios-card.types").KeyRatiosCardData;
+      return (
+        keyRatiosCard.liveData.priceToEarningsRatioTTM !== null ||
+        keyRatiosCard.liveData.priceToBookRatioTTM !== null ||
+        keyRatiosCard.liveData.debtToEquityRatioTTM !== null
+      );
+    }
+
+    case "revenuebreakdown": {
+      // Revenue breakdown card needs segmentation data
+      const revenueBreakdownCard = card as import("@/components/game/cards/revenue-breakdown-card/revenue-breakdown-card.types").RevenueBreakdownCardData;
+      return (
+        revenueBreakdownCard.liveData.breakdown !== null &&
+        Array.isArray(revenueBreakdownCard.liveData.breakdown) &&
+        revenueBreakdownCard.liveData.breakdown.length > 0
+      );
+    }
+
+    case "analystgrades": {
+      // Analyst grades card needs grading data
+      const analystGradesCard = card as import("@/components/game/cards/analyst-grades-card/analyst-grades-card.types").AnalystGradesCardData;
+      return (
+        analystGradesCard.liveData.ratingsDistribution !== null &&
+        Array.isArray(analystGradesCard.liveData.ratingsDistribution) &&
+        analystGradesCard.liveData.ratingsDistribution.length > 0
+      );
+    }
+
+    case "exchangevariants": {
+      // Exchange variants card needs variant data
+      const exchangeVariantsCard = card as import("@/components/game/cards/exchange-variants-card/exchange-variants-card.types").ExchangeVariantsCardData;
+      return (
+        exchangeVariantsCard.liveData.variants !== null &&
+        Array.isArray(exchangeVariantsCard.liveData.variants) &&
+        exchangeVariantsCard.liveData.variants.length > 0
+      );
+    }
+
+    case "dividendshistory": {
+      // Dividends history card needs dividend data
+      const dividendsHistoryCard = card as import("@/components/game/cards/dividends-history-card/dividends-history-card.types").DividendsHistoryCardData;
+      return (
+        dividendsHistoryCard.liveData.latestDividend !== null &&
+        dividendsHistoryCard.liveData.latestDividend !== undefined
+      );
+    }
+
+    default:
+      // For unknown card types, assume they have data if they exist
+      return true;
+  }
+};
+
 export const revalidate = 0;
 
 export async function GET() {
@@ -127,7 +234,8 @@ export async function GET() {
       const successfulCards = results
         .map((res) => (res.status === "fulfilled" ? res.value : null))
         .filter((card): card is DisplayableCard => card !== null)
-        .filter((card) => hasValidSupabaseLogo(card.logoUrl));
+        .filter((card) => hasValidSupabaseLogo(card.logoUrl))
+        .filter((card) => hasCardData(card));
 
       validCards = [...validCards, ...successfulCards];
 
