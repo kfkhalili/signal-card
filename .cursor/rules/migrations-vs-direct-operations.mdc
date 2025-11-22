@@ -1,0 +1,199 @@
+---
+description: When to use migrations vs direct SQL operations
+globs: supabase/migrations/**/*, supabase/**/*.sql
+alwaysApply: true
+---
+
+# Migrations vs Direct Operations
+
+## Core Principle
+
+**Migrations are for infrastructure setup. Direct operations are for data manipulation.**
+
+Not everything needs a migration. Use migrations only for schema changes and infrastructure that must exist in production. Use direct SQL operations (via MCP or Supabase dashboard) for data manipulation, test data, and one-off operations.
+
+---
+
+## ✅ Use Migrations For
+
+### Schema & Infrastructure Changes
+
+1. **Table Creation/Modification**
+   - CREATE TABLE, ALTER TABLE
+   - Column additions/modifications
+   - Index creation
+   - Constraint changes
+
+2. **Database Functions**
+   - CREATE OR REPLACE FUNCTION
+   - Function modifications
+   - Trigger functions
+
+3. **Security & Access Control**
+   - RLS policies
+   - GRANT/REVOKE statements
+   - Security configurations
+
+4. **System Configuration**
+   - Feature flags (initial setup)
+   - Data type registry entries (system config)
+   - Cron job setup
+   - Realtime configuration
+
+5. **Infrastructure Required for Production**
+   - Anything needed for a fresh database to work
+   - Idempotent setup operations
+
+---
+
+## ❌ Do NOT Use Migrations For
+
+### Data Manipulation
+
+1. **Test Data**
+   - ❌ INSERT test symbols into `supported_symbols`
+   - ❌ INSERT test jobs into `api_call_queue_v2`
+   - ❌ INSERT test subscriptions
+   - ✅ Use direct SQL via MCP or Supabase dashboard
+
+2. **One-Off Data Operations**
+   - ❌ Data cleanup scripts
+   - ❌ Data migration scripts (unless part of schema change)
+   - ❌ Bulk data updates
+   - ✅ Use direct SQL via MCP or Supabase dashboard
+
+3. **Environment-Specific Data**
+   - ❌ Development-only test data
+   - ❌ Staging-specific configurations
+   - ✅ Use direct SQL or seed scripts
+
+4. **Temporary Operations**
+   - ❌ Debug queries
+   - ❌ Ad-hoc data fixes
+   - ✅ Use direct SQL via MCP or Supabase dashboard
+
+---
+
+## How to Execute Direct SQL
+
+### Option 1: Use MCP Tools (Preferred)
+
+```typescript
+// Use MCP Supabase tool to execute SQL directly
+mcp_supabase-tickered_execute_sql({
+  query: `
+    INSERT INTO api_call_queue_v2 (symbol, data_type, status, priority)
+    VALUES ('AAPL', 'profile', 'pending', 100);
+  `
+});
+```
+
+### Option 2: Use Supabase Dashboard
+
+1. Navigate to Supabase Dashboard
+2. Go to SQL Editor
+3. Execute SQL directly
+4. Results are immediate (no migration needed)
+
+### Option 3: Use Supabase CLI (Development Only)
+
+```bash
+# For local development
+supabase db execute "INSERT INTO api_call_queue_v2 ..."
+```
+
+---
+
+## Decision Tree
+
+```
+Is this a schema/infrastructure change?
+├─ YES → Use Migration
+│   ├─ Table creation/modification?
+│   ├─ Function creation/modification?
+│   ├─ RLS policy changes?
+│   ├─ System configuration (feature flags, registry)?
+│   └─ Required for production to work?
+│
+└─ NO → Use Direct SQL Operation
+    ├─ Test data insertion?
+    ├─ One-off data manipulation?
+    ├─ Temporary debugging?
+    ├─ Environment-specific data?
+    └─ Use MCP or Supabase Dashboard
+```
+
+---
+
+## Examples
+
+### ✅ Good: Migration for Infrastructure
+
+```sql
+-- supabase/migrations/20250121120000_create_feature_flags.sql
+CREATE TABLE IF NOT EXISTS public.feature_flags (
+  flag_name TEXT PRIMARY KEY,
+  enabled BOOLEAN NOT NULL DEFAULT false
+);
+
+-- Initial flags are infrastructure (system config)
+INSERT INTO public.feature_flags (flag_name, enabled) VALUES
+  ('use_queue_system', false)
+ON CONFLICT (flag_name) DO NOTHING;
+```
+
+### ❌ Bad: Migration for Test Data
+
+```sql
+-- ❌ DO NOT CREATE: supabase/migrations/20250121120000_insert_test_jobs.sql
+INSERT INTO api_call_queue_v2 (symbol, data_type, status)
+VALUES ('AAPL', 'profile', 'pending');
+```
+
+**Why:** This is test data, not infrastructure. Production shouldn't automatically have these jobs.
+
+### ✅ Good: Direct SQL for Test Data
+
+```sql
+-- Execute via MCP or Supabase Dashboard (NOT a migration)
+INSERT INTO api_call_queue_v2 (symbol, data_type, status, priority, estimated_data_size_bytes)
+SELECT 
+  s.symbol,
+  d.data_type,
+  'pending',
+  100,
+  d.estimated_data_size_bytes
+FROM (VALUES ('AAPL'), ('MSFT'), ('GOOGL')) AS s(symbol)
+CROSS JOIN (
+  SELECT data_type, estimated_data_size_bytes
+  FROM data_type_registry_v2
+  WHERE refresh_strategy = 'on-demand'
+) d
+WHERE NOT EXISTS (
+  SELECT 1 FROM api_call_queue_v2 q
+  WHERE q.symbol = s.symbol
+    AND q.data_type = d.data_type
+    AND q.status IN ('pending', 'processing')
+);
+```
+
+---
+
+## When in Doubt
+
+**Ask yourself:**
+1. "Would a fresh production database need this?"
+2. "Is this infrastructure or data?"
+3. "Is this idempotent and safe to run on any environment?"
+
+**If infrastructure → Migration**  
+**If data → Direct SQL Operation**
+
+---
+
+## Summary
+
+- **Migrations** = Schema, functions, RLS, system config (infrastructure)
+- **Direct SQL** = Test data, one-off operations, data manipulation
+- **Always use MCP tools** for direct SQL operations when available
+- **Never commit test data** to migrations
