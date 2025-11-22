@@ -356,7 +356,7 @@ useEffect(() => {
 ### Edge Function Patterns
 
 #### Standard Structure
-**Note:** Edge Functions run in Deno runtime. Use `fromPromise()` from neverthrow for Supabase queries to maintain consistency with the codebase. Import neverthrow using npm specifier: `import { fromPromise } from "npm:neverthrow@6.0.0";`
+**Note:** Edge Functions run in Deno runtime. Use `fromPromise()` from neverthrow for Supabase queries to maintain consistency with the codebase. Import neverthrow using npm specifier: `import { fromPromise } from "npm:neverthrow@8.2.0";`
 
 ```typescript
 // supabase/functions/[function-name]/index.ts

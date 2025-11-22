@@ -325,7 +325,7 @@ export function [CardName]Content({
 // supabase/functions/[function-name]/index.ts
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
-import { fromPromise } from "npm:neverthrow@6.0.0";
+import { fromPromise } from "npm:neverthrow@8.2.0";
 import { CORS_HEADERS } from "../_shared/auth.ts";
 
 Deno.serve(async (req: Request) => {

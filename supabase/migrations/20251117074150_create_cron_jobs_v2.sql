@@ -17,9 +17,9 @@ BEGIN
     PERFORM cron.schedule(
       'check-stale-data-v2',
       '* * * * *', -- Every minute (matches 1-minute TTL for quotes)
-      $$
+      $cron$
       SELECT check_and_queue_stale_data_from_presence_v2();
-      $$
+      $cron$
     );
   END IF;
 END $$;
@@ -37,9 +37,9 @@ BEGIN
     PERFORM cron.schedule(
       'queue-scheduled-refreshes-v2',
       '* * * * *', -- Every minute
-      $$
+      $cron$
       SELECT queue_scheduled_refreshes_v2();
-      $$
+      $cron$
     );
   END IF;
 END $$;
@@ -59,12 +59,12 @@ BEGIN
     PERFORM cron.schedule(
       'invoke-processor-v2',
       '* * * * *', -- Every minute
-      $$
+      $cron$
       SELECT invoke_processor_loop_v2(
         p_max_iterations := 3,
         p_iteration_delay_seconds := 2
       );
-      $$
+      $cron$
     );
   END IF;
 END $$;
@@ -81,9 +81,9 @@ BEGIN
     PERFORM cron.schedule(
       'maintain-queue-partitions-v2',
       '0 2 * * 0', -- Sunday at 2 AM UTC
-      $$
+      $cron$
       SELECT maintain_queue_partitions_v2();
-      $$
+      $cron$
     );
   END IF;
 END $$;
