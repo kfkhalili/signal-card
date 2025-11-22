@@ -154,6 +154,10 @@ This document defines the **canonical architecture** for Tickered's API calling 
 
 ## Architecture Overview
 
+**URL Structure:**
+- **Frontend Application:** `https://www.tickered.com` (user-facing web application)
+- **API & Edge Functions:** `https://api.tickered.com` (all backend endpoints, Edge Functions, and Realtime)
+
 ```
 ┌─────────────────────────────────────────┐
 │  Frontend (Passive)                     │

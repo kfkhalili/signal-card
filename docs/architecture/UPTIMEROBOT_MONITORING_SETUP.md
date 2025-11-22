@@ -20,6 +20,7 @@ Each monitor checks the `monitoring-alerts` Edge Function endpoint and triggers 
 1. **UptimeRobot Account** - Sign up at https://uptimerobot.com (free tier: 50 monitors)
 2. **Edge Function Deployed** - `monitoring-alerts` function must be deployed
 3. **API URL** - Your API URL: `https://api.tickered.com`
+   - **Note:** The frontend application is at `https://www.tickered.com`, while all API endpoints and Edge Functions are at `https://api.tickered.com`
 
 ---
 
