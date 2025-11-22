@@ -1,0 +1,360 @@
+---
+description: Migration immutability and amendment principles
+globs: supabase/migrations/**/*, supabase/**/*.sql
+alwaysApply: true
+---
+
+# Migration Immutability and Amendment Rules
+
+## Core Principle
+
+**Migrations should be immutable. If changes are needed, amend the original migration file, don't create update migrations.**
+
+The goal is to have migrations that create the final desired state from the beginning, not create-then-modify patterns. This ensures:
+- Clean migration history
+- Easier understanding of the final schema
+- No redundant "fix" migrations
+- Better maintainability
+
+---
+
+## ✅ DO: Amend Original Migrations
+
+### When to Amend
+
+1. **Security Fixes**
+   - Adding `SET search_path` to functions
+   - Fixing RLS policies
+   - Adding missing security configurations
+
+2. **Performance Optimizations**
+   - Adding missing indexes
+   - Optimizing function definitions
+   - Fixing query patterns
+
+3. **Bug Fixes in Original Logic**
+   - Correcting function signatures
+   - Fixing constraint definitions
+   - Correcting table structures
+
+4. **Completeness Fixes**
+   - Adding missing columns that should have been there
+   - Adding missing policies that should have been there
+   - Adding missing configurations
+
+### How to Amend
+
+1. **Identify the original migration** that created the object
+2. **Edit that migration file directly** to include the fix
+3. **Remove any "fix" migrations** that were created to address the issue
+4. **Ensure the amended migration** creates the final desired state
+
+### Example: Amending a Function Migration
+
+#### ❌ BAD: Create-Then-Modify Pattern
+
+```sql
+-- Migration 1: Create function
+-- supabase/migrations/20251117072633_create_staleness_functions_v2.sql
+CREATE OR REPLACE FUNCTION public.is_data_stale_v2(...)
+RETURNS BOOLEAN AS $$
+BEGIN
+  -- function body
+END;
+$$ LANGUAGE plpgsql STABLE;
+
+-- Migration 2: Fix security issue
+-- supabase/migrations/20251122124200_fix_function_search_path_security.sql
+CREATE OR REPLACE FUNCTION public.is_data_stale_v2(...)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+STABLE
+SET search_path = public, extensions  -- Added here
+AS $$
+BEGIN
+  -- same function body
+END;
+$$;
+```
+
+#### ✅ GOOD: Do It Right From The Start
+
+```sql
+-- Migration 1: Create function correctly
+-- supabase/migrations/20251117072633_create_staleness_functions_v2.sql
+CREATE OR REPLACE FUNCTION public.is_data_stale_v2(...)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+STABLE
+SET search_path = public, extensions  -- Included from the start
+AS $$
+BEGIN
+  -- function body
+END;
+$$;
+```
+
+---
+
+## ❌ DON'T: Create Update Migrations
+
+### Anti-Patterns to Avoid
+
+1. **Fix Migrations**
+   - ❌ `20251122124200_fix_function_search_path_security.sql`
+   - ❌ `20251122130300_fix_partition_table_rls_enable.sql`
+   - ❌ `20251122125700_fix_function_search_path_drop_recreate.sql`
+
+2. **Update Migrations**
+   - ❌ `20251122120000_update_table_schema.sql`
+   - ❌ `20251122120000_add_missing_index.sql`
+   - ❌ `20251122120000_add_missing_policy.sql`
+
+3. **Modify Migrations**
+   - ❌ `20251122120000_modify_function_signature.sql`
+   - ❌ `20251122120000_change_constraint.sql`
+
+### Why This Is Bad
+
+- **Creates redundant history**: The migration history shows "create X" then "fix X" instead of "create X correctly"
+- **Harder to understand**: Future developers see multiple migrations for the same object
+- **Migration bloat**: Unnecessary migrations that add no value
+- **Confusing dependencies**: Hard to understand what the final state should be
+
+---
+
+## Consolidation Process
+
+### When Consolidating Existing Migrations
+
+If you discover a create-then-modify pattern:
+
+1. **Identify the original migration** that created the object
+2. **Identify the fix migrations** that modify it
+3. **Amend the original migration** to include all fixes
+4. **Delete the fix migrations**
+5. **Test** that the consolidated migration produces the same result
+
+### Example: Consolidating Partition RLS
+
+#### Before (Bad Pattern)
+
+```sql
+-- Migration 1: Create partitions
+-- 20251117072631_create_api_call_queue_v2.sql
+CREATE TABLE api_call_queue_v2_pending PARTITION OF api_call_queue_v2...;
+ALTER TABLE api_call_queue_v2_pending ENABLE ROW LEVEL SECURITY;
+
+-- Migration 2: Disable RLS (wrong approach)
+-- 20251122123601_fix_partition_table_rls.sql
+ALTER TABLE api_call_queue_v2_pending DISABLE ROW LEVEL SECURITY;
+
+-- Migration 3: Re-enable RLS
+-- 20251122130300_fix_partition_table_rls_enable.sql
+ALTER TABLE api_call_queue_v2_pending ENABLE ROW LEVEL SECURITY;
+
+-- Migration 4: Add policies
+-- 20251122130301_add_partition_table_rls_policies.sql
+CREATE POLICY "Users can read queue for monitoring" ON api_call_queue_v2_pending...;
+```
+
+#### After (Good Pattern)
+
+```sql
+-- Migration 1: Create partitions correctly
+-- 20251117072631_create_api_call_queue_v2.sql
+CREATE TABLE api_call_queue_v2_pending PARTITION OF api_call_queue_v2...;
+ALTER TABLE api_call_queue_v2_pending ENABLE ROW LEVEL SECURITY;
+
+-- Add policies from the start
+CREATE POLICY "Users can read queue for monitoring"
+  ON api_call_queue_v2_pending
+  FOR SELECT
+  TO authenticated, anon
+  USING (true);
+
+CREATE POLICY "Only service role can modify queue"
+  ON api_call_queue_v2_pending
+  FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
+```
+
+---
+
+## Exception: New Features
+
+### When to Create New Migrations
+
+Create new migrations ONLY for:
+
+1. **New Features**
+   - Adding new tables
+   - Adding new functions
+   - Adding new capabilities
+
+2. **Breaking Changes**
+   - Removing deprecated functionality
+   - Major schema refactoring
+   - Data migrations (when required for schema changes)
+
+3. **Independent Additions**
+   - New indexes on existing tables (if not fixing a bug)
+   - New policies for new use cases
+   - New functions that don't modify existing ones
+
+### Example: New Feature Migration
+
+```sql
+-- ✅ GOOD: New feature gets its own migration
+-- supabase/migrations/20251122075900_create_monitoring_alert_functions.sql
+CREATE OR REPLACE FUNCTION public.check_queue_success_rate_alert()
+RETURNS TABLE (...)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+-- function body
+$$;
+```
+
+---
+
+## Migration Dependencies
+
+### Ordering Considerations
+
+When amending migrations, ensure:
+
+1. **Dependencies are respected**: If migration B depends on migration A, A must come first
+2. **Chronological order**: Use timestamps to ensure correct order
+3. **Logical grouping**: Related changes should be in the same migration when possible
+
+### Example: Function Dependencies
+
+```sql
+-- Migration 1: Create helper function
+-- 20251117073800_create_exchange_status_check_function_v2.sql
+CREATE OR REPLACE FUNCTION public.is_exchange_open_for_symbol_v2(...)
+-- function definition
+
+-- Migration 2: Use helper function (depends on Migration 1)
+-- 20251117073830_create_staleness_check_functions_v2.sql
+CREATE OR REPLACE FUNCTION public.check_and_queue_stale_batch_v2(...)
+AS $$
+BEGIN
+  -- Uses is_exchange_open_for_symbol_v2 from Migration 1
+  SELECT is_exchange_open_for_symbol_v2(p_symbol, 'quote') INTO exchange_is_open;
+END;
+$$;
+```
+
+**If you need to fix `is_exchange_open_for_symbol_v2`:**
+- ✅ Amend `20251117073800_create_exchange_status_check_function_v2.sql`
+- ❌ Don't create `20251122130000_fix_exchange_status_check.sql`
+
+---
+
+## Workflow for Changes
+
+### Step 1: Identify What Needs Changing
+
+1. Is this a bug fix in existing functionality?
+2. Is this a security fix?
+3. Is this a performance optimization?
+4. Or is this a new feature?
+
+### Step 2: Find the Original Migration
+
+```bash
+# Search for where the object was created
+grep -r "CREATE.*FUNCTION.*function_name" supabase/migrations/
+grep -r "CREATE.*TABLE.*table_name" supabase/migrations/
+```
+
+### Step 3: Amend the Original
+
+1. Edit the original migration file
+2. Include all fixes in the CREATE statement
+3. Ensure it creates the final desired state
+
+### Step 4: Remove Fix Migrations
+
+1. Delete any "fix" migrations that addressed this issue
+2. Update the temporary ALTER migration if applicable
+3. Test that the consolidated migration works
+
+### Step 5: Verify
+
+1. Run contract tests
+2. Verify migration order is correct
+3. Ensure no dependencies are broken
+
+---
+
+## Decision Tree
+
+```
+Need to change something in a migration?
+├─ Is it a new feature?
+│   └─ YES → Create new migration ✅
+│
+└─ NO (bug fix, security, performance)
+    ├─ Find original migration that created the object
+    ├─ Amend that migration to include the fix
+    ├─ Delete any "fix" migrations
+    └─ Verify migration order and dependencies ✅
+```
+
+---
+
+## Examples
+
+### ✅ GOOD: Amended Migration
+
+```sql
+-- supabase/migrations/20251117073700_create_quota_functions_v2.sql
+-- Original migration, amended to include SET search_path from the start
+
+CREATE OR REPLACE FUNCTION public.is_quota_exceeded_v2(
+  p_safety_buffer NUMERIC DEFAULT 0.95
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+STABLE
+SET search_path = public, extensions  -- Included from the start
+AS $$
+BEGIN
+  -- function body
+END;
+$$;
+```
+
+### ❌ BAD: Create-Then-Modify
+
+```sql
+-- Migration 1: Create without SET search_path
+-- 20251117073700_create_quota_functions_v2.sql
+CREATE OR REPLACE FUNCTION public.is_quota_exceeded_v2(...)
+RETURNS BOOLEAN AS $$
+-- function body
+$$ LANGUAGE plpgsql STABLE;
+
+-- Migration 2: Fix security issue
+-- 20251122124200_fix_function_search_path_security.sql
+ALTER FUNCTION public.is_quota_exceeded_v2(NUMERIC) SET search_path = public, extensions;
+```
+
+---
+
+## Summary
+
+- **Amend original migrations** when fixing bugs, security issues, or performance problems
+- **Create new migrations** only for new features or independent additions
+- **Never create "fix" migrations** - fix the original instead
+- **Consolidate existing create-then-modify patterns** by amending originals and deleting fixes
+- **Test thoroughly** after consolidation to ensure correctness
+- **Respect dependencies** - ensure migrations run in the correct order
+
+**Principle: Do the right thing from the beginning, not create-then-modify.**
