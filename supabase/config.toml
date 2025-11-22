@@ -71,6 +71,9 @@ entrypoint = "./functions/fetch-fmp-available-exchanges/index.ts"
 [functions.fetch-exchange-rates]
 enabled = true
 verify_jwt = false
+entrypoint = "./functions/fetch-exchange-rates/index.ts"
+import_map = "./functions/fetch-exchange-rates/deno.json"
+static_files = [ "./functions/fetch-exchange-rates/types.ts" ]
 
 [functions.health-check]
 enabled = true
@@ -81,9 +84,6 @@ entrypoint = "./functions/health-check/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/monitoring-alerts/index.ts"
-entrypoint = "./functions/fetch-exchange-rates/index.ts"
-import_map = "./functions/fetch-exchange-rates/deno.json"
-static_files = [ "./functions/fetch-exchange-rates/types.ts" ]
 
 [functions.delete-user]
 enabled = true
