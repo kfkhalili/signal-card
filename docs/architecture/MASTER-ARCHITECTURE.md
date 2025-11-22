@@ -380,7 +380,7 @@ More complex staleness checks requiring multiple columns or different signatures
        // Handle real-time updates
      })
      .subscribe();
-   
+
    // Subscription is automatically tracked in realtime.subscription
    // No manual registration needed
    ```
@@ -423,7 +423,7 @@ More complex staleness checks requiring multiple columns or different signatures
    AFTER INSERT ON realtime.subscription
    FOR EACH ROW
    EXECUTE FUNCTION on_realtime_subscription_insert();
-   
+
    -- Trigger function checks staleness and creates jobs immediately (0 latency)
    CREATE OR REPLACE FUNCTION on_realtime_subscription_insert()
    RETURNS TRIGGER AS $$
@@ -507,7 +507,7 @@ $$ LANGUAGE plpgsql STABLE;
 1. **Subscription created** - When frontend subscribes to Realtime channel:
    - Supabase automatically inserts record into `realtime.subscription`
    - Database trigger `on_realtime_subscription_insert_trigger` fires immediately
-   
+
 2. **Trigger function** - `on_realtime_subscription_insert()`:
    - Extracts `symbol` from `filters` JSONB
    - Maps `entity` to `data_type`

@@ -21,20 +21,10 @@ After examining all architecture documents, here's the relevance assessment:
    - **Purpose:** Complete architecture specification
    - **Action:** Keep as primary reference
 
-3. **API_QUEUE_ERROR_ANALYSIS.md** ⭐
-   - **Status:** Recent analysis (2025-11-20)
-   - **Purpose:** Error patterns and fixes
-   - **Action:** Keep for reference
-
-4. **CARD-OPEN-TO-JOB-CREATION-FLOW.md** ⭐
+3. **CARD-OPEN-TO-JOB-CREATION-FLOW.md** ⭐
    - **Status:** Current system flow (updated for event-driven processing)
    - **Purpose:** Data flow documentation
    - **Action:** Keep for understanding system
-
-5. **EVENT_DRIVEN_PROCESSING_ANALYSIS.md** ⭐
-   - **Status:** Implementation complete
-   - **Purpose:** Documents event-driven processing implementation
-   - **Action:** Keep for reference (implementation complete)
 
 6. **MIGRATION-PRINCIPLES.md** ⭐
    - **Status:** Active guidelines
@@ -123,22 +113,15 @@ docs/architecture/
 ├── README.md (updated)
 ├── PROGRESS-SUMMARY-2025-11-20.md ⭐
 ├── MASTER-ARCHITECTURE.md ⭐
-├── API_QUEUE_ERROR_ANALYSIS.md ⭐
 ├── CARD-OPEN-TO-JOB-CREATION-FLOW.md ⭐
 ├── MIGRATION-PRINCIPLES.md ⭐
 ├── HANDLE-NEW-USER-FUNCTION-EXPLANATION.md
 └── archived/
-    ├── completed-migrations/
-    └── outdated-status/
-        ├── 00-IMPLEMENTATION-PLAN.md
-        ├── 01-BUILD-ANSWERS.md
-        ├── 02-BUILD-READINESS-ASSESSMENT.md
-        ├── 03-SAFETY-MECHANISMS.md
-        ├── 04-BUILD-TRACKING.md
-        ├── 05-TESTING-GUIDE.md
-        ├── 06-MIGRATION-AUTOMATION.md
-        ├── 07-AI-AUTOMATION-GUIDE.md
-        └── TESTING-PLAN.md
+    ├── completed-migrations/ (migration plans)
+    ├── completed-fixes/ (fix documentation)
+    ├── completed-implementations/ (implementation docs)
+    ├── historical-analysis/ (historical error analysis)
+    └── outdated-status/ (build planning docs)
 ```
 
 ---

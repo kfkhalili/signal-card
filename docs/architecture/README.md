@@ -34,16 +34,6 @@ This directory contains the canonical architecture and operational documentation
   - Real-time update flow
   - Exchange status checks
 
-- **[EVENT_DRIVEN_PROCESSING_ANALYSIS.md](./EVENT_DRIVEN_PROCESSING_ANALYSIS.md)** - Event-driven processing implementation
-  - Database trigger on `realtime.subscription`
-  - 0-latency job creation for new subscriptions
-  - Background polling still needed (catches data that becomes stale while viewing)
-
-- **[API_QUEUE_ERROR_ANALYSIS.md](./API_QUEUE_ERROR_ANALYSIS.md)** - Queue error analysis and fixes
-  - Error breakdown and patterns
-  - Root cause analysis
-  - Fix implementations
-  - Recent error resolution
 
 ### Development Guidelines
 
@@ -84,7 +74,10 @@ This directory contains the canonical architecture and operational documentation
 ## Archived Documents
 
 - **[archived/](./archived/)** - Historical and completed documents
-  - `completed-migrations/` - Migration cleanup documentation (completed)
+  - `completed-migrations/` - Migration plans (completed)
+  - `completed-fixes/` - Fix documentation (completed)
+  - `completed-implementations/` - Implementation documentation (completed)
+  - `historical-analysis/` - Historical error analysis and reports
   - `outdated-status/` - Build planning docs (system is complete)
     - Implementation plans
     - Build readiness assessments
@@ -99,7 +92,7 @@ This directory contains the canonical architecture and operational documentation
 
 **Understanding the system?** Read [PROGRESS-SUMMARY-2025-11-20.md](./PROGRESS-SUMMARY-2025-11-20.md) first, then [MASTER-ARCHITECTURE.md](./MASTER-ARCHITECTURE.md) for details.
 
-**Troubleshooting?** Check [API_QUEUE_ERROR_ANALYSIS.md](./API_QUEUE_ERROR_ANALYSIS.md), [CARD-OPEN-TO-JOB-CREATION-FLOW.md](./CARD-OPEN-TO-JOB-CREATION-FLOW.md), and [OPERATIONAL_RUNBOOK.md](./OPERATIONAL_RUNBOOK.md).
+**Troubleshooting?** Check [CARD-OPEN-TO-JOB-CREATION-FLOW.md](./CARD-OPEN-TO-JOB-CREATION-FLOW.md) and [OPERATIONAL_RUNBOOK.md](./OPERATIONAL_RUNBOOK.md). For historical error analysis, see [archived/historical-analysis/](./archived/historical-analysis/).
 
 **Creating migrations?** Follow [MIGRATION-PRINCIPLES.md](./MIGRATION-PRINCIPLES.md).
 
