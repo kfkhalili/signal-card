@@ -128,10 +128,16 @@ const result = await fromPromise(
   supabase.from("profiles").select("*").eq("symbol", "AAPL"),
   (e) => new Error((e as Error).message)
 );
-if (result.isErr() || result.value.error) {
+if (result.isErr()) {
   // Handle error
+  return;
 }
-const { data } = result.value;
+const { data, error } = result.value;
+if (error) {
+  // Handle Supabase query error
+  return;
+}
+// Use data here
 
 // Multiple filters (chained)
 const result = await fromPromise(
@@ -144,40 +150,64 @@ const result = await fromPromise(
     .limit(1),
   (e) => new Error((e as Error).message)
 );
-if (result.isErr() || result.value.error) {
+if (result.isErr()) {
   // Handle error
+  return;
 }
-const { data } = result.value;
+const { data, error } = result.value;
+if (error) {
+  // Handle Supabase query error
+  return;
+}
+// Use data here
 
 // IN clause for multiple values
 const result = await fromPromise(
   supabase.from("profiles").select("*").in("symbol", ["AAPL", "MSFT", "GOOGL"]),
   (e) => new Error((e as Error).message)
 );
-if (result.isErr() || result.value.error) {
+if (result.isErr()) {
   // Handle error
+  return;
 }
-const { data } = result.value;
+const { data, error } = result.value;
+if (error) {
+  // Handle Supabase query error
+  return;
+}
+// Use data here
 
 // Pattern matching
 const result = await fromPromise(
   supabase.from("profiles").select("*").ilike("company_name", "%Apple%"),
   (e) => new Error((e as Error).message)
 );
-if (result.isErr() || result.value.error) {
+if (result.isErr()) {
   // Handle error
+  return;
 }
-const { data } = result.value;
+const { data, error } = result.value;
+if (error) {
+  // Handle Supabase query error
+  return;
+}
+// Use data here
 
 // maybeSingle() for optional results (returns null if not found)
 const result = await fromPromise(
   supabase.from("profiles").select("*").eq("symbol", symbol).maybeSingle(),
   (e) => new Error((e as Error).message)
 );
-if (result.isErr() || result.value.error) {
+if (result.isErr()) {
   // Handle error
+  return;
 }
-const { data } = result.value; // Returns null if no match, instead of empty array
+const { data, error } = result.value;
+if (error) {
+  // Handle Supabase query error
+  return;
+}
+// data is null if no match, instead of empty array
 ```
 
 ### Real-time Subscriptions
