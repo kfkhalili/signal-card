@@ -86,27 +86,6 @@ Every 1 minute:
 - ✅ Uses existing `check_and_queue_stale_batch_v2()` function
 - ✅ **Event-driven** (no polling for new subscriptions)
 
-### Phase 2: Reduce Background Polling Frequency (Optional)
-
-**Goal:** Reduce polling overhead while still catching data that becomes stale over time.
-
-**Implementation:**
-
-```sql
--- Update cron job frequency from 1 minute to 5 minutes
-SELECT cron.alter_job(
-  (SELECT jobid FROM cron.job WHERE jobname = 'check-stale-data-v2'),
-  schedule := '*/5 * * * *'  -- Every 5 minutes instead of every minute
-);
-```
-
-**Benefits:**
-- ✅ **80% reduction** in polling queries (5x less frequent)
-- ✅ Still catches data that becomes stale over time
-- ✅ Minimal impact (most jobs created immediately via trigger)
-
-**Status:** ⏳ **PENDING** - Can be implemented when ready (low priority)
-
 ---
 
 ## Current Status
@@ -130,9 +109,7 @@ SELECT cron.alter_job(
 
 **Migration:** `supabase/migrations/20250121150000_create_realtime_subscription_trigger.sql`
 
-### ⏳ Phase 2: Optional (Reduce Polling)
-
-Can be implemented when ready to reduce background polling from 1 minute to 5 minutes.
+**Note:** Background polling still runs every minute to catch data that becomes stale while users are viewing cards (e.g., quote data TTL = 1 minute). The trigger only handles NEW subscriptions, so polling is still needed for ongoing staleness detection.
 
 ---
 
@@ -185,9 +162,7 @@ The database trigger on `realtime.subscription` successfully eliminates the 1-mi
 - ✅ **Event-driven** (no polling for new subscriptions)
 - ✅ **Tested and verified** in production
 
-**Optional Next Steps:**
-- Reduce background polling frequency from 1 minute to 5 minutes (80% reduction in queries)
-- Monitor trigger performance over time
+**Note:** Background polling frequency (1 minute) matches the fastest TTL (quote data = 1 minute), so it cannot be reduced without risking stale data windows.
 
 ---
 
