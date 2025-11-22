@@ -88,6 +88,7 @@ INSERT INTO public.data_type_registry_v2 (
 
 -- Financial-statements data type
 -- CRITICAL: Financial statements are updated monthly/quarterly, so use 30-day TTL (43200 minutes)
+-- CRITICAL: Uses accepted_date as source_timestamp_column for source timestamp validation
 INSERT INTO public.data_type_registry_v2 (
   data_type,
   table_name,
@@ -97,7 +98,8 @@ INSERT INTO public.data_type_registry_v2 (
   edge_function_name,
   refresh_strategy,
   symbol_column,
-  estimated_data_size_bytes
+  estimated_data_size_bytes,
+  source_timestamp_column
 ) VALUES (
   'financial-statements',
   'financial_statements',
@@ -107,7 +109,8 @@ INSERT INTO public.data_type_registry_v2 (
   'queue-processor-v2',
   'on-demand',
   'symbol',
-  500000 -- 500 KB estimate (financial statements are large JSON payloads)
+  500000, -- 500 KB estimate (financial statements are large JSON payloads)
+  'accepted_date' -- Source timestamp column for validation (when SEC accepted the filing)
 ) ON CONFLICT (data_type) DO UPDATE SET
   table_name = EXCLUDED.table_name,
   timestamp_column = EXCLUDED.timestamp_column,
@@ -117,6 +120,7 @@ INSERT INTO public.data_type_registry_v2 (
   refresh_strategy = EXCLUDED.refresh_strategy,
   symbol_column = EXCLUDED.symbol_column,
   estimated_data_size_bytes = EXCLUDED.estimated_data_size_bytes,
+  source_timestamp_column = EXCLUDED.source_timestamp_column,
   updated_at = NOW();
 
 -- Ratios-ttm data type
