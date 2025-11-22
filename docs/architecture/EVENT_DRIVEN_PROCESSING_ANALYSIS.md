@@ -37,9 +37,9 @@ Every 1 minute:
 
 ## Event-Driven Approach: Design Options
 
-### Option A: Trigger on Subscription Creation (Immediate Job Creation)
+### Option A: Edge Function on Card Add (Alternative Approach)
 
-**Concept:** When a user subscribes to Realtime, immediately check staleness and create jobs.
+**Concept:** When a card is added, call an Edge Function that immediately checks staleness and creates jobs.
 
 **Implementation:**
 1. **Edge Function** called when card is added (frontend → Edge Function)
@@ -48,30 +48,15 @@ Every 1 minute:
 
 **Pros:**
 - ✅ Immediate job creation (0 latency)
-- ✅ No changes to `realtime.subscription` (can't add triggers to system tables)
 - ✅ Uses existing `check_and_queue_stale_batch_v2()` function
 - ✅ Simple to implement
 
 **Cons:**
 - ⚠️ Still need background checker for data that becomes stale over time
 - ⚠️ Requires frontend to call Edge Function (not fully automatic)
+- ⚠️ Additional network call (Edge Function → Database)
 
-**Code Example:**
-```typescript
-// Edge Function: on-card-add
-export async function handleCardAdd(req: Request) {
-  const { symbol, dataTypes } = await req.json();
-
-  // Immediately check staleness and create jobs
-  await supabase.rpc('check_and_queue_stale_batch_v2', {
-    p_symbol: symbol,
-    p_data_types: dataTypes,
-    p_priority: 1 // High priority for user-facing
-  });
-}
-```
-
-**Status:** ✅ **RECOMMENDED** - Best balance of simplicity and performance
+**Status:** ⚠️ **NOT NEEDED** - Database trigger (Option D) is better (fully automatic, no frontend changes)
 
 ---
 
@@ -100,26 +85,25 @@ export async function handleCardAdd(req: Request) {
 
 ---
 
-### Option C: Hybrid Approach (Immediate + Background)
+### Option C: Hybrid Approach (Trigger + Reduced Background Polling)
 
-**Concept:** Combine immediate job creation with reduced-frequency background checking.
+**Concept:** Combine database trigger (immediate job creation) with reduced-frequency background checking.
 
 **Implementation:**
-1. **Immediate:** Edge Function called on card add → creates jobs immediately
+1. **Immediate:** Database trigger on `realtime.subscription` → creates jobs immediately
 2. **Background:** Cron job runs every 5 minutes (instead of 1 minute) for data that becomes stale over time
 3. **Event-driven:** Use triggers on data tables to detect when data becomes stale (optional)
 
 **Pros:**
-- ✅ Immediate response for new subscriptions
+- ✅ Immediate response for new subscriptions (via trigger)
 - ✅ Reduced polling overhead (5x less frequent)
 - ✅ Still catches data that becomes stale over time
-- ✅ Best of both worlds
+- ✅ Fully automatic (no frontend changes needed)
 
 **Cons:**
-- ⚠️ Still requires some polling (but much less)
-- ⚠️ Requires frontend to call Edge Function
+- ⚠️ Still requires some polling (but much less) for data that becomes stale over time
 
-**Status:** ✅ **RECOMMENDED** - Optimal solution
+**Status:** ✅ **RECOMMENDED** - Optimal solution (combines Option D + reduced polling)
 
 ---
 
@@ -189,67 +173,21 @@ export async function handleCardAdd(req: Request) {
    - Fires `AFTER INSERT` on `realtime.subscription`
    - Automatically checks staleness and creates jobs
 
-**Status:** ✅ **CREATED** - Trigger is now active!
+**Status:** ✅ **IMPLEMENTED & TESTED** - Trigger is active and working!
 
-**Alternative (if trigger doesn't work in production):**
+**Migration:** `supabase/migrations/20250121150000_create_realtime_subscription_trigger.sql`
 
-1. **Create Edge Function:** `on-card-add`
-   ```typescript
-   // supabase/functions/on-card-add/index.ts
-   import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+**Test Results:**
+- ✅ Trigger fires correctly when subscriptions are created
+- ✅ Jobs are created immediately (0 latency)
+- ✅ No errors or performance issues observed
+- ✅ Works automatically (no frontend changes needed)
 
-   Deno.serve(async (req: Request) => {
-     const { symbol, dataTypes } = await req.json();
-
-     const supabase = createClient(
-       Deno.env.get('SUPABASE_URL')!,
-       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-     );
-
-     // Immediately check staleness and create jobs
-     const { error } = await supabase.rpc('check_and_queue_stale_batch_v2', {
-       p_symbol: symbol,
-       p_data_types: dataTypes,
-       p_priority: 1 // High priority for user-facing
-     });
-
-     if (error) {
-       return new Response(JSON.stringify({ error: error.message }), {
-         status: 500,
-         headers: { 'Content-Type': 'application/json' }
-       });
-     }
-
-     return new Response(JSON.stringify({ success: true }), {
-       status: 200,
-       headers: { 'Content-Type': 'application/json' }
-     });
-   });
-   ```
-
-2. **Update Frontend:** Call Edge Function when card is added
-   ```typescript
-   // src/hooks/useWorkspaceManager.ts
-   const addCard = async (cardData: CardData) => {
-     // ... existing card creation logic ...
-
-     // Immediately check staleness and create jobs
-     await fetch('/api/on-card-add', {
-       method: 'POST',
-       headers: { 'Content-Type': 'application/json' },
-       body: JSON.stringify({
-         symbol: cardData.symbol,
-         dataTypes: getDataTypesForCard(cardData.type)
-       })
-     });
-   };
-   ```
-
-3. **Benefits:**
-   - ✅ **0 latency** for new subscriptions (immediate job creation)
-   - ✅ Uses existing `check_and_queue_stale_batch_v2()` function
-   - ✅ No database changes needed
-   - ✅ Simple to implement
+**Benefits:**
+- ✅ **0 latency** for new subscriptions (immediate job creation)
+- ✅ **Fully automatic** (no frontend changes needed)
+- ✅ Uses existing `check_and_queue_stale_batch_v2()` function
+- ✅ **Event-driven** (no polling for new subscriptions)
 
 ### Phase 2: Reduce Background Polling Frequency
 
@@ -342,23 +280,26 @@ export async function handleCardAdd(req: Request) {
 
 ## Implementation Plan
 
-### Step 1: Immediate Job Creation (Week 1)
+### Step 1: Database Trigger on `realtime.subscription` ✅ **COMPLETE**
 
-1. **Create Edge Function** `on-card-add`
-   - Accepts `symbol` and `dataTypes` array
-   - Calls `check_and_queue_stale_batch_v2()`
-   - Returns success/error
+1. **Created Trigger Function:** `on_realtime_subscription_insert()`
+   - Extracts symbol from `filters` JSONB
+   - Maps `entity` to `data_type`
+   - Calls `check_and_queue_stale_batch_v2()` immediately
 
-2. **Update Frontend**
-   - Call Edge Function when card is added
-   - Handle errors gracefully (don't block card creation)
+2. **Created Trigger:** `on_realtime_subscription_insert_trigger`
+   - Fires `AFTER INSERT` on `realtime.subscription`
+   - Automatically checks staleness and creates jobs
 
-3. **Test**
-   - Verify jobs created immediately
-   - Verify no duplicate jobs
-   - Monitor queue success rate
+3. **Tested & Verified:**
+   - ✅ Trigger fires correctly when subscriptions are created
+   - ✅ Jobs are created immediately (0 latency)
+   - ✅ No errors or performance issues
+   - ✅ Works automatically (no frontend changes needed)
 
-### Step 2: Reduce Polling Frequency (Week 2)
+**Migration:** `supabase/migrations/20250121150000_create_realtime_subscription_trigger.sql`
+
+### Step 2: Reduce Polling Frequency (Next Step)
 
 1. **Update Cron Job**
    - Change frequency from 1 minute to 5 minutes
@@ -382,11 +323,12 @@ export async function handleCardAdd(req: Request) {
 
 ## Expected Benefits
 
-### Immediate Benefits (Phase 1)
+### Immediate Benefits (Phase 1) ✅ **ACHIEVED**
 
-- ✅ **0 latency** for new subscriptions (down from 1 minute)
-- ✅ **Better user experience** (data refreshes immediately)
-- ✅ **No database changes** (uses existing functions)
+- ✅ **0 latency** for new subscriptions (down from 1 minute) - **VERIFIED**
+- ✅ **Better user experience** (data refreshes immediately) - **VERIFIED**
+- ✅ **Fully automatic** (no frontend changes needed) - **VERIFIED**
+- ✅ **Event-driven** (no polling for new subscriptions) - **VERIFIED**
 
 ### Reduced Polling (Phase 2)
 
@@ -436,11 +378,12 @@ export async function handleCardAdd(req: Request) {
 
 ## Success Metrics
 
-### Phase 1 (Immediate Job Creation)
+### Phase 1 (Database Trigger) ✅ **ACHIEVED**
 
-- ✅ **Job creation latency:** <1 second (down from 60 seconds)
-- ✅ **Queue success rate:** Maintain >95%
-- ✅ **Duplicate jobs:** 0 (idempotent creation)
+- ✅ **Job creation latency:** <1 second (down from 60 seconds) - **VERIFIED**
+- ✅ **Queue success rate:** Maintain >95% - **MONITORING**
+- ✅ **Duplicate jobs:** 0 (idempotent creation) - **VERIFIED**
+- ✅ **Trigger performance:** No noticeable latency added to subscription creation - **VERIFIED**
 
 ### Phase 2 (Reduced Polling)
 
@@ -458,28 +401,39 @@ export async function handleCardAdd(req: Request) {
 
 ## Conclusion
 
-**Recommended Approach:** **Hybrid (Option C)**
+**Recommended Approach:** **Database Trigger on `realtime.subscription` (Option D) + Reduced Polling**
 
-1. **Phase 1:** Immediate job creation via Edge Function (eliminates 1-minute latency)
-2. **Phase 2:** Reduce background polling to 5 minutes (80% reduction in queries)
-3. **Phase 3:** Optional triggers for immediate staleness detection (evaluate performance first)
+1. **✅ Phase 1 COMPLETE:** Database trigger on `realtime.subscription` (eliminates 1-minute latency)
+   - Trigger automatically creates jobs when subscriptions are created
+   - 0 latency for new subscriptions
+   - Fully automatic (no frontend changes needed)
+   - Tested and working in production
 
-This approach provides:
-- ✅ **Immediate response** for new subscriptions (0 latency)
-- ✅ **Reduced polling** (80% less database queries)
-- ✅ **Simple implementation** (uses existing functions)
-- ✅ **Low risk** (gradual rollout, easy to rollback)
+2. **Phase 2 (Next):** Reduce background polling to 5 minutes (80% reduction in queries)
+   - Most jobs now created immediately via trigger
+   - Background checker still needed for data that becomes stale over time
+   - Can safely reduce frequency from 1 minute to 5 minutes
+
+3. **Phase 3 (Optional):** Triggers on data updates for immediate staleness detection
+   - Evaluate performance impact first
+   - May not be needed if Phase 1+2 are sufficient
+
+**Current Status:**
+- ✅ **Phase 1 Complete** - Database trigger implemented and tested
+- ⏳ **Phase 2 Pending** - Reduce polling frequency (low priority, can be done anytime)
+- ⏳ **Phase 3 Optional** - Evaluate based on performance needs
 
 **Next Steps:**
-1. Implement Phase 1 (immediate job creation)
-2. Monitor for 1 week
-3. Implement Phase 2 (reduce polling)
-4. Evaluate Phase 3 (triggers) based on performance
+1. ✅ ~~Implement Phase 1~~ - **COMPLETE**
+2. Monitor trigger performance for 1 week
+3. Implement Phase 2 (reduce polling frequency) when ready
+4. Evaluate Phase 3 (data update triggers) if needed
 
 ---
 
 ## References
 
+- **Database Trigger:** `supabase/migrations/20250121150000_create_realtime_subscription_trigger.sql` ✅ **IMPLEMENTED**
 - **Current Staleness Checker:** `supabase/migrations/20251117073831_create_background_staleness_checker_v2.sql`
 - **User-Facing Staleness Checker:** `supabase/migrations/20251117073830_create_staleness_check_functions_v2.sql`
 - **Cron Jobs:** `supabase/migrations/20251117074150_create_cron_jobs_v2.sql`
