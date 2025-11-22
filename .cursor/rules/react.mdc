@@ -106,11 +106,28 @@ export default function WorkspacePage() {
 }
 
 // workspace-content.tsx (Server Component)
+import { fromPromise } from "neverthrow";
+
 async function WorkspaceContent() {
   const supabase = await createSupabaseServerClient();
-  const { data } = await supabase.from("cards").select("*");
+  
+  // ✅ GOOD: Using fromPromise for consistency with project patterns
+  const cardsResult = await fromPromise(
+    supabase.from("cards").select("*"),
+    (e) => new Error((e as Error).message)
+  );
 
-  return <Workspace cards={data} />;
+  if (cardsResult.isErr()) {
+    // Handle error appropriately
+    return <div>Error loading cards</div>;
+  }
+
+  const { data, error } = cardsResult.value;
+  if (error) {
+    return <div>Error: {error.message}</div>;
+  }
+
+  return <Workspace cards={data || []} />;
 }
 ```
 

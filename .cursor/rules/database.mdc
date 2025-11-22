@@ -66,7 +66,13 @@ if (profileResult.isErr()) {
   return err(profileResult.error);
 }
 
-const profileData = profileResult.value.data;
+// CRITICAL: Check for Supabase query errors (Supabase returns { data, error } without rejecting)
+const { data, error } = profileResult.value;
+if (error) {
+  return err(new Error(`Supabase query error: ${error.message}`));
+}
+
+const profileData = data;
 
 // Pattern 2: Handling empty results (use Option for optional data)
 import { Option } from "effect";
@@ -115,39 +121,63 @@ if (quoteResult.isErr()) {
 
 **Examples:**
 ```typescript
+import { fromPromise } from "neverthrow";
+
 // Single filter
-const { data } = await supabase
-  .from("profiles")
-  .select("*")
-  .eq("symbol", "AAPL");
+const result = await fromPromise(
+  supabase.from("profiles").select("*").eq("symbol", "AAPL"),
+  (e) => new Error((e as Error).message)
+);
+if (result.isErr() || result.value.error) {
+  // Handle error
+}
+const { data } = result.value;
 
 // Multiple filters (chained)
-const { data } = await supabase
-  .from("financial_statements")
-  .select("*")
-  .eq("symbol", "AAPL")
-  .eq("period", "FY")
-  .order("date", { ascending: false })
-  .limit(1);
+const result = await fromPromise(
+  supabase
+    .from("financial_statements")
+    .select("*")
+    .eq("symbol", "AAPL")
+    .eq("period", "FY")
+    .order("date", { ascending: false })
+    .limit(1),
+  (e) => new Error((e as Error).message)
+);
+if (result.isErr() || result.value.error) {
+  // Handle error
+}
+const { data } = result.value;
 
 // IN clause for multiple values
-const { data } = await supabase
-  .from("profiles")
-  .select("*")
-  .in("symbol", ["AAPL", "MSFT", "GOOGL"]);
+const result = await fromPromise(
+  supabase.from("profiles").select("*").in("symbol", ["AAPL", "MSFT", "GOOGL"]),
+  (e) => new Error((e as Error).message)
+);
+if (result.isErr() || result.value.error) {
+  // Handle error
+}
+const { data } = result.value;
 
 // Pattern matching
-const { data } = await supabase
-  .from("profiles")
-  .select("*")
-  .ilike("company_name", "%Apple%");
+const result = await fromPromise(
+  supabase.from("profiles").select("*").ilike("company_name", "%Apple%"),
+  (e) => new Error((e as Error).message)
+);
+if (result.isErr() || result.value.error) {
+  // Handle error
+}
+const { data } = result.value;
 
 // maybeSingle() for optional results (returns null if not found)
-const { data } = await supabase
-  .from("profiles")
-  .select("*")
-  .eq("symbol", symbol)
-  .maybeSingle(); // Returns null if no match, instead of empty array
+const result = await fromPromise(
+  supabase.from("profiles").select("*").eq("symbol", symbol).maybeSingle(),
+  (e) => new Error((e as Error).message)
+);
+if (result.isErr() || result.value.error) {
+  // Handle error
+}
+const { data } = result.value; // Returns null if no match, instead of empty array
 ```
 
 ### Real-time Subscriptions

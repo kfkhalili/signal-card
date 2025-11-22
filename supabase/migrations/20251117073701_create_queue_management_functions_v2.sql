@@ -175,7 +175,7 @@ BEGIN
     WHERE data_type = job_data_type;
   END IF;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 COMMENT ON FUNCTION public.complete_queue_job_v2 IS 'Marks a job as completed and tracks data usage. API calls are already tracked in reserve_api_calls. Auto-corrects registry estimates using statistical sampling.';
 
@@ -274,7 +274,7 @@ BEGIN
     WHERE id = p_job_id;
   END IF;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 COMMENT ON FUNCTION public.fail_queue_job_v2 IS 'Marks a job as failed or resets to pending for retry. Rate limit errors (429) are always retried indefinitely. Stale data errors (same timestamp) fail immediately without retries to save API calls. UI jobs (priority 1000) get 5 retries instead of 3.';
 
@@ -299,7 +299,7 @@ BEGIN
     RAISE WARNING 'Job % not found or not in processing state', p_job_id;
   END IF;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 COMMENT ON FUNCTION public.reset_job_immediate_v2 IS 'Immediately resets a job to pending without incrementing retry_count. Used for deadlock recovery.';
 

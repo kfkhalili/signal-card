@@ -30,7 +30,8 @@ Where:
 ```bash
 # Get current timestamp
 CURRENT_TS=$(date +"%Y%m%d%H%M%S")
-# Creates: supabase/migrations/20250122143025_fix_function_search_path.sql
+# Example: If run on November 22, 2025 at 14:30:25, creates:
+# supabase/migrations/20251122143025_fix_function_search_path.sql
 ```
 
 ### ❌ WRONG
