@@ -32,10 +32,16 @@ cd /Users/Q407910/git/tickered
 supabase functions deploy monitoring-alerts
 ```
 
-**Verify deployment:**
+**Get Your Supabase Anon Key:**
+1. Go to Supabase Dashboard → Your Project → Settings → API
+2. Copy the **anon/public** key
+3. You'll need this for UptimeRobot configuration
+
+**Verify deployment (with auth):**
 
 ```bash
-curl https://[your-project].supabase.co/functions/v1/monitoring-alerts/all-alerts
+curl -H "apikey: [YOUR_ANON_KEY]" \
+  https://[your-project].supabase.co/functions/v1/monitoring-alerts/all-alerts
 ```
 
 **Expected response (200 OK when healthy):**
@@ -103,13 +109,20 @@ curl https://[your-project].supabase.co/functions/v1/monitoring-alerts/all-alert
    - **Alert When Down:** Immediately (0 minutes)
    - **Alert When Up:** Immediately (0 minutes)
 
-4. **Advanced Settings:**
+4. **CRITICAL: Add Authorization Header**
+   - **HTTP Method:** GET
+   - **HTTP Headers:** Click "Add Header"
+   - **Header Name:** `apikey`
+   - **Header Value:** `[YOUR_SUPABASE_ANON_KEY]` (get from Supabase Dashboard → Settings → API)
+   - **Alternative:** Use `Authorization` header with value `Bearer [YOUR_SUPABASE_ANON_KEY]`
+
+5. **Advanced Settings:**
    - **Up HTTP Status Codes:** `200` (only 200 is "UP", 503 triggers alert)
    - **Keyword Monitoring (Optional):**
      - **If present:** `"status":"healthy"` → Monitor is UP
      - **If absent:** Alert (this means unhealthy)
 
-5. **Save Monitor**
+6. **Save Monitor**
 
 ### Monitor 2: Quota Usage
 
@@ -123,11 +136,16 @@ curl https://[your-project].supabase.co/functions/v1/monitoring-alerts/all-alert
    - **Alert When Down:** Immediately (0 minutes)
    - **Alert When Up:** Immediately (0 minutes)
 
-3. **Advanced Settings:**
+3. **CRITICAL: Add Authorization Header**
+   - **HTTP Headers:** Click "Add Header"
+   - **Header Name:** `apikey`
+   - **Header Value:** `[YOUR_SUPABASE_ANON_KEY]`
+
+4. **Advanced Settings:**
    - **Up HTTP Status Codes:** `200`
    - **Keyword Monitoring (Optional):** `"status":"healthy"`
 
-4. **Save Monitor**
+5. **Save Monitor**
 
 ### Monitor 3: Stuck Jobs
 
@@ -141,11 +159,16 @@ curl https://[your-project].supabase.co/functions/v1/monitoring-alerts/all-alert
    - **Alert When Down:** Immediately (0 minutes)
    - **Alert When Up:** Immediately (0 minutes)
 
-3. **Advanced Settings:**
+3. **CRITICAL: Add Authorization Header**
+   - **HTTP Headers:** Click "Add Header"
+   - **Header Name:** `apikey`
+   - **Header Value:** `[YOUR_SUPABASE_ANON_KEY]`
+
+4. **Advanced Settings:**
    - **Up HTTP Status Codes:** `200`
    - **Keyword Monitoring (Optional):** `"status":"healthy"`
 
-4. **Save Monitor**
+5. **Save Monitor**
 
 ### Monitor 4: All Alerts (Optional - Summary)
 
@@ -159,11 +182,16 @@ curl https://[your-project].supabase.co/functions/v1/monitoring-alerts/all-alert
    - **Alert When Down:** Immediately (0 minutes)
    - **Alert When Up:** Immediately (0 minutes)
 
-3. **Advanced Settings:**
+3. **CRITICAL: Add Authorization Header**
+   - **HTTP Headers:** Click "Add Header"
+   - **Header Name:** `apikey`
+   - **Header Value:** `[YOUR_SUPABASE_ANON_KEY]`
+
+4. **Advanced Settings:**
    - **Up HTTP Status Codes:** `200`
    - **Keyword Monitoring (Optional):** `"status":"healthy"`
 
-4. **Save Monitor**
+5. **Save Monitor**
 
 ---
 
