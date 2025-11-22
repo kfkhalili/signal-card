@@ -1,0 +1,85 @@
+# Migration Timestamp Rules
+
+## Core Principle
+
+**ALWAYS use the CURRENT timestamp when creating new migrations. Never use past dates or hardcoded timestamps.**
+
+## Critical Rule
+
+When creating a new migration file, you MUST:
+
+1. **Get the current timestamp** using: `date +"%Y%m%d%H%M%S"`
+2. **Use that exact timestamp** as the migration filename prefix
+3. **Never reuse timestamps** - each migration must have a unique timestamp
+4. **Never use past dates** - migrations must be chronologically ordered
+
+## Migration Naming Format
+
+```
+supabase/migrations/YYYYMMDDHHMMSS_descriptive_name.sql
+```
+
+Where:
+- `YYYYMMDDHHMMSS` = Current timestamp from `date +"%Y%m%d%H%M%S"`
+- `descriptive_name` = Snake_case description of what the migration does
+
+## Examples
+
+### ✅ CORRECT
+
+```bash
+# Get current timestamp
+CURRENT_TS=$(date +"%Y%m%d%H%M%S")
+# Creates: supabase/migrations/20250122143025_fix_function_search_path.sql
+```
+
+### ❌ WRONG
+
+```bash
+# Using hardcoded past date
+# Creates: supabase/migrations/20250122010000_fix_function_search_path.sql
+# This will run BEFORE existing migrations from November 2025!
+```
+
+## Why This Matters
+
+- **Migration Order**: Supabase applies migrations in chronological order by filename
+- **Breaking Changes**: If a migration runs before it should, it can break the database
+- **Dependencies**: Migrations may depend on previous migrations existing first
+- **Production Safety**: Wrong order can cause production database corruption
+
+## Workflow
+
+1. **Before creating a migration:**
+   ```bash
+   # Get current timestamp
+   CURRENT_TS=$(date +"%Y%m%d%H%M%S")
+
+   # Check latest migration
+   LATEST=$(ls -t supabase/migrations/*.sql | head -1 | xargs basename | cut -d'_' -f1)
+
+   # Verify new timestamp is after latest
+   if [ "$CURRENT_TS" -le "$LATEST" ]; then
+     echo "ERROR: Current timestamp $CURRENT_TS is not after latest migration $LATEST"
+     echo "Add 1-2 minutes to ensure uniqueness"
+     CURRENT_TS=$(date -v+1M +"%Y%m%d%H%M%S" 2>/dev/null || date -d "+1 minute" +"%Y%m%d%H%M%S")
+   fi
+
+   echo "Creating migration: ${CURRENT_TS}_your_migration_name.sql"
+   ```
+
+2. **Always verify timestamp is current:**
+   - Check that it's later than the most recent migration
+   - Verify it's not in the past
+   - If multiple migrations in same second, increment the last 2 digits (SS)
+
+3. **If you accidentally used a past timestamp:**
+   - Rename the migration file to use current timestamp
+   - Update any references to the old filename
+   - Verify the new timestamp is after all existing migrations
+
+## Enforcement
+
+- **Never create migrations with timestamps earlier than existing migrations**
+- **Always check the latest migration timestamp before creating a new one**
+- **When in doubt, use a timestamp slightly in the future (add 1-2 minutes) to ensure uniqueness**
