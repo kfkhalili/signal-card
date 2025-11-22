@@ -2745,23 +2745,19 @@ ROLLBACK;
 
 ### 3. CI/CD Integration
 
-**These tests MUST run in CI/CD before any PR merge:**
+✅ **These tests run automatically in CI/CD before any PR merge.**
 
-```yaml
-# .github/workflows/database-contracts.yml
-name: Database Contract Tests
+**Implementation:** `.github/workflows/database-contracts.yml`
 
-on: [pull_request]
+**Features:**
+- ✅ Runs on every PR to `main` or `develop`
+- ✅ Automatically starts local Supabase instance
+- ✅ Installs pgTAP extension
+- ✅ Runs all contract tests via `npm run test:contracts`
+- ✅ Blocks PR merge if any test fails
+- ✅ Cleans up Supabase instance after tests
 
-jobs:
-  test-contracts:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Run pgTAP tests
-        run: |
-          psql $DATABASE_URL -f tests/contracts/test_all_contracts.sql
-```
+**Status:** ✅ Implemented and active
 
 ### 4. Test Maintenance
 
