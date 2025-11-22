@@ -228,16 +228,20 @@ export async function fetchFinancialStatementsLogic(
             // This prevents UI jobs from failing when the API returns the same data
             const isUIJob = job.priority >= 1000;
             if (newSourceTimestamp < oldSourceTimestamp) {
-              throw new Error(
-                `FMP returned 200 OK but data is stale. Source timestamp (max accepted_date): ${maxNewAcceptedDate} (existing: ${existingData.accepted_date}). ` +
-                `This indicates an API caching bug or stale cache. Rejecting to prevent data laundering.`
-              );
+              // Stale data detected - this is expected behavior, not a failure
+              // Return success with message indicating data was correctly rejected
+              return {
+                success: true,
+                dataSizeBytes: 0,
+                message: `Data was stale (source timestamp: ${maxNewAcceptedDate} vs existing: ${existingData.accepted_date}). Correctly rejected to prevent data laundering.`,
+              };
             } else if (!isUIJob && newSourceTimestamp.getTime() === oldSourceTimestamp.getTime()) {
               // For non-UI jobs, reject equal timestamps (data laundering prevention)
-              throw new Error(
-                `FMP returned 200 OK but data is stale. Source timestamp (max accepted_date): ${maxNewAcceptedDate} (existing: ${existingData.accepted_date}). ` +
-                `This indicates an API caching bug or stale cache. Rejecting to prevent data laundering.`
-              );
+              return {
+                success: true,
+                dataSizeBytes: 0,
+                message: `Data was stale (equal timestamps: ${maxNewAcceptedDate}). Correctly rejected to prevent data laundering.`,
+              };
             }
             // For UI jobs, accept equal timestamps (user is actively waiting, better to show data than fail)
           }

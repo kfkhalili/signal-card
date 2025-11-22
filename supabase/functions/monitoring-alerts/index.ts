@@ -26,6 +26,8 @@ interface AlertResult {
   threshold: string;
 }
 
+// CRITICAL: This function is PUBLIC (no JWT verification) for UptimeRobot monitoring
+// It uses SERVICE_ROLE_KEY internally, so it can read data without user authentication
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -48,7 +50,13 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+    // Use service role key to bypass RLS - this is a monitoring endpoint
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
     const url = new URL(req.url);
     const path = url.pathname.split("/").pop() || "";
 
@@ -122,15 +130,17 @@ async function checkQueueSuccessRate(supabase: ReturnType<typeof createClient>):
   const successRate = parseFloat(result?.success_rate_percent ?? "100");
   const completed = parseInt(result?.completed_count ?? "0", 10);
   const failed = parseInt(result?.failed_count ?? "0", 10);
+  const staleRejections = parseInt(result?.stale_data_rejections ?? "0", 10);
   const alertStatus = result?.alert_status ?? "healthy";
+
+  const message = alertStatus === "alert"
+    ? `Queue success rate is ${successRate.toFixed(2)}% (below 90% threshold). ${failed} actual failures, ${staleRejections} stale data rejections (expected).`
+    : `Queue success rate is ${successRate.toFixed(2)}% (${failed} actual failures, ${staleRejections} stale data rejections excluded)`;
 
   return {
     alert_type: "queue_success_rate",
     status: alertStatus === "alert" ? "alert" : "healthy",
-    message:
-      alertStatus === "alert"
-        ? `Queue success rate is ${successRate.toFixed(2)}% (below 90% threshold)`
-        : `Queue success rate is ${successRate.toFixed(2)}%`,
+    message,
     metric_value: successRate,
     threshold: "90%",
   };

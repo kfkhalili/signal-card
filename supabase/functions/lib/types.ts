@@ -17,5 +17,6 @@ export interface ProcessJobResult {
   success: boolean;
   dataSizeBytes: number;
   error?: string;
+  message?: string; // Optional informational message (e.g., "Data was stale, correctly rejected")
 }
 
