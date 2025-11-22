@@ -4,8 +4,9 @@
 -- Partitions: pending, processing, completed, failed
 
 -- Create parent table (partitioned by status)
+-- CRITICAL: PRIMARY KEY must include partitioning column (status) for partitioned tables
 CREATE TABLE IF NOT EXISTS public.api_call_queue_v2 (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID DEFAULT gen_random_uuid(),
   symbol TEXT NOT NULL,
   data_type TEXT NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
@@ -17,7 +18,8 @@ CREATE TABLE IF NOT EXISTS public.api_call_queue_v2 (
   estimated_data_size_bytes BIGINT DEFAULT 0,
   actual_data_size_bytes BIGINT,
   error_message TEXT,
-  job_metadata JSONB DEFAULT '{}'::jsonb
+  job_metadata JSONB DEFAULT '{}'::jsonb,
+  PRIMARY KEY (id, status)
 ) PARTITION BY LIST (status);
 
 COMMENT ON TABLE public.api_call_queue_v2 IS 'Queue for API calls. Partitioned by status to prevent table bloat at scale.';
