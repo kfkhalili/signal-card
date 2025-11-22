@@ -130,12 +130,10 @@ async function checkQueueSuccessRate(supabase: ReturnType<typeof createClient>):
   const successRate = parseFloat(result?.success_rate_percent ?? "100");
   const completed = parseInt(result?.completed_count ?? "0", 10);
   const failed = parseInt(result?.failed_count ?? "0", 10);
-  const staleRejections = parseInt(result?.stale_data_rejections ?? "0", 10);
+  const alertStatus = result?.alert_status ?? "healthy";
   const alertStatus = result?.alert_status ?? "healthy";
 
   const message = alertStatus === "alert"
-    ? `Queue success rate is ${successRate.toFixed(2)}% (below 90% threshold). ${failed} actual failures, ${staleRejections} stale data rejections (expected).`
-    : `Queue success rate is ${successRate.toFixed(2)}% (${failed} actual failures, ${staleRejections} stale data rejections excluded)`;
 
   return {
     alert_type: "queue_success_rate",
