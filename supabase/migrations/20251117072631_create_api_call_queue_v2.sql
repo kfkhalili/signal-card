@@ -3,7 +3,7 @@
 -- CRITICAL: This table is partitioned to prevent table bloat at scale
 -- Partitions: pending, processing, completed, failed
 
--- Create parent table
+-- Create parent table (partitioned by status)
 CREATE TABLE IF NOT EXISTS public.api_call_queue_v2 (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   symbol TEXT NOT NULL,
@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS public.api_call_queue_v2 (
   actual_data_size_bytes BIGINT,
   error_message TEXT,
   job_metadata JSONB DEFAULT '{}'::jsonb
-);
+) PARTITION BY LIST (status);
 
 COMMENT ON TABLE public.api_call_queue_v2 IS 'Queue for API calls. Partitioned by status to prevent table bloat at scale.';
 COMMENT ON COLUMN public.api_call_queue_v2.symbol IS 'Stock/crypto symbol to fetch data for';
