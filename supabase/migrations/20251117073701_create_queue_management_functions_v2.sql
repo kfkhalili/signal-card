@@ -21,7 +21,10 @@ RETURNS TABLE(
   created_at TIMESTAMPTZ,
   estimated_data_size_bytes BIGINT,
   job_metadata JSONB
-) AS $$
+)
+LANGUAGE plpgsql
+SET search_path = public, extensions
+AS $$
 DECLARE
   v_batch_ids UUID[];
   quota_limit_bytes BIGINT;
@@ -101,7 +104,7 @@ BEGIN
   WHERE q.id = ANY(COALESCE(v_batch_ids, ARRAY[]::UUID[]))
   ORDER BY q.priority DESC, q.created_at ASC;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 COMMENT ON FUNCTION public.get_queue_batch_v2 IS 'Atomically claims a batch of jobs from the queue. Includes predictive quota check and uses FOR UPDATE SKIP LOCKED to prevent race conditions. Fixed array handling bug - uses array_agg in CTE to properly collect multiple IDs.';
 
@@ -113,7 +116,10 @@ CREATE OR REPLACE FUNCTION public.complete_queue_job_v2(
   p_data_size_bytes BIGINT,
   p_api_calls_made INTEGER DEFAULT NULL
 )
-RETURNS void AS $$
+RETURNS void
+LANGUAGE plpgsql
+SET search_path = public, extensions
+AS $$
 DECLARE
   job_data_type TEXT;
   expected_api_calls INTEGER;
@@ -177,7 +183,10 @@ COMMENT ON FUNCTION public.complete_queue_job_v2 IS 'Marks a job as completed an
 -- CRITICAL: UI jobs (priority 1000) must never fail - users are actively waiting for data
 -- Solution: Give UI jobs more retries (5 instead of 3)
 CREATE OR REPLACE FUNCTION public.set_ui_job_max_retries()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public, extensions
+AS $$
 BEGIN
   -- If priority is 1000 (UI job), set max_retries to 5
   IF NEW.priority = 1000 AND NEW.max_retries < 5 THEN
@@ -205,7 +214,10 @@ CREATE OR REPLACE FUNCTION public.fail_queue_job_v2(
   p_job_id UUID,
   p_error_message TEXT
 )
-RETURNS void AS $$
+RETURNS void
+LANGUAGE plpgsql
+SET search_path = public, extensions
+AS $$
 DECLARE
   current_retry_count INTEGER;
   current_max_retries INTEGER;
@@ -271,7 +283,10 @@ COMMENT ON FUNCTION public.fail_queue_job_v2 IS 'Marks a job as failed or resets
 CREATE OR REPLACE FUNCTION public.reset_job_immediate_v2(
   p_job_id UUID
 )
-RETURNS void AS $$
+RETURNS void
+LANGUAGE plpgsql
+SET search_path = public, extensions
+AS $$
 BEGIN
   UPDATE public.api_call_queue_v2
   SET

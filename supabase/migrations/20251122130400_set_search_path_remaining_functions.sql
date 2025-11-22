@@ -1,22 +1,27 @@
--- Fix Function Search Path Security Issue (ALTER approach)
--- Uses ALTER FUNCTION to set search_path instead of dropping/recreating
--- This is safer and avoids trigger dependency issues
+-- Set search_path for remaining functions (temporary until consolidated into original migrations)
+-- TODO: Consolidate these into their original CREATE FUNCTION migrations
+-- This migration is a stopgap to ensure all functions have SET search_path
+-- Functions already updated in original migrations:
+--   - is_data_stale_v2, is_profile_stale_v2 (20251117072633)
+--   - get_queue_batch_v2, complete_queue_job_v2, set_ui_job_max_retries, fail_queue_job_v2, reset_job_immediate_v2 (20251117073701)
+--   - on_realtime_subscription_insert (20251122092100)
 
 -- ============================================================================
 -- Staleness Functions
 -- ============================================================================
 
-ALTER FUNCTION public.is_data_stale_v2(TIMESTAMPTZ, INTEGER) SET search_path = public, extensions;
-ALTER FUNCTION public.is_profile_stale_v2(TIMESTAMPTZ, INTEGER) SET search_path = public, extensions;
-ALTER FUNCTION public.is_quote_stale_v2(TIMESTAMPTZ, INTEGER) SET search_path = public, extensions;
+ALTER FUNCTION public.is_quote_stale_v2(TEXT) SET search_path = public, extensions;
 
 -- ============================================================================
--- Queue Management Functions
+-- Queue Management Functions (remaining)
 -- ============================================================================
 
-ALTER FUNCTION public.get_queue_batch_v2(INTEGER, INTEGER) SET search_path = public, extensions;
-ALTER FUNCTION public.complete_queue_job_v2(UUID, BIGINT, INTEGER) SET search_path = public, extensions;
-ALTER FUNCTION public.fail_queue_job_v2(UUID, TEXT) SET search_path = public, extensions;
+-- (get_queue_batch_v2, complete_queue_job_v2, set_ui_job_max_retries, fail_queue_job_v2, reset_job_immediate_v2 already done)
+
+-- ============================================================================
+-- Recovery Functions
+-- ============================================================================
+
 ALTER FUNCTION public.recover_stuck_jobs_v2() SET search_path = public, extensions;
 
 -- ============================================================================
@@ -49,7 +54,6 @@ ALTER FUNCTION public.queue_scheduled_refreshes_v2() SET search_path = public, e
 -- Realtime Functions
 -- ============================================================================
 
-ALTER FUNCTION public.on_realtime_subscription_insert() SET search_path = public, extensions;
 ALTER FUNCTION public.get_active_subscriptions_from_realtime() SET search_path = public, extensions;
 
 -- ============================================================================
@@ -77,7 +81,6 @@ ALTER FUNCTION public.is_feature_enabled(TEXT) SET search_path = public, extensi
 -- ============================================================================
 
 ALTER FUNCTION public.update_updated_at_column() SET search_path = public, extensions;
-ALTER FUNCTION public.set_ui_job_max_retries() SET search_path = public, extensions;
 
 -- ============================================================================
 -- Monitoring Functions
@@ -94,16 +97,4 @@ ALTER FUNCTION public.check_cron_job_health(TEXT[]) SET search_path = public, ex
 
 ALTER FUNCTION public.record_baseline_metric(p_metric_name text, p_metric_value jsonb, p_notes text) SET search_path = public, extensions;
 ALTER FUNCTION public.capture_system_baseline() SET search_path = public, extensions;
-
--- ============================================================================
--- Edge Function Invoker
--- ============================================================================
-
-ALTER FUNCTION invoke_edge_function_v2(p_function_name TEXT, p_payload JSONB, p_timeout_milliseconds INTEGER) SET search_path = public, extensions;
-
--- ============================================================================
--- Leaderboard Function
--- ============================================================================
-
-ALTER FUNCTION public.get_weighted_leaderboard(weights jsonb) SET search_path = public, extensions;
 

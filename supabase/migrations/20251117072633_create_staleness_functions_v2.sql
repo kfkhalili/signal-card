@@ -8,7 +8,11 @@ CREATE OR REPLACE FUNCTION public.is_data_stale_v2(
   p_fetched_at TIMESTAMPTZ,
   p_ttl_minutes INTEGER
 )
-RETURNS BOOLEAN AS $$
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+STABLE
+SET search_path = public, extensions
+AS $$
 BEGIN
   -- CRITICAL: Validate TTL is positive
   IF p_ttl_minutes IS NULL OR p_ttl_minutes <= 0 THEN
@@ -18,7 +22,7 @@ BEGIN
   -- Check if data is stale
   RETURN p_fetched_at IS NULL OR p_fetched_at < NOW() - (p_ttl_minutes || ' minutes')::INTERVAL;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$;
 
 COMMENT ON FUNCTION public.is_data_stale_v2 IS 'Generic staleness check. Returns true if data is stale. TTL must be explicitly provided (no default).';
 
@@ -27,7 +31,11 @@ CREATE OR REPLACE FUNCTION public.is_profile_stale_v2(
   p_modified_at TIMESTAMPTZ,
   p_ttl_minutes INTEGER
 )
-RETURNS BOOLEAN AS $$
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+STABLE
+SET search_path = public, extensions
+AS $$
 BEGIN
   -- CRITICAL: Validate TTL is positive
   IF p_ttl_minutes IS NULL OR p_ttl_minutes <= 0 THEN
@@ -37,7 +45,7 @@ BEGIN
   -- Check if profile is stale
   RETURN p_modified_at IS NULL OR p_modified_at < NOW() - (p_ttl_minutes || ' minutes')::INTERVAL;
 END;
-$$ LANGUAGE plpgsql STABLE;
+$$;
 
 COMMENT ON FUNCTION public.is_profile_stale_v2 IS 'Profile-specific staleness check. Returns true if profile is stale. TTL must be explicitly provided (no default).';
 

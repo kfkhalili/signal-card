@@ -95,13 +95,81 @@ CREATE POLICY "Only service role can modify queue"
 
 -- CRITICAL: Partitions must have RLS explicitly enabled even though they inherit policies from parent
 -- This ensures Supabase shows them as "restricted" instead of "unrestricted"
+-- CRITICAL: Supabase Advisor requires explicit policies on partitions (doesn't detect inherited policies)
 ALTER TABLE public.api_call_queue_v2_pending ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.api_call_queue_v2_processing ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.api_call_queue_v2_completed ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.api_call_queue_v2_failed ENABLE ROW LEVEL SECURITY;
 
-COMMENT ON TABLE public.api_call_queue_v2_pending IS 'Partition of api_call_queue_v2 for pending jobs. RLS enabled - inherits policies from parent.';
-COMMENT ON TABLE public.api_call_queue_v2_processing IS 'Partition of api_call_queue_v2 for processing jobs. RLS enabled - inherits policies from parent.';
-COMMENT ON TABLE public.api_call_queue_v2_completed IS 'Partition of api_call_queue_v2 for completed jobs. RLS enabled - inherits policies from parent.';
-COMMENT ON TABLE public.api_call_queue_v2_failed IS 'Partition of api_call_queue_v2 for failed jobs. RLS enabled - inherits policies from parent.';
+-- Explicit policies on partitions (match parent table policies)
+-- Supabase Advisor doesn't detect inherited policies, so we create explicit ones
+
+-- Policies for api_call_queue_v2_pending
+CREATE POLICY "Users can read queue for monitoring"
+  ON public.api_call_queue_v2_pending
+  FOR SELECT
+  TO authenticated, anon
+  USING (true);
+
+CREATE POLICY "Only service role can modify queue"
+  ON public.api_call_queue_v2_pending
+  FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
+
+-- Policies for api_call_queue_v2_processing
+CREATE POLICY "Users can read queue for monitoring"
+  ON public.api_call_queue_v2_processing
+  FOR SELECT
+  TO authenticated, anon
+  USING (true);
+
+CREATE POLICY "Only service role can modify queue"
+  ON public.api_call_queue_v2_processing
+  FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
+
+-- Policies for api_call_queue_v2_completed
+CREATE POLICY "Users can read queue for monitoring"
+  ON public.api_call_queue_v2_completed
+  FOR SELECT
+  TO authenticated, anon
+  USING (true);
+
+CREATE POLICY "Only service role can modify queue"
+  ON public.api_call_queue_v2_completed
+  FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
+
+-- Policies for api_call_queue_v2_failed
+CREATE POLICY "Users can read queue for monitoring"
+  ON public.api_call_queue_v2_failed
+  FOR SELECT
+  TO authenticated, anon
+  USING (true);
+
+CREATE POLICY "Only service role can modify queue"
+  ON public.api_call_queue_v2_failed
+  FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
+
+COMMENT ON TABLE public.api_call_queue_v2_pending IS 'Partition of api_call_queue_v2 for pending jobs. RLS enabled with explicit policies matching parent table.';
+COMMENT ON TABLE public.api_call_queue_v2_processing IS 'Partition of api_call_queue_v2 for processing jobs. RLS enabled with explicit policies matching parent table.';
+COMMENT ON TABLE public.api_call_queue_v2_completed IS 'Partition of api_call_queue_v2 for completed jobs. RLS enabled with explicit policies matching parent table.';
+COMMENT ON TABLE public.api_call_queue_v2_failed IS 'Partition of api_call_queue_v2 for failed jobs. RLS enabled with explicit policies matching parent table.';
+COMMENT ON POLICY "Users can read queue for monitoring" ON public.api_call_queue_v2_pending IS 'Allows authenticated and anon users to read queue for monitoring. Matches parent table policy.';
+COMMENT ON POLICY "Only service role can modify queue" ON public.api_call_queue_v2_pending IS 'Only service role can modify queue. Matches parent table policy.';
+COMMENT ON POLICY "Users can read queue for monitoring" ON public.api_call_queue_v2_processing IS 'Allows authenticated and anon users to read queue for monitoring. Matches parent table policy.';
+COMMENT ON POLICY "Only service role can modify queue" ON public.api_call_queue_v2_processing IS 'Only service role can modify queue. Matches parent table policy.';
+COMMENT ON POLICY "Users can read queue for monitoring" ON public.api_call_queue_v2_completed IS 'Allows authenticated and anon users to read queue for monitoring. Matches parent table policy.';
+COMMENT ON POLICY "Only service role can modify queue" ON public.api_call_queue_v2_completed IS 'Only service role can modify queue. Matches parent table policy.';
+COMMENT ON POLICY "Users can read queue for monitoring" ON public.api_call_queue_v2_failed IS 'Allows authenticated and anon users to read queue for monitoring. Matches parent table policy.';
+COMMENT ON POLICY "Only service role can modify queue" ON public.api_call_queue_v2_failed IS 'Only service role can modify queue. Matches parent table policy.';
 

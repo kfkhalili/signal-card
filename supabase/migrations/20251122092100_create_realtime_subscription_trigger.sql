@@ -61,7 +61,9 @@ BEGIN
 
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions;
 
 COMMENT ON FUNCTION public.on_realtime_subscription_insert IS 'Trigger function that automatically checks staleness and creates jobs when a new subscription is added to realtime.subscription. Extracts symbol from filters and maps entity to data_type, then calls check_and_queue_stale_batch_v2() with high priority. Uses same filter parsing logic as get_active_subscriptions_from_realtime(). Wrapped in exception handler to prevent trigger failure from blocking subscription creation.';
 
