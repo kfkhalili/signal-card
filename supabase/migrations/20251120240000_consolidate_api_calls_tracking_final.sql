@@ -3,13 +3,7 @@
 -- Uses atomic reservation to prevent race conditions across concurrent processors
 -- Includes circuit breaker to stop processing when limit is reached
 
--- Step 1: Add api_calls_per_job column to data_type_registry_v2
-ALTER TABLE public.data_type_registry_v2
-ADD COLUMN IF NOT EXISTS api_calls_per_job INTEGER DEFAULT 1 NOT NULL;
-
-COMMENT ON COLUMN public.data_type_registry_v2.api_calls_per_job IS 'Number of API calls this data type makes per job. Used for rate limit tracking.';
-
--- Step 2: Create api_calls_rate_tracker table
+-- Step 1: Create api_calls_rate_tracker table
 CREATE TABLE IF NOT EXISTS public.api_calls_rate_tracker (
   minute_bucket TIMESTAMPTZ PRIMARY KEY,
   api_calls_made INTEGER DEFAULT 0 NOT NULL,
@@ -38,6 +32,15 @@ CREATE POLICY "Only service role can modify API call rate tracking"
   TO service_role
   USING (true)
   WITH CHECK (true);
+
+-- Step 2: Update existing data type registry entries with api_calls_per_job
+-- (Column already exists in table creation, just update values)
+UPDATE public.data_type_registry_v2
+SET api_calls_per_job = CASE
+  WHEN data_type = 'financial-statements' THEN 3
+  ELSE 1
+END
+WHERE api_calls_per_job = 1; -- Only update if still at default (idempotent)
 
 -- Step 3: Atomic reservation function (check AND reserve in one operation)
 CREATE OR REPLACE FUNCTION public.reserve_api_calls(
@@ -123,15 +126,7 @@ $$ LANGUAGE plpgsql;
 
 COMMENT ON FUNCTION public.cleanup_api_calls_rate_tracker IS 'Cleans up old API call rate tracking data (keeps only last hour).';
 
--- Step 6: Update existing data type registry entries with api_calls_per_job
-UPDATE public.data_type_registry_v2
-SET api_calls_per_job = CASE
-  WHEN data_type = 'financial-statements' THEN 3
-  ELSE 1
-END
-WHERE api_calls_per_job = 1; -- Only update if still at default (idempotent)
-
--- Step 7: Update complete_queue_job_v2 to accept api_calls_made parameter (for logging/validation)
+-- Step 6: Update complete_queue_job_v2 to accept api_calls_made parameter (for logging/validation)
 CREATE OR REPLACE FUNCTION public.complete_queue_job_v2(
   p_job_id UUID,
   p_data_size_bytes BIGINT,

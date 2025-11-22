@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS public.data_type_registry_v2 (
   estimated_data_size_bytes BIGINT DEFAULT 0,
   symbol_column TEXT DEFAULT 'symbol', -- For generic queries
   source_timestamp_column TEXT NULL, -- Optional: Column name in API response for source timestamp (e.g., 'lastUpdated', 'timestamp', 'date')
+  api_calls_per_job INTEGER DEFAULT 1 NOT NULL, -- Number of API calls this data type makes per job (for rate limit tracking)
   created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
@@ -32,6 +33,7 @@ COMMENT ON COLUMN public.data_type_registry_v2.priority IS 'Priority level for q
 COMMENT ON COLUMN public.data_type_registry_v2.estimated_data_size_bytes IS 'Estimated size of API response in bytes (for quota tracking)';
 COMMENT ON COLUMN public.data_type_registry_v2.symbol_column IS 'Column name that stores the symbol (default: symbol)';
 COMMENT ON COLUMN public.data_type_registry_v2.source_timestamp_column IS 'Optional: Column name in API response for source timestamp validation';
+COMMENT ON COLUMN public.data_type_registry_v2.api_calls_per_job IS 'Number of API calls this data type makes per job. Used for rate limit tracking.';
 
 -- CRITICAL SECURITY: Make registry read-only for all non-super-admin roles
 -- This prevents SQL injection via malicious registry entries
