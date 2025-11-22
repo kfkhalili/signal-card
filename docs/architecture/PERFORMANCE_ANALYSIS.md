@@ -22,7 +22,9 @@
 | Job | Schedule | Function | Settings |
 |-----|----------|----------|----------|
 | `check-stale-data-v2` | Every minute | `check_and_queue_stale_data_from_presence_v2()` | 50s timeout, 1000 symbols max |
+| `queue-scheduled-refreshes-v2` | Every minute | `queue_scheduled_refreshes_v2()` | Throttled internally by queue depth |
 | `invoke-processor-v2` | Every minute | `invoke_processor_loop_v2()` | 3 iterations, 2s delay |
+| `maintain-queue-partitions-v2` | Weekly (Sun 2 AM UTC) | `maintain_queue_partitions_v2()` | Truncates completed/failed partitions |
 
 ---
 

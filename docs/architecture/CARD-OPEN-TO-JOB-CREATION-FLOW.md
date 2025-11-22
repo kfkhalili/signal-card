@@ -82,10 +82,11 @@ There are **TWO separate paths** that can create jobs in the queue:
   ```
 
 ### Step 4: Iterate Over Active Subscriptions
-- Loops through distinct symbols from `active_subscriptions_v2`:
+- Loops through distinct symbols from `realtime.subscription`:
   ```sql
   FOR symbol_row IN
-    SELECT DISTINCT symbol FROM active_subscriptions_v2
+    SELECT DISTINCT symbol
+    FROM get_active_subscriptions_from_realtime()
     LIMIT 1000 -- Prevents timeout
   LOOP
   ```
@@ -96,7 +97,7 @@ There are **TWO separate paths** that can create jobs in the queue:
   FOR reg_row IN
     SELECT DISTINCT r.*
     FROM data_type_registry_v2 r
-    INNER JOIN active_subscriptions_v2 asub
+    INNER JOIN get_active_subscriptions_from_realtime() asub
       ON asub.symbol = symbol_row.symbol
       AND asub.data_type = r.data_type
     WHERE r.refresh_strategy = 'on-demand'
@@ -139,10 +140,10 @@ There are **TWO separate paths** that can create jobs in the queue:
     'pending' AS status,
     COUNT(DISTINCT asub.user_id)::INTEGER AS priority, -- Number of users viewing
     2000::BIGINT AS estimated_size
-  FROM live_quote_indicators t
-  JOIN active_subscriptions_v2 asub
-    ON t.symbol = asub.symbol
-    AND asub.data_type = 'quote'
+              FROM live_quote_indicators t
+              JOIN get_active_subscriptions_from_realtime() asub
+                ON t.symbol = asub.symbol
+                AND asub.data_type = 'quote'
   WHERE
     t.symbol = 'AAPL'
     AND is_data_stale_v2(t.fetched_at, 1) = true
@@ -258,7 +259,7 @@ There are **TWO separate paths** that can create jobs in the queue:
 - **Purpose:** Background staleness checker (runs every minute)
 - **Checks:** Exchange status (for quotes) + Staleness
 - **Creates:** Jobs in queue if stale
-- **Uses:** `active_subscriptions_v2` table for performance
+- **Uses:** `get_active_subscriptions_from_realtime()` to read from `realtime.subscription`
 
 ### `is_data_stale_v2(timestamp, ttl_minutes)`
 - **Purpose:** Check if data is stale based on TTL
@@ -271,30 +272,28 @@ There are **TWO separate paths** that can create jobs in the queue:
 
 **Scenario:** User opens Price Card for AAPL at 2:00 PM (market is open)
 
-1. **2:00:00 PM** - Card mounts, `useTrackSubscription` called
-2. **2:00:00 PM** - Subscription added to `active_subscriptions_v2`
-3. **2:00:01 PM** - Background staleness checker runs (cron)
-4. **2:00:01 PM** - Exchange status check: ✅ Open
-5. **2:00:01 PM** - Staleness check: ✅ Stale (data older than 1 minute)
-6. **2:00:01 PM** - Job created in `api_call_queue_v2_pending`
-7. **2:00:02 PM** - Processor runs, fetches data, updates database
-8. **2:01:00 PM** - Heartbeat sent (updates `last_seen_at`)
-9. **2:01:01 PM** - Background staleness checker runs again
-10. **2:01:01 PM** - Exchange status check: ✅ Open
-11. **2:01:01 PM** - Staleness check: ❌ Fresh (data updated 1 minute ago)
-12. **2:01:01 PM** - No job created
+1. **2:00:00 PM** - Card mounts, Realtime subscription created
+2. **2:00:00 PM** - Subscription inserted into `realtime.subscription`
+3. **2:00:00 PM** - **Database trigger fires immediately** → `check_and_queue_stale_batch_v2()` called
+4. **2:00:00 PM** - Exchange status check: ✅ Open
+5. **2:00:00 PM** - Staleness check: ✅ Stale (data older than 1 minute)
+6. **2:00:00 PM** - **Job created immediately** (0 latency) in `api_call_queue_v2_pending`
+7. **2:00:01 PM** - Processor runs, fetches data, updates database
+8. **2:01:01 PM** - Background staleness checker runs (cron)
+9. **2:01:01 PM** - Exchange status check: ✅ Open
+10. **2:01:01 PM** - Staleness check: ❌ Fresh (data updated 1 minute ago)
+11. **2:01:01 PM** - No job created
 
 **Scenario:** User opens Price Card for AAPL at 10:00 PM (market is closed)
 
-1. **10:00:00 PM** - Card mounts, `useTrackSubscription` called
-2. **10:00:00 PM** - Subscription added to `active_subscriptions_v2`
-3. **10:00:01 PM** - Background staleness checker runs (cron)
-4. **10:00:01 PM** - Exchange status check: ❌ Closed
-5. **10:00:01 PM** - **Job NOT created** (skipped due to closed exchange)
-6. **10:01:00 PM** - Heartbeat sent
-7. **10:01:01 PM** - Background staleness checker runs again
-8. **10:01:01 PM** - Exchange status check: ❌ Closed
-9. **10:01:01 PM** - **Job NOT created** (skipped due to closed exchange)
+1. **10:00:00 PM** - Card mounts, Realtime subscription created
+2. **10:00:00 PM** - Subscription inserted into `realtime.subscription`
+3. **10:00:00 PM** - **Database trigger fires immediately** → `check_and_queue_stale_batch_v2()` called
+4. **10:00:00 PM** - Exchange status check: ❌ Closed
+5. **10:00:00 PM** - **Job NOT created** (skipped due to closed exchange)
+6. **10:01:01 PM** - Background staleness checker runs (cron)
+7. **10:01:01 PM** - Exchange status check: ❌ Closed
+8. **10:01:01 PM** - **Job NOT created** (skipped due to closed exchange)
 
 ---
 
@@ -310,9 +309,11 @@ There are **TWO separate paths** that can create jobs in the queue:
 
 ## Notes
 
-- **Frontend does NOT call staleness checker directly** - it only tracks subscriptions
-- **Background staleness checker is the primary job creator** - runs every minute
+- **Frontend does NOT call staleness checker directly** - it only creates Realtime subscriptions
+- **Database trigger is the primary job creator for new subscriptions** - creates jobs immediately (0 latency)
+- **Background staleness checker is the secondary job creator** - runs every minute to catch data that becomes stale while viewing
 - **Exchange status check is a safety mechanism** - prevents creating jobs that will fail
 - **Processor has a second check** - in case exchange status changes between queueing and processing
 - **Fail-safe behavior** - if exchange status is unknown, we allow the fetch (better to try than skip)
+- **No heartbeat needed** - Subscriptions auto-remove on disconnect, subscription exists = active
 

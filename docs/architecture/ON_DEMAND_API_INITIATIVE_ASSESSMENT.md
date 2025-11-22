@@ -236,10 +236,11 @@ The **On-Demand API Initiative** successfully transformed Tickered from a schedu
 
 ### Limitations
 
-1. **No Event-Driven Queue Processing**
-   - **Current:** Polling-based (cron jobs check every minute)
-   - **Impact:** 1-minute delay for job creation
-   - **Future Enhancement:** Database triggers could eliminate polling
+1. **Background Polling Still Required**
+   - **Current:** Event-driven trigger for new subscriptions (0 latency) + background polling for ongoing staleness
+   - **Why:** Data can become stale while users are viewing (e.g., quote TTL = 1 minute)
+   - **Impact:** Background checker runs every minute to catch data that becomes stale while viewing
+   - **Status:** ✅ Event-driven processing implemented (database trigger eliminates 1-minute latency for new subscriptions)
 
 2. **No Predictive Prefetching**
    - **Current:** Only refreshes data when users are viewing
@@ -345,10 +346,10 @@ The **On-Demand API Initiative** successfully transformed Tickered from a schedu
 
 ### Medium-term (3-6 months)
 
-1. **Event-Driven Processing**
-   - Evaluate database triggers for queue processing
-   - Eliminate polling-based staleness checking
-   - Reduce job creation latency
+1. **✅ Event-Driven Processing** - **COMPLETE**
+   - ✅ Database trigger on `realtime.subscription` implemented
+   - ✅ Immediate job creation for new subscriptions (0 latency)
+   - ✅ Background polling still needed (catches data that becomes stale while viewing)
 
 2. **Predictive Prefetching**
    - Analyze user viewing patterns

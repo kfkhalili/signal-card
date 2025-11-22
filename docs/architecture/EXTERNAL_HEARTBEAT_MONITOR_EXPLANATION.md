@@ -19,8 +19,8 @@ The entire on-demand API system is **100% dependent on `pg_cron`**:
 
 - **Background staleness checker** runs via `pg_cron` (every minute)
 - **Queue processor invoker** runs via `pg_cron` (every minute)
-- **Analytics refresh** runs via `pg_cron` (every minute)
 - **Scheduled refreshes** run via `pg_cron` (every minute)
+- **Partition maintenance** runs via `pg_cron` (weekly)
 
 **If `pg_cron` fails, hangs, or is misconfigured:**
 - ❌ No staleness checks happen
@@ -121,12 +121,20 @@ GET https://api.tickered.com/functions/v1/health-check
   "status": "healthy",
   "jobs": [
     {
-      "jobname": "check-stale-data",
+      "jobname": "check-stale-data-v2",
       "last_run": "2025-11-21T15:00:00Z"
     },
     {
-      "jobname": "process-queue-batch",
+      "jobname": "invoke-processor-v2",
       "last_run": "2025-11-21T15:00:00Z"
+    },
+    {
+      "jobname": "queue-scheduled-refreshes-v2",
+      "last_run": "2025-11-21T15:00:00Z"
+    },
+    {
+      "jobname": "maintain-queue-partitions-v2",
+      "last_run": "2025-11-21T14:00:00Z"
     }
   ],
   "timestamp": "2025-11-21T15:05:00Z"
@@ -140,7 +148,7 @@ GET https://api.tickered.com/functions/v1/health-check
   "error": "Cron jobs are stale",
   "stale_jobs": [
     {
-      "name": "check-stale-data",
+      "name": "check-stale-data-v2",
       "last_run": "2025-11-21T14:50:00Z",
       "time_since_run_minutes": 15
     }
@@ -153,11 +161,10 @@ GET https://api.tickered.com/functions/v1/health-check
 
 The health-check function checks if jobs have run within these intervals:
 
-- **`process-queue-batch`:** 2 minutes (runs every 1 min, allows 1 min buffer)
-- **`check-stale-data`:** 10 minutes (runs every 5 min, allows 5 min buffer)
-- **`scheduled-refreshes`:** 5 minutes (runs every 1 min, allows 4 min buffer)
-- **`refresh-analytics-table`:** 20 minutes (runs every 15 min, allows 5 min buffer)
-- **`maintain-queue-partitions`:** 1 week (runs weekly, allows 1 day buffer)
+- **`check-stale-data-v2`:** 2 minutes (runs every 1 min, allows 1 min buffer)
+- **`invoke-processor-v2`:** 2 minutes (runs every 1 min, allows 1 min buffer)
+- **`queue-scheduled-refreshes-v2`:** 2 minutes (runs every 1 min, allows 1 min buffer)
+- **`maintain-queue-partitions-v2`:** 1 week (runs weekly on Sunday 2 AM UTC, allows 1 day buffer)
 
 If a job hasn't run within its expected interval, it's considered "stale" and the endpoint returns 503.
 
@@ -182,8 +189,8 @@ When health-check returns `503`:
 The health-check endpoint returned 503 (Service Unavailable).
 
 Stale Jobs:
-- check-stale-data: Last run 15 minutes ago (expected: < 10 minutes)
-- process-queue-batch: Last run 8 minutes ago (expected: < 2 minutes)
+- check-stale-data-v2: Last run 15 minutes ago (expected: < 2 minutes)
+- invoke-processor-v2: Last run 8 minutes ago (expected: < 2 minutes)
 
 Action Required:
 1. Check Supabase dashboard for pg_cron job status

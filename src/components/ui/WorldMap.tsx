@@ -83,7 +83,7 @@ const MarkersLayer: React.FC<{ markers: { label: string; position: [number, numb
     // Use whenReady to ensure map is initialized
     map.whenReady(() => {
       if (!isMounted) return;
-      
+
       // Double-check after a small delay to ensure DOM is fully ready
       timer = setTimeout(() => {
         if (isMounted) {
@@ -110,7 +110,7 @@ const MarkersLayer: React.FC<{ markers: { label: string; position: [number, numb
   try {
     const container = map.getContainer();
     const markerPane = map.getPane('markerPane');
-    
+
     if (!container || !container.parentElement || !markerPane || !markerPane.parentNode) {
       return null;
     }

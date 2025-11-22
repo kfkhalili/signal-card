@@ -17,7 +17,7 @@ check_and_queue_stale_data_from_presence_v2()
     ↓
 2. Check Quota (prevent backlog buildup)
     ↓
-3. Get Active Subscriptions (from active_subscriptions_v2 or realtime.subscription)
+3. Get Active Subscriptions (from realtime.subscription via get_active_subscriptions_from_realtime())
     ↓
 4. For Each Symbol:
     ↓
@@ -78,17 +78,7 @@ END IF;
 
 ### Step 4: Get Active Subscriptions
 
-**Current Implementation (Before Migration):**
-```sql
--- Outer loop: Get distinct symbols from active_subscriptions_v2
-FOR symbol_row IN
-  SELECT DISTINCT symbol
-  FROM public.active_subscriptions_v2
-  LIMIT max_symbols_per_run  -- Default: 1000 symbols per run
-LOOP
-```
-
-**After Migration (Using realtime.subscription):**
+**Current Implementation (Using realtime.subscription):**
 ```sql
 -- Outer loop: Get distinct symbols from realtime.subscription
 FOR symbol_row IN
@@ -123,7 +113,7 @@ ASAN
 FOR reg_row IN
   SELECT DISTINCT r.*
   FROM public.data_type_registry_v2 r
-  INNER JOIN public.active_subscriptions_v2 asub
+  INNER JOIN get_active_subscriptions_from_realtime() asub
     ON asub.symbol = symbol_row.symbol
     AND asub.data_type = r.data_type
   WHERE r.refresh_strategy = 'on-demand'
@@ -131,7 +121,7 @@ LOOP
 ```
 
 **What this does:**
-- Joins `data_type_registry_v2` (metadata) with `active_subscriptions_v2` (active subscriptions)
+- Joins `data_type_registry_v2` (metadata) with `get_active_subscriptions_from_realtime()` (active subscriptions)
 - Filters to only `on-demand` data types (excludes scheduled refreshes)
 - Gets registry metadata for each subscribed data type
 
@@ -216,7 +206,7 @@ sql_text := format(
         ELSE COUNT(DISTINCT asub.user_id)::INTEGER
       END AS priority,                           -- Priority = number of users subscribed
       %L::BIGINT AS estimated_size               -- From registry
-    FROM active_subscriptions_v2 asub
+    FROM get_active_subscriptions_from_realtime() asub
     LEFT JOIN %I t                               -- e.g., 'financial_statements' table
       ON t.%I = asub.symbol                       -- e.g., t.symbol = 'ASAN'
     WHERE
@@ -452,27 +442,18 @@ Let's trace through a concrete example:
 
 ---
 
-## After Migration to `realtime.subscription`
+## Current Implementation Using `realtime.subscription`
 
-**The only change:** Replace the subscription source
-
-**Before:**
-```sql
-FROM public.active_subscriptions_v2 asub
-```
-
-**After:**
+**Subscription Source:**
 ```sql
 FROM get_active_subscriptions_from_realtime() asub
 ```
 
-**Everything else stays the same:**
+**Key Features:**
 - ✅ Same staleness checking logic
 - ✅ Same job creation logic
 - ✅ Same priority calculation
 - ✅ Same error handling
-
-**Benefits:**
 - ✅ No client-side registration needed
 - ✅ No heartbeat needed
 - ✅ Automatic cleanup (subscriptions auto-remove on disconnect)
@@ -517,10 +498,7 @@ ORDER BY created_at DESC;
 
 **Check subscription counts:**
 ```sql
--- Before migration
-SELECT COUNT(*) FROM active_subscriptions_v2;
-
--- After migration
+-- Current implementation
 SELECT COUNT(*) FROM get_active_subscriptions_from_realtime();
 ```
 
