@@ -12,8 +12,8 @@
 
 ```sql
 -- Calculate queue success rate over last 24 hours
-SELECT 
-  COUNT(*) FILTER (WHERE status = 'completed') * 100.0 / 
+SELECT
+  COUNT(*) FILTER (WHERE status = 'completed') * 100.0 /
     NULLIF(COUNT(*) FILTER (WHERE status IN ('completed', 'failed')), 0) as success_rate_percent,
   COUNT(*) FILTER (WHERE status = 'completed') as completed_count,
   COUNT(*) FILTER (WHERE status = 'failed') as failed_count,
@@ -26,14 +26,14 @@ WHERE created_at > NOW() - INTERVAL '24 hours';
 **Alert Condition:**
 ```sql
 -- Returns rows if success rate < 90%
-SELECT 
+SELECT
   'ALERT: Queue success rate below 90%' as alert,
   success_rate_percent,
   completed_count,
   failed_count
 FROM (
-  SELECT 
-    COUNT(*) FILTER (WHERE status = 'completed') * 100.0 / 
+  SELECT
+    COUNT(*) FILTER (WHERE status = 'completed') * 100.0 /
       NULLIF(COUNT(*) FILTER (WHERE status IN ('completed', 'failed')), 0) as success_rate_percent,
     COUNT(*) FILTER (WHERE status = 'completed') as completed_count,
     COUNT(*) FILTER (WHERE status = 'failed') as failed_count
@@ -47,7 +47,7 @@ WHERE success_rate_percent < 90;
 
 ```sql
 -- Analyze failed jobs by data type
-SELECT 
+SELECT
   data_type,
   COUNT(*) as failed_count,
   COUNT(DISTINCT symbol) as affected_symbols,
@@ -65,7 +65,7 @@ ORDER BY failed_count DESC;
 
 ```sql
 -- Find jobs stuck in processing state for >10 minutes
-SELECT 
+SELECT
   COUNT(*) as stuck_jobs_count,
   COUNT(DISTINCT data_type) as affected_data_types,
   COUNT(DISTINCT symbol) as affected_symbols,
@@ -79,7 +79,7 @@ WHERE status = 'processing'
 **Alert Query:**
 ```sql
 -- Returns rows if >10 stuck jobs
-SELECT 
+SELECT
   'ALERT: Stuck jobs detected' as alert,
   COUNT(*) as stuck_jobs_count,
   COUNT(DISTINCT data_type) as affected_data_types
@@ -99,7 +99,7 @@ HAVING COUNT(*) > 10;
 
 ```sql
 -- Calculate current quota usage (rolling 30 days)
-SELECT 
+SELECT
   date,
   total_bytes,
   ROUND(total_bytes / (20.0 * 1024 * 1024 * 1024) * 100, 2) as usage_percent,
@@ -112,7 +112,7 @@ ORDER BY date DESC;
 **Alert Query:**
 ```sql
 -- Returns rows if quota usage >80%
-SELECT 
+SELECT
   'ALERT: Quota usage above 80%' as alert,
   date,
   total_bytes,
@@ -128,7 +128,7 @@ LIMIT 1;
 
 ```sql
 -- Daily data transfer for last 7 days
-SELECT 
+SELECT
   date,
   total_bytes,
   ROUND(total_bytes / (1024 * 1024), 2) as mb_transferred,
@@ -146,7 +146,7 @@ ORDER BY date DESC;
 
 ```sql
 -- Jobs processed per minute (last hour)
-SELECT 
+SELECT
   DATE_TRUNC('minute', processed_at) as minute,
   COUNT(*) as jobs_processed,
   AVG(actual_data_size_bytes) as avg_size_bytes,
@@ -163,7 +163,7 @@ ORDER BY minute DESC;
 ```sql
 -- Check staleness checker execution time (from logs/notices)
 -- Note: This requires logging to be enabled
-SELECT 
+SELECT
   'Staleness checker should complete within 50 seconds' as note,
   'Check pg_stat_activity for running queries' as monitoring_method;
 ```
@@ -172,7 +172,7 @@ SELECT
 
 ```sql
 -- Check partition sizes
-SELECT 
+SELECT
   schemaname,
   tablename,
   pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) as size,
@@ -186,7 +186,7 @@ ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
 
 ```sql
 -- Analyze batch processing patterns
-SELECT 
+SELECT
   DATE_TRUNC('hour', processed_at) as hour,
   COUNT(*) as jobs_completed,
   AVG(EXTRACT(EPOCH FROM (processed_at - created_at))) as avg_processing_time_seconds,
@@ -206,13 +206,13 @@ ORDER BY hour DESC;
 
 ```sql
 -- Success rate by data type (last 24 hours)
-SELECT 
+SELECT
   data_type,
   COUNT(*) FILTER (WHERE status = 'completed') as completed,
   COUNT(*) FILTER (WHERE status = 'failed') as failed,
   COUNT(*) FILTER (WHERE status = 'pending') as pending,
   ROUND(
-    COUNT(*) FILTER (WHERE status = 'completed') * 100.0 / 
+    COUNT(*) FILTER (WHERE status = 'completed') * 100.0 /
     NULLIF(COUNT(*) FILTER (WHERE status IN ('completed', 'failed')), 0),
     2
   ) as success_rate_percent
@@ -226,16 +226,16 @@ ORDER BY success_rate_percent ASC;
 
 ```sql
 -- Compare estimates vs actuals by data type
-SELECT 
+SELECT
   r.data_type,
   r.estimated_data_size_bytes as estimate,
   AVG(j.actual_data_size_bytes) as avg_actual,
-  ROUND(100.0 * (AVG(j.actual_data_size_bytes) - r.estimated_data_size_bytes) / 
+  ROUND(100.0 * (AVG(j.actual_data_size_bytes) - r.estimated_data_size_bytes) /
     NULLIF(r.estimated_data_size_bytes, 0), 2) as percent_diff,
   COUNT(j.id) as sample_size
 FROM public.data_type_registry_v2 r
-LEFT JOIN api_call_queue_v2 j ON j.data_type = r.data_type 
-  AND j.status = 'completed' 
+LEFT JOIN api_call_queue_v2 j ON j.data_type = r.data_type
+  AND j.status = 'completed'
   AND j.actual_data_size_bytes IS NOT NULL
   AND j.processed_at > NOW() - INTERVAL '7 days'
 WHERE r.refresh_strategy = 'on-demand'
@@ -252,9 +252,9 @@ ORDER BY ABS(percent_diff) DESC;
 
 ```sql
 -- Count active subscriptions from realtime.subscription
-SELECT 
+SELECT
   COUNT(*) as total_subscriptions,
-  COUNT(DISTINCT 
+  COUNT(DISTINCT
     SUBSTRING(filters::text FROM 'symbol,eq,([^)]+)')
   ) as unique_symbols,
   COUNT(DISTINCT entity) as unique_data_types
@@ -266,10 +266,10 @@ WHERE created_at > NOW() - INTERVAL '1 hour';
 
 ```sql
 -- Subscriptions by data type
-SELECT 
+SELECT
   entity as data_type,
   COUNT(*) as subscription_count,
-  COUNT(DISTINCT 
+  COUNT(DISTINCT
     SUBSTRING(filters::text FROM 'symbol,eq,([^)]+)')
   ) as unique_symbols
 FROM realtime.subscription
@@ -286,7 +286,7 @@ ORDER BY subscription_count DESC;
 
 ```sql
 -- Check cron job configuration
-SELECT 
+SELECT
   jobname,
   schedule,
   active,
@@ -301,7 +301,7 @@ ORDER BY jobname;
 ```sql
 -- Check recent cron job runs (requires logging)
 -- Note: This may require custom logging setup
-SELECT 
+SELECT
   'Check Supabase logs for cron job execution' as note,
   'Use Supabase Dashboard → Logs → Postgres' as method;
 ```
@@ -316,25 +316,25 @@ SELECT
 -- Comprehensive alert check
 WITH alerts AS (
   -- Queue success rate alert
-  SELECT 
+  SELECT
     'queue_success_rate' as alert_type,
-    CASE 
-      WHEN COUNT(*) FILTER (WHERE status = 'completed') * 100.0 / 
+    CASE
+      WHEN COUNT(*) FILTER (WHERE status = 'completed') * 100.0 /
            NULLIF(COUNT(*) FILTER (WHERE status IN ('completed', 'failed')), 0) < 90
       THEN 'ALERT: Queue success rate below 90%'
       ELSE NULL
     END as message,
-    COUNT(*) FILTER (WHERE status = 'completed') * 100.0 / 
+    COUNT(*) FILTER (WHERE status = 'completed') * 100.0 /
       NULLIF(COUNT(*) FILTER (WHERE status IN ('completed', 'failed')), 0) as metric_value
   FROM api_call_queue_v2
   WHERE created_at > NOW() - INTERVAL '24 hours'
-  
+
   UNION ALL
-  
+
   -- Stuck jobs alert
-  SELECT 
+  SELECT
     'stuck_jobs' as alert_type,
-    CASE 
+    CASE
       WHEN COUNT(*) > 10 THEN 'ALERT: More than 10 stuck jobs'
       ELSE NULL
     END as message,
@@ -342,13 +342,13 @@ WITH alerts AS (
   FROM api_call_queue_v2
   WHERE status = 'processing'
     AND processed_at < NOW() - INTERVAL '10 minutes'
-  
+
   UNION ALL
-  
+
   -- Quota usage alert
-  SELECT 
+  SELECT
     'quota_usage' as alert_type,
-    CASE 
+    CASE
       WHEN total_bytes > (20.0 * 1024 * 1024 * 1024 * 0.8)
       THEN 'ALERT: Quota usage above 80%'
       ELSE NULL
@@ -371,9 +371,9 @@ WHERE message IS NOT NULL;
 
 ```sql
 -- Quick health check
-SELECT 
+SELECT
   'Queue Health' as category,
-  COUNT(*) FILTER (WHERE status = 'completed') * 100.0 / 
+  COUNT(*) FILTER (WHERE status = 'completed') * 100.0 /
     NULLIF(COUNT(*) FILTER (WHERE status IN ('completed', 'failed')), 0) as success_rate,
   COUNT(*) FILTER (WHERE status = 'pending') as pending_jobs,
   COUNT(*) FILTER (WHERE status = 'processing') as processing_jobs
@@ -382,7 +382,7 @@ WHERE created_at > NOW() - INTERVAL '24 hours'
 
 UNION ALL
 
-SELECT 
+SELECT
   'Quota Status' as category,
   ROUND(total_bytes / (20.0 * 1024 * 1024 * 1024) * 100, 2) as usage_percent,
   CASE WHEN is_quota_exceeded_v2() THEN 1 ELSE 0 END as quota_exceeded,
@@ -394,7 +394,7 @@ LIMIT 1
 
 UNION ALL
 
-SELECT 
+SELECT
   'Stuck Jobs' as category,
   COUNT(*) as stuck_count,
   NULL,

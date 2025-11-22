@@ -22,8 +22,8 @@
 **Diagnosis:**
 ```sql
 -- Check success rate
-SELECT 
-  COUNT(*) FILTER (WHERE status = 'completed') * 100.0 / 
+SELECT
+  COUNT(*) FILTER (WHERE status = 'completed') * 100.0 /
     NULLIF(COUNT(*) FILTER (WHERE status IN ('completed', 'failed')), 0) as success_rate
 FROM api_call_queue_v2
 WHERE created_at > NOW() - INTERVAL '24 hours';
@@ -33,7 +33,7 @@ WHERE created_at > NOW() - INTERVAL '24 hours';
 
 1. **Check failure patterns:**
 ```sql
-SELECT 
+SELECT
   data_type,
   COUNT(*) as failed_count,
   STRING_AGG(DISTINCT LEFT(error_message, 100), '; ') as error_samples
@@ -71,7 +71,7 @@ ORDER BY failed_count DESC;
 **Diagnosis:**
 ```sql
 -- Check quota status
-SELECT 
+SELECT
   date,
   total_bytes,
   ROUND(total_bytes / (20.0 * 1024 * 1024 * 1024) * 100, 2) as usage_percent,
@@ -85,7 +85,7 @@ ORDER BY date DESC;
 
 1. **Check daily transfer trends:**
 ```sql
-SELECT 
+SELECT
   date,
   total_bytes,
   ROUND(total_bytes / (1024 * 1024), 2) as mb_transferred
@@ -96,7 +96,7 @@ ORDER BY date DESC;
 
 2. **Identify high-volume data types:**
 ```sql
-SELECT 
+SELECT
   data_type,
   COUNT(*) as job_count,
   SUM(actual_data_size_bytes) as total_bytes,
@@ -112,7 +112,7 @@ ORDER BY total_bytes DESC;
 
 1. **Immediate:** System automatically stops creating new jobs when quota exceeded
 2. **Short-term:** Wait for rolling 30-day window to clear old data
-3. **Long-term:** 
+3. **Long-term:**
    - Review data type estimates (may be too low)
    - Optimize data fetching (reduce unnecessary refreshes)
    - Consider data compression
@@ -131,7 +131,7 @@ ORDER BY total_bytes DESC;
 **Diagnosis:**
 ```sql
 -- Find stuck jobs
-SELECT 
+SELECT
   id,
   symbol,
   data_type,
@@ -154,7 +154,7 @@ ORDER BY processed_at ASC;
 2. **Check for deadlocks:**
 ```sql
 -- Check for blocking queries
-SELECT 
+SELECT
   pid,
   state,
   query,
@@ -178,7 +178,7 @@ SELECT recover_stuck_jobs_v2();
 ```sql
 -- Force reset specific jobs
 UPDATE api_call_queue_v2
-SET 
+SET
   status = 'pending',
   processed_at = NULL,
   retry_count = retry_count + 1
@@ -201,19 +201,19 @@ WHERE status = 'processing'
 **Diagnosis:**
 ```sql
 -- Check failure rate by data type
-SELECT 
+SELECT
   data_type,
   COUNT(*) FILTER (WHERE status = 'failed') as failed,
   COUNT(*) FILTER (WHERE status = 'completed') as completed,
   ROUND(
-    COUNT(*) FILTER (WHERE status = 'failed') * 100.0 / 
+    COUNT(*) FILTER (WHERE status = 'failed') * 100.0 /
     NULLIF(COUNT(*) FILTER (WHERE status IN ('completed', 'failed')), 0),
     2
   ) as failure_rate
 FROM api_call_queue_v2
 WHERE created_at > NOW() - INTERVAL '24 hours'
 GROUP BY data_type
-HAVING COUNT(*) FILTER (WHERE status = 'failed') * 100.0 / 
+HAVING COUNT(*) FILTER (WHERE status = 'failed') * 100.0 /
   NULLIF(COUNT(*) FILTER (WHERE status IN ('completed', 'failed')), 0) > 10
 ORDER BY failure_rate DESC;
 ```
@@ -222,7 +222,7 @@ ORDER BY failure_rate DESC;
 
 1. **Analyze error messages:**
 ```sql
-SELECT 
+SELECT
   data_type,
   error_message,
   COUNT(*) as occurrence_count
@@ -235,7 +235,7 @@ ORDER BY occurrence_count DESC;
 
 2. **Check affected symbols:**
 ```sql
-SELECT 
+SELECT
   symbol,
   data_type,
   error_message,
@@ -274,7 +274,7 @@ LIMIT 20;
 **Diagnosis:**
 ```sql
 -- Check processing times
-SELECT 
+SELECT
   data_type,
   AVG(EXTRACT(EPOCH FROM (processed_at - created_at))) as avg_processing_time_seconds,
   PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (processed_at - created_at))) as median_time,
@@ -290,7 +290,7 @@ ORDER BY avg_processing_time_seconds DESC;
 
 1. **Check queue depth:**
 ```sql
-SELECT 
+SELECT
   status,
   COUNT(*) as job_count,
   AVG(EXTRACT(EPOCH FROM (NOW() - created_at))) as avg_wait_time_seconds
@@ -300,7 +300,7 @@ GROUP BY status;
 
 2. **Check processor throughput:**
 ```sql
-SELECT 
+SELECT
   DATE_TRUNC('hour', processed_at) as hour,
   COUNT(*) as jobs_completed,
   COUNT(*) / 60.0 as jobs_per_minute
@@ -320,7 +320,7 @@ ORDER BY hour DESC;
 2. **Check rate limiting:**
 ```sql
 -- Check if rate limiting is active
-SELECT 
+SELECT
   should_stop_processing_api_calls() as rate_limit_active;
 ```
 
@@ -403,7 +403,7 @@ SELECT recover_stuck_jobs_v2();
 ```sql
 -- Reset failed jobs (use with caution)
 UPDATE api_call_queue_v2
-SET 
+SET
   status = 'pending',
   processed_at = NULL,
   error_message = NULL,

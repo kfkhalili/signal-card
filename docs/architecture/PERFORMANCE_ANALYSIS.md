@@ -38,7 +38,7 @@
 **Analysis:**
 ```sql
 -- Check actual processing rate
-SELECT 
+SELECT
   DATE_TRUNC('hour', processed_at) as hour,
   COUNT(*) as jobs_completed,
   COUNT(*) / 60.0 as jobs_per_minute,
@@ -61,7 +61,7 @@ ORDER BY hour DESC;
 ```sql
 -- Check staleness checker patterns
 -- Note: Requires logging to capture execution times
-SELECT 
+SELECT
   'Staleness checker should complete within 50 seconds' as note,
   'Monitor via pg_stat_activity or application logs' as method;
 ```
@@ -76,13 +76,13 @@ SELECT
 **Analysis:**
 ```sql
 -- Check partition sizes
-SELECT 
+SELECT
   schemaname,
   tablename,
   pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) as size,
   pg_total_relation_size(schemaname||'.'||tablename) as size_bytes,
-  (SELECT COUNT(*) FROM api_call_queue_v2 WHERE status = 
-    CASE tablename 
+  (SELECT COUNT(*) FROM api_call_queue_v2 WHERE status =
+    CASE tablename
       WHEN 'api_call_queue_v2_pending' THEN 'pending'
       WHEN 'api_call_queue_v2_processing' THEN 'processing'
       WHEN 'api_call_queue_v2_completed' THEN 'completed'
@@ -100,7 +100,7 @@ ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
 
 ### 1. Processor Batch Size
 
-**Current:** 125 jobs per batch  
+**Current:** 125 jobs per batch
 **Analysis:**
 - Batch size of 125 is large
 - With 3 iterations per minute, theoretical max is 375 jobs/minute
@@ -115,12 +115,12 @@ ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
 **Test Query:**
 ```sql
 -- Analyze job processing times
-SELECT 
+SELECT
   data_type,
   AVG(EXTRACT(EPOCH FROM (processed_at - created_at))) as avg_total_time_seconds,
-  AVG(EXTRACT(EPOCH FROM (processed_at - 
-    (SELECT MIN(created_at) FROM api_call_queue_v2 j2 
-     WHERE j2.symbol = j.symbol AND j2.data_type = j.data_type 
+  AVG(EXTRACT(EPOCH FROM (processed_at -
+    (SELECT MIN(created_at) FROM api_call_queue_v2 j2
+     WHERE j2.symbol = j.symbol AND j2.data_type = j.data_type
      AND j2.status = 'processing' AND j2.processed_at < j.processed_at)
   ))) as avg_processing_time_seconds,
   COUNT(*) as sample_size
@@ -133,7 +133,7 @@ ORDER BY avg_total_time_seconds DESC;
 
 ### 2. Staleness Checker Optimization
 
-**Current:** Symbol-by-symbol processing (1000 symbols max)  
+**Current:** Symbol-by-symbol processing (1000 symbols max)
 **Analysis:**
 - Symbol-by-symbol prevents "thundering herd"
 - Timeout protection ensures completion
@@ -148,7 +148,7 @@ ORDER BY avg_total_time_seconds DESC;
 ```sql
 -- Check staleness checker efficiency
 -- Count how many symbols are typically processed
-SELECT 
+SELECT
   COUNT(DISTINCT symbol) as unique_symbols,
   COUNT(*) as total_subscriptions
 FROM get_active_subscriptions_from_realtime();
@@ -156,7 +156,7 @@ FROM get_active_subscriptions_from_realtime();
 
 ### 3. Rate Limiting Optimization
 
-**Current:** 300 API calls/minute limit  
+**Current:** 300 API calls/minute limit
 **Analysis:**
 - Financial-statements: 3 calls per job
 - Other data types: 1 call per job
@@ -170,7 +170,7 @@ FROM get_active_subscriptions_from_realtime();
 **Test Query:**
 ```sql
 -- Analyze API call usage by data type
-SELECT 
+SELECT
   data_type,
   COUNT(*) as job_count,
   SUM(api_calls_per_job) as total_api_calls,
@@ -191,7 +191,7 @@ ORDER BY total_api_calls DESC;
 
 ```sql
 -- Monitor queue depth (pending jobs)
-SELECT 
+SELECT
   DATE_TRUNC('hour', created_at) as hour,
   COUNT(*) as pending_jobs,
   AVG(priority) as avg_priority
@@ -206,7 +206,7 @@ ORDER BY hour DESC;
 
 ```sql
 -- Average time from creation to completion
-SELECT 
+SELECT
   data_type,
   AVG(EXTRACT(EPOCH FROM (processed_at - created_at))) as avg_latency_seconds,
   PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (processed_at - created_at))) as median_latency,
@@ -222,7 +222,7 @@ ORDER BY avg_latency_seconds DESC;
 
 ```sql
 -- Jobs processed per hour
-SELECT 
+SELECT
   DATE_TRUNC('hour', processed_at) as hour,
   COUNT(*) as jobs_completed,
   COUNT(DISTINCT data_type) as data_types_processed,
@@ -314,7 +314,7 @@ ORDER BY hour DESC;
 
 ```sql
 -- Real-time queue status
-SELECT 
+SELECT
   status,
   COUNT(*) as count,
   AVG(EXTRACT(EPOCH FROM (NOW() - created_at))) as avg_age_seconds
@@ -326,7 +326,7 @@ GROUP BY status;
 
 ```sql
 -- Hourly performance trends
-SELECT 
+SELECT
   DATE_TRUNC('hour', processed_at) as hour,
   COUNT(*) as jobs_completed,
   AVG(EXTRACT(EPOCH FROM (processed_at - created_at))) as avg_latency,
