@@ -213,6 +213,27 @@ export const WorldMap: React.FC<WorldMapProps> = React.memo(({ markers, classNam
     };
   }, [map, isMapReady, mapBounds]);
 
+  // Track when we can safely render markers (after map is ready and a small delay)
+  const [canRenderMarkers, setCanRenderMarkers] = useState(false);
+
+  // Only allow marker rendering after map is ready and a small delay
+  useEffect(() => {
+    if (isMapReady && Option.isSome(map)) {
+      // Small delay to ensure map container and panes are fully initialized
+      const timer = setTimeout(() => {
+        const mapInstance = map.value;
+        const container = mapInstance.getContainer();
+        // Double-check container is still valid before allowing marker rendering
+        if (container && container.parentElement) {
+          setCanRenderMarkers(true);
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    } else {
+      setCanRenderMarkers(false);
+    }
+  }, [isMapReady, map]);
+
   // Memoize the layers to prevent re-creating them on every render
   // Only render layers when map is ready to prevent Leaflet DOM access errors
   const displayLayers = useMemo(() => {
@@ -226,7 +247,7 @@ export const WorldMap: React.FC<WorldMapProps> = React.memo(({ markers, classNam
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        {validMarkers.map((marker) => (
+        {canRenderMarkers && validMarkers.map((marker) => (
           <Marker
             key={marker.label}
             position={marker.position as L.LatLngExpression}
@@ -248,7 +269,7 @@ export const WorldMap: React.FC<WorldMapProps> = React.memo(({ markers, classNam
         ))}
       </>
     );
-  }, [validMarkers, isMapReady, map]);
+  }, [validMarkers, isMapReady, map, canRenderMarkers]);
 
   return (
     <div
