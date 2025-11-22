@@ -100,26 +100,29 @@ export default function WorkspacePage() {
       // Check for multiple pending cards first (for "Explore Top 3" functionality)
       const pendingCardsJson = sessionStorage.getItem("pendingCardsToAdd");
       if (pendingCardsJson) {
-        try {
-          const pendingCards: {
-            symbol: string;
-            cardTypes: CardType[];
-          }[] = JSON.parse(pendingCardsJson);
-          sessionStorage.removeItem("pendingCardsToAdd");
-          // Add all cards to workspace
-          pendingCards.forEach((card) => {
-            if (card.cardTypes.length > 0) {
-              addCardToWorkspace({
-                symbol: card.symbol,
-                cardTypes: card.cardTypes as [CardType, ...CardType[]],
-              });
+        const processPendingCards = async () => {
+          try {
+            const pendingCards: {
+              symbol: string;
+              cardTypes: CardType[];
+            }[] = JSON.parse(pendingCardsJson);
+            sessionStorage.removeItem("pendingCardsToAdd");
+            // Add all cards to workspace sequentially to avoid race conditions
+            for (const card of pendingCards) {
+              if (card.cardTypes.length > 0) {
+                await addCardToWorkspace({
+                  symbol: card.symbol,
+                  cardTypes: card.cardTypes as [CardType, ...CardType[]],
+                });
+              }
             }
-          });
-          return; // Exit early if we handled multiple cards
-        } catch (error) {
-          console.error("Failed to parse pending cards:", error);
-          sessionStorage.removeItem("pendingCardsToAdd");
-        }
+          } catch (error) {
+            console.error("Failed to parse pending cards:", error);
+            sessionStorage.removeItem("pendingCardsToAdd");
+          }
+        };
+        processPendingCards();
+        return; // Exit early if we handled multiple cards
       }
 
       // Fall back to single pending card (for backward compatibility)
