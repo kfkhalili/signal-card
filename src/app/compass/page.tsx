@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { useLeaderboardStore } from "@/stores/compassStore";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDebounce } from "use-debounce";
@@ -320,10 +321,11 @@ export default function CompassPage() {
                       <div className="relative w-10 h-10 rounded-full bg-muted shrink-0 overflow-hidden border border-border/50">
                         {logoUrl ? (
                           // Use API route for images (works with Next.js Image optimization)
-                          <img
+                          <Image
                             src={createSecureImageUrl(logoUrl)}
                             alt={companyName || item.symbol}
-                            className="w-full h-full object-cover"
+                            fill
+                            className="object-cover"
                             onError={(e) => {
                               // Hide image on error, show fallback
                               e.currentTarget.style.display = "none";
