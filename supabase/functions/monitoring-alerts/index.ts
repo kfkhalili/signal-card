@@ -1,9 +1,9 @@
 /**
  * Monitoring Alerts Edge Function
- * 
+ *
  * Exposes monitoring queries as HTTP endpoints for UptimeRobot integration.
  * Each endpoint returns 200 OK if healthy, 503 Service Unavailable if alert condition is met.
- * 
+ *
  * Endpoints:
  * - /queue-success-rate - Checks if queue success rate <90%
  * - /quota-usage - Checks if quota usage >80%
@@ -11,8 +11,7 @@
  * - /all-alerts - Returns all alert statuses in one response
  */
 
-import "@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",

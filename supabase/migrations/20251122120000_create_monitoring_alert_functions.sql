@@ -17,8 +17,8 @@ DECLARE
   v_completed BIGINT;
   v_failed BIGINT;
 BEGIN
-  SELECT 
-    COUNT(*) FILTER (WHERE status = 'completed') * 100.0 / 
+  SELECT
+    COUNT(*) FILTER (WHERE status = 'completed') * 100.0 /
       NULLIF(COUNT(*) FILTER (WHERE status IN ('completed', 'failed')), 0),
     COUNT(*) FILTER (WHERE status = 'completed'),
     COUNT(*) FILTER (WHERE status = 'failed')
@@ -26,11 +26,11 @@ BEGIN
   FROM api_call_queue_v2
   WHERE created_at > NOW() - INTERVAL '24 hours';
 
-  RETURN QUERY SELECT 
+  RETURN QUERY SELECT
     COALESCE(v_success_rate, 100),
     COALESCE(v_completed, 0),
     COALESCE(v_failed, 0),
-    CASE 
+    CASE
       WHEN v_success_rate < 90 THEN 'alert'
       ELSE 'healthy'
     END;
@@ -53,7 +53,7 @@ DECLARE
   v_usage_percent NUMERIC;
   v_total_bytes BIGINT;
 BEGIN
-  SELECT 
+  SELECT
     ROUND(total_bytes / (20.0 * 1024 * 1024 * 1024) * 100, 2),
     total_bytes
   INTO v_usage_percent, v_total_bytes
@@ -62,10 +62,10 @@ BEGIN
   ORDER BY date DESC
   LIMIT 1;
 
-  RETURN QUERY SELECT 
+  RETURN QUERY SELECT
     COALESCE(v_usage_percent, 0),
     COALESCE(v_total_bytes, 0),
-    CASE 
+    CASE
       WHEN v_usage_percent > 80 THEN 'alert'
       ELSE 'healthy'
     END;
@@ -88,7 +88,7 @@ DECLARE
   v_stuck_count BIGINT;
   v_affected_types BIGINT;
 BEGIN
-  SELECT 
+  SELECT
     COUNT(*),
     COUNT(DISTINCT data_type)
   INTO v_stuck_count, v_affected_types
@@ -96,10 +96,10 @@ BEGIN
   WHERE status = 'processing'
     AND processed_at < NOW() - INTERVAL '10 minutes';
 
-  RETURN QUERY SELECT 
+  RETURN QUERY SELECT
     COALESCE(v_stuck_count, 0),
     COALESCE(v_affected_types, 0),
-    CASE 
+    CASE
       WHEN v_stuck_count > 10 THEN 'alert'
       ELSE 'healthy'
     END;
