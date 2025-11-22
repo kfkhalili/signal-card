@@ -61,7 +61,7 @@ Every 1 minute:
 // Edge Function: on-card-add
 export async function handleCardAdd(req: Request) {
   const { symbol, dataTypes } = await req.json();
-  
+
   // Immediately check staleness and create jobs
   await supabase.rpc('check_and_queue_stale_batch_v2', {
     p_symbol: symbol,
@@ -123,28 +123,27 @@ export async function handleCardAdd(req: Request) {
 
 ---
 
-### Option D: PostgreSQL LISTEN/NOTIFY (Advanced)
+### Option D: Database Trigger on `realtime.subscription` (✅ **FEASIBLE!**)
 
-**Concept:** Use PostgreSQL's LISTEN/NOTIFY to detect subscription changes.
+**Concept:** Create a trigger on `realtime.subscription` that fires when subscriptions are created.
 
 **Implementation:**
-1. **Trigger** on a custom subscription tracking table (not `realtime.subscription`)
-2. Trigger sends NOTIFY when subscription is created/deleted
-3. Background process LISTENs for notifications
-4. On notification, immediately checks staleness and creates jobs
+1. **Trigger function** extracts symbol and data_type from subscription
+2. Trigger calls `check_and_queue_stale_batch_v2()` immediately
+3. No polling needed for new subscriptions
 
 **Pros:**
-- ✅ True event-driven (no polling)
-- ✅ Immediate response
-- ✅ Efficient (only processes when subscriptions change)
+- ✅ **True event-driven** (no polling for new subscriptions)
+- ✅ **Immediate response** (0 latency)
+- ✅ **Automatic** (no frontend changes needed)
+- ✅ **Uses existing functions** (`check_and_queue_stale_batch_v2`)
+- ✅ **Can create triggers on `realtime.subscription`** (verified - it works!)
 
 **Cons:**
-- ❌ **Can't trigger on `realtime.subscription`** (system table, no triggers)
-- ❌ Requires maintaining a separate subscription tracking table
-- ❌ Complex setup (LISTEN/NOTIFY requires persistent connection)
-- ❌ We already migrated away from custom subscription tracking
+- ⚠️ Still need background checker for data that becomes stale over time
+- ⚠️ Trigger runs synchronously (could slow down subscription creation if heavy)
 
-**Status:** ❌ **NOT RECOMMENDED** - Defeats the purpose of using `realtime.subscription`
+**Status:** ✅ **RECOMMENDED** - Best solution for immediate job creation!
 
 ---
 
@@ -171,41 +170,56 @@ export async function handleCardAdd(req: Request) {
 
 ---
 
-## Recommended Solution: Hybrid Approach (Option C)
+## Recommended Solution: Database Trigger on `realtime.subscription` (Option D - UPDATED!)
 
-### Phase 1: Immediate Job Creation (High Priority)
+**UPDATE:** After testing, we confirmed that **triggers CAN be created on `realtime.subscription`**! This changes the recommended approach.
 
-**Goal:** Eliminate 1-minute latency for new subscriptions.
+### Phase 1: Database Trigger on `realtime.subscription` (✅ **IMPLEMENTED!**)
+
+**Goal:** Eliminate 1-minute latency for new subscriptions using database triggers.
 
 **Implementation:**
+
+1. **Create Trigger Function:** `on_realtime_subscription_insert()`
+   - Extracts symbol from `filters` JSONB
+   - Maps `entity` to `data_type`
+   - Calls `check_and_queue_stale_batch_v2()` immediately
+
+2. **Create Trigger:** `on_realtime_subscription_insert_trigger`
+   - Fires `AFTER INSERT` on `realtime.subscription`
+   - Automatically checks staleness and creates jobs
+
+**Status:** ✅ **CREATED** - Trigger is now active!
+
+**Alternative (if trigger doesn't work in production):**
 
 1. **Create Edge Function:** `on-card-add`
    ```typescript
    // supabase/functions/on-card-add/index.ts
    import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-   
+
    Deno.serve(async (req: Request) => {
      const { symbol, dataTypes } = await req.json();
-     
+
      const supabase = createClient(
        Deno.env.get('SUPABASE_URL')!,
        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
      );
-     
+
      // Immediately check staleness and create jobs
      const { error } = await supabase.rpc('check_and_queue_stale_batch_v2', {
        p_symbol: symbol,
        p_data_types: dataTypes,
        p_priority: 1 // High priority for user-facing
      });
-     
+
      if (error) {
        return new Response(JSON.stringify({ error: error.message }), {
          status: 500,
          headers: { 'Content-Type': 'application/json' }
        });
      }
-     
+
      return new Response(JSON.stringify({ success: true }), {
        status: 200,
        headers: { 'Content-Type': 'application/json' }
@@ -218,7 +232,7 @@ export async function handleCardAdd(req: Request) {
    // src/hooks/useWorkspaceManager.ts
    const addCard = async (cardData: CardData) => {
      // ... existing card creation logic ...
-     
+
      // Immediately check staleness and create jobs
      await fetch('/api/on-card-add', {
        method: 'POST',
@@ -275,11 +289,11 @@ export async function handleCardAdd(req: Request) {
      SELECT * INTO reg_row
      FROM data_type_registry_v2
      WHERE table_name = TG_TABLE_NAME;
-     
+
      IF NOT FOUND THEN
        RETURN NEW; -- Not a tracked table
      END IF;
-     
+
      -- Check if data is stale
      EXECUTE format(
        'SELECT %I($1.%I, %L::INTEGER)',
@@ -287,7 +301,7 @@ export async function handleCardAdd(req: Request) {
        reg_row.timestamp_column,
        reg_row.default_ttl_minutes
      ) USING NEW INTO is_stale;
-     
+
      -- If stale, create job (only if subscription exists)
      IF is_stale THEN
        PERFORM queue_refresh_if_not_exists_v2(
@@ -297,7 +311,7 @@ export async function handleCardAdd(req: Request) {
          reg_row.estimated_data_size_bytes
        );
      END IF;
-     
+
      RETURN NEW;
    END;
    $$ LANGUAGE plpgsql;
