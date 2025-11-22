@@ -129,7 +129,9 @@ export const WorldMap: React.FC<WorldMapProps> = React.memo(({ markers, classNam
     return L.latLngBounds(latLngs);
   }, [validMarkers]);
 
-  // Handle map initialization with proper cleanup
+  // Handle map initialization
+  // NOTE: React-Leaflet's MapContainer handles map cleanup automatically.
+  // We only need to track the map instance for our own state management.
   const handleMapRef = React.useCallback((mapInstance: L.Map | null) => {
     if (mapInstance) {
       // Wait for map to be fully ready before setting state
@@ -142,49 +144,24 @@ export const WorldMap: React.FC<WorldMapProps> = React.memo(({ markers, classNam
         }
       });
     } else {
-      // Cleanup on unmount
+      // Map is being unmounted - just reset our state
+      // React-Leaflet will handle the actual cleanup
       setIsMapReady(false);
       setMap(Option.none());
     }
   }, []);
 
-  // Cleanup effect: properly destroy map instance on unmount
-  // This prevents Leaflet from trying to access DOM elements that have been removed
+  // Cleanup effect: reset state on unmount
+  // NOTE: We do NOT call mapInstance.remove() here because React-Leaflet's MapContainer
+  // already handles map cleanup. Calling remove() manually causes "Map container is being
+  // reused by another instance" error when both try to clean up the same instance.
   useEffect(() => {
     return () => {
-      if (Option.isSome(map)) {
-        try {
-          const mapInstance = map.value;
-          const container = mapInstance.getContainer();
-          
-          // Only cleanup if container still exists
-          if (container && container.parentElement) {
-            // Remove all layers before destroying
-            mapInstance.eachLayer((layer) => {
-              try {
-                // Check if layer has a DOM element before removing
-                if (layer instanceof L.Marker) {
-                  const el = layer.getElement();
-                  if (el && el.parentNode) {
-                    mapInstance.removeLayer(layer);
-                  }
-                } else {
-                  mapInstance.removeLayer(layer);
-                }
-              } catch {
-                // Ignore errors during cleanup
-              }
-            });
-            
-            // Remove the map instance
-            mapInstance.remove();
-          }
-        } catch {
-          // Ignore errors during cleanup - map may already be destroyed
-        }
-      }
+      // Just reset our state - React-Leaflet will handle the actual map cleanup
+      setIsMapReady(false);
+      setMap(Option.none());
     };
-  }, [map]);
+  }, []);
 
   useEffect(() => {
     if (Option.isNone(map) || !isMapReady || !mapBounds) return;
