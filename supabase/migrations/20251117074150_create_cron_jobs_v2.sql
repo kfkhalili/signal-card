@@ -6,7 +6,7 @@
 
 -- Job 1: Background Staleness Checker (Primary - Catches data that becomes stale while users are viewing)
 -- Runs every minute (updated to match 1-minute TTL for quotes)
--- CRITICAL: Uses active_subscriptions_v2 table (updated by Job 5) for performance
+-- CRITICAL: Uses get_active_subscriptions_from_realtime() to read from realtime.subscription (Supabase built-in)
 -- CRITICAL: Symbol-by-Symbol pattern prevents temp table thundering herd
 -- CRITICAL: Quota-aware (prevents quota rebound catastrophe)
 DO $$
@@ -88,25 +88,10 @@ BEGIN
   END IF;
 END $$;
 
--- Job 5: Analytics Refresh (Heavy operation moved from Job 1)
--- Runs every minute (matches minimum TTL of 1 minute for quotes)
--- CRITICAL: Must run at least as frequently as minimum TTL so staleness checker has accurate data
--- CRITICAL: Updates active_subscriptions_v2 table (used by Job 1)
--- CRITICAL: Uses Edge Function to query Realtime Presence and update analytics table
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM cron.job WHERE jobname = 'refresh-analytics-v2'
-  ) THEN
-    PERFORM cron.schedule(
-      'refresh-analytics-v2',
-      '* * * * *', -- Every minute (matches 1-minute TTL for quotes)
-      $$
-      SELECT refresh_analytics_from_presence_v2();
-      $$
-    );
-  END IF;
-END $$;
+-- Job 5: REMOVED - Analytics Refresh no longer needed
+-- MIGRATED: Subscriptions are now tracked via realtime.subscription (Supabase built-in)
+-- No manual registration, heartbeat, or cleanup needed
+-- The staleness checker reads directly from realtime.subscription via get_active_subscriptions_from_realtime()
 
 -- Helper function to list all cron jobs
 CREATE OR REPLACE FUNCTION list_queue_system_cron_jobs_v2()
@@ -128,8 +113,7 @@ BEGIN
     'check-stale-data-v2',
     'queue-scheduled-refreshes-v2',
     'invoke-processor-v2',
-    'maintain-queue-partitions-v2',
-    'refresh-analytics-v2'
+    'maintain-queue-partitions-v2'
   )
   ORDER BY j.jobname;
 END;
@@ -145,7 +129,6 @@ BEGIN
   PERFORM cron.unschedule('queue-scheduled-refreshes-v2');
   PERFORM cron.unschedule('invoke-processor-v2');
   PERFORM cron.unschedule('maintain-queue-partitions-v2');
-  PERFORM cron.unschedule('refresh-analytics-v2');
 
   RAISE NOTICE 'All queue system cron jobs unscheduled';
 END;

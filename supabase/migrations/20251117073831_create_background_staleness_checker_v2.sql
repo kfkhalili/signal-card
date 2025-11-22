@@ -1,13 +1,57 @@
 -- Phase 3: Staleness System
--- Create background staleness checker (uses active_subscriptions table, not Presence)
+-- Create background staleness checker (uses realtime.subscription via get_active_subscriptions_from_realtime)
 -- CRITICAL: Symbol-by-Symbol query pattern (prevents temp table thundering herd)
--- CRITICAL: Uses active_subscriptions table (updated by separate cron job) for performance
+-- CRITICAL: Uses get_active_subscriptions_from_realtime() to read from realtime.subscription (Supabase built-in)
 -- CRITICAL: Advisory lock prevents cron pile-ups
 -- CRITICAL: Quota check prevents quota rebound catastrophe
 -- CRITICAL: LEFT JOIN handles missing data (treats missing as stale)
 -- CRITICAL: Timeout-protected to complete within 50 seconds
 -- CRITICAL: For quote data type: always creates job if data missing (even if exchange closed), only checks exchange status if data exists
 
+-- Step 1: Create function to extract active subscriptions from realtime.subscription
+-- This replaces active_subscriptions_v2 for the staleness checker
+CREATE OR REPLACE FUNCTION get_active_subscriptions_from_realtime()
+RETURNS TABLE(
+  user_id UUID,
+  symbol TEXT,
+  data_type TEXT,
+  subscribed_at TIMESTAMPTZ,
+  last_seen_at TIMESTAMPTZ
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    (rs.claims->>'sub')::UUID AS user_id,
+    SUBSTRING(rs.filters::text FROM 'symbol,eq,([^)]+)') AS symbol,
+    CASE
+      WHEN rs.entity::text = 'profiles' THEN 'profile'
+      WHEN rs.entity::text = 'live_quote_indicators' THEN 'quote'
+      WHEN rs.entity::text = 'financial_statements' THEN 'financial-statements'
+      WHEN rs.entity::text = 'ratios_ttm' THEN 'ratios-ttm'
+      WHEN rs.entity::text = 'dividend_history' THEN 'dividend-history'
+      WHEN rs.entity::text = 'revenue_product_segmentation' THEN 'revenue-product-segmentation'
+      WHEN rs.entity::text = 'grades_historical' THEN 'grades-historical'
+      WHEN rs.entity::text = 'exchange_variants' THEN 'exchange-variants'
+    END AS data_type,
+    rs.created_at AS subscribed_at,
+    rs.created_at AS last_seen_at  -- Use created_at as proxy (subscription exists = active)
+  FROM realtime.subscription rs
+  WHERE
+    rs.filters::text LIKE '%symbol,eq,%'  -- Only symbol-specific subscriptions
+    AND rs.entity::text IN (
+      'profiles', 'live_quote_indicators', 'financial_statements', 'ratios_ttm',
+      'dividend_history', 'revenue_product_segmentation',
+      'grades_historical', 'exchange_variants'
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execute permission
+GRANT EXECUTE ON FUNCTION get_active_subscriptions_from_realtime() TO service_role;
+
+COMMENT ON FUNCTION get_active_subscriptions_from_realtime IS 'Extracts active subscriptions from realtime.subscription table. Replaces active_subscriptions_v2 for staleness checker. Returns user_id, symbol, data_type, subscribed_at, and last_seen_at (using created_at as proxy).';
+
+-- Step 2: Create background staleness checker that uses the function above
 CREATE OR REPLACE FUNCTION public.check_and_queue_stale_data_from_presence_v2()
 RETURNS void AS $$
 DECLARE
@@ -39,12 +83,13 @@ BEGIN
     END IF;
 
     -- CRITICAL: Symbol-by-Symbol query pattern (prevents temp table thundering herd)
-    -- Outer loop: Iterate over distinct symbols from active_subscriptions (typically 1k-10k, not 300k)
+    -- MIGRATED: Now uses get_active_subscriptions_from_realtime() instead of active_subscriptions_v2
+    -- Outer loop: Iterate over distinct symbols from realtime.subscription (typically 1k-10k, not 300k)
     -- This creates tiny, fast, indexed queries instead of giant JOINs
     -- CRITICAL: Added LIMIT to prevent long-running queries
     FOR symbol_row IN
       SELECT DISTINCT symbol
-      FROM public.active_subscriptions_v2
+      FROM get_active_subscriptions_from_realtime()
       LIMIT max_symbols_per_run
     LOOP
       -- CRITICAL: Check timeout every symbol to prevent blocking next cron run
@@ -58,10 +103,11 @@ BEGIN
       symbols_processed := symbols_processed + 1;
 
       -- Inner loop: Get data types for THIS symbol (typically 1-5 types per symbol)
+      -- MIGRATED: Now uses get_active_subscriptions_from_realtime() instead of active_subscriptions_v2
       FOR reg_row IN
         SELECT DISTINCT r.*
         FROM public.data_type_registry_v2 r
-        INNER JOIN public.active_subscriptions_v2 asub
+        INNER JOIN get_active_subscriptions_from_realtime() asub
           ON asub.symbol = symbol_row.symbol
           AND asub.data_type = r.data_type
         WHERE r.refresh_strategy = 'on-demand'
@@ -115,6 +161,8 @@ BEGIN
         BEGIN
           -- Build dynamic SQL for THIS symbol and data type (100% generic, no hardcoding)
           -- CRITICAL: Use LEFT JOIN to handle missing data (treat missing as stale)
+          -- CRITICAL: Use CASE WHEN to set financial-statements to priority 500 (unless user_count >= 1000)
+          -- MIGRATED: Now uses get_active_subscriptions_from_realtime() instead of active_subscriptions_v2
           sql_text := format(
             $SQL$
               INSERT INTO api_call_queue_v2 (symbol, data_type, status, priority, estimated_data_size_bytes)
@@ -122,9 +170,12 @@ BEGIN
                 %L AS symbol,
                 %L AS data_type,
                 'pending' AS status,
-                COUNT(DISTINCT asub.user_id)::INTEGER AS priority,
+                CASE
+                  WHEN %L = 'financial-statements' AND COUNT(DISTINCT asub.user_id) < 1000 THEN 500
+                  ELSE COUNT(DISTINCT asub.user_id)::INTEGER
+                END AS priority,
                 %L::BIGINT AS estimated_size
-              FROM active_subscriptions_v2 asub
+              FROM get_active_subscriptions_from_realtime() asub
               LEFT JOIN %I t
                 ON t.%I = asub.symbol
               WHERE
@@ -147,18 +198,19 @@ BEGIN
             $SQL$,
             symbol_row.symbol,                    -- 1: %L symbol
             reg_row.data_type,                    -- 2: %L data_type
-            reg_row.estimated_data_size_bytes,    -- 3: %L estimated_size
-            reg_row.table_name,                   -- 4: %I table_name
-            reg_row.symbol_column,                -- 5: %I symbol_column (ON clause)
-            symbol_row.symbol,                    -- 6: %L asub.symbol
-            reg_row.data_type,                    -- 7: %L asub.data_type
-            reg_row.symbol_column,                -- 8: %I t.%I IS NULL
-            reg_row.symbol_column,                -- 9: %I t.%I (staleness function)
-            reg_row.staleness_function,           -- 10: %I staleness_function
-            reg_row.timestamp_column,             -- 11: %I timestamp_column
-            reg_row.default_ttl_minutes,          -- 12: %L default_ttl_minutes
-            symbol_row.symbol,                    -- 13: %L q.symbol
-            reg_row.data_type                     -- 14: %L q.data_type
+            reg_row.data_type,                    -- 3: %L data_type (for CASE WHEN)
+            reg_row.estimated_data_size_bytes,    -- 4: %L estimated_size
+            reg_row.table_name,                   -- 5: %I table_name
+            reg_row.symbol_column,                -- 6: %I symbol_column (ON clause)
+            symbol_row.symbol,                    -- 7: %L asub.symbol
+            reg_row.data_type,                    -- 8: %L asub.data_type
+            reg_row.symbol_column,                -- 9: %I t.%I IS NULL
+            reg_row.symbol_column,                -- 10: %I t.%I (staleness function)
+            reg_row.staleness_function,           -- 11: %I staleness_function
+            reg_row.timestamp_column,             -- 12: %I timestamp_column
+            reg_row.default_ttl_minutes,          -- 13: %L default_ttl_minutes
+            symbol_row.symbol,                    -- 14: %L q.symbol
+            reg_row.data_type                     -- 15: %L q.data_type
           );
 
           EXECUTE sql_text;
@@ -187,5 +239,5 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-COMMENT ON FUNCTION public.check_and_queue_stale_data_from_presence_v2 IS 'Background staleness checker. Runs every minute. Uses LEFT JOIN to handle missing data (treats missing as stale). Timeout-protected to complete within 50 seconds. For quote data type: always creates job if data missing (even if exchange closed), only checks exchange status if data exists. Quota-aware.';
+COMMENT ON FUNCTION public.check_and_queue_stale_data_from_presence_v2 IS 'Background staleness checker. Runs every minute. MIGRATED: Now uses get_active_subscriptions_from_realtime() instead of active_subscriptions_v2. Financial-statements jobs automatically get priority 500 (unless user_count >= 1000 indicating UI priority). Uses LEFT JOIN to handle missing data (treats missing as stale). Timeout-protected to complete within 50 seconds. For quote data type: always creates job if data missing (even if exchange closed), only checks exchange status if data exists. Quota-aware.';
 

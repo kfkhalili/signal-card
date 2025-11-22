@@ -1,8 +1,8 @@
 -- supabase/migrations/20250615112021_create_exchange_variants_table.sql
 
 CREATE TABLE IF NOT EXISTS "public"."exchange_variants" (
-    "base_symbol" TEXT NOT NULL,
-    "variant_symbol" TEXT NOT NULL,
+    "symbol" TEXT NOT NULL,
+    "symbol_variant" TEXT NOT NULL,
     "exchange_short_name" TEXT NOT NULL,
     "price" DOUBLE PRECISION,
     "beta" DOUBLE PRECISION,
@@ -25,13 +25,13 @@ CREATE TABLE IF NOT EXISTS "public"."exchange_variants" (
     "fetched_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
 
-    PRIMARY KEY ("variant_symbol", "exchange_short_name"),
-    CONSTRAINT "fk_exchange_variants_base_symbol" FOREIGN KEY ("base_symbol") REFERENCES "public"."profiles"("symbol") ON DELETE CASCADE
+    PRIMARY KEY ("symbol_variant", "exchange_short_name"),
+    CONSTRAINT "fk_exchange_variants_symbol" FOREIGN KEY ("symbol") REFERENCES "public"."profiles"("symbol") ON DELETE CASCADE
 );
 
 COMMENT ON TABLE "public"."exchange_variants" IS 'Stores exchange-specific variant data for symbols from FMP.';
-COMMENT ON COLUMN "public"."exchange_variants"."base_symbol" IS 'The base stock symbol, references profiles.symbol.';
-COMMENT ON COLUMN "public"."exchange_variants"."variant_symbol" IS 'The exchange-specific symbol (e.g., "AAPL.DE"). Part of composite PK.';
+COMMENT ON COLUMN "public"."exchange_variants"."symbol" IS 'The base stock symbol, references profiles.symbol. Renamed from base_symbol for consistency with other tables.';
+COMMENT ON COLUMN "public"."exchange_variants"."symbol_variant" IS 'The exchange-specific symbol variant (e.g., "AAPL.DE"). Renamed from variant_symbol. Part of composite PK.';
 COMMENT ON COLUMN "public"."exchange_variants"."exchange_short_name" IS 'The short name of the exchange (e.g., "XETRA"). Part of composite PK.';
 
 
@@ -42,8 +42,8 @@ FOR EACH ROW
 EXECUTE FUNCTION "extensions"."moddatetime"('updated_at');
 
 -- Indexes
-CREATE INDEX IF NOT EXISTS "idx_exchange_variants_base_symbol" ON "public"."exchange_variants" USING BTREE ("base_symbol");
-CREATE INDEX IF NOT EXISTS "idx_exchange_variants_variant_symbol" ON "public"."exchange_variants" USING BTREE ("variant_symbol");
+CREATE INDEX IF NOT EXISTS "idx_exchange_variants_symbol" ON "public"."exchange_variants" USING BTREE ("symbol");
+CREATE INDEX IF NOT EXISTS "idx_exchange_variants_symbol_variant" ON "public"."exchange_variants" USING BTREE ("symbol_variant");
 
 -- Enable RLS
 ALTER TABLE "public"."exchange_variants" ENABLE ROW LEVEL SECURITY;
