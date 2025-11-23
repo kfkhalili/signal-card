@@ -825,8 +825,8 @@ export default function SymbolAnalysisPage() {
         }
         if (data) {
           // Deduplicate: For each fiscal_year, keep only the one with the latest fetched_at
-          const deduplicated = data.reduce((acc, current) => {
-            const existing = acc.find(item => item.fiscal_year === current.fiscal_year);
+          const deduplicated = data.reduce((acc: typeof data, current: typeof data[0]) => {
+            const existing = acc.find((item: typeof data[0]) => item.fiscal_year === current.fiscal_year);
             if (!existing) {
               acc.push(current);
             } else {
@@ -841,10 +841,10 @@ export default function SymbolAnalysisPage() {
             }
             return acc;
           }, [] as typeof data);
-
+          
           // Sort by date descending and take the latest 12
           const sorted = deduplicated
-            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+            .sort((a: typeof data[0], b: typeof data[0]) => new Date(b.date).getTime() - new Date(a.date).getTime())
             .slice(0, 12);
 
           setFinancialStatementsHistory(sorted);
