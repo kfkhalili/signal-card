@@ -7,9 +7,9 @@
 ## Executive Summary
 
 ### Current Status
-- ✅ **Working with Real Data**: Insider Activity, Price, P/E Ratio, Gross Margin
-- ⚠️ **Partially Working**: Some metrics from `ratios_ttm` and `financial_statements`
-- ❌ **Hardcoded/Placeholder**: DCF, ROIC, WACC, Safety metrics, Institutional data, Analyst data
+- ✅ **Working with Real Data**: Insider Activity, Price, P/E Ratio, PEG Ratio, Gross Margin, DCF Fair Value, ROIC, FCF Yield
+- ⚠️ **Partially Working**: Quality metrics (ROIC ✅, FCF Yield ✅, but WACC still hardcoded)
+- ❌ **Hardcoded/Placeholder**: WACC, Safety metrics (Net Debt/EBITDA, Altman Z-Score, Interest Coverage), Institutional data, Analyst data
 
 ### Investment Value Assessment
 - **High Value**: Valuation (DCF), Quality (ROIC), Safety (Debt metrics), Insider Activity ✅
@@ -34,9 +34,9 @@
 
 | Metric | Status | Investment Value | Data Needed |
 |--------|--------|------------------|-------------|
-| **Valuation** | ❌ Hardcoded (145.0) | ⭐⭐⭐⭐⭐ Critical | DCF Fair Value calculation |
+| **Valuation** | ✅ **Live** (DCF from `valuations` table) | ⭐⭐⭐⭐⭐ Critical | ✅ Complete |
 | **Health** | ❌ Hardcoded (0.8) | ⭐⭐⭐⭐⭐ Critical | Net Debt/EBITDA from financials |
-| **Quality (ROIC)** | ❌ Hardcoded (22.0) | ⭐⭐⭐⭐⭐ Critical | ROIC calculation from financials |
+| **Quality (ROIC)** | ✅ **Live** (calculated from `financial_statements`) | ⭐⭐⭐⭐⭐ Critical | ✅ Complete |
 | **Sentiment** | ❌ Hardcoded ("Buy") | ⭐⭐⭐ Medium | Analyst consensus from API |
 
 **Investment Value**: ⭐⭐⭐⭐⭐ **Critical** - This is the "at-a-glance" decision framework
@@ -56,11 +56,11 @@
 
 | Metric | Status | Investment Value | Data Needed |
 |--------|--------|------------------|-------------|
-| **DCF Fair Value** | ❌ Hardcoded (145.0) | ⭐⭐⭐⭐⭐ Critical | Calculate from financials |
-| **Current Price** | ✅ Live | ⭐⭐⭐⭐⭐ Critical | Already working |
-| **P/E (TTM)** | ✅ Live | ⭐⭐⭐⭐ High | Already working |
-| **PEG Ratio** | ❌ Hardcoded (1.1) | ⭐⭐⭐ Medium | P/E / Growth Rate |
-| **Price vs DCF Chart** | ❌ Empty | ⭐⭐ Nice-to-have | Historical price + DCF data |
+| **DCF Fair Value** | ✅ **Live** (from `valuations` table) | ⭐⭐⭐⭐⭐ Critical | ✅ Complete |
+| **Current Price** | ✅ Live | ⭐⭐⭐⭐⭐ Critical | ✅ Complete |
+| **P/E (TTM)** | ✅ Live | ⭐⭐⭐⭐ High | ✅ Complete |
+| **PEG Ratio** | ✅ **Live** (from `ratios_ttm.price_to_earnings_growth_ratio_ttm`) | ⭐⭐⭐ Medium | ✅ Complete |
+| **Price vs DCF Chart** | ✅ **Functional** (uses `valuations` table data) | ⭐⭐ Nice-to-have | ✅ Complete - Shows DCF valuations with price at calculation time |
 
 **Investment Value**: ⭐⭐⭐⭐⭐ **Critical** - Core valuation question: "Is the stock cheap?"
 
@@ -84,10 +84,10 @@
    - **Growth Rate**: Calculate from `financial_statements` (revenue growth over last 3-5 years)
 
 3. **Historical Price Chart**:
-   - **New Data Type Needed**: Historical price data (daily/weekly)
-   - **FMP API**: `/v3/historical-price-full/{symbol}?from=YYYY-MM-DD&to=YYYY-MM-DD`
-   - **Table**: New `historical_prices` table
-   - **TTL**: 1440 minutes (24 hours) - historical data doesn't change
+   - ✅ **Current Implementation**: Uses `valuations` table with `stock_price_at_calculation` field
+   - **Limitation**: Only shows data points where DCF was calculated (typically 1-2 entries currently)
+   - **Future Enhancement**: Could add dedicated historical price data for richer chart visualization
+   - **Optional FMP API**: `/v3/historical-price-full/{symbol}?from=YYYY-MM-DD&to=YYYY-MM-DD` for full price history
 
 **Calculation Complexity**: 🔴 **High** - DCF requires financial modeling expertise
 
@@ -98,11 +98,11 @@
 
 | Metric | Status | Investment Value | Data Needed |
 |--------|--------|------------------|-------------|
-| **ROIC** | ❌ Hardcoded (22.0) | ⭐⭐⭐⭐⭐ Critical | Calculate from financials |
-| **WACC** | ❌ Hardcoded (8.5) | ⭐⭐⭐⭐ High | Calculate (complex) |
-| **Gross Margin** | ✅ Live | ⭐⭐⭐⭐ High | Already working |
-| **FCF Yield** | ❌ Hardcoded (4.2) | ⭐⭐⭐⭐ High | FCF / Market Cap |
-| **ROIC vs WACC Chart** | ❌ Empty | ⭐⭐ Nice-to-have | Historical ROIC/WACC |
+| **ROIC** | ✅ **Live** (calculated from `financial_statements`) | ⭐⭐⭐⭐⭐ Critical | ✅ Complete |
+| **WACC** | ❌ Hardcoded (8.5) | ⭐⭐⭐⭐ High | Calculate (complex - requires market data) |
+| **Gross Margin** | ✅ Live | ⭐⭐⭐⭐ High | ✅ Complete |
+| **FCF Yield** | ✅ **Live** (calculated from `financial_statements` + `live_quote_indicators`) | ⭐⭐⭐⭐ High | ✅ Complete |
+| **ROIC vs WACC Chart** | ❌ Empty | ⭐⭐ Nice-to-have | Historical ROIC/WACC data |
 
 **Investment Value**: ⭐⭐⭐⭐⭐ **Critical** - Measures business quality and competitive moat
 
@@ -254,12 +254,12 @@
 ## Data Priority Matrix
 
 ### 🔴 **Critical Priority** (Must Have for Investment Decisions)
-1. **DCF Fair Value** - Core valuation metric
-2. **ROIC** - Business quality indicator
-3. **Net Debt/EBITDA** - Financial safety
-4. **Altman Z-Score** - Bankruptcy risk
-5. **Interest Coverage** - Debt serviceability
-6. **FCF Yield** - Cash generation efficiency
+1. ✅ **DCF Fair Value** - Core valuation metric - **COMPLETE**
+2. ✅ **ROIC** - Business quality indicator - **COMPLETE**
+3. ✅ **FCF Yield** - Cash generation efficiency - **COMPLETE**
+4. ❌ **Net Debt/EBITDA** - Financial safety - **PENDING**
+5. ❌ **Altman Z-Score** - Bankruptcy risk - **PENDING**
+6. ❌ **Interest Coverage** - Debt serviceability - **PENDING**
 
 ### 🟡 **High Priority** (Important but Can Use Estimates)
 1. **WACC** - Can use industry averages initially
@@ -285,16 +285,16 @@
 
 ### Phase 2: Quality Metrics (Medium Complexity, High Value)
 **Estimated Effort**: 3-5 days
-- ✅ Calculate ROIC from `financial_statements`
-- ✅ Calculate FCF Yield from `financial_statements` + `live_quote_indicators`
-- ⚠️ Calculate WACC (simplified version using industry averages)
-- **Impact**: Unlocks Quality Card mostly
+- ✅ **COMPLETE**: Calculate ROIC from `financial_statements` (implemented 2025-01-22)
+- ✅ **COMPLETE**: Calculate FCF Yield from `financial_statements` + `live_quote_indicators` (implemented 2025-01-22)
+- ⚠️ **PENDING**: Calculate WACC (simplified version using industry averages)
+- **Impact**: Quality Card is 75% functional (ROIC ✅, FCF Yield ✅, Gross Margin ✅, WACC ❌)
 
 ### Phase 3: Valuation Metrics (High Complexity, Critical Value)
 **Estimated Effort**: 5-7 days
-- ✅ Calculate DCF Fair Value (simplified 2-stage model)
-- ✅ Calculate PEG Ratio (P/E / Growth Rate)
-- **Impact**: Unlocks Valuation Card completely
+- ✅ **COMPLETE**: DCF Fair Value from `valuations` table (implemented previously)
+- ✅ **COMPLETE**: PEG Ratio from `ratios_ttm.price_to_earnings_growth_ratio_ttm` (implemented 2025-01-22)
+- **Impact**: ✅ Valuation Card is fully functional
 
 ### Phase 4: Market Sentiment Data (Low Complexity, Medium Value)
 **Estimated Effort**: 2-3 days
@@ -339,9 +339,16 @@
 
 ## Investment Decision Framework
 
-### Current State: ⚠️ **Partially Functional**
-- **Can Make Decisions On**: Insider activity, current valuation (P/E), basic quality (gross margin)
-- **Cannot Make Decisions On**: True intrinsic value (DCF), business quality (ROIC), financial safety (debt metrics)
+### Current State: ✅ **Mostly Functional** (75% complete)
+- **Can Make Decisions On**:
+  - ✅ Insider activity (fully functional)
+  - ✅ Current valuation (P/E, PEG Ratio - both live)
+  - ✅ Intrinsic value (DCF Fair Value - live from `valuations` table)
+  - ✅ Business quality (ROIC, FCF Yield, Gross Margin - all live)
+- **Cannot Make Decisions On**:
+  - ❌ Financial safety (debt metrics - Net Debt/EBITDA, Altman Z-Score, Interest Coverage)
+  - ❌ WACC (still hardcoded, but ROIC is live so quality assessment is possible)
+  - ❌ Market sentiment (analyst consensus, price targets)
 
 ### Target State: ✅ **Fully Functional**
 - **Valuation**: DCF vs Price comparison → "Is it cheap?"
@@ -354,8 +361,8 @@
 ## Recommendations
 
 ### Immediate Actions (This Week)
-1. **Implement Safety Metrics** (Phase 1) - Easiest, unlocks Safety Card
-2. **Implement ROIC and FCF Yield** (Phase 2, partial) - High value, medium complexity
+1. **Implement Safety Metrics** (Phase 1) - Easiest, unlocks Safety Card completely
+   - ✅ ROIC and FCF Yield already complete (Phase 2)
 
 ### Short Term (Next 2 Weeks)
 3. **Implement DCF Calculation** (Phase 3) - Critical for valuation
@@ -374,20 +381,23 @@
 
 ## Conclusion
 
-**Current Investment Value**: ⭐⭐⭐ (3/5) - Can make basic decisions, but missing critical metrics
+**Current Investment Value**: ⭐⭐⭐⭐ (4/5) - Can make informed decisions on valuation and quality, but missing safety metrics
 
 **Target Investment Value**: ⭐⭐⭐⭐⭐ (5/5) - Complete framework for intelligent investment decisions
 
 **Key Gaps**:
-1. DCF Fair Value (critical for valuation)
-2. ROIC (critical for quality)
-3. Safety metrics (critical for risk assessment)
-4. Market sentiment data (important for contrarian analysis)
+1. ✅ ~~DCF Fair Value~~ - **COMPLETE** (from `valuations` table)
+2. ✅ ~~ROIC~~ - **COMPLETE** (calculated from `financial_statements`)
+3. ✅ ~~FCF Yield~~ - **COMPLETE** (calculated from `financial_statements` + market cap)
+4. ✅ ~~PEG Ratio~~ - **COMPLETE** (from `ratios_ttm`)
+5. ❌ Safety metrics (critical for risk assessment) - Net Debt/EBITDA, Altman Z-Score, Interest Coverage
+6. ❌ WACC (important for quality comparison, but ROIC alone is sufficient for quality assessment)
+7. ❌ Market sentiment data (important for contrarian analysis) - Analyst consensus, price targets, short interest
 
-**Estimated Total Effort**: 14-21 days to reach full functionality
+**Remaining Effort**: ~7-10 days to reach full functionality (down from 14-21 days)
 
 ---
 
-**Last Updated**: 2025-01-22
-**Next Review**: After Phase 1 completion
+**Last Updated**: 2025-01-22 (after ROIC and FCF Yield implementation)
+**Next Review**: After Phase 1 (Safety Metrics) completion
 

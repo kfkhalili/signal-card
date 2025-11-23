@@ -901,6 +901,33 @@ export type Database = {
         }
         Relationships: []
       }
+      market_risk_premiums: {
+        Row: {
+          continent: string | null
+          country: string
+          country_risk_premium: number | null
+          fetched_at: string
+          total_equity_risk_premium: number
+          updated_at: string
+        }
+        Insert: {
+          continent?: string | null
+          country: string
+          country_risk_premium?: number | null
+          fetched_at?: string
+          total_equity_risk_premium: number
+          updated_at?: string
+        }
+        Update: {
+          continent?: string | null
+          country?: string
+          country_risk_premium?: number | null
+          fetched_at?: string
+          total_equity_risk_premium?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       migration_baseline: {
         Row: {
           id: number
@@ -1343,6 +1370,60 @@ export type Database = {
           is_active?: boolean
           last_processed_at?: string | null
           symbol?: string
+        }
+        Relationships: []
+      }
+      treasury_rates: {
+        Row: {
+          date: string
+          fetched_at: string
+          month1: number | null
+          month2: number | null
+          month3: number | null
+          month6: number | null
+          updated_at: string
+          year1: number | null
+          year10: number
+          year2: number | null
+          year20: number | null
+          year3: number | null
+          year30: number | null
+          year5: number | null
+          year7: number | null
+        }
+        Insert: {
+          date: string
+          fetched_at?: string
+          month1?: number | null
+          month2?: number | null
+          month3?: number | null
+          month6?: number | null
+          updated_at?: string
+          year1?: number | null
+          year10: number
+          year2?: number | null
+          year20?: number | null
+          year3?: number | null
+          year30?: number | null
+          year5?: number | null
+          year7?: number | null
+        }
+        Update: {
+          date?: string
+          fetched_at?: string
+          month1?: number | null
+          month2?: number | null
+          month3?: number | null
+          month6?: number | null
+          updated_at?: string
+          year1?: number | null
+          year10?: number
+          year2?: number | null
+          year20?: number | null
+          year3?: number | null
+          year30?: number | null
+          year5?: number | null
+          year7?: number | null
         }
         Relationships: []
       }

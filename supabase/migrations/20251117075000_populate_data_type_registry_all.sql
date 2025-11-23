@@ -414,5 +414,91 @@ INSERT INTO public.data_type_registry_v2 (
   source_timestamp_column = EXCLUDED.source_timestamp_column,
   updated_at = NOW();
 
+-- Market Risk Premium data type
+-- CRITICAL: This is NOT symbol-specific - it's a global dataset with country-specific values
+-- The job.symbol field will be ignored, but we need it for the queue system
+INSERT INTO public.data_type_registry_v2 (
+  data_type,
+  table_name,
+  timestamp_column,
+  staleness_function,
+  default_ttl_minutes,
+  edge_function_name,
+  refresh_strategy,
+  refresh_schedule,
+  priority,
+  estimated_data_size_bytes,
+  symbol_column,
+  source_timestamp_column
+) VALUES (
+  'market-risk-premium',
+  'market_risk_premiums',
+  'fetched_at',
+  'is_data_stale_v2',
+  1440, -- 24 hours TTL (market risk premiums are relatively stable)
+  'queue-processor-v2',
+  'on-demand',
+  NULL, -- No scheduled refresh (on-demand only)
+  0, -- Default priority (will be overridden by viewer count)
+  50000, -- Estimated 50KB (multiple countries)
+  NULL, -- Not symbol-specific
+  NULL -- No source timestamp column in FMP API
+) ON CONFLICT (data_type) DO UPDATE SET
+  table_name = EXCLUDED.table_name,
+  timestamp_column = EXCLUDED.timestamp_column,
+  staleness_function = EXCLUDED.staleness_function,
+  default_ttl_minutes = EXCLUDED.default_ttl_minutes,
+  edge_function_name = EXCLUDED.edge_function_name,
+  refresh_strategy = EXCLUDED.refresh_strategy,
+  refresh_schedule = EXCLUDED.refresh_schedule,
+  priority = EXCLUDED.priority,
+  estimated_data_size_bytes = EXCLUDED.estimated_data_size_bytes,
+  symbol_column = EXCLUDED.symbol_column,
+  source_timestamp_column = EXCLUDED.source_timestamp_column,
+  updated_at = NOW();
+
+-- Treasury Rates data type
+-- CRITICAL: This is NOT symbol-specific - it's a global dataset (US Treasury rates)
+-- The job.symbol field will be ignored, but we need it for the queue system
+INSERT INTO public.data_type_registry_v2 (
+  data_type,
+  table_name,
+  timestamp_column,
+  staleness_function,
+  default_ttl_minutes,
+  edge_function_name,
+  refresh_strategy,
+  refresh_schedule,
+  priority,
+  estimated_data_size_bytes,
+  symbol_column,
+  source_timestamp_column
+) VALUES (
+  'treasury-rates',
+  'treasury_rates',
+  'fetched_at',
+  'is_data_stale_v2',
+  1440, -- 24 hours TTL (Treasury rates change daily with market conditions)
+  'queue-processor-v2',
+  'on-demand',
+  NULL, -- No scheduled refresh (on-demand only)
+  0, -- Default priority (will be overridden by viewer count)
+  10000, -- Estimated 10KB (multiple dates)
+  NULL, -- Not symbol-specific
+  NULL -- No source timestamp column in FMP API
+) ON CONFLICT (data_type) DO UPDATE SET
+  table_name = EXCLUDED.table_name,
+  timestamp_column = EXCLUDED.timestamp_column,
+  staleness_function = EXCLUDED.staleness_function,
+  default_ttl_minutes = EXCLUDED.default_ttl_minutes,
+  edge_function_name = EXCLUDED.edge_function_name,
+  refresh_strategy = EXCLUDED.refresh_strategy,
+  refresh_schedule = EXCLUDED.refresh_schedule,
+  priority = EXCLUDED.priority,
+  estimated_data_size_bytes = EXCLUDED.estimated_data_size_bytes,
+  symbol_column = EXCLUDED.symbol_column,
+  source_timestamp_column = EXCLUDED.source_timestamp_column,
+  updated_at = NOW();
+
 COMMENT ON TABLE public.data_type_registry_v2 IS 'Single source of truth for all data types. Adding new types requires zero code changes.';
 

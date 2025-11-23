@@ -32,6 +32,8 @@ import { fetchExchangeVariantsLogic } from '../lib/fetch-fmp-exchange-variants.t
 import { fetchInsiderTradingStatisticsLogic } from '../lib/fetch-fmp-insider-trading-statistics.ts';
 import { fetchInsiderTransactionsLogic } from '../lib/fetch-fmp-insider-transactions.ts';
 import { fetchDcfLogic } from '../lib/fetch-fmp-dcf.ts';
+import { fetchMarketRiskPremiumLogic } from '../lib/fetch-fmp-market-risk-premium.ts';
+import { fetchTreasuryRatesLogic } from '../lib/fetch-fmp-treasury-rates.ts';
 // All card data types have been migrated to the queue system
 
 interface QueueJob {
@@ -378,6 +380,10 @@ async function processJob(
       return await fetchInsiderTransactionsLogic(job, supabase);
     case 'valuations':
       return await fetchDcfLogic(job, supabase);
+    case 'market-risk-premium':
+      return await fetchMarketRiskPremiumLogic(job, supabase);
+    case 'treasury-rates':
+      return await fetchTreasuryRatesLogic(job, supabase);
     default:
       return {
         success: false,

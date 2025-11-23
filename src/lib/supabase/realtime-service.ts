@@ -112,6 +112,24 @@ export type ValuationsPayload =
 
 type ValuationsUpdateCallback = (payload: ValuationsPayload) => void;
 
+export type MarketRiskPremiumDBRow =
+  Database["public"]["Tables"]["market_risk_premiums"]["Row"];
+
+export type MarketRiskPremiumPayload =
+  RealtimePostgresChangesPayload<MarketRiskPremiumDBRow>;
+
+type MarketRiskPremiumUpdateCallback = (
+  payload: MarketRiskPremiumPayload
+) => void;
+
+export type TreasuryRateDBRow =
+  Database["public"]["Tables"]["treasury_rates"]["Row"];
+
+export type TreasuryRatePayload =
+  RealtimePostgresChangesPayload<TreasuryRateDBRow>;
+
+type TreasuryRateUpdateCallback = (payload: TreasuryRatePayload) => void;
+
 const LIVE_QUOTE_TABLE_NAME = "live_quote_indicators";
 const FINANCIAL_STATEMENTS_TABLE_NAME = "financial_statements";
 const PROFILES_TABLE_NAME = "profiles";
@@ -123,6 +141,8 @@ const EXCHANGE_VARIANTS_TABLE_NAME = "exchange_variants";
 const INSIDER_TRADING_STATISTICS_TABLE_NAME = "insider_trading_statistics";
 const INSIDER_TRANSACTIONS_TABLE_NAME = "insider_transactions";
 const VALUATIONS_TABLE_NAME = "valuations";
+const MARKET_RISK_PREMIUMS_TABLE_NAME = "market_risk_premiums";
+const TREASURY_RATES_TABLE_NAME = "treasury_rates";
 
 let supabaseClientInstance: SupabaseClient<Database> | null = null;
 let clientInitialized = false; // Flag to ensure createSupabaseBrowserClient is called only once if needed initially
@@ -1083,3 +1103,136 @@ export function subscribeToInsiderTransactionsUpdates(
 ): () => void {
   return subscribeToInsiderTradingUpdates(symbol, undefined, onData, onStatusChange);
 }
+
+export function subscribeToMarketRiskPremiumUpdates(
+  onData: MarketRiskPremiumUpdateCallback,
+  onStatusChange?: SubscriptionStatusCallback
+): () => void {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    console.warn(
+      `[realtime-service] Supabase client not available for market risk premium updates.`
+    );
+    if (typeof onStatusChange === "function") {
+      onStatusChange(
+        "CLIENT_UNAVAILABLE",
+        new Error("Supabase client not initialized.")
+      );
+    }
+    return noOpUnsubscribe;
+  }
+
+  const channelName = `market-risk-premiums-global`;
+  const channel: RealtimeChannel = supabase.channel(channelName, {
+    config: { broadcast: { ack: true } },
+  });
+
+  channel
+    .on<MarketRiskPremiumDBRow>(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: MARKET_RISK_PREMIUMS_TABLE_NAME,
+        // No filter - this is a global table
+      },
+      (payload) => {
+        if (typeof onData === "function") {
+          onData(payload as MarketRiskPremiumPayload);
+        }
+      }
+    )
+    .subscribe((status, err) => {
+      if (status === "CHANNEL_ERROR" && err) {
+        console.error(`[realtime-service] Market risk premium channel error:`, err);
+      }
+      const castedStatus = status as SubscriptionStatus;
+      if (typeof onStatusChange === "function") {
+        onStatusChange(castedStatus, err);
+      }
+    });
+
+  return () => {
+    if (supabase) {
+      // Use Result types for error handling (fire and forget)
+      void fromPromise(
+        supabase.removeChannel(channel),
+        (e) => e as Error
+      ).then((result) => {
+        result.mapErr((error) => {
+          console.error(
+            `[realtime-service] Error removing Market Risk Premium channel ${channel.topic}:`,
+            error.message
+          );
+        });
+      });
+    }
+  };
+}
+
+export function subscribeToTreasuryRateUpdates(
+  onData: TreasuryRateUpdateCallback,
+  onStatusChange?: SubscriptionStatusCallback
+): () => void {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    console.warn(
+      `[realtime-service] Supabase client not available for treasury rate updates.`
+    );
+    if (typeof onStatusChange === "function") {
+      onStatusChange(
+        "CLIENT_UNAVAILABLE",
+        new Error("Supabase client not initialized.")
+      );
+    }
+    return noOpUnsubscribe;
+  }
+
+  const channelName = `treasury-rates-global`;
+  const channel: RealtimeChannel = supabase.channel(channelName, {
+    config: { broadcast: { ack: true } },
+  });
+
+  channel
+    .on<TreasuryRateDBRow>(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: TREASURY_RATES_TABLE_NAME,
+        // No filter - this is a global table
+      },
+      (payload) => {
+        if (typeof onData === "function") {
+          onData(payload as TreasuryRatePayload);
+        }
+      }
+    )
+    .subscribe((status, err) => {
+      if (status === "CHANNEL_ERROR" && err) {
+        console.error(`[realtime-service] Treasury rate channel error:`, err);
+      }
+      const castedStatus = status as SubscriptionStatus;
+      if (typeof onStatusChange === "function") {
+        onStatusChange(castedStatus, err);
+      }
+    });
+
+  return () => {
+    if (supabase) {
+      // Use Result types for error handling (fire and forget)
+      void fromPromise(
+        supabase.removeChannel(channel),
+        (e) => e as Error
+      ).then((result) => {
+        result.mapErr((error) => {
+          console.error(
+            `[realtime-service] Error removing Treasury Rate channel ${channel.topic}:`,
+            error.message
+          );
+        });
+      });
+    }
+  };
+}
+

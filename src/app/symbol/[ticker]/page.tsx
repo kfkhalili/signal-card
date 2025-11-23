@@ -1,10 +1,13 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Option } from "effect";
 import { useAuth } from "@/contexts/AuthContext";
 import type { InsiderTradingStatisticsDBRow, InsiderTransactionsDBRow, ValuationsDBRow } from "@/lib/supabase/realtime-service";
+import type { Database } from "@/lib/supabase/database.types";
+
+type FinancialStatementDBRow = Database["public"]["Tables"]["financial_statements"]["Row"];
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,16 +15,24 @@ import { Separator } from "@/components/ui/separator";
 import {
   ArrowLeft, AlertTriangle, DollarSign,
   Activity, Shield, Users, PlusCircle, Loader2,
-  Briefcase, Landmark, TrendingUp, TrendingDown
+  Briefcase, Landmark, TrendingUp, TrendingDown, Clock
 } from "lucide-react";
 import { cn, createSecureImageUrl } from "@/lib/utils";
 import Image from "next/image";
 import { useAddCardToWorkspace } from "@/hooks/useAddCardToWorkspace";
 import { useStockData, type ProfileDBRow } from "@/hooks/useStockData";
+import {
+  subscribeToMarketRiskPremiumUpdates,
+  subscribeToTreasuryRateUpdates,
+  type MarketRiskPremiumDBRow,
+  type TreasuryRateDBRow,
+  type MarketRiskPremiumPayload,
+  type TreasuryRatePayload,
+} from "@/lib/supabase/realtime-service";
 import { formatFinancialValue } from "@/lib/formatters";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import type { RatiosTtmDBRow } from "@/lib/supabase/realtime-service";
-import type { Database } from "@/lib/supabase/database.types";
+import { calculateROIC, calculateFCFYield } from "@/lib/financial-calculations";
 import {
   Line,
   ResponsiveContainer,
@@ -49,7 +60,7 @@ interface QualityMetrics {
   wacc: Option.Option<number>;
   grossMargin: Option.Option<number>;
   fcfYield: Option.Option<number>;
-  roicHistory: { date: string; roic: number; wacc: number }[];
+  roicHistory: { date: string; dateLabel: string; roic: number; wacc: number }[];
 }
 
 interface SafetyMetrics {
@@ -65,11 +76,12 @@ interface InsiderActivity {
   latestTrade: Option.Option<{ name: string; action: string; shares: number; date: string }>;
 }
 
-interface InstitutionalData {
-  institutionOwnership: Option.Option<number>;
-  hedgeFundOwnership: Option.Option<number>;
-  notableOwners: { name: string; position: string }[];
-}
+// Institutional data interface - Coming soon (requires higher API tier)
+// interface InstitutionalData {
+//   institutionOwnership: Option.Option<number>;
+//   hedgeFundOwnership: Option.Option<number>;
+//   notableOwners: { name: string; position: string }[];
+// }
 
 interface ContrarianIndicators {
   shortInterest: Option.Option<number>;
@@ -98,6 +110,12 @@ function calculateValuationStatus(
 
   const priceVal = price.value;
   const dcfVal = dcf.value;
+
+  // Edge case: If DCF is negative or zero, treat as overvalued (distressed company)
+  if (dcfVal <= 0 || !isFinite(dcfVal)) {
+    return { status: "Overvalued", color: "text-red-600", borderColor: "border-l-red-500" };
+  }
+
   const discount = ((dcfVal - priceVal) / dcfVal) * 100;
 
   // Score-based approach: Consider DCF discount, P/E, and PEG
@@ -123,10 +141,14 @@ function calculateValuationStatus(
   // Signal 2: P/E Ratio (weight: 30%)
   // Compare to typical market average (~20-25) and consider if we have historical context
   // Lower P/E = better (cheaper), Higher P/E = worse (expensive)
+  // Edge case: Negative P/E (loss-making companies) = very expensive (no earnings yield)
   if (Option.isSome(peRatio)) {
     const pe = peRatio.value;
-    // P/E < 15 = very cheap, 15-20 = reasonable, 20-30 = expensive, > 30 = very expensive
-    if (pe < 15) {
+    // Handle negative P/E (loss-making companies) - treat as very expensive
+    if (pe <= 0 || !isFinite(pe)) {
+      score -= 30;
+      signals++;
+    } else if (pe < 15) {
       score += 30;
       signals++;
     } else if (pe < 20) {
@@ -139,15 +161,20 @@ function calculateValuationStatus(
       score -= 15;
       signals++;
     } else {
-      signals++; // Neutral zone
+      signals++; // Neutral zone (20 <= pe <= 25)
     }
   }
 
   // Signal 3: PEG Ratio (weight: 30%)
   // PEG < 1.0 = undervalued, 1.0-2.0 = fair, > 2.0 = overvalued
+  // Edge case: Negative PEG (negative growth or earnings) = very overvalued
   if (Option.isSome(pegRatio)) {
     const peg = pegRatio.value;
-    if (peg < 1.0) {
+    // Handle negative PEG (negative growth or earnings) - treat as very overvalued
+    if (peg <= 0 || !isFinite(peg)) {
+      score -= 30;
+      signals++;
+    } else if (peg < 1.0) {
       score += 30;
       signals++;
     } else if (peg < 1.5) {
@@ -160,7 +187,7 @@ function calculateValuationStatus(
       score -= 15;
       signals++;
     } else {
-      signals++; // Neutral zone (1.5-2.0)
+      signals++; // Neutral zone (1.5 <= peg <= 2.0)
     }
   }
 
@@ -237,6 +264,15 @@ export default function SymbolAnalysisPage() {
   // Valuations data (array for historical DCF data)
   const [valuations, setValuations] = useState<ValuationsDBRow[]>([]);
 
+  // Financial statements data (latest statement for ROIC and FCF Yield calculations)
+  const [financialStatement, setFinancialStatement] = useState<Option.Option<FinancialStatementDBRow>>(Option.none());
+  // Historical financial statements for ROIC history chart
+  const [financialStatementsHistory, setFinancialStatementsHistory] = useState<FinancialStatementDBRow[]>([]);
+
+  // Global market data (for WACC calculations)
+  const [marketRiskPremiums, setMarketRiskPremiums] = useState<MarketRiskPremiumDBRow[]>([]);
+  const [treasuryRates, setTreasuryRates] = useState<TreasuryRateDBRow[]>([]);
+
   // Derived metrics (using real data from valuations table)
   const valuationMetrics: ValuationMetrics = (() => {
     // Get latest DCF valuation
@@ -285,16 +321,140 @@ export default function SymbolAnalysisPage() {
     };
   })();
 
-  const qualityMetrics: QualityMetrics = {
-    roic: Option.some(22.0), // TODO: Calculate from financials
-    wacc: Option.some(8.5), // TODO: Calculate
-    grossMargin: Option.match(ratios, {
+  // Calculate Quality metrics from financial statements
+  const qualityMetrics: QualityMetrics = (() => {
+    // Get the latest financial statement
+    const latestStatement = Option.match(financialStatement, {
+      onNone: () => null,
+      onSome: (fs) => fs,
+    });
+
+    // Calculate ROIC from financial statements
+    const roic = calculateROIC(latestStatement);
+
+    // Calculate FCF Yield from financial statements and market cap
+    const marketCap = Option.match(quote, {
       onNone: () => Option.none<number>(),
-      onSome: (r) => r.gross_profit_margin_ttm ? Option.some(r.gross_profit_margin_ttm) : Option.none<number>(),
-    }),
-    fcfYield: Option.some(4.2),
-    roicHistory: [], // TODO: Fetch historical ROIC data
-  };
+      onSome: (q) => q.market_cap ? Option.some(q.market_cap) : Option.none<number>(),
+    });
+    const fcfYield = calculateFCFYield(latestStatement, marketCap);
+
+    // Calculate WACC if we have the required data
+    // Basic WACC calculation using CAPM for cost of equity
+    // WACC = (E/V × Re) + (D/V × Rd × (1-Tc))
+    // For now, we'll calculate a simplified version using available data
+    const wacc = (() => {
+      // Need market risk premiums and treasury rates to be loaded
+      if (marketRiskPremiums.length === 0 || treasuryRates.length === 0) {
+        return Option.none<number>();
+      }
+
+      // Get company country from profile
+      const companyCountry = Option.match(profile, {
+        onNone: () => null,
+        onSome: (p) => p.country || null,
+      });
+
+      // Get market risk premium for the company's country (fallback to United States)
+      // Try exact match first, then try "United States", then fallback to first available
+      const marketRiskPremium = marketRiskPremiums.find(
+        (mrp) => mrp.country === companyCountry
+      ) || marketRiskPremiums.find((mrp) => mrp.country === "United States")
+      || marketRiskPremiums.find((mrp) => mrp.country?.toLowerCase().includes("united states"))
+      || marketRiskPremiums[0]; // Fallback to first available
+
+      // Get latest treasury rate (10-year)
+      const latestTreasuryRate = treasuryRates.length > 0
+        ? treasuryRates.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
+        : null;
+
+      // Get beta from profile
+      const beta = Option.match(profile, {
+        onNone: () => null,
+        onSome: (p) => p.beta || null,
+      });
+
+      // If we have all required data, calculate WACC using CAPM
+      // Re = Rf + β × (Rm - Rf)
+      // Note: total_equity_risk_premium is already (Rm - Rf) from the API
+      if (marketRiskPremium && latestTreasuryRate && beta !== null && latestTreasuryRate.year10 !== null) {
+        const riskFreeRate = latestTreasuryRate.year10 / 100; // Convert percentage to decimal (e.g., 4.06% -> 0.0406)
+        const equityRiskPremium = marketRiskPremium.total_equity_risk_premium / 100; // Convert percentage to decimal
+        const costOfEquity = riskFreeRate + (beta * equityRiskPremium);
+
+        // For now, use a simplified WACC (assume 100% equity, no debt)
+        // TODO: Implement full WACC with debt and tax rate
+        const simplifiedWacc = costOfEquity;
+        return Option.some(simplifiedWacc);
+      }
+
+      return Option.none<number>();
+    })();
+
+    return {
+      roic,
+      wacc,
+      grossMargin: Option.match(ratios, {
+        onNone: () => Option.none<number>(),
+        onSome: (r) => r.gross_profit_margin_ttm ? Option.some(r.gross_profit_margin_ttm) : Option.none<number>(),
+      }),
+      fcfYield,
+      roicHistory: useMemo(() => {
+        // Build ROIC history from multiple financial statements
+        // Calculate ROIC for each statement and pair with WACC
+        const history = financialStatementsHistory
+          .map((fs) => {
+            const roic = calculateROIC(fs);
+            return Option.match(roic, {
+              onNone: () => null,
+              onSome: (r) => {
+                // Parse date to calculate quarter label
+                // Use explicit parsing to avoid timezone issues
+                const parts = fs.date.split('-');
+                if (parts.length !== 3) {
+                  return null;
+                }
+
+                const year = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10);
+                const day = parseInt(parts[2], 10);
+
+                // Validate parsed values
+                if (isNaN(year) || isNaN(month) || isNaN(day)) {
+                  return null;
+                }
+
+                // Create date in local time (month is 0-indexed)
+                const date = new Date(year, month - 1, day);
+
+                // Verify date was created correctly
+                if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+                  return null;
+                }
+
+                const quarter = Math.floor(date.getMonth() / 3) + 1;
+                const yearShort = String(date.getFullYear()).slice(-2);
+                const quarterLabel = `Q${quarter}${yearShort}`;
+
+                return {
+                  date: fs.date,
+                  dateLabel: quarterLabel, // Pre-formatted quarter label
+                  roic: r * 100, // Convert to percentage for display
+                  wacc: Option.match(wacc, {
+                    onNone: () => 0,
+                    onSome: (w) => w * 100, // Convert to percentage for display
+                  }),
+                };
+              },
+            });
+          })
+          .filter((h): h is { date: string; dateLabel: string; roic: number; wacc: number } => h !== null)
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()); // Sort chronologically
+
+        return history;
+      }, [financialStatementsHistory, wacc]),
+    };
+  })();
 
   const safetyMetrics: SafetyMetrics = {
     netDebtToEbitda: Option.some(0.8),
@@ -318,7 +478,10 @@ export default function SymbolAnalysisPage() {
     // Calculate net insider sentiment (shares bought - shares sold)
     const netSentiment = totalAcquiredShares - totalDisposedShares;
 
-    // Convert to dollar values using current price (approximation)
+    // Convert to dollar values using current price
+    // ⚠️ NOTE: This calculates current market value, not actual purchase/sale price
+    // If an insider bought at $10 and price is now $100, this shows 10x the actual amount
+    // Future enhancement: Use transaction_price from API if available for accurate volume
     const totalAcquiredDollars = currentPrice && totalAcquiredShares > 0
       ? totalAcquiredShares * currentPrice
       : null;
@@ -368,11 +531,12 @@ export default function SymbolAnalysisPage() {
     };
   })();
 
-  const institutionalData: InstitutionalData = {
-    institutionOwnership: Option.some(72),
-    hedgeFundOwnership: Option.some(12),
-    notableOwners: [{ name: "Berkshire Hathaway", position: "New Position" }],
-  };
+  // Institutional data - Coming soon (requires higher API tier)
+  // const institutionalData: InstitutionalData = {
+  //   institutionOwnership: Option.some(72),
+  //   hedgeFundOwnership: Option.some(12),
+  //   notableOwners: [{ name: "Berkshire Hathaway", position: "New Position" }],
+  // };
 
   const contrarianIndicators: ContrarianIndicators = {
     shortInterest: Option.some(2.1),
@@ -453,6 +617,22 @@ export default function SymbolAnalysisPage() {
     });
   }, []);
 
+  const handleFinancialStatementUpdate = useCallback((statementData: FinancialStatementDBRow) => {
+    // Only update if this is the latest statement (by date)
+    setFinancialStatement((prev) => {
+      if (Option.isNone(prev)) {
+        return Option.some(statementData);
+      }
+      const prevDate = new Date(prev.value.date);
+      const newDate = new Date(statementData.date);
+      // Update if new statement is more recent
+      if (newDate >= prevDate) {
+        return Option.some(statementData);
+      }
+      return prev;
+    });
+  }, []);
+
   // Use the existing useStockData hook for Realtime subscriptions
   useStockData({
     symbol: ticker,
@@ -462,7 +642,113 @@ export default function SymbolAnalysisPage() {
     onInsiderTradingStatisticsUpdate: handleInsiderStatisticsUpdate,
     onInsiderTransactionsUpdate: handleInsiderTransactionsUpdate,
     onValuationsUpdate: handleValuationsUpdate,
+    onFinancialStatementUpdate: handleFinancialStatementUpdate,
   });
+
+  // Subscribe to global market data tables (market risk premiums and treasury rates)
+  // These are global tables, so we subscribe once per app instance
+  // The data can be used for WACC calculations or any other purpose
+  useEffect(() => {
+    const handleMarketRiskPremiumUpdate = (payload: MarketRiskPremiumPayload) => {
+      if (payload.new) {
+        const newItem = payload.new as MarketRiskPremiumDBRow;
+        setMarketRiskPremiums((prev) => {
+          // Update or add the country's market risk premium
+          const existing = prev.findIndex((mrp) => mrp.country === newItem.country);
+          if (existing >= 0) {
+            const updated = [...prev];
+            updated[existing] = newItem;
+            return updated;
+          }
+          return [...prev, newItem];
+        });
+      } else if (payload.old) {
+        // Handle deletion (unlikely but handle it)
+        const oldItem = payload.old as MarketRiskPremiumDBRow;
+        setMarketRiskPremiums((prev) => prev.filter((mrp) => mrp.country !== oldItem.country));
+      }
+    };
+
+    const handleTreasuryRateUpdate = (payload: TreasuryRatePayload) => {
+      if (payload.new) {
+        const newItem = payload.new as TreasuryRateDBRow;
+        setTreasuryRates((prev) => {
+          // Update or add the date's treasury rate
+          const existing = prev.findIndex((tr) => tr.date === newItem.date);
+          if (existing >= 0) {
+            const updated = [...prev];
+            updated[existing] = newItem;
+            return updated;
+          }
+          return [...prev, newItem];
+        });
+      } else if (payload.old) {
+        // Handle deletion (unlikely but handle it)
+        const oldItem = payload.old as TreasuryRateDBRow;
+        setTreasuryRates((prev) => prev.filter((tr) => tr.date !== oldItem.date));
+      }
+    };
+
+    const unsubscribeMRP = subscribeToMarketRiskPremiumUpdates(
+      handleMarketRiskPremiumUpdate,
+      (status, err) => {
+        if (status === "CHANNEL_ERROR" && err) {
+          console.error("[Symbol Page] Market Risk Premium subscription error:", err);
+        }
+      }
+    );
+
+    const unsubscribeTR = subscribeToTreasuryRateUpdates(
+      handleTreasuryRateUpdate,
+      (status, err) => {
+        if (status === "CHANNEL_ERROR" && err) {
+          console.error("[Symbol Page] Treasury Rate subscription error:", err);
+        }
+      }
+    );
+
+    return () => {
+      unsubscribeMRP();
+      unsubscribeTR();
+    };
+  }, []);
+
+  // Fetch initial global market data (market risk premiums and treasury rates)
+  useEffect(() => {
+    if (!supabase) return;
+
+    // Fetch market risk premiums (all countries)
+    supabase
+      .from("market_risk_premiums")
+      .select("*")
+      .then(({ data, error }) => {
+        if (error) {
+          console.error(`[SymbolAnalysisPage] Error fetching market risk premiums:`, error);
+          return;
+        }
+        if (data) {
+          console.log(`[SymbolAnalysisPage] Fetched ${data.length} market risk premiums`);
+          setMarketRiskPremiums(data);
+        }
+      });
+
+    // Fetch treasury rates (latest dates)
+    supabase
+      .from("treasury_rates")
+      .select("*")
+      .order("date", { ascending: false })
+      .limit(30) // Last 30 days
+      .then(({ data, error }) => {
+        if (error) {
+          console.error(`[SymbolAnalysisPage] Error fetching treasury rates:`, error);
+          return;
+        }
+        if (data) {
+          console.log(`[SymbolAnalysisPage] Fetched ${data.length} treasury rates`);
+          setTreasuryRates(data);
+        }
+      });
+  }, [supabase]);
 
   // Fetch initial insider trading data and valuations
   useEffect(() => {
@@ -504,14 +790,14 @@ export default function SymbolAnalysisPage() {
         }
       });
 
-    // Fetch valuations (DCF - last 90 days for chart)
+    // Fetch valuations (DCF - last 180 days for chart)
     supabase
       .from("valuations")
       .select("*")
       .eq("symbol", ticker)
       .eq("valuation_type", "dcf")
       .order("date", { ascending: false })
-      .limit(90)
+      .limit(180)
       .then(({ data, error }) => {
         if (error) {
           console.error(`[SymbolAnalysisPage] Error fetching valuations:`, error);
@@ -519,6 +805,49 @@ export default function SymbolAnalysisPage() {
         }
         if (data) {
           setValuations(data);
+        }
+      });
+
+    // Fetch historical financial statements for ROIC history chart (last 12 annual reports)
+    // Filter for annual reports (FY period) to get end-of-year dates (September for AAPL)
+    // Handle duplicates by taking the latest fetched_at for each fiscal_year
+    supabase
+      .from("financial_statements")
+      .select("*")
+      .eq("symbol", ticker)
+      .eq("period", "FY") // Only annual reports (fiscal year end)
+      .order("fetched_at", { ascending: false })
+      .order("date", { ascending: false })
+      .then(({ data, error }) => {
+        if (error) {
+          console.error(`[SymbolAnalysisPage] Error fetching financial statements history:`, error);
+          return;
+        }
+        if (data) {
+          // Deduplicate: For each fiscal_year, keep only the one with the latest fetched_at
+          const deduplicated = data.reduce((acc, current) => {
+            const existing = acc.find(item => item.fiscal_year === current.fiscal_year);
+            if (!existing) {
+              acc.push(current);
+            } else {
+              // Compare fetched_at dates - keep the one with the latest fetched_at
+              const existingFetchedAt = existing.fetched_at ? new Date(existing.fetched_at).getTime() : 0;
+              const currentFetchedAt = current.fetched_at ? new Date(current.fetched_at).getTime() : 0;
+              if (currentFetchedAt > existingFetchedAt) {
+                // Replace with the newer one
+                const index = acc.indexOf(existing);
+                acc[index] = current;
+              }
+            }
+            return acc;
+          }, [] as typeof data);
+
+          // Sort by date descending and take the latest 12
+          const sorted = deduplicated
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+            .slice(0, 12);
+
+          setFinancialStatementsHistory(sorted);
         }
       });
   }, [supabase, ticker]);
@@ -663,12 +992,14 @@ export default function SymbolAnalysisPage() {
 
             {/* A2. The "Intelligent" Scorecard */}
             <div className="flex-1 w-full lg:w-auto grid grid-cols-2 sm:grid-cols-4 gap-4 bg-muted/30 p-4 rounded-xl border border-border/50">
-              <ScorecardItem
-                icon={<DollarSign className="h-4 w-4" />}
-                label="Valuation"
-                status={valuationStatus.status}
-                statusColor={valuationStatus.color}
-              />
+              {valuationStatus.status !== "Unknown" && (
+                <ScorecardItem
+                  icon={<DollarSign className="h-4 w-4" />}
+                  label="Valuation"
+                  status={valuationStatus.status}
+                  statusColor={valuationStatus.color}
+                />
+              )}
               <ScorecardItem
                 icon={<Shield className="h-4 w-4" />}
                 label="Health"
@@ -707,17 +1038,18 @@ export default function SymbolAnalysisPage() {
                   <DollarSign className="h-5 w-5 text-primary" />
                   Is it Cheap? (Valuation)
                 </CardTitle>
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    valuationStatus.status === "Undervalued" && "bg-green-50 text-green-700 border-green-300",
-                    valuationStatus.status === "Overvalued" && "bg-red-50 text-red-700 border-red-300",
-                    valuationStatus.status === "Fair" && "bg-yellow-50 text-yellow-700 border-yellow-300",
-                    valuationStatus.status === "Unknown" && "bg-muted text-muted-foreground"
-                  )}
-                >
-                  {valuationStatus.status}
-                </Badge>
+                {valuationStatus.status !== "Unknown" && (
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      valuationStatus.status === "Undervalued" && "bg-green-50 text-green-700 border-green-300",
+                      valuationStatus.status === "Overvalued" && "bg-red-50 text-red-700 border-red-300",
+                      valuationStatus.status === "Fair" && "bg-yellow-50 text-yellow-700 border-yellow-300"
+                    )}
+                  >
+                    {valuationStatus.status}
+                  </Badge>
+                )}
               </div>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -726,9 +1058,88 @@ export default function SymbolAnalysisPage() {
                 {valuationMetrics.priceHistory.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={valuationMetrics.priceHistory}>
-                      <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                      <YAxis tick={{ fontSize: 10 }} />
-                      <Tooltip />
+                      <XAxis
+                        dataKey="date"
+                        type="category"
+                        tick={{ fontSize: 10 }}
+                        tickFormatter={(value) => {
+                          // Parse date string (YYYY-MM-DD) explicitly to avoid timezone issues
+                          // The value should be the date string from the data
+                          let date: Date;
+                          if (typeof value === 'string') {
+                            // Parse YYYY-MM-DD format explicitly
+                            const parts = value.split('-');
+                            if (parts.length === 3) {
+                              const year = parseInt(parts[0], 10);
+                              const month = parseInt(parts[1], 10);
+                              const day = parseInt(parts[2], 10);
+                              // Create date in local time to avoid UTC timezone shifts
+                              date = new Date(year, month - 1, day);
+                            } else {
+                              date = new Date(value);
+                            }
+                          } else if (value instanceof Date) {
+                            // If Recharts converted it to a Date, use UTC methods to get the original date
+                            // This handles cases where "2025-09-27" was parsed as UTC and shifted
+                            const year = value.getUTCFullYear();
+                            const month = value.getUTCMonth();
+                            const day = value.getUTCDate();
+                            date = new Date(year, month, day);
+                          } else {
+                            date = new Date(value);
+                          }
+
+                          if (isNaN(date.getTime())) {
+                            return String(value);
+                          }
+
+                          const quarter = Math.floor(date.getMonth() / 3) + 1;
+                          const year = String(date.getFullYear()).slice(-2);
+                          return `Q${quarter}${year}`;
+                        }}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 10 }}
+                        tickFormatter={(value) => value.toFixed(1)}
+                      />
+                      <Tooltip
+                        formatter={(value: number) => value.toFixed(1)}
+                        labelFormatter={(label, payload) => {
+                          // Get the actual date string from the payload to avoid Recharts date conversion issues
+                          const dateStr = payload?.[0]?.payload?.date || label;
+
+                          // Parse date string (YYYY-MM-DD) explicitly to avoid timezone issues
+                          let date: Date;
+                          if (typeof dateStr === 'string') {
+                            const parts = dateStr.split('-');
+                            if (parts.length === 3) {
+                              const year = parseInt(parts[0], 10);
+                              const month = parseInt(parts[1], 10);
+                              const day = parseInt(parts[2], 10);
+                              date = new Date(year, month - 1, day); // month is 0-indexed, local time
+                            } else {
+                              date = new Date(dateStr);
+                            }
+                          } else if (dateStr instanceof Date) {
+                            // Use UTC methods to avoid timezone shifts
+                            const year = dateStr.getUTCFullYear();
+                            const month = dateStr.getUTCMonth();
+                            const day = dateStr.getUTCDate();
+                            date = new Date(year, month, day);
+                          } else {
+                            date = new Date(dateStr);
+                          }
+
+                          if (isNaN(date.getTime())) {
+                            return String(label);
+                          }
+
+                          const day = String(date.getDate()).padStart(2, '0');
+                          const month = String(date.getMonth() + 1).padStart(2, '0');
+                          const year = date.getFullYear();
+                          return `${day}/${month}/${year}`;
+                        }}
+                      />
                       <Area
                         type="monotone"
                         dataKey="dcf"
@@ -746,7 +1157,15 @@ export default function SymbolAnalysisPage() {
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-full bg-muted/20 rounded flex items-center justify-center border border-dashed">
-                    <span className="text-sm text-muted-foreground">DCF vs Price Chart (Loading...)</span>
+                    {Option.isSome(valuationMetrics.dcfFairValue) || Option.isSome(valuationMetrics.currentPrice) ? (
+                      <span className="text-sm text-muted-foreground">DCF vs Price Chart (Loading...)</span>
+                    ) : (
+                      <div className="space-y-2 w-full px-4">
+                        <div className="h-4 w-3/4 bg-muted animate-pulse rounded" />
+                        <div className="h-4 w-1/2 bg-muted animate-pulse rounded" />
+                        <div className="h-4 w-2/3 bg-muted animate-pulse rounded" />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -825,15 +1244,87 @@ export default function SymbolAnalysisPage() {
                   })}
                   subtext="Cash generation"
                 />
+                <MetricRow
+                  label="WACC"
+                  value={Option.match(qualityMetrics.wacc, {
+                    onNone: () => null,
+                    onSome: (v) => (v * 100).toFixed(1) + "%",
+                  })}
+                  subtext="Cost of Capital"
+                />
               </div>
               {/* ROIC vs WACC Trend Chart */}
               <div className="h-48">
                 {qualityMetrics.roicHistory.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={qualityMetrics.roicHistory}>
-                      <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                      <YAxis tick={{ fontSize: 10 }} />
-                      <Tooltip />
+                    <ComposedChart
+                      data={qualityMetrics.roicHistory}
+                      margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+                    >
+                      <XAxis
+                        dataKey="dateLabel"
+                        type="category"
+                        tick={{ fontSize: 10 }}
+                        tickFormatter={(value) => {
+                          // With type="category" and dataKey="dateLabel", value should be the dateLabel string
+                          // But verify and log to debug
+                          if (typeof value !== 'string') {
+                            console.warn('[ROIC Chart XAxis] Non-string value received:', typeof value, value);
+                          }
+                          // Verify it matches expected format
+                          if (typeof value === 'string' && value.match(/^Q[1-4]\d{2}$/)) {
+                            return value;
+                          }
+                          // If it's not the expected format, log and return as-is
+                          console.error('[ROIC Chart XAxis] Unexpected dateLabel format:', value);
+                          return String(value);
+                        }}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 10 }}
+                        tickFormatter={(value) => value.toFixed(1) + "%"}
+                      />
+                      <Tooltip
+                        formatter={(value: number) => value.toFixed(1) + "%"}
+                        labelFormatter={(label) => {
+                          // Recharts may pass the date as a Date object or string
+                          // We need to handle both and parse explicitly to avoid timezone issues
+                          let date: Date;
+
+                          if (label instanceof Date) {
+                            // If it's already a Date object, check if it was created from a string
+                            // Use UTC methods to avoid timezone shifts
+                            const year = label.getUTCFullYear();
+                            const month = label.getUTCMonth();
+                            const day = label.getUTCDate();
+                            date = new Date(year, month, day); // Recreate in local time from UTC components
+                          } else if (typeof label === 'string') {
+                            // Parse date string (YYYY-MM-DD) explicitly to avoid timezone issues
+                            const parts = label.split('-');
+                            if (parts.length === 3) {
+                              const year = parseInt(parts[0], 10);
+                              const month = parseInt(parts[1], 10);
+                              const day = parseInt(parts[2], 10);
+                              date = new Date(year, month - 1, day); // month is 0-indexed, local time
+                            } else {
+                              // Fallback for other string formats
+                              date = new Date(label);
+                            }
+                          } else {
+                            // Fallback for other types
+                            date = new Date(label);
+                          }
+
+                          if (isNaN(date.getTime())) {
+                            return String(label); // Fallback to original value if date is invalid
+                          }
+
+                          const day = String(date.getDate()).padStart(2, '0');
+                          const month = String(date.getMonth() + 1).padStart(2, '0');
+                          const year = date.getFullYear();
+                          return `${day}/${month}/${year}`;
+                        }}
+                      />
                       <Line
                         type="monotone"
                         dataKey="roic"
@@ -851,7 +1342,15 @@ export default function SymbolAnalysisPage() {
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-full bg-muted/20 rounded flex items-center justify-center border border-dashed">
-                    <span className="text-sm text-muted-foreground">ROIC vs WACC Trend (Loading...)</span>
+                    {Option.isNone(qualityMetrics.roic) && Option.isNone(qualityMetrics.wacc) ? (
+                      <div className="space-y-2 w-full px-4">
+                        <div className="h-4 w-3/4 bg-muted animate-pulse rounded" />
+                        <div className="h-4 w-1/2 bg-muted animate-pulse rounded" />
+                        <div className="h-4 w-2/3 bg-muted animate-pulse rounded" />
+                      </div>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">ROIC vs WACC Trend (Loading...)</span>
+                    )}
                   </div>
                 )}
               </div>
@@ -983,34 +1482,22 @@ export default function SymbolAnalysisPage() {
             </CardContent>
           </Card>
 
-          {/* C2. Institutional Holdings */}
-          <Card>
+          {/* C2. Institutional Holdings - Coming Soon */}
+          <Card className="border-dashed">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Landmark className="h-4 w-4" />
                 Smart Money
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <MetricRow
-                label="Institutions"
-                value={Option.match(institutionalData.institutionOwnership, {
-                  onNone: () => null,
-                  onSome: (v) => (v * 100).toFixed(0) + "%",
-                })}
-              />
-              <MetricRow
-                label="Hedge Funds"
-                value={Option.match(institutionalData.hedgeFundOwnership, {
-                  onNone: () => null,
-                  onSome: (v) => (v * 100).toFixed(0) + "%",
-                })}
-              />
-              {institutionalData.notableOwners.length > 0 && (
-                <div className="p-3 bg-muted/30 rounded text-xs text-muted-foreground">
-                  Notable Owner: <strong>{institutionalData.notableOwners[0].name}</strong> ({institutionalData.notableOwners[0].position})
-                </div>
-              )}
+            <CardContent>
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <Clock className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                <h3 className="text-lg font-semibold text-muted-foreground mb-2">Coming Soon</h3>
+                <p className="text-sm text-muted-foreground max-w-xs">
+                  Institutional holdings and smart money tracking will be available in a future update.
+                </p>
+              </div>
             </CardContent>
           </Card>
 
