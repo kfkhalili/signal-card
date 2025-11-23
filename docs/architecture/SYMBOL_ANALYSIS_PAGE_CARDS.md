@@ -7,9 +7,9 @@
 ## Executive Summary
 
 ### Current Status
-- ✅ **Working with Real Data**: Insider Activity, Price, P/E Ratio, PEG Ratio, Gross Margin, DCF Fair Value, ROIC, FCF Yield
-- ⚠️ **Partially Working**: Quality metrics (ROIC ✅, FCF Yield ✅, but WACC still hardcoded)
-- ❌ **Hardcoded/Placeholder**: WACC, Safety metrics (Net Debt/EBITDA, Altman Z-Score, Interest Coverage), Institutional data, Analyst data
+- ✅ **Working with Real Data**: Insider Activity, Price, P/E Ratio, PEG Ratio, Gross Margin, DCF Fair Value, ROIC, FCF Yield, WACC, Safety Metrics (Net Debt/EBITDA, Altman Z-Score, Interest Coverage)
+- ⚠️ **Partially Working**: None (all critical metrics are live)
+- ❌ **Hardcoded/Placeholder**: Institutional data (blocked by API tier), Analyst data (needs API integration)
 
 ### Investment Value Assessment
 - **High Value**: Valuation (DCF), Quality (ROIC), Safety (Debt metrics), Insider Activity ✅
@@ -30,12 +30,12 @@
 - **Action Required**: None
 
 #### A2. Intelligent Scorecard
-**Status**: ⚠️ **Partially Functional** (3/4 metrics are placeholders)
+**Status**: ⚠️ **Partially Functional** (3/4 metrics are live, 1/4 needs API integration)
 
 | Metric | Status | Investment Value | Data Needed |
 |--------|--------|------------------|-------------|
 | **Valuation** | ✅ **Live** (DCF from `valuations` table) | ⭐⭐⭐⭐⭐ Critical | ✅ Complete |
-| **Health** | ❌ Hardcoded (0.8) | ⭐⭐⭐⭐⭐ Critical | Net Debt/EBITDA from financials |
+| **Health** | ✅ **Live** (Net Debt/EBITDA calculated from `financial_statements`) | ⭐⭐⭐⭐⭐ Critical | ✅ Complete |
 | **Quality (ROIC)** | ✅ **Live** (calculated from `financial_statements`) | ⭐⭐⭐⭐⭐ Critical | ✅ Complete |
 | **Sentiment** | ❌ Hardcoded ("Buy") | ⭐⭐⭐ Medium | Analyst consensus from API |
 
@@ -94,15 +94,15 @@
 ---
 
 #### B2. Quality Card: "Is the Business Good?"
-**Status**: ⚠️ **Partially Functional**
+**Status**: ✅ **Fully Functional**
 
 | Metric | Status | Investment Value | Data Needed |
 |--------|--------|------------------|-------------|
 | **ROIC** | ✅ **Live** (calculated from `financial_statements`) | ⭐⭐⭐⭐⭐ Critical | ✅ Complete |
-| **WACC** | ❌ Hardcoded (8.5) | ⭐⭐⭐⭐ High | Calculate (complex - requires market data) |
+| **WACC** | ✅ **Live** (calculated using CAPM with market risk premiums and treasury rates) | ⭐⭐⭐⭐ High | ✅ Complete |
 | **Gross Margin** | ✅ Live | ⭐⭐⭐⭐ High | ✅ Complete |
 | **FCF Yield** | ✅ **Live** (calculated from `financial_statements` + `live_quote_indicators`) | ⭐⭐⭐⭐ High | ✅ Complete |
-| **ROIC vs WACC Chart** | ❌ Empty | ⭐⭐ Nice-to-have | Historical ROIC/WACC data |
+| **ROIC vs WACC Chart** | ✅ **Functional** (12 quarters of historical data) | ⭐⭐ Nice-to-have | ✅ Complete |
 
 **Investment Value**: ⭐⭐⭐⭐⭐ **Critical** - Measures business quality and competitive moat
 
@@ -140,13 +140,13 @@
 ---
 
 #### B3. Safety Card: "Is it Safe?"
-**Status**: ❌ **Fully Hardcoded**
+**Status**: ✅ **Fully Functional**
 
 | Metric | Status | Investment Value | Data Needed |
 |--------|--------|------------------|-------------|
-| **Net Debt/EBITDA** | ❌ Hardcoded (0.8) | ⭐⭐⭐⭐⭐ Critical | Calculate from financials |
-| **Altman Z-Score** | ❌ Hardcoded (4.5) | ⭐⭐⭐⭐ High | Calculate from financials |
-| **Interest Coverage** | ❌ Hardcoded (18.0) | ⭐⭐⭐⭐ High | Calculate from financials |
+| **Net Debt/EBITDA** | ✅ **Live** (calculated from `financial_statements`) | ⭐⭐⭐⭐⭐ Critical | ✅ Complete |
+| **Altman Z-Score** | ✅ **Live** (calculated from `financial_statements` + `live_quote_indicators`) | ⭐⭐⭐⭐ High | ✅ Complete |
+| **Interest Coverage** | ✅ **Live** (calculated from `financial_statements`) | ⭐⭐⭐⭐ High | ✅ Complete |
 
 **Investment Value**: ⭐⭐⭐⭐⭐ **Critical** - Measures financial distress risk
 
@@ -257,9 +257,9 @@
 1. ✅ **DCF Fair Value** - Core valuation metric - **COMPLETE**
 2. ✅ **ROIC** - Business quality indicator - **COMPLETE**
 3. ✅ **FCF Yield** - Cash generation efficiency - **COMPLETE**
-4. ❌ **Net Debt/EBITDA** - Financial safety - **PENDING**
-5. ❌ **Altman Z-Score** - Bankruptcy risk - **PENDING**
-6. ❌ **Interest Coverage** - Debt serviceability - **PENDING**
+4. ✅ **Net Debt/EBITDA** - Financial safety - **COMPLETE**
+5. ✅ **Altman Z-Score** - Bankruptcy risk - **COMPLETE**
+6. ✅ **Interest Coverage** - Debt serviceability - **COMPLETE**
 
 ### 🟡 **High Priority** (Important but Can Use Estimates)
 1. **WACC** - Can use industry averages initially
@@ -278,17 +278,18 @@
 
 ### Phase 1: Safety Metrics (Easiest, High Value)
 **Estimated Effort**: 2-3 days
-- ✅ Calculate Net Debt/EBITDA from `financial_statements`
-- ✅ Calculate Altman Z-Score from `financial_statements`
-- ✅ Calculate Interest Coverage from `financial_statements`
-- **Impact**: Unlocks Safety Card completely
+- ✅ **COMPLETE**: Calculate Net Debt/EBITDA from `financial_statements` (implemented 2025-01-23)
+- ✅ **COMPLETE**: Calculate Altman Z-Score from `financial_statements` (implemented 2025-01-23)
+- ✅ **COMPLETE**: Calculate Interest Coverage from `financial_statements` (implemented 2025-01-23)
+- **Impact**: ✅ Safety Card is fully functional
 
 ### Phase 2: Quality Metrics (Medium Complexity, High Value)
 **Estimated Effort**: 3-5 days
 - ✅ **COMPLETE**: Calculate ROIC from `financial_statements` (implemented 2025-01-22)
 - ✅ **COMPLETE**: Calculate FCF Yield from `financial_statements` + `live_quote_indicators` (implemented 2025-01-22)
-- ⚠️ **PENDING**: Calculate WACC (simplified version using industry averages)
-- **Impact**: Quality Card is 75% functional (ROIC ✅, FCF Yield ✅, Gross Margin ✅, WACC ❌)
+- ✅ **COMPLETE**: Calculate WACC using CAPM with market risk premiums and treasury rates (implemented 2025-01-23)
+- ✅ **COMPLETE**: ROIC vs WACC Chart with 12 quarters of historical data (implemented 2025-01-23)
+- **Impact**: ✅ Quality Card is fully functional
 
 ### Phase 3: Valuation Metrics (High Complexity, Critical Value)
 **Estimated Effort**: 5-7 days
@@ -339,16 +340,15 @@
 
 ## Investment Decision Framework
 
-### Current State: ✅ **Mostly Functional** (75% complete)
+### Current State: ✅ **Highly Functional** (90% complete)
 - **Can Make Decisions On**:
   - ✅ Insider activity (fully functional)
   - ✅ Current valuation (P/E, PEG Ratio - both live)
   - ✅ Intrinsic value (DCF Fair Value - live from `valuations` table)
-  - ✅ Business quality (ROIC, FCF Yield, Gross Margin - all live)
+  - ✅ Business quality (ROIC, FCF Yield, Gross Margin, WACC - all live)
+  - ✅ Financial safety (Net Debt/EBITDA, Altman Z-Score, Interest Coverage - all live)
 - **Cannot Make Decisions On**:
-  - ❌ Financial safety (debt metrics - Net Debt/EBITDA, Altman Z-Score, Interest Coverage)
-  - ❌ WACC (still hardcoded, but ROIC is live so quality assessment is possible)
-  - ❌ Market sentiment (analyst consensus, price targets)
+  - ❌ Market sentiment (analyst consensus, price targets) - needs API integration
 
 ### Target State: ✅ **Fully Functional**
 - **Valuation**: DCF vs Price comparison → "Is it cheap?"
@@ -381,23 +381,24 @@
 
 ## Conclusion
 
-**Current Investment Value**: ⭐⭐⭐⭐ (4/5) - Can make informed decisions on valuation and quality, but missing safety metrics
+**Current Investment Value**: ⭐⭐⭐⭐⭐ (5/5) - Can make informed decisions on valuation, quality, and safety. Only missing market sentiment data (analyst consensus, price targets).
 
-**Target Investment Value**: ⭐⭐⭐⭐⭐ (5/5) - Complete framework for intelligent investment decisions
+**Target Investment Value**: ⭐⭐⭐⭐⭐ (5/5) - Complete framework for intelligent investment decisions (with sentiment data)
 
 **Key Gaps**:
 1. ✅ ~~DCF Fair Value~~ - **COMPLETE** (from `valuations` table)
 2. ✅ ~~ROIC~~ - **COMPLETE** (calculated from `financial_statements`)
 3. ✅ ~~FCF Yield~~ - **COMPLETE** (calculated from `financial_statements` + market cap)
 4. ✅ ~~PEG Ratio~~ - **COMPLETE** (from `ratios_ttm`)
-5. ❌ Safety metrics (critical for risk assessment) - Net Debt/EBITDA, Altman Z-Score, Interest Coverage
-6. ❌ WACC (important for quality comparison, but ROIC alone is sufficient for quality assessment)
-7. ❌ Market sentiment data (important for contrarian analysis) - Analyst consensus, price targets, short interest
+5. ✅ ~~Safety metrics~~ - **COMPLETE** (Net Debt/EBITDA, Altman Z-Score, Interest Coverage - all calculated from `financial_statements`)
+6. ✅ ~~WACC~~ - **COMPLETE** (calculated using CAPM with market risk premiums and treasury rates)
+7. ✅ ~~ROIC vs WACC Chart~~ - **COMPLETE** (12 quarters of historical data)
+8. ❌ Market sentiment data (important for contrarian analysis) - Analyst consensus, price targets, short interest
 
-**Remaining Effort**: ~7-10 days to reach full functionality (down from 14-21 days)
+**Remaining Effort**: ~2-3 days to reach full functionality (down from 7-10 days)
 
 ---
 
-**Last Updated**: 2025-01-22 (after ROIC and FCF Yield implementation)
-**Next Review**: After Phase 1 (Safety Metrics) completion
+**Last Updated**: 2025-01-23 (after Safety Metrics, WACC, and ROIC vs WACC Chart implementation)
+**Next Review**: After Phase 4 (Market Sentiment Data) completion
 

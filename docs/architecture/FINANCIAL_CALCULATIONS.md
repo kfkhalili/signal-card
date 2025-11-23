@@ -277,68 +277,117 @@ upside = ((priceTarget - currentPrice) / currentPrice) × 100
 
 ### Net Debt to EBITDA
 
-**Status**: ⚠️ Currently hardcoded (0.8)
-**Planned Formula**: `Net Debt / EBITDA`
+**Status**: ✅ **Implemented** (calculated from `financial_statements`)
+**Formula**: `Net Debt / EBITDA`
 
-**Planned Inputs** (from `financial_statements` table):
+**Inputs** (from `financial_statements` table):
 - **Net Debt**: `totalDebt - cashAndCashEquivalents` (from `balance_sheet_payload`)
+  - `totalDebt = shortTermDebt + longTermDebt`
+  - `netDebt = totalDebt - cashAndCashEquivalents`
 - **EBITDA**: From `income_statement_payload.ebitda` (or calculate: `operatingIncome + depreciationAndAmortization`)
 
-**Current Implementation**: Hardcoded value
+**Current Implementation**: Calculated in `calculateNetDebtToEbitda()` function
+
+**Edge Cases**:
+- If `EBITDA ≤ 0`: Return `None` (company is losing money, ratio is not meaningful)
+- If any required field is missing: Return `None`
 
 ---
 
 ### Altman Z-Score
 
-**Status**: ⚠️ Currently hardcoded (4.5)
-**Planned Formula**: `Z = 1.2A + 1.4B + 3.3C + 0.6D + 1.0E`
+**Status**: ✅ **Implemented** (calculated from `financial_statements` + `live_quote_indicators`)
+**Formula**: `Z = 1.2A + 1.4B + 3.3C + 0.6D + 1.0E`
 
-**Planned Components** (from `financial_statements.balance_sheet_payload` and `income_statement_payload`):
+**Components** (from `financial_statements.balance_sheet_payload`, `income_statement_payload`, and `live_quote_indicators`):
 - **A** = Working Capital / Total Assets
+  - `Working Capital = currentAssets - currentLiabilities`
 - **B** = Retained Earnings / Total Assets
 - **C** = EBIT / Total Assets
+  - Uses `ebit` if available, otherwise falls back to `operatingIncome`
 - **D** = Market Value of Equity / Total Liabilities
-- **E** = Sales / Total Assets
+  - `Market Value of Equity = market_cap` (from `live_quote_indicators`)
+- **E** = Sales (Revenue) / Total Assets
 
-**Current Implementation**: Hardcoded value
+**Current Implementation**: Calculated in `calculateAltmanZScore()` function
 
 **Interpretation**:
 - `Z > 2.99` → Safe Zone (low bankruptcy risk)
 - `1.81 < Z ≤ 2.99` → Grey Zone (moderate risk)
 - `Z ≤ 1.81` → Distress Zone (high bankruptcy risk)
 
+**Edge Cases**:
+- If `marketCap` is missing: Return `None`
+- If any required field is missing: Return `None`
+
 ---
 
 ### Interest Coverage Ratio
 
-**Status**: ⚠️ Currently hardcoded (18.0x)
-**Planned Formula**: `Interest Coverage = EBIT / Interest Expense`
+**Status**: ✅ **Implemented** (calculated from `financial_statements`)
+**Formula**: `Interest Coverage = EBIT / Interest Expense`
 
-**Planned Inputs** (from `financial_statements.income_statement_payload`):
-- **EBIT**: `operatingIncome` or `ebit`
+**Inputs** (from `financial_statements.income_statement_payload`):
+- **EBIT**: Uses `ebit` if available, otherwise falls back to `operatingIncome`
 - **Interest Expense**: `interestExpense`
 
-**Current Implementation**: Hardcoded value
+**Current Implementation**: Calculated in `calculateInterestCoverage()` function
 
 **Interpretation**:
 - Higher is better (indicates ability to pay interest obligations)
 - `> 5x` is generally considered safe
+- `> 10x` is exceptional
+- `< 1.5x` indicates risk of default
+- `999x` (or very high value) indicates perfect coverage - company has no interest expense or has interest income
+
+**Edge Cases**:
+- If `Interest Expense ≤ 0`: Return `999` (perfect/infinite coverage - company has no interest expense or has interest income)
+- If any required field is missing: Return `None`
 
 ---
 
 ### Safety Status
 
-**Formula**: Threshold-based classification using Net Debt to EBITDA
+**Formula**: Composite scoring system using all three safety metrics
 
-**Classification**:
-- `Net Debt/EBITDA < 3.0` → **Safe** (Green) - Low financial risk
-- `3.0 ≤ Net Debt/EBITDA < 5.0` → **Moderate** (Yellow) - Moderate financial risk
-- `Net Debt/EBITDA ≥ 5.0` → **Risky** (Red) - High financial risk
+**Calculation Steps**:
+
+1. **Net Debt to EBITDA Signal (40% weight)**:
+   - `< 1.0x` → +40 points (Exceptional)
+   - `1.0-2.0x` → +30 points (Excellent)
+   - `2.0-3.0x` → +20 points (Good)
+   - `3.0-5.0x` → -10 points (Moderate)
+   - `5.0-7.0x` → -30 points (Risky)
+   - `> 7.0x` → -40 points (Very Risky)
+
+2. **Altman Z-Score Signal (35% weight)**:
+   - `> 3.0` → +35 points (Safe Zone)
+   - `2.7-3.0` → +20 points (Good)
+   - `1.81-2.7` → -10 points (Grey Zone)
+   - `1.0-1.81` → -30 points (Distress Zone)
+   - `< 1.0` → -40 points (Critical)
+
+3. **Interest Coverage Signal (25% weight)**:
+   - `> 10x` → +25 points (Exceptional)
+   - `5-10x` → +20 points (Excellent)
+   - `3-5x` → +10 points (Good)
+   - `1.5-3x` → -15 points (Moderate)
+   - `0-1.5x` → -30 points (Risky)
+   - `< 0` → -40 points (Critical)
+
+4. **Status Determination**:
+   - `score ≥ 50` → **Safe** (Green)
+   - `score ≥ 10` → **Moderate** (Yellow)
+   - `score < 10` → **Risky** (Red)
+   - Requires at least 2 signals for valid assessment
 
 **Inputs**:
-- Net Debt to EBITDA ratio (currently hardcoded, planned to calculate from financials)
+- Net Debt to EBITDA ratio (calculated from `financial_statements`)
+- Altman Z-Score (calculated from `financial_statements` + `live_quote_indicators`)
+- Interest Coverage ratio (calculated from `financial_statements`)
 
 **Usage**:
+- Determines status badge and colored border on Safety card
 - Determines status badge in scorecard at top of page
 
 ---

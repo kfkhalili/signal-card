@@ -32,7 +32,13 @@ import {
 import { formatFinancialValue } from "@/lib/formatters";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import type { RatiosTtmDBRow } from "@/lib/supabase/realtime-service";
-import { calculateROIC, calculateFCFYield } from "@/lib/financial-calculations";
+import {
+  calculateROIC,
+  calculateFCFYield,
+  calculateNetDebtToEbitda,
+  calculateAltmanZScore,
+  calculateInterestCoverage,
+} from "@/lib/financial-calculations";
 import {
   Line,
   ResponsiveContainer,
@@ -90,7 +96,7 @@ interface ContrarianIndicators {
 }
 
 type HealthStatus = "Undervalued" | "Fair" | "Overvalued" | "Unknown";
-type QualityStatus = "Moat" | "High" | "Moderate" | "Low" | "Unknown";
+type QualityStatus = "Excellent" | "Good" | "Average" | "Poor" | "Unknown";
 type SafetyStatus = "Safe" | "Moderate" | "Risky" | "Unknown";
 
 // ============================================================================
@@ -214,29 +220,267 @@ function calculateValuationStatus(
   }
 }
 
-function calculateQualityStatus(roic: Option.Option<number>): { status: QualityStatus; color: string } {
+function calculateQualityStatus(
+  roic: Option.Option<number>,
+  wacc: Option.Option<number>,
+  grossMargin: Option.Option<number>,
+  fcfYield: Option.Option<number>,
+  roicHistory: { date: string; dateLabel: string; roic: number; wacc: number }[]
+): { status: QualityStatus; color: string; borderColor: string } {
+  // If we don't have ROIC, we can't assess quality
   if (Option.isNone(roic)) {
-    return { status: "Unknown", color: "text-muted-foreground" };
+    return { status: "Unknown", color: "text-muted-foreground", borderColor: "border-l-border" };
   }
 
   const roicVal = roic.value;
-  if (roicVal > 15) return { status: "Moat", color: "text-green-600" };
-  if (roicVal > 10) return { status: "High", color: "text-green-600" };
-  if (roicVal > 5) return { status: "Moderate", color: "text-yellow-600" };
-  return { status: "Low", color: "text-red-600" };
+  let score = 0;
+  let signals = 0;
+
+  // Signal 1: ROIC vs WACC Spread (40% weight) - Most important indicator
+  // ROIC > WACC means the company is creating value
+  if (Option.isSome(wacc)) {
+    const waccVal = wacc.value;
+    const spread = roicVal - waccVal; // Percentage points difference
+
+    if (spread > 0.10) {
+      score += 40; // Exceptional value creation (>10% spread)
+      signals++;
+    } else if (spread > 0.05) {
+      score += 30; // Strong value creation (5-10% spread)
+      signals++;
+    } else if (spread > 0) {
+      score += 15; // Creating value (0-5% spread)
+      signals++;
+    } else if (spread > -0.05) {
+      score -= 15; // Marginally destroying value (-5% to 0% spread)
+      signals++;
+    } else {
+      score -= 40; // Significantly destroying value (<-5% spread)
+      signals++;
+    }
+  } else {
+    // If no WACC, use absolute ROIC thresholds
+    if (roicVal > 0.20) {
+      score += 30; // >20% ROIC is exceptional
+      signals++;
+    } else if (roicVal > 0.15) {
+      score += 20; // >15% ROIC is excellent
+      signals++;
+    } else if (roicVal > 0.10) {
+      score += 10; // >10% ROIC is good
+      signals++;
+    } else if (roicVal > 0.05) {
+      score += 0; // 5-10% ROIC is average
+      signals++;
+    } else if (roicVal > 0) {
+      score -= 20; // 0-5% ROIC is poor
+      signals++;
+    } else {
+      score -= 40; // Negative ROIC is destroying value
+      signals++;
+    }
+  }
+
+  // Signal 2: ROIC Absolute Level (25% weight)
+  if (roicVal > 0.20) {
+    score += 25; // Exceptional (>20%)
+    signals++;
+  } else if (roicVal > 0.15) {
+    score += 20; // Excellent (15-20%)
+    signals++;
+  } else if (roicVal > 0.10) {
+    score += 10; // Good (10-15%)
+    signals++;
+  } else if (roicVal > 0.05) {
+    score += 0; // Average (5-10%)
+    signals++;
+  } else if (roicVal > 0) {
+    score -= 15; // Poor (0-5%)
+    signals++;
+  } else {
+    score -= 30; // Negative (destroying value)
+    signals++;
+  }
+
+  // Signal 3: Gross Margin (20% weight) - Pricing power indicator
+  if (Option.isSome(grossMargin)) {
+    const margin = grossMargin.value;
+    if (margin > 0.60) {
+      score += 20; // Exceptional pricing power (>60%)
+      signals++;
+    } else if (margin > 0.40) {
+      score += 15; // Strong pricing power (40-60%)
+      signals++;
+    } else if (margin > 0.30) {
+      score += 5; // Moderate pricing power (30-40%)
+      signals++;
+    } else if (margin > 0.20) {
+      score -= 5; // Weak pricing power (20-30%)
+      signals++;
+    } else {
+      score -= 15; // Very weak pricing power (<20%)
+      signals++;
+    }
+  }
+
+  // Signal 4: FCF Yield (15% weight) - Cash generation
+  if (Option.isSome(fcfYield)) {
+    const fcfYieldValue = fcfYield.value;
+    if (fcfYieldValue > 0.10) {
+      score += 15; // Exceptional cash generation (>10%)
+      signals++;
+    } else if (fcfYieldValue > 0.05) {
+      score += 10; // Strong cash generation (5-10%)
+      signals++;
+    } else if (fcfYieldValue > 0.03) {
+      score += 5; // Moderate cash generation (3-5%)
+      signals++;
+    } else if (fcfYieldValue > 0) {
+      score -= 5; // Weak cash generation (0-3%)
+      signals++;
+    } else {
+      score -= 15; // Negative cash flow
+      signals++;
+    }
+  }
+
+  // Signal 5: ROIC Trend (bonus/penalty) - Is quality improving or declining?
+  if (roicHistory.length >= 2) {
+    const recent = roicHistory.slice(0, 3); // Last 3 data points
+    const oldest = recent[recent.length - 1];
+    const newest = recent[0];
+    const trend = newest.roic - oldest.roic; // Change in ROIC (already in percentage form)
+
+    if (trend > 0.05) {
+      score += 10; // Improving significantly (>5% points)
+    } else if (trend > 0.02) {
+      score += 5; // Improving moderately (2-5% points)
+    } else if (trend < -0.05) {
+      score -= 10; // Declining significantly (<-5% points)
+    } else if (trend < -0.02) {
+      score -= 5; // Declining moderately (-2 to -5% points)
+    }
+  }
+
+  // Determine status based on composite score
+  // Require at least 2 signals for a valid assessment
+  if (signals < 2) {
+    return { status: "Unknown", color: "text-muted-foreground", borderColor: "border-l-border" };
+  }
+
+  if (score >= 50) {
+    return { status: "Excellent", color: "text-green-600", borderColor: "border-l-green-500" };
+  } else if (score >= 20) {
+    return { status: "Good", color: "text-green-600", borderColor: "border-l-green-500" };
+  } else if (score >= -10) {
+    return { status: "Average", color: "text-yellow-600", borderColor: "border-l-yellow-500" };
+  } else {
+    return { status: "Poor", color: "text-red-600", borderColor: "border-l-red-500" };
+  }
 }
 
 function calculateSafetyStatus(
-  netDebtToEbitda: Option.Option<number>
-): { status: SafetyStatus; color: string } {
-  if (Option.isNone(netDebtToEbitda)) {
-    return { status: "Unknown", color: "text-muted-foreground" };
+  netDebtToEbitda: Option.Option<number>,
+  altmanZScore: Option.Option<number>,
+  interestCoverage: Option.Option<number>
+): { status: SafetyStatus; color: string; borderColor: string } {
+  // If we don't have at least one metric, we can't assess safety
+  if (Option.isNone(netDebtToEbitda) && Option.isNone(altmanZScore) && Option.isNone(interestCoverage)) {
+    return { status: "Unknown", color: "text-muted-foreground", borderColor: "border-l-border" };
   }
 
-  const ratio = netDebtToEbitda.value;
-  if (ratio < 3) return { status: "Safe", color: "text-green-600" };
-  if (ratio < 5) return { status: "Moderate", color: "text-yellow-600" };
-  return { status: "Risky", color: "text-red-600" };
+  let score = 0;
+  let signals = 0;
+
+  // Signal 1: Net Debt to EBITDA (40% weight) - Most important debt metric
+  // Lower is better - indicates ability to pay down debt
+  if (Option.isSome(netDebtToEbitda)) {
+    const ratio = netDebtToEbitda.value;
+    if (ratio < 1.0) {
+      score += 40; // Exceptional (< 1.0x) - Very low debt burden
+      signals++;
+    } else if (ratio < 2.0) {
+      score += 30; // Excellent (1.0-2.0x) - Low debt burden
+      signals++;
+    } else if (ratio < 3.0) {
+      score += 20; // Good (2.0-3.0x) - Safe level
+      signals++;
+    } else if (ratio < 5.0) {
+      score -= 10; // Moderate (3.0-5.0x) - Moderate risk
+      signals++;
+    } else if (ratio < 7.0) {
+      score -= 30; // Risky (5.0-7.0x) - High debt burden
+      signals++;
+    } else {
+      score -= 40; // Very Risky (> 7.0x) - Very high debt burden
+      signals++;
+    }
+  }
+
+  // Signal 2: Altman Z-Score (35% weight) - Bankruptcy risk indicator
+  // Higher is better - indicates financial stability
+  if (Option.isSome(altmanZScore)) {
+    const zScore = altmanZScore.value;
+    if (zScore > 3.0) {
+      score += 35; // Safe Zone (> 3.0) - Low bankruptcy risk
+      signals++;
+    } else if (zScore > 2.7) {
+      score += 20; // Good (2.7-3.0) - Low to moderate risk
+      signals++;
+    } else if (zScore > 1.81) {
+      score -= 10; // Grey Zone (1.81-2.7) - Moderate bankruptcy risk
+      signals++;
+    } else if (zScore > 1.0) {
+      score -= 30; // Distress Zone (1.0-1.81) - High bankruptcy risk
+      signals++;
+    } else {
+      score -= 40; // Critical (< 1.0) - Very high bankruptcy risk
+      signals++;
+    }
+  }
+
+  // Signal 3: Interest Coverage (25% weight) - Ability to service debt
+  // Higher is better - indicates ability to pay interest obligations
+  if (Option.isSome(interestCoverage)) {
+    const coverage = interestCoverage.value;
+    // Special case: 999 indicates perfect coverage (no interest expense)
+    if (coverage >= 999) {
+      score += 25; // Perfect coverage (no interest expense) - Exceptional
+      signals++;
+    } else if (coverage > 10.0) {
+      score += 25; // Exceptional (> 10x) - Very safe
+      signals++;
+    } else if (coverage > 5.0) {
+      score += 20; // Excellent (5-10x) - Safe
+      signals++;
+    } else if (coverage > 3.0) {
+      score += 10; // Good (3-5x) - Adequate
+      signals++;
+    } else if (coverage > 1.5) {
+      score -= 15; // Moderate (1.5-3x) - Tight coverage
+      signals++;
+    } else if (coverage > 0) {
+      score -= 30; // Risky (0-1.5x) - May struggle to pay interest
+      signals++;
+    } else {
+      score -= 40; // Critical (< 0) - Cannot cover interest
+      signals++;
+    }
+  }
+
+  // Determine status based on composite score
+  // Require at least 2 signals for a valid assessment
+  if (signals < 2) {
+    return { status: "Unknown", color: "text-muted-foreground", borderColor: "border-l-border" };
+  }
+
+  if (score >= 50) {
+    return { status: "Safe", color: "text-green-600", borderColor: "border-l-green-500" };
+  } else if (score >= 10) {
+    return { status: "Moderate", color: "text-yellow-600", borderColor: "border-l-yellow-500" };
+  } else {
+    return { status: "Risky", color: "text-red-600", borderColor: "border-l-red-500" };
+  }
 }
 
 // ============================================================================
@@ -434,7 +678,7 @@ export default function SymbolAnalysisPage() {
 
                 const quarter = Math.floor(date.getMonth() / 3) + 1;
                 const yearShort = String(date.getFullYear()).slice(-2);
-                const quarterLabel = `Q${quarter}${yearShort}`;
+                const quarterLabel = `Q${quarter}/${yearShort}`;
 
                 return {
                   date: fs.date,
@@ -456,11 +700,54 @@ export default function SymbolAnalysisPage() {
     };
   })();
 
-  const safetyMetrics: SafetyMetrics = {
-    netDebtToEbitda: Option.some(0.8),
-    altmanZScore: Option.some(4.5),
-    interestCoverage: Option.some(18.0),
-  };
+  // Calculate Safety metrics from financial statements
+  const safetyMetrics: SafetyMetrics = (() => {
+    // Get the latest financial statement
+    const latestStatement = Option.match(financialStatement, {
+      onNone: () => {
+        console.log(`[SafetyMetrics] No financial statement available for ${ticker}`);
+        return null;
+      },
+      onSome: (fs) => {
+        console.log(`[SafetyMetrics] Using financial statement for ${ticker}:`, {
+          date: fs.date,
+          period: fs.period,
+        });
+        return fs;
+      },
+    });
+
+    // Get market cap for Altman Z-Score
+    const marketCap = Option.match(quote, {
+      onNone: () => {
+        console.log(`[SafetyMetrics] No market cap available for ${ticker}`);
+        return Option.none<number>();
+      },
+      onSome: (q) => {
+        const cap = q.market_cap ? Option.some(q.market_cap) : Option.none<number>();
+        if (Option.isSome(cap)) {
+          console.log(`[SafetyMetrics] Market cap for ${ticker}:`, cap.value);
+        }
+        return cap;
+      },
+    });
+
+    const netDebtToEbitda = calculateNetDebtToEbitda(latestStatement);
+    const altmanZScore = calculateAltmanZScore(latestStatement, marketCap);
+    const interestCoverage = calculateInterestCoverage(latestStatement);
+
+    console.log(`[SafetyMetrics] Calculated metrics for ${ticker}:`, {
+      netDebtToEbitda: Option.match(netDebtToEbitda, { onNone: () => "None", onSome: (v) => v }),
+      altmanZScore: Option.match(altmanZScore, { onNone: () => "None", onSome: (v) => v }),
+      interestCoverage: Option.match(interestCoverage, { onNone: () => "None", onSome: (v) => v }),
+    });
+
+    return {
+      netDebtToEbitda,
+      altmanZScore,
+      interestCoverage,
+    };
+  })();
 
   // Calculate insider activity from real data
   const insiderActivity: InsiderActivity = (() => {
@@ -808,6 +1095,33 @@ export default function SymbolAnalysisPage() {
         }
       });
 
+    // Fetch latest financial statement for Safety metrics calculations (any period)
+    supabase
+      .from("financial_statements")
+      .select("*")
+      .eq("symbol", ticker)
+      .order("date", { ascending: false })
+      .order("fetched_at", { ascending: false })
+      .limit(1)
+      .then(({ data, error }) => {
+        if (error) {
+          console.error(`[SymbolAnalysisPage] Error fetching latest financial statement:`, error);
+          return;
+        }
+        if (data && data.length > 0) {
+          console.log(`[SymbolAnalysisPage] Fetched latest financial statement for ${ticker}:`, {
+            date: data[0].date,
+            period: data[0].period,
+            hasIncome: !!data[0].income_statement_payload,
+            hasBalance: !!data[0].balance_sheet_payload,
+            hasCashFlow: !!data[0].cash_flow_payload,
+          });
+          setFinancialStatement(Option.some(data[0]));
+        } else {
+          console.warn(`[SymbolAnalysisPage] No financial statements found for ${ticker}`);
+        }
+      });
+
     // Fetch historical financial statements for ROIC history chart (last 12 annual reports)
     // Filter for annual reports (FY period) to get end-of-year dates (September for AAPL)
     // Handle duplicates by taking the latest fetched_at for each fiscal_year
@@ -841,7 +1155,7 @@ export default function SymbolAnalysisPage() {
             }
             return acc;
           }, [] as typeof data);
-          
+
           // Sort by date descending and take the latest 12
           const sorted = deduplicated
             .sort((a: typeof data[0], b: typeof data[0]) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -868,8 +1182,18 @@ export default function SymbolAnalysisPage() {
     valuationMetrics.peRatio,
     valuationMetrics.pegRatio
   );
-  const qualityStatus = calculateQualityStatus(qualityMetrics.roic);
-  const safetyStatus = calculateSafetyStatus(safetyMetrics.netDebtToEbitda);
+  const qualityStatus = calculateQualityStatus(
+    qualityMetrics.roic,
+    qualityMetrics.wacc,
+    qualityMetrics.grossMargin,
+    qualityMetrics.fcfYield,
+    qualityMetrics.roicHistory
+  );
+  const safetyStatus = calculateSafetyStatus(
+    safetyMetrics.netDebtToEbitda,
+    safetyMetrics.altmanZScore,
+    safetyMetrics.interestCoverage
+  );
 
   // Get company name
   const companyName = Option.match(profile, {
@@ -1095,7 +1419,7 @@ export default function SymbolAnalysisPage() {
 
                           const quarter = Math.floor(date.getMonth() / 3) + 1;
                           const year = String(date.getFullYear()).slice(-2);
-                          return `Q${quarter}${year}`;
+                          return `Q${quarter}/${year}`;
                         }}
                       />
                       <YAxis
@@ -1210,12 +1534,19 @@ export default function SymbolAnalysisPage() {
           </Card>
 
           {/* B2. Quality & Moat */}
-          <Card>
+          <Card className={cn("border-l-4", qualityStatus.borderColor)}>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="h-5 w-5 text-primary" />
-                Is the Business Good? (Quality)
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-primary" />
+                  Is the Business Good? (Quality)
+                </CardTitle>
+                {qualityStatus.status !== "Unknown" && (
+                  <Badge variant="outline" className={qualityStatus.color}>
+                    {qualityStatus.status}
+                  </Badge>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
@@ -1267,16 +1598,7 @@ export default function SymbolAnalysisPage() {
                         tick={{ fontSize: 10 }}
                         tickFormatter={(value) => {
                           // With type="category" and dataKey="dateLabel", value should be the dateLabel string
-                          // But verify and log to debug
-                          if (typeof value !== 'string') {
-                            console.warn('[ROIC Chart XAxis] Non-string value received:', typeof value, value);
-                          }
-                          // Verify it matches expected format
-                          if (typeof value === 'string' && value.match(/^Q[1-4]\d{2}$/)) {
-                            return value;
-                          }
-                          // If it's not the expected format, log and return as-is
-                          console.error('[ROIC Chart XAxis] Unexpected dateLabel format:', value);
+                          // We pre-format it in roicHistory as Qx/YY, so just return as-is
                           return String(value);
                         }}
                       />
@@ -1286,33 +1608,36 @@ export default function SymbolAnalysisPage() {
                       />
                       <Tooltip
                         formatter={(value: number) => value.toFixed(1) + "%"}
-                        labelFormatter={(label) => {
-                          // Recharts may pass the date as a Date object or string
-                          // We need to handle both and parse explicitly to avoid timezone issues
-                          let date: Date;
+                        labelFormatter={(label, payload) => {
+                          // With type="category" and dataKey="dateLabel", label is the dateLabel string (e.g., "Q3/25")
+                          // But we need the actual date for the tooltip. Get it from the payload.
+                          const dateStr = payload?.[0]?.payload?.date;
 
-                          if (label instanceof Date) {
-                            // If it's already a Date object, check if it was created from a string
-                            // Use UTC methods to avoid timezone shifts
-                            const year = label.getUTCFullYear();
-                            const month = label.getUTCMonth();
-                            const day = label.getUTCDate();
-                            date = new Date(year, month, day); // Recreate in local time from UTC components
-                          } else if (typeof label === 'string') {
-                            // Parse date string (YYYY-MM-DD) explicitly to avoid timezone issues
-                            const parts = label.split('-');
+                          if (!dateStr) {
+                            // Fallback to label if no date in payload
+                            return String(label);
+                          }
+
+                          // Parse date string (YYYY-MM-DD) explicitly to avoid timezone issues
+                          let date: Date;
+                          if (typeof dateStr === 'string') {
+                            const parts = dateStr.split('-');
                             if (parts.length === 3) {
                               const year = parseInt(parts[0], 10);
                               const month = parseInt(parts[1], 10);
                               const day = parseInt(parts[2], 10);
                               date = new Date(year, month - 1, day); // month is 0-indexed, local time
                             } else {
-                              // Fallback for other string formats
-                              date = new Date(label);
+                              date = new Date(dateStr);
                             }
+                          } else if (dateStr instanceof Date) {
+                            // Use UTC methods to avoid timezone shifts
+                            const year = dateStr.getUTCFullYear();
+                            const month = dateStr.getUTCMonth();
+                            const day = dateStr.getUTCDate();
+                            date = new Date(year, month, day);
                           } else {
-                            // Fallback for other types
-                            date = new Date(label);
+                            date = new Date(dateStr);
                           }
 
                           if (isNaN(date.getTime())) {
@@ -1358,55 +1683,76 @@ export default function SymbolAnalysisPage() {
           </Card>
 
           {/* B3. Financial Safety */}
-          <Card>
+          <Card className={cn("border-l-4", safetyStatus.borderColor)}>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5 text-primary" />
-                Is it Safe? (Balance Sheet)
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-primary" />
+                  Is it Safe? (Balance Sheet)
+                </CardTitle>
+                {safetyStatus.status !== "Unknown" && (
+                  <Badge variant="outline" className={safetyStatus.color}>
+                    {safetyStatus.status}
+                  </Badge>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="flex justify-between gap-4">
               <div className="flex-1 text-center p-4 border rounded">
                 <div className="text-muted-foreground text-sm mb-1">Net Debt / EBITDA</div>
-                <div className={cn(
-                  "text-2xl font-bold",
-                  Option.match(safetyMetrics.netDebtToEbitda, {
-                    onNone: () => "text-muted-foreground",
-                    onSome: (v) => v < 3 ? "text-green-600" : v < 5 ? "text-yellow-600" : "text-red-600",
-                  })
-                )}>
-                  {Option.match(safetyMetrics.netDebtToEbitda, {
-                    onNone: () => "...",
-                    onSome: (v) => v.toFixed(1) + "x",
-                  })}
-                </div>
+                {Option.match(safetyMetrics.netDebtToEbitda, {
+                  onNone: () => (
+                    <div className="h-8 w-20 bg-muted animate-pulse rounded mx-auto mb-1" />
+                  ),
+                  onSome: (v) => (
+                    <div className={cn(
+                      "text-2xl font-bold",
+                      v < 3 ? "text-green-600" : v < 5 ? "text-yellow-600" : "text-red-600"
+                    )}>
+                      {v.toFixed(1)}x
+                    </div>
+                  ),
+                })}
                 <div className="text-xs text-muted-foreground">Safe (&lt; 3.0x)</div>
               </div>
               <div className="flex-1 text-center p-4 border rounded">
                 <div className="text-muted-foreground text-sm mb-1">Altman Z-Score</div>
-                <div className={cn(
-                  "text-2xl font-bold",
-                  Option.match(safetyMetrics.altmanZScore, {
-                    onNone: () => "text-muted-foreground",
-                    onSome: (v) => v > 3 ? "text-green-600" : v > 2.7 ? "text-yellow-600" : "text-red-600",
-                  })
-                )}>
-                  {Option.match(safetyMetrics.altmanZScore, {
-                    onNone: () => "...",
-                    onSome: (v) => v.toFixed(1),
-                  })}
-                </div>
+                {Option.match(safetyMetrics.altmanZScore, {
+                  onNone: () => (
+                    <div className="h-8 w-20 bg-muted animate-pulse rounded mx-auto mb-1" />
+                  ),
+                  onSome: (v) => (
+                    <div className={cn(
+                      "text-2xl font-bold",
+                      v > 3 ? "text-green-600" : v > 2.7 ? "text-yellow-600" : "text-red-600"
+                    )}>
+                      {v.toFixed(1)}
+                    </div>
+                  ),
+                })}
                 <div className="text-xs text-muted-foreground">Safe Zone</div>
               </div>
               <div className="flex-1 text-center p-4 border rounded">
                 <div className="text-muted-foreground text-sm mb-1">Interest Coverage</div>
-                <div className="text-2xl font-bold">
+                {Option.match(safetyMetrics.interestCoverage, {
+                  onNone: () => (
+                    <div className="h-8 w-20 bg-muted animate-pulse rounded mx-auto mb-1" />
+                  ),
+                  onSome: (v) => (
+                    <div className={cn(
+                      "text-2xl font-bold",
+                      v >= 999 ? "text-green-600" : v > 10 ? "text-green-600" : v > 5 ? "text-yellow-600" : "text-red-600"
+                    )}>
+                      {v >= 999 ? "∞" : v.toFixed(0) + "x"}
+                    </div>
+                  ),
+                })}
+                <div className="text-xs text-muted-foreground">
                   {Option.match(safetyMetrics.interestCoverage, {
-                    onNone: () => "...",
-                    onSome: (v) => v.toFixed(0) + "x",
+                    onNone: () => "Can pay debts",
+                    onSome: (v) => v >= 999 ? "No interest expense" : "Can pay debts",
                   })}
                 </div>
-                <div className="text-xs text-muted-foreground">Can pay debts</div>
               </div>
             </CardContent>
           </Card>
