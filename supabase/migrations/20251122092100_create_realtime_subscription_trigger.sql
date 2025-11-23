@@ -39,6 +39,7 @@ BEGIN
     WHEN 'exchange_variants' THEN v_data_type := 'exchange-variants';
     WHEN 'insider_trading_statistics' THEN v_data_type := 'insider-trading-statistics';
     WHEN 'insider_transactions' THEN v_data_type := 'insider-transactions';
+    WHEN 'valuations' THEN v_data_type := 'valuations';
     ELSE
       -- Not a tracked entity, skip
       RETURN NEW;

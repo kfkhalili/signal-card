@@ -104,6 +104,14 @@ type InsiderTransactionsUpdateCallback = (
   payload: InsiderTransactionsPayload
 ) => void;
 
+export type ValuationsDBRow =
+  Database["public"]["Tables"]["valuations"]["Row"];
+
+export type ValuationsPayload =
+  RealtimePostgresChangesPayload<ValuationsDBRow>;
+
+type ValuationsUpdateCallback = (payload: ValuationsPayload) => void;
+
 const LIVE_QUOTE_TABLE_NAME = "live_quote_indicators";
 const FINANCIAL_STATEMENTS_TABLE_NAME = "financial_statements";
 const PROFILES_TABLE_NAME = "profiles";
@@ -114,6 +122,7 @@ const GRADES_HISTORICAL_TABLE_NAME = "grades_historical";
 const EXCHANGE_VARIANTS_TABLE_NAME = "exchange_variants";
 const INSIDER_TRADING_STATISTICS_TABLE_NAME = "insider_trading_statistics";
 const INSIDER_TRANSACTIONS_TABLE_NAME = "insider_transactions";
+const VALUATIONS_TABLE_NAME = "valuations";
 
 let supabaseClientInstance: SupabaseClient<Database> | null = null;
 let clientInitialized = false; // Flag to ensure createSupabaseBrowserClient is called only once if needed initially
@@ -131,9 +140,10 @@ const noOpUnsubscribe = () => {
 };
 
 // Unified subscription interface for all symbol data types
+// NOTE: Quote updates are handled separately by RealtimeStockManager to avoid duplicates
 export interface UnifiedSymbolSubscriptionCallbacks {
   onProfileUpdate?: ProfileUpdateCallback;
-  onQuoteUpdate?: QuoteUpdateCallback;
+  // onQuoteUpdate?: QuoteUpdateCallback; // REMOVED: Quotes handled by RealtimeStockManager
   onFinancialStatementUpdate?: FinancialStatementUpdateCallback;
   onRatiosTTMUpdate?: RatiosTtmUpdateCallback;
   onDividendHistoryUpdate?: DividendHistoryUpdateCallback;
@@ -142,6 +152,7 @@ export interface UnifiedSymbolSubscriptionCallbacks {
   onExchangeVariantsUpdate?: ExchangeVariantsUpdateCallback;
   onInsiderTradingStatisticsUpdate?: InsiderTradingStatisticsUpdateCallback;
   onInsiderTransactionsUpdate?: InsiderTransactionsUpdateCallback;
+  onValuationsUpdate?: ValuationsUpdateCallback;
 }
 
 // Unified subscription function - ONE channel per symbol for ALL tables
@@ -191,22 +202,25 @@ export function subscribeToAllSymbolUpdates(
     );
   }
 
-  if (callbacks.onQuoteUpdate) {
-    channel.on<LiveQuoteIndicatorDBRow>(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: LIVE_QUOTE_TABLE_NAME,
-        filter: topicFilter,
-      },
-      (payload) => {
-        if (callbacks.onQuoteUpdate) {
-          callbacks.onQuoteUpdate(payload as LiveQuotePayload);
-        }
-      }
-    );
-  }
+  // NOTE: Quote updates are handled separately by RealtimeStockManager
+  // Do NOT create quote subscriptions here to avoid duplicates
+  // If quote updates are needed, use RealtimeStockManager instead
+  // if (callbacks.onQuoteUpdate) {
+  //   channel.on<LiveQuoteIndicatorDBRow>(
+  //     "postgres_changes",
+  //     {
+  //       event: "*",
+  //       schema: "public",
+  //       table: LIVE_QUOTE_TABLE_NAME,
+  //       filter: topicFilter,
+  //     },
+  //     (payload) => {
+  //       if (callbacks.onQuoteUpdate) {
+  //         callbacks.onQuoteUpdate(payload as LiveQuotePayload);
+  //       }
+  //     }
+  //   );
+  // }
 
   if (callbacks.onFinancialStatementUpdate) {
     channel.on<FinancialStatementDBRow>(
@@ -339,6 +353,23 @@ export function subscribeToAllSymbolUpdates(
       (payload) => {
         if (callbacks.onInsiderTransactionsUpdate) {
           callbacks.onInsiderTransactionsUpdate(payload as InsiderTransactionsPayload);
+        }
+      }
+    );
+  }
+
+  if (callbacks.onValuationsUpdate) {
+    channel.on<ValuationsDBRow>(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: VALUATIONS_TABLE_NAME,
+        filter: topicFilter,
+      },
+      (payload) => {
+        if (callbacks.onValuationsUpdate) {
+          callbacks.onValuationsUpdate(payload as ValuationsPayload);
         }
       }
     );

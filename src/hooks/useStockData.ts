@@ -25,6 +25,8 @@ import {
   type InsiderTradingStatisticsDBRow,
   type InsiderTransactionsPayload,
   type InsiderTransactionsDBRow,
+  type ValuationsDBRow,
+  type ValuationsPayload,
 } from "@/lib/supabase/realtime-service";
 
 export type ProfileDBRow = Database["public"]["Tables"]["profiles"]["Row"];
@@ -72,6 +74,7 @@ interface UseStockDataProps {
   onExchangeVariantsUpdate?: (variant: ExchangeVariantsDBRow) => void;
   onInsiderTradingStatisticsUpdate?: (statistics: InsiderTradingStatisticsDBRow) => void;
   onInsiderTransactionsUpdate?: (transaction: InsiderTransactionsDBRow) => void;
+  onValuationsUpdate?: (valuation: ValuationsDBRow) => void;
 }
 
 async function fetchInitialProfile(
@@ -272,6 +275,25 @@ async function fetchInitialInsiderTransactions(
   );
 }
 
+async function fetchInitialValuations(
+  supabase: SupabaseClient<Database>,
+  symbol: string
+): Promise<Result<Option.Option<ValuationsDBRow[]>, Error>> {
+  const result = await fromPromise(
+    supabase
+      .from("valuations")
+      .select("*")
+      .eq("symbol", symbol)
+      .eq("valuation_type", "dcf")
+      .order("date", { ascending: false })
+      .limit(90), // Last 90 days for chart
+    (e) => e as Error
+  );
+  return result.map((response) =>
+    response.data && response.data.length > 0 ? Option.some(response.data) : Option.none()
+  );
+}
+
 export function useStockData({
   symbol,
   onProfileUpdate,
@@ -285,6 +307,7 @@ export function useStockData({
   onExchangeVariantsUpdate,
   onInsiderTradingStatisticsUpdate,
   onInsiderTransactionsUpdate,
+  onValuationsUpdate,
 }: UseStockDataProps): MarketStatusUpdate {
   const [profileData, setProfileData] = useState<Option.Option<ProfileDBRow>>(Option.none());
   const [latestQuote, setLatestQuote] = useState<Option.Option<LiveQuoteIndicatorDBRow>>(Option.none());
@@ -382,10 +405,23 @@ export function useStockData({
 
   // Use refs to store latest callbacks to avoid recreating subscription on every render
   // This prevents infinite loops when callbacks are not memoized in parent components
-  const callbacksRef = useRef<UnifiedSymbolSubscriptionCallbacks>({});
+  // Note: We store the hook's callbacks (which expect row data), not payload callbacks
+  const callbacksRef = useRef<{
+    onProfileUpdate?: (profile: ProfileDBRow) => void;
+    onFinancialStatementUpdate?: (statement: FinancialStatementDBRow) => void;
+    onRatiosTTMUpdate?: (ratios: RatiosTtmDBRow) => void;
+    onDividendHistoryUpdate?: (dividend: DividendHistoryDBRow) => void;
+    onRevenueSegmentationUpdate?: (segmentation: RevenueProductSegmentationDBRow) => void;
+    onGradesHistoricalUpdate?: (grades: GradesHistoricalDBRow) => void;
+    onExchangeVariantsUpdate?: (variant: ExchangeVariantsDBRow) => void;
+    onInsiderTradingStatisticsUpdate?: (statistics: InsiderTradingStatisticsDBRow) => void;
+    onInsiderTransactionsUpdate?: (transaction: InsiderTransactionsDBRow) => void;
+    onValuationsUpdate?: (valuation: ValuationsDBRow) => void;
+  }>({});
   const exchangeStatusRef = useRef(exchangeStatus);
   const subscriptionRef = useRef<(() => void) | null>(null);
   const isSubscribedRef = useRef(false);
+  const isSubscribingRef = useRef(false); // Prevent concurrent subscription attempts
 
   // Update refs when props change (but don't trigger re-subscription)
   useEffect(() => {
@@ -403,6 +439,7 @@ export function useStockData({
       onExchangeVariantsUpdate,
       onInsiderTradingStatisticsUpdate,
       onInsiderTransactionsUpdate,
+      onValuationsUpdate,
     };
   }, [
     onProfileUpdate,
@@ -414,6 +451,7 @@ export function useStockData({
     onExchangeVariantsUpdate,
     onInsiderTradingStatisticsUpdate,
     onInsiderTransactionsUpdate,
+    onValuationsUpdate,
   ]);
 
   // Unified subscription - ONE channel per symbol for ALL tables
@@ -436,12 +474,18 @@ export function useStockData({
     // If already subscribed to this symbol, don't subscribe again
     if (isSubscribedRef.current && currentSymbolRef.current === symbol) return;
 
+    // If currently subscribing, don't start another subscription
+    if (isSubscribingRef.current) return;
+
     // If subscribed to a different symbol, unsubscribe first
     if (subscriptionRef.current && currentSymbolRef.current !== symbol) {
       subscriptionRef.current();
       subscriptionRef.current = null;
       isSubscribedRef.current = false;
     }
+
+    // Mark as subscribing to prevent concurrent attempts
+    isSubscribingRef.current = true;
 
     // Build callbacks object using refs to get latest callbacks
     const callbacks: UnifiedSymbolSubscriptionCallbacks = {};
@@ -496,7 +540,7 @@ export function useStockData({
           callbacksRef.current.onFinancialStatementUpdate(updatedStatement);
         }
       };
-    }
+        }
 
     // Ratios TTM updates
     if (callbacksRef.current.onRatiosTTMUpdate) {
@@ -506,7 +550,7 @@ export function useStockData({
           callbacksRef.current.onRatiosTTMUpdate(updatedRatios);
         }
       };
-    }
+        }
 
     // Dividend history updates
     if (callbacksRef.current.onDividendHistoryUpdate) {
@@ -516,7 +560,7 @@ export function useStockData({
           callbacksRef.current.onDividendHistoryUpdate(updatedDividend);
         }
       };
-    }
+        }
 
     // Revenue segmentation updates
     if (callbacksRef.current.onRevenueSegmentationUpdate) {
@@ -565,6 +609,16 @@ export function useStockData({
           const updatedTransaction = payload.new as InsiderTransactionsDBRow;
           callbacksRef.current.onInsiderTransactionsUpdate(updatedTransaction);
         }
+    };
+    }
+
+    // Valuations updates
+    if (callbacksRef.current.onValuationsUpdate) {
+      callbacks.onValuationsUpdate = (payload: ValuationsPayload) => {
+        if (payload.new && isMountedRef.current && callbacksRef.current.onValuationsUpdate) {
+          const updatedValuation = payload.new as ValuationsDBRow;
+          callbacksRef.current.onValuationsUpdate(updatedValuation);
+        }
       };
     }
 
@@ -579,11 +633,21 @@ export function useStockData({
       symbol,
       callbacks,
       (status, err) => {
+        // Clear subscribing flag once subscription completes (success or error)
+        isSubscribingRef.current = false;
+
         if (status === "CHANNEL_ERROR" && err) {
           console.error(
             `[useStockData ${symbol}] Unified symbol Realtime subscription error:`,
             err
           );
+          // On error, reset subscription state to allow retry
+          // But don't immediately retry - let the effect handle it on next render
+          isSubscribedRef.current = false;
+          currentSymbolRef.current = null;
+        } else if (status === "SUBSCRIBED") {
+          // Successfully subscribed
+          isSubscribingRef.current = false;
         }
       }
     );
@@ -592,6 +656,7 @@ export function useStockData({
 
     return () => {
       isSubscribedRef.current = false;
+      isSubscribingRef.current = false;
       currentSymbolRef.current = null;
       if (subscriptionRef.current) {
         subscriptionRef.current();
@@ -862,6 +927,28 @@ export function useStockData({
       );
     }
 
+    if (onValuationsUpdate) {
+      const valuationsResult = await fetchInitialValuations(
+        supabaseClient,
+        symbol
+      );
+      if (!isMountedRef.current) return ok(undefined);
+      valuationsResult.match(
+        (valuationsOption) => {
+          if (Option.isSome(valuationsOption) && valuationsOption.value.length > 0) {
+            // Call callback with the most recent DCF valuation
+            onValuationsUpdate(valuationsOption.value[0]);
+          }
+        },
+        (error) => {
+          console.error(
+            `[useStockData ${symbol}] Error fetching initial valuations:`,
+            error
+          );
+        }
+      );
+    }
+
     return ok(undefined);
   }, [
     symbol,
@@ -877,6 +964,7 @@ export function useStockData({
     onExchangeVariantsUpdate,
     onInsiderTradingStatisticsUpdate,
     onInsiderTransactionsUpdate,
+    onValuationsUpdate,
   ]);
 
   useEffect(() => {

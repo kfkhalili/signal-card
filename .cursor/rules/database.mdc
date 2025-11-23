@@ -272,6 +272,25 @@ useEffect(() => {
 - **Include rollback** logic when possible
 - **Document breaking changes** in migration comments
 
+### Generating TypeScript Types
+**CRITICAL**: Always regenerate TypeScript types after applying migrations to ensure type safety.
+
+**Command for remote database:**
+```bash
+npx supabase gen types typescript --project-id fqrdybodxzjnhklzsgxx --schema public > src/lib/supabase/database.types.ts
+```
+
+**Command for local database:**
+```bash
+supabase gen types typescript --local > src/lib/supabase/database.types.ts
+```
+
+**When to regenerate:**
+- After applying any migration (local or remote)
+- After creating new tables, columns, or modifying schema
+- Before committing changes that affect database types
+- When TypeScript errors indicate missing types
+
 ### Migration Pattern
 ```sql
 -- Migration: Add new column to table

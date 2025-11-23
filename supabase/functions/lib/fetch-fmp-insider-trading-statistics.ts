@@ -18,8 +18,8 @@ const FmpInsiderTradingStatisticsSchema = z.object({
   acquiredTransactions: z.number().int().nonnegative().nullable().optional(),
   disposedTransactions: z.number().int().nonnegative().nullable().optional(),
   acquiredDisposedRatio: z.number().nullable().optional(),
-  totalAcquired: z.number().int().nonnegative().nullable().optional(),
-  totalDisposed: z.number().int().nonnegative().nullable().optional(),
+  totalAcquired: z.number().nonnegative().nullable().optional(), // Accept float, convert to int when storing
+  totalDisposed: z.number().nonnegative().nullable().optional(), // Accept float, convert to int when storing
   averageAcquired: z.number().nonnegative().nullable().optional(),
   averageDisposed: z.number().nonnegative().nullable().optional(),
   totalPurchases: z.number().int().nonnegative().nullable().optional(),
@@ -151,8 +151,12 @@ export async function fetchInsiderTradingStatisticsLogic(
       acquired_transactions: record.acquiredTransactions ?? null,
       disposed_transactions: record.disposedTransactions ?? null,
       acquired_disposed_ratio: record.acquiredDisposedRatio ?? null,
-      total_acquired: record.totalAcquired ?? null, // Keep as number, PostgreSQL will handle it
-      total_disposed: record.totalDisposed ?? null, // Keep as number, PostgreSQL will handle it
+      total_acquired: record.totalAcquired !== null && record.totalAcquired !== undefined
+        ? Math.floor(record.totalAcquired) // Convert float to int
+        : null,
+      total_disposed: record.totalDisposed !== null && record.totalDisposed !== undefined
+        ? Math.floor(record.totalDisposed) // Convert float to int
+        : null,
       average_acquired: record.averageAcquired ?? null,
       average_disposed: record.averageDisposed ?? null,
       total_purchases: record.totalPurchases ?? null,

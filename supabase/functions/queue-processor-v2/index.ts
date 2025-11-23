@@ -31,6 +31,7 @@ import { fetchGradesHistoricalLogic } from '../lib/fetch-fmp-grades-historical.t
 import { fetchExchangeVariantsLogic } from '../lib/fetch-fmp-exchange-variants.ts';
 import { fetchInsiderTradingStatisticsLogic } from '../lib/fetch-fmp-insider-trading-statistics.ts';
 import { fetchInsiderTransactionsLogic } from '../lib/fetch-fmp-insider-transactions.ts';
+import { fetchDcfLogic } from '../lib/fetch-fmp-dcf.ts';
 // All card data types have been migrated to the queue system
 
 interface QueueJob {
@@ -375,6 +376,8 @@ async function processJob(
       return await fetchInsiderTradingStatisticsLogic(job, supabase);
     case 'insider-transactions':
       return await fetchInsiderTransactionsLogic(job, supabase);
+    case 'valuations':
+      return await fetchDcfLogic(job, supabase);
     default:
       return {
         success: false,

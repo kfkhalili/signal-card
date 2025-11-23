@@ -1,10 +1,10 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Option } from "effect";
 import { useAuth } from "@/contexts/AuthContext";
-import type { InsiderTradingStatisticsDBRow, InsiderTransactionsDBRow } from "@/lib/supabase/realtime-service";
+import type { InsiderTradingStatisticsDBRow, InsiderTransactionsDBRow, ValuationsDBRow } from "@/lib/supabase/realtime-service";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -87,19 +87,104 @@ type SafetyStatus = "Safe" | "Moderate" | "Risky" | "Unknown";
 
 function calculateValuationStatus(
   price: Option.Option<number>,
-  dcf: Option.Option<number>
-): { status: HealthStatus; color: string } {
+  dcf: Option.Option<number>,
+  peRatio: Option.Option<number>,
+  pegRatio: Option.Option<number>
+): { status: HealthStatus; color: string; borderColor: string } {
+  // If we don't have enough data, return unknown
   if (Option.isNone(price) || Option.isNone(dcf)) {
-    return { status: "Unknown", color: "text-muted-foreground" };
+    return { status: "Unknown", color: "text-muted-foreground", borderColor: "border-l-border" };
   }
 
   const priceVal = price.value;
   const dcfVal = dcf.value;
   const discount = ((dcfVal - priceVal) / dcfVal) * 100;
 
-  if (discount > 20) return { status: "Undervalued", color: "text-green-600" };
-  if (discount < -20) return { status: "Overvalued", color: "text-red-600" };
-  return { status: "Fair", color: "text-yellow-600" };
+  // Score-based approach: Consider DCF discount, P/E, and PEG
+  let score = 0;
+  let signals = 0;
+
+  // Signal 1: DCF Discount (weight: 40%)
+  // > 20% discount = undervalued, < -20% = overvalued
+  if (discount > 20) {
+    score += 40;
+    signals++;
+  } else if (discount < -20) {
+    score -= 40;
+    signals++;
+  } else if (discount > 0) {
+    score += 20; // Slightly undervalued
+    signals++;
+  } else {
+    score -= 20; // Slightly overvalued
+    signals++;
+  }
+
+  // Signal 2: P/E Ratio (weight: 30%)
+  // Compare to typical market average (~20-25) and consider if we have historical context
+  // Lower P/E = better (cheaper), Higher P/E = worse (expensive)
+  if (Option.isSome(peRatio)) {
+    const pe = peRatio.value;
+    // P/E < 15 = very cheap, 15-20 = reasonable, 20-30 = expensive, > 30 = very expensive
+    if (pe < 15) {
+      score += 30;
+      signals++;
+    } else if (pe < 20) {
+      score += 15;
+      signals++;
+    } else if (pe > 30) {
+      score -= 30;
+      signals++;
+    } else if (pe > 25) {
+      score -= 15;
+      signals++;
+    } else {
+      signals++; // Neutral zone
+    }
+  }
+
+  // Signal 3: PEG Ratio (weight: 30%)
+  // PEG < 1.0 = undervalued, 1.0-2.0 = fair, > 2.0 = overvalued
+  if (Option.isSome(pegRatio)) {
+    const peg = pegRatio.value;
+    if (peg < 1.0) {
+      score += 30;
+      signals++;
+    } else if (peg < 1.5) {
+      score += 15;
+      signals++;
+    } else if (peg > 2.5) {
+      score -= 30;
+      signals++;
+    } else if (peg > 2.0) {
+      score -= 15;
+      signals++;
+    } else {
+      signals++; // Neutral zone (1.5-2.0)
+    }
+  }
+
+  // Determine status based on composite score
+  // If we have at least 2 signals, use the score
+  // Otherwise, fall back to DCF-only logic
+  if (signals >= 2) {
+    if (score >= 30) {
+      return { status: "Undervalued", color: "text-green-600", borderColor: "border-l-green-500" };
+    } else if (score <= -30) {
+      return { status: "Overvalued", color: "text-red-600", borderColor: "border-l-red-500" };
+    } else {
+      return { status: "Fair", color: "text-yellow-600", borderColor: "border-l-yellow-500" };
+    }
+  } else {
+    // Fallback to DCF-only logic if we don't have enough signals
+    if (discount > 20) {
+      return { status: "Undervalued", color: "text-green-600", borderColor: "border-l-green-500" };
+    } else if (discount < -20) {
+      return { status: "Overvalued", color: "text-red-600", borderColor: "border-l-red-500" };
+    } else {
+      return { status: "Fair", color: "text-yellow-600", borderColor: "border-l-yellow-500" };
+    }
+  }
 }
 
 function calculateQualityStatus(roic: Option.Option<number>): { status: QualityStatus; color: string } {
@@ -149,20 +234,56 @@ export default function SymbolAnalysisPage() {
   const [insiderStatistics, setInsiderStatistics] = useState<InsiderTradingStatisticsDBRow[]>([]);
   const [insiderTransactions, setInsiderTransactions] = useState<InsiderTransactionsDBRow[]>([]);
 
-  // Derived metrics (placeholders for now - will be calculated from real data)
-  const valuationMetrics: ValuationMetrics = {
-    dcfFairValue: Option.some(145.0), // TODO: Calculate from financials
-    currentPrice: Option.match(quote, {
-      onNone: () => Option.none<number>(),
-      onSome: (q) => q.current_price ? Option.some(q.current_price) : Option.none<number>(),
-    }),
-    peRatio: Option.match(ratios, {
-      onNone: () => Option.none<number>(),
-      onSome: (r) => r.price_to_earnings_ratio_ttm ? Option.some(r.price_to_earnings_ratio_ttm) : Option.none<number>(),
-    }),
-    pegRatio: Option.some(1.1),
-    priceHistory: [], // TODO: Fetch historical price data
-  };
+  // Valuations data (array for historical DCF data)
+  const [valuations, setValuations] = useState<ValuationsDBRow[]>([]);
+
+  // Derived metrics (using real data from valuations table)
+  const valuationMetrics: ValuationMetrics = (() => {
+    // Get latest DCF valuation
+    const latestDcf = valuations
+      .filter(v => v.valuation_type === 'dcf')
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+
+    const dcfFairValue = latestDcf
+      ? Option.some(latestDcf.value)
+      : Option.none<number>();
+
+    // Build price history for chart (last 90 days of DCF + price)
+    const priceHistory = valuations
+      .filter(v => v.valuation_type === 'dcf')
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .map(v => {
+        const currentPrice = Option.match(quote, {
+          onNone: () => null,
+          onSome: (q) => q.current_price || null,
+        });
+        // Use stock_price_at_calculation if available, otherwise use current price
+        const price = v.stock_price_at_calculation || currentPrice || 0;
+        return {
+          date: v.date,
+          price,
+          dcf: v.value,
+        };
+      })
+      .filter(h => h.price > 0); // Only include entries with valid price
+
+    return {
+      dcfFairValue,
+      currentPrice: Option.match(quote, {
+        onNone: () => Option.none<number>(),
+        onSome: (q) => q.current_price ? Option.some(q.current_price) : Option.none<number>(),
+      }),
+      peRatio: Option.match(ratios, {
+        onNone: () => Option.none<number>(),
+        onSome: (r) => r.price_to_earnings_ratio_ttm ? Option.some(r.price_to_earnings_ratio_ttm) : Option.none<number>(),
+      }),
+      pegRatio: Option.match(ratios, {
+        onNone: () => Option.none<number>(),
+        onSome: (r) => r.price_to_earnings_growth_ratio_ttm ? Option.some(r.price_to_earnings_growth_ratio_ttm) : Option.none<number>(),
+      }),
+      priceHistory,
+    };
+  })();
 
   const qualityMetrics: QualityMetrics = {
     roic: Option.some(22.0), // TODO: Calculate from financials
@@ -259,64 +380,91 @@ export default function SymbolAnalysisPage() {
     priceTarget: Option.some(180),
   };
 
-  // Use the existing useStockData hook for Realtime subscriptions
-  useStockData({
-    symbol: ticker,
-    onProfileUpdate: (profileData) => {
-      setProfile(Option.some(profileData));
-    },
-    onLiveQuoteUpdate: (quoteData) => {
-      setQuote(Option.some(quoteData));
-    },
-    onRatiosTTMUpdate: (ratiosData) => {
-      setRatios(Option.some(ratiosData));
-    },
-    onInsiderTradingStatisticsUpdate: (statsData) => {
-      // Add or update the statistics record
-      setInsiderStatistics((prev) => {
-        const existing = prev.findIndex(
-          (s) => s.symbol === statsData.symbol && s.year === statsData.year && s.quarter === statsData.quarter
-        );
-        if (existing >= 0) {
-          const updated = [...prev];
-          updated[existing] = statsData;
-          return updated;
-        }
-        return [...prev, statsData].sort((a, b) => {
-          if (a.year !== b.year) return b.year - a.year;
-          return b.quarter - a.quarter;
-        });
+  // Memoize callbacks to prevent infinite re-renders
+  const handleProfileUpdate = useCallback((profileData: ProfileDBRow) => {
+    setProfile(Option.some(profileData));
+  }, []);
+
+  const handleQuoteUpdate = useCallback((quoteData: Database["public"]["Tables"]["live_quote_indicators"]["Row"]) => {
+    setQuote(Option.some(quoteData));
+  }, []);
+
+  const handleRatiosUpdate = useCallback((ratiosData: RatiosTtmDBRow) => {
+    setRatios(Option.some(ratiosData));
+  }, []);
+
+  const handleInsiderStatisticsUpdate = useCallback((statsData: InsiderTradingStatisticsDBRow) => {
+    setInsiderStatistics((prev) => {
+      const existing = prev.findIndex(
+        (s) => s.symbol === statsData.symbol && s.year === statsData.year && s.quarter === statsData.quarter
+      );
+      if (existing >= 0) {
+        const updated = [...prev];
+        updated[existing] = statsData;
+        return updated;
+      }
+      return [...prev, statsData].sort((a, b) => {
+        if (a.year !== b.year) return b.year - a.year;
+        return b.quarter - a.quarter;
       });
-    },
-    onInsiderTransactionsUpdate: (transactionData) => {
-      // Add or update the transaction record
-      setInsiderTransactions((prev) => {
-        const existing = prev.findIndex(
-          (t) =>
-            t.symbol === transactionData.symbol &&
-            t.filing_date === transactionData.filing_date &&
-            t.reporting_cik === transactionData.reporting_cik &&
-            t.securities_transacted === transactionData.securities_transacted
-        );
-        if (existing >= 0) {
-          const updated = [...prev];
-          updated[existing] = transactionData;
-          return updated.sort((a, b) => {
-            const aDate = a.transaction_date || a.filing_date;
-            const bDate = b.transaction_date || b.filing_date;
-            return new Date(bDate).getTime() - new Date(aDate).getTime();
-          });
-        }
-        return [...prev, transactionData].sort((a, b) => {
+    });
+  }, []);
+
+  const handleInsiderTransactionsUpdate = useCallback((transactionData: InsiderTransactionsDBRow) => {
+    setInsiderTransactions((prev) => {
+      const existing = prev.findIndex(
+        (t) =>
+          t.symbol === transactionData.symbol &&
+          t.filing_date === transactionData.filing_date &&
+          t.reporting_cik === transactionData.reporting_cik &&
+          t.securities_transacted === transactionData.securities_transacted
+      );
+      if (existing >= 0) {
+        const updated = [...prev];
+        updated[existing] = transactionData;
+        return updated.sort((a, b) => {
           const aDate = a.transaction_date || a.filing_date;
           const bDate = b.transaction_date || b.filing_date;
           return new Date(bDate).getTime() - new Date(aDate).getTime();
         });
+      }
+      return [...prev, transactionData].sort((a, b) => {
+        const aDate = a.transaction_date || a.filing_date;
+        const bDate = b.transaction_date || b.filing_date;
+        return new Date(bDate).getTime() - new Date(aDate).getTime();
       });
-    },
+    });
+  }, []);
+
+  const handleValuationsUpdate = useCallback((valuationData: ValuationsDBRow) => {
+    setValuations((prev) => {
+      const existing = prev.findIndex(
+        (v) =>
+          v.symbol === valuationData.symbol &&
+          v.date === valuationData.date &&
+          v.valuation_type === valuationData.valuation_type
+      );
+      if (existing >= 0) {
+        const updated = [...prev];
+        updated[existing] = valuationData;
+        return updated.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      }
+      return [...prev, valuationData].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    });
+  }, []);
+
+  // Use the existing useStockData hook for Realtime subscriptions
+  useStockData({
+    symbol: ticker,
+    onProfileUpdate: handleProfileUpdate,
+    onLiveQuoteUpdate: handleQuoteUpdate,
+    onRatiosTTMUpdate: handleRatiosUpdate,
+    onInsiderTradingStatisticsUpdate: handleInsiderStatisticsUpdate,
+    onInsiderTransactionsUpdate: handleInsiderTransactionsUpdate,
+    onValuationsUpdate: handleValuationsUpdate,
   });
 
-  // Fetch initial insider trading data
+  // Fetch initial insider trading data and valuations
   useEffect(() => {
     if (!supabase || !ticker) return;
 
@@ -355,6 +503,24 @@ export default function SymbolAnalysisPage() {
           setInsiderTransactions(data);
         }
       });
+
+    // Fetch valuations (DCF - last 90 days for chart)
+    supabase
+      .from("valuations")
+      .select("*")
+      .eq("symbol", ticker)
+      .eq("valuation_type", "dcf")
+      .order("date", { ascending: false })
+      .limit(90)
+      .then(({ data, error }) => {
+        if (error) {
+          console.error(`[SymbolAnalysisPage] Error fetching valuations:`, error);
+          return;
+        }
+        if (data) {
+          setValuations(data);
+        }
+      });
   }, [supabase, ticker]);
 
   const handleAddToWorkspace = async () => {
@@ -369,7 +535,9 @@ export default function SymbolAnalysisPage() {
   // Calculate health statuses
   const valuationStatus = calculateValuationStatus(
     valuationMetrics.currentPrice,
-    valuationMetrics.dcfFairValue
+    valuationMetrics.dcfFairValue,
+    valuationMetrics.peRatio,
+    valuationMetrics.pegRatio
   );
   const qualityStatus = calculateQualityStatus(qualityMetrics.roic);
   const safetyStatus = calculateSafetyStatus(safetyMetrics.netDebtToEbitda);
@@ -532,12 +700,25 @@ export default function SymbolAnalysisPage() {
         {/* --- ZONE B: THE THESIS BUILDER (LEFT COL - 66%) --- */}
         <div className="lg:col-span-2 space-y-6">
           {/* B1. Valuation & Intrinsic Value */}
-          <Card>
+          <Card className={cn("border-l-4", valuationStatus.borderColor)}>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-primary" />
-                Is it Cheap? (Valuation)
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-primary" />
+                  Is it Cheap? (Valuation)
+                </CardTitle>
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    valuationStatus.status === "Undervalued" && "bg-green-50 text-green-700 border-green-300",
+                    valuationStatus.status === "Overvalued" && "bg-red-50 text-red-700 border-red-300",
+                    valuationStatus.status === "Fair" && "bg-yellow-50 text-yellow-700 border-yellow-300",
+                    valuationStatus.status === "Unknown" && "bg-muted text-muted-foreground"
+                  )}
+                >
+                  {valuationStatus.status}
+                </Badge>
+              </div>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* DCF vs Price Chart */}
@@ -744,7 +925,7 @@ export default function SymbolAnalysisPage() {
               : "border-l-border"
           )}>
             <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between">
                 <div>
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Briefcase className="h-4 w-4" />
@@ -752,16 +933,18 @@ export default function SymbolAnalysisPage() {
                   </CardTitle>
                   <CardDescription>Last 6 Months</CardDescription>
                 </div>
-                {insiderActivity.netSentiment > 0 && (
-                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
-                    Net Accumulation
-                  </Badge>
-                )}
-                {insiderActivity.netSentiment < 0 && (
-                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300">
-                    Net Distribution
-                  </Badge>
-                )}
+                <div className="flex items-center">
+                  {insiderActivity.netSentiment > 0 && (
+                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
+                      Net Accumulation
+                    </Badge>
+                  )}
+                  {insiderActivity.netSentiment < 0 && (
+                    <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300">
+                      Net Distribution
+                    </Badge>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -770,7 +953,7 @@ export default function SymbolAnalysisPage() {
                   <span className="font-medium">Buying</span>
                   <span className="text-green-600 font-bold">
                     {Option.match(insiderActivity.netBuyVolume, {
-                      onNone: () => "...",
+                      onNone: () => <div className="h-4 w-16 bg-muted animate-pulse rounded" />,
                       onSome: (v) => formatFinancialValue(v, "USD", 1, exchangeRates),
                     })}
                   </span>
@@ -779,7 +962,7 @@ export default function SymbolAnalysisPage() {
                   <span className="font-medium">Selling</span>
                   <span className="text-red-600 font-bold">
                     {Option.match(insiderActivity.netSellVolume, {
-                      onNone: () => "...",
+                      onNone: () => <div className="h-4 w-16 bg-muted animate-pulse rounded" />,
                       onSome: (v) => formatFinancialValue(v, "USD", 1, exchangeRates),
                     })}
                   </span>
@@ -788,7 +971,7 @@ export default function SymbolAnalysisPage() {
                 <div className="text-xs text-muted-foreground">
                   Latest:{" "}
                   {Option.match(insiderActivity.latestTrade, {
-                    onNone: () => "No recent trades",
+                    onNone: () => <span className="text-muted-foreground">No recent trades</span>,
                     onSome: (t) => (
                       <span className="text-foreground">
                         {t.name} {t.action} {t.shares.toLocaleString()} shares ({t.date})

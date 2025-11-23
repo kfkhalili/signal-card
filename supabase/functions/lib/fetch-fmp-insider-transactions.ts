@@ -20,7 +20,7 @@ const FmpInsiderTransactionSchema = z.object({
   reportingCik: z.string().min(1),
   companyCik: z.string().nullable().optional(),
   transactionType: z.string().nullable().optional(), // e.g., "G-Gift", "S-Sale", "P-Purchase"
-  securitiesOwned: z.number().int().nonnegative().nullable().optional(),
+  securitiesOwned: z.number().nonnegative().nullable().optional(), // Accept float, convert to int when storing
   reportingName: z.string().nullable().optional(),
   typeOfOwner: z.string().nullable().optional(), // e.g., "officer: SVP, GC and Secretary"
   acquisitionOrDisposition: z
@@ -161,7 +161,9 @@ export async function fetchInsiderTransactionsLogic(
       reporting_cik: record.reportingCik,
       company_cik: record.companyCik || null,
       transaction_type: record.transactionType || null,
-      securities_owned: record.securitiesOwned ?? null, // Keep as number, PostgreSQL will handle it
+      securities_owned: record.securitiesOwned !== null && record.securitiesOwned !== undefined
+        ? Math.floor(record.securitiesOwned) // Convert float to int
+        : null,
       reporting_name: record.reportingName || null,
       type_of_owner: record.typeOfOwner || null,
       acquisition_or_disposition: record.acquisitionOrDisposition || null,
