@@ -717,15 +717,28 @@ BEGIN
     -- FAULT TOLERANCE: Wrap in exception handler so one bad data type doesn't break the batch
     BEGIN
       -- Dynamically check staleness for this symbol
-      sql_text := format(
-        'SELECT %I(t.%I, COALESCE(t.cache_ttl_minutes, %L::INTEGER)) FROM %I t WHERE t.%I = %L',
-        reg_row.staleness_function,
-        reg_row.timestamp_column,
-        reg_row.default_ttl_minutes,
-        reg_row.table_name,
-        reg_row.symbol_column,
-        p_symbol
-      );
+      -- CRITICAL: Handle global tables (symbol_column IS NULL) differently
+      IF reg_row.symbol_column IS NULL THEN
+        -- Global table - query entire table (no symbol filter)
+        sql_text := format(
+          'SELECT %I(MAX(t.%I), %L::INTEGER) FROM %I t',
+          reg_row.staleness_function,
+          reg_row.timestamp_column,
+          reg_row.default_ttl_minutes,
+          reg_row.table_name
+        );
+      ELSE
+        -- Symbol-specific table - filter by symbol
+        sql_text := format(
+          'SELECT %I(t.%I, COALESCE(t.cache_ttl_minutes, %L::INTEGER)) FROM %I t WHERE t.%I = %L',
+          reg_row.staleness_function,
+          reg_row.timestamp_column,
+          reg_row.default_ttl_minutes,
+          reg_row.table_name,
+          reg_row.symbol_column,
+          p_symbol
+        );
+      END IF;
 
       EXECUTE sql_text INTO is_stale;
 
