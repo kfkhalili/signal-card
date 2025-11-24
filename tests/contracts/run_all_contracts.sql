@@ -33,8 +33,24 @@ END $$;
 \i test_contract_3_advisory_locks.sql
 
 \echo ''
+\echo 'Running Contract #4: Exception Blocks...'
+\i test_contract_4_exception_blocks.sql
+
+\echo ''
 \echo 'Running Contract #8: Scheduled Job Priority...'
 \i test_contract_8_scheduled_job_priority.sql
+
+\echo ''
+\echo 'Running Contract #9: TABLESAMPLE...'
+\i test_contract_9_tablesample.sql
+
+\echo ''
+\echo 'Running Contract #11: Table Partitioning...'
+\i test_contract_11_table_partitioning.sql
+
+\echo ''
+\echo 'Running Contract #12: Symbol-by-Symbol Query Pattern...'
+\i test_contract_12_symbol_by_symbol.sql
 
 \echo ''
 \echo 'Running Contract #13: No TTL Defaults...'
@@ -47,6 +63,10 @@ END $$;
 \echo ''
 \echo 'Running Contract #16: Polite Partition Maintenance...'
 \i test_contract_16_partition_maintenance.sql
+
+\echo ''
+\echo 'Running Contract #17: Deadlock-Aware Error Handling...'
+\i test_contract_17_deadlock_handling.sql
 
 \echo ''
 \echo 'Running Contract #18: SECURITY DEFINER...'
