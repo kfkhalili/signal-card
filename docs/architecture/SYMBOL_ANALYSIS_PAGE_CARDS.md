@@ -7,9 +7,9 @@
 ## Executive Summary
 
 ### Current Status
-- ✅ **Working with Real Data**: Insider Activity, Price, P/E Ratio, PEG Ratio, Gross Margin, DCF Fair Value, ROIC, FCF Yield, WACC, Safety Metrics (Net Debt/EBITDA, Altman Z-Score, Interest Coverage)
+- ✅ **Working with Real Data**: Insider Activity, Price, P/E Ratio, PEG Ratio, Gross Margin, DCF Fair Value, ROIC, FCF Yield, WACC, Safety Metrics (Net Debt/EBITDA, Altman Z-Score, Interest Coverage), Analyst Sentiment (from `grades_historical`)
 - ⚠️ **Partially Working**: None (all critical metrics are live)
-- ❌ **Hardcoded/Placeholder**: Institutional data (blocked by API tier), Analyst data (needs API integration)
+- ❌ **Hardcoded/Placeholder**: Institutional data (blocked by API tier), Short Interest (no API endpoint available)
 
 ### Investment Value Assessment
 - **High Value**: Valuation (DCF), Quality (ROIC), Safety (Debt metrics), Insider Activity ✅
@@ -30,29 +30,29 @@
 - **Action Required**: None
 
 #### A2. Intelligent Scorecard
-**Status**: ⚠️ **Partially Functional** (3/4 metrics are live, 1/4 needs API integration)
+**Status**: ✅ **Fully Functional** (4/4 metrics are live)
 
 | Metric | Status | Investment Value | Data Needed |
 |--------|--------|------------------|-------------|
 | **Valuation** | ✅ **Live** (DCF from `valuations` table) | ⭐⭐⭐⭐⭐ Critical | ✅ Complete |
 | **Health** | ✅ **Live** (Net Debt/EBITDA calculated from `financial_statements`) | ⭐⭐⭐⭐⭐ Critical | ✅ Complete |
 | **Quality (ROIC)** | ✅ **Live** (calculated from `financial_statements`) | ⭐⭐⭐⭐⭐ Critical | ✅ Complete |
-| **Sentiment** | ❌ Hardcoded ("Buy") | ⭐⭐⭐ Medium | Analyst consensus from API |
+| **Sentiment** | ✅ **Live** (Analyst consensus calculated from `grades_historical`) | ⭐⭐⭐ Medium | ✅ Complete |
 
 **Investment Value**: ⭐⭐⭐⭐⭐ **Critical** - This is the "at-a-glance" decision framework
 
 **Data Requirements**:
-1. **DCF Fair Value**: Calculate from `financial_statements` (Free Cash Flow, growth rates, discount rate)
-2. **Net Debt/EBITDA**: Calculate from `financial_statements` (Total Debt - Cash, EBITDA)
-3. **ROIC**: Calculate from `financial_statements` (NOPAT / Invested Capital)
-4. **Analyst Consensus**: New data type needed (FMP API: `/v3/rating/{symbol}` or `/v3/analyst-estimates/{symbol}`)
+1. ✅ **DCF Fair Value**: From `valuations` table (fetched from FMP API)
+2. ✅ **Net Debt/EBITDA**: Calculated from `financial_statements` (Total Debt - Cash, EBITDA)
+3. ✅ **ROIC**: Calculated from `financial_statements` (NOPAT / Invested Capital)
+4. ✅ **Analyst Consensus**: Calculated from `grades_historical` table (weighted scoring from analyst ratings)
 
 ---
 
 ### ZONE B: Thesis Builder (Left Column - 66%)
 
 #### B1. Valuation Card: "Is it Cheap?"
-**Status**: ⚠️ **Partially Functional**
+**Status**: ✅ **Fully Functional**
 
 | Metric | Status | Investment Value | Data Needed |
 |--------|--------|------------------|-------------|
@@ -217,35 +217,33 @@
 ---
 
 #### C3. Contrarian Indicators Card
-**Status**: ❌ **Fully Hardcoded**
+**Status**: ⚠️ **Partially Functional** (2/3 metrics are live, 1/3 unavailable)
 
 | Metric | Status | Investment Value | Data Needed |
 |--------|--------|------------------|-------------|
-| **Short Interest** | ❌ Hardcoded (2.1%) | ⭐⭐⭐ Medium | FMP API: Short interest |
-| **Analyst Consensus** | ❌ Hardcoded ("Buy") | ⭐⭐⭐ Medium | FMP API: Analyst ratings |
-| **Price Target** | ❌ Hardcoded (180) | ⭐⭐⭐ Medium | FMP API: Analyst price targets |
+| **Short Interest** | ❌ **Unavailable** (no API endpoint found) | ⭐⭐⭐ Medium | No FMP API endpoint available |
+| **Analyst Consensus** | ✅ **Live** (calculated from `grades_historical` table) | ⭐⭐⭐ Medium | ✅ Complete |
+| **Price Target** | ✅ **Live** (from `analyst_price_targets` table) | ⭐⭐⭐ Medium | ✅ Complete |
 
 **Investment Value**: ⭐⭐⭐ **Medium** - Useful contrarian signals, but not decision-critical
 
 **Data Requirements**:
 1. **Short Interest**:
-   - **FMP API**: `/v3/short-interest/{symbol}` or check if available in `live_quote_indicators`
-   - **New Table**: `short_interest` (if not in quote table)
-   - **Fields**: `symbol`, `short_interest_ratio`, `short_interest_percentage`, `date`
-   - **TTL**: 1440 minutes (24 hours)
+   - **Status**: ❌ No FMP API endpoint found
+   - **Alternative Options**: FINRA API or wait for FMP support
+   - **Impact**: Medium value, not decision-critical
 
 2. **Analyst Consensus**:
-   - **FMP API**: `/v3/rating/{symbol}` or `/v3/analyst-estimates/{symbol}`
-   - **New Table**: `analyst_ratings` (or extend `grades_historical` if it has this)
-   - **Fields**: `symbol`, `rating` (Buy/Hold/Sell), `rating_score`, `analyst_count`, `date`
-   - **TTL**: 1440 minutes (24 hours)
-   - **Calculation**: Average rating or most common rating
+   - ✅ **COMPLETE**: Calculated from `grades_historical` table
+   - **Calculation**: Weighted scoring from analyst ratings (Strong Buy, Buy, Hold, Sell, Strong Sell)
+   - **Data Source**: `grades_historical.analyst_ratings_*` columns
+   - **Updates**: Real-time via Realtime subscription
 
 3. **Price Target**:
-   - **FMP API**: `/v3/analyst-estimates/{symbol}` or `/v3/price-target/{symbol}`
-   - **New Table**: `analyst_price_targets` (or extend `analyst_ratings`)
-   - **Fields**: `symbol`, `target_price`, `target_high`, `target_low`, `target_median`, `date`
-   - **TTL**: 1440 minutes (24 hours)
+   - ✅ **COMPLETE**: From `analyst_price_targets` table
+   - **Data Source**: FMP API `/stable/price-target-consensus`
+   - **Fields**: `target_consensus`, `target_high`, `target_low`, `target_median`
+   - **Updates**: Real-time via Realtime subscription
 
 **Calculation Complexity**: 🟢 **Low** - Direct API data, minimal calculation
 
@@ -262,15 +260,15 @@
 6. ✅ **Interest Coverage** - Debt serviceability - **COMPLETE**
 
 ### 🟡 **High Priority** (Important but Can Use Estimates)
-1. **WACC** - Can use industry averages initially
-2. **PEG Ratio** - Growth-adjusted valuation
-3. **Analyst Consensus** - Market sentiment
-4. **Price Target** - Analyst expectations
+1. ✅ **WACC** - **COMPLETE** (calculated using CAPM with market risk premiums and treasury rates)
+2. ✅ **PEG Ratio** - **COMPLETE** (from `ratios_ttm.price_to_earnings_growth_ratio_ttm`)
+3. ✅ **Analyst Consensus** - **COMPLETE** (calculated from `grades_historical` table)
+4. ✅ **Price Target** - **COMPLETE** (from `analyst_price_targets` table)
 
 ### 🟢 **Medium Priority** (Nice to Have)
-1. **Institutional Holdings** - Ownership structure
-2. **Short Interest** - Contrarian signal
-3. **Historical Charts** - Visual context
+1. ❌ **Institutional Holdings** - Ownership structure (blocked by API tier limitation)
+2. ❌ **Short Interest** - Contrarian signal (no FMP API endpoint available)
+3. ✅ **Historical Charts** - Visual context (ROIC vs WACC chart complete, DCF vs Price chart functional)
 
 ---
 
@@ -299,11 +297,11 @@
 
 ### Phase 4: Market Sentiment Data (Low Complexity, Medium Value)
 **Estimated Effort**: 2-3 days
-- ✅ Add institutional holdings data type
-- ✅ Add analyst ratings/consensus data type
-- ✅ Add short interest data type
-- ✅ Add price target data type
-- **Impact**: Unlocks Smart Money and Contrarian Indicators cards
+- ❌ **BLOCKED**: Institutional holdings data type (API tier limitation)
+- ✅ **COMPLETE**: Analyst ratings/consensus data type (using `grades_historical` table)
+- ❌ **UNAVAILABLE**: Short interest data type (no FMP API endpoint)
+- ✅ **COMPLETE**: Price target data type (using `analyst_price_targets` table)
+- **Impact**: ✅ Contrarian Indicators card is 2/3 functional (only missing Short Interest)
 
 ### Phase 5: Historical Charts (Low Priority, Nice-to-Have)
 **Estimated Effort**: 2-3 days
@@ -322,13 +320,18 @@
 - ✅ `live_quote_indicators` - Current price, market cap
 - ✅ `insider_trading_statistics` - Insider trading stats
 - ✅ `insider_transactions` - Individual insider transactions
+- ✅ `grades_historical` - Historical analyst ratings (used for consensus calculation)
+- ✅ `analyst_price_targets` - Analyst price target consensus
+- ✅ `valuations` - DCF fair value calculations
+- ✅ `market_risk_premiums` - Market risk premium data (for WACC)
+- ✅ `treasury_rates` - Treasury rate data (for WACC)
 
 ### Need to Add
-1. **Institutional Holdings** - New data type + table
-2. **Analyst Ratings** - New data type + table (or extend `grades_historical`)
-3. **Short Interest** - New data type + table (or add to `live_quote_indicators`)
-4. **Price Targets** - New data type + table (or combine with analyst ratings)
-5. **Historical Prices** - New data type + table (for charts)
+1. **Institutional Holdings** - New data type + table (blocked by API tier limitation)
+2. ✅ ~~**Analyst Ratings**~~ - **COMPLETE** (using `grades_historical` table)
+3. **Short Interest** - New data type + table (no FMP API endpoint available)
+4. ✅ ~~**Price Targets**~~ - **COMPLETE** (using `analyst_price_targets` table)
+5. **Historical Prices** - New data type + table (for charts - nice-to-have)
 
 ### Calculation Functions Needed
 1. **DCF Calculator** - Edge function or database function
@@ -340,15 +343,17 @@
 
 ## Investment Decision Framework
 
-### Current State: ✅ **Highly Functional** (90% complete)
+### Current State: ✅ **Highly Functional** (98% complete)
 - **Can Make Decisions On**:
   - ✅ Insider activity (fully functional)
   - ✅ Current valuation (P/E, PEG Ratio - both live)
   - ✅ Intrinsic value (DCF Fair Value - live from `valuations` table)
   - ✅ Business quality (ROIC, FCF Yield, Gross Margin, WACC - all live)
   - ✅ Financial safety (Net Debt/EBITDA, Altman Z-Score, Interest Coverage - all live)
+  - ✅ Market sentiment (Analyst consensus from `grades_historical`, Price targets from `analyst_price_targets` - both live)
 - **Cannot Make Decisions On**:
-  - ❌ Market sentiment (analyst consensus, price targets) - needs API integration
+  - ❌ Short Interest (no API endpoint available)
+  - ❌ Institutional Holdings (blocked by API tier limitation)
 
 ### Target State: ✅ **Fully Functional**
 - **Valuation**: DCF vs Price comparison → "Is it cheap?"
@@ -365,12 +370,12 @@
    - ✅ ROIC and FCF Yield already complete (Phase 2)
 
 ### Short Term (Next 2 Weeks)
-3. **Implement DCF Calculation** (Phase 3) - Critical for valuation
-4. **Add Analyst Data** (Phase 4) - Completes sentiment analysis
+3. ✅ ~~**Implement DCF Calculation**~~ - **COMPLETE** (Phase 3)
+4. ✅ ~~**Add Analyst Data**~~ - **COMPLETE** (Phase 4 - Analyst Consensus and Price Targets working)
 
 ### Medium Term (Next Month)
-5. **Implement WACC** (Phase 2, complete) - Completes quality analysis
-6. **Add Historical Charts** (Phase 5) - Visual polish
+5. ✅ ~~**Implement WACC**~~ - **COMPLETE** (Phase 2)
+6. ✅ ~~**Add Historical Charts**~~ - **COMPLETE** (Phase 5 - ROIC vs WACC chart with 12 quarters, DCF vs Price chart functional)
 
 ### Long Term (Future)
 7. **Advanced DCF Models** - Multi-stage, sensitivity analysis
@@ -381,7 +386,7 @@
 
 ## Conclusion
 
-**Current Investment Value**: ⭐⭐⭐⭐⭐ (5/5) - Can make informed decisions on valuation, quality, and safety. Only missing market sentiment data (analyst consensus, price targets).
+**Current Investment Value**: ⭐⭐⭐⭐⭐ (5/5) - Can make informed decisions on valuation, quality, safety, and market sentiment. Only missing Short Interest (no API) and Institutional Holdings (API tier limitation).
 
 **Target Investment Value**: ⭐⭐⭐⭐⭐ (5/5) - Complete framework for intelligent investment decisions (with sentiment data)
 
@@ -393,12 +398,15 @@
 5. ✅ ~~Safety metrics~~ - **COMPLETE** (Net Debt/EBITDA, Altman Z-Score, Interest Coverage - all calculated from `financial_statements`)
 6. ✅ ~~WACC~~ - **COMPLETE** (calculated using CAPM with market risk premiums and treasury rates)
 7. ✅ ~~ROIC vs WACC Chart~~ - **COMPLETE** (12 quarters of historical data)
-8. ❌ Market sentiment data (important for contrarian analysis) - Analyst consensus, price targets, short interest
+8. ✅ ~~Analyst Sentiment~~ - **COMPLETE** (calculated from `grades_historical` table)
+9. ✅ ~~Price Targets~~ - **COMPLETE** (from `analyst_price_targets` table)
+10. ❌ Short Interest - No API endpoint available
+11. ❌ Institutional Holdings - Blocked by API tier limitation
 
-**Remaining Effort**: ~2-3 days to reach full functionality (down from 7-10 days)
+**Remaining Effort**: ~1-2 days to reach full functionality (only missing Short Interest and Institutional Holdings, both blocked by API limitations)
 
 ---
 
-**Last Updated**: 2025-01-23 (after Safety Metrics, WACC, and ROIC vs WACC Chart implementation)
-**Next Review**: After Phase 4 (Market Sentiment Data) completion
+**Last Updated**: 2025-11-24 (after confirming Analyst Sentiment is working)
+**Next Review**: After finding alternative data sources for Short Interest or API tier upgrade
 
