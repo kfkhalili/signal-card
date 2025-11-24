@@ -34,6 +34,7 @@ import { fetchInsiderTransactionsLogic } from '../lib/fetch-fmp-insider-transact
 import { fetchDcfLogic } from '../lib/fetch-fmp-dcf.ts';
 import { fetchMarketRiskPremiumLogic } from '../lib/fetch-fmp-market-risk-premium.ts';
 import { fetchTreasuryRatesLogic } from '../lib/fetch-fmp-treasury-rates.ts';
+import { fetchPriceTargetConsensusLogic } from '../lib/fetch-fmp-price-target-consensus.ts';
 // All card data types have been migrated to the queue system
 
 interface QueueJob {
@@ -241,10 +242,6 @@ Deno.serve(async (req: Request) => {
               console.error(`[queue-processor-v2] Failed to complete job ${job.id}:`, completeError);
               processedJobs.push({ id: job.id, success: false, error: completeError.message });
             } else {
-              // Log informational message if present (e.g., stale data rejection)
-              if (result.message) {
-                console.log(`[queue-processor-v2] Job ${job.id} completed: ${result.message}`);
-              }
               processedJobs.push({ id: job.id, success: true });
               jobsProcessed++; // Count successful jobs toward rate limit
             }
@@ -384,6 +381,8 @@ async function processJob(
       return await fetchMarketRiskPremiumLogic(job, supabase);
     case 'treasury-rates':
       return await fetchTreasuryRatesLogic(job, supabase);
+    case 'analyst-price-targets':
+      return await fetchPriceTargetConsensusLogic(job, supabase);
     default:
       return {
         success: false,

@@ -142,7 +142,6 @@ export async function fetchTreasuryRatesLogic(
       throw new Error(`Database upsert failed: ${upsertError.message}`);
     }
 
-    console.log(`[fetchTreasuryRatesLogic] Successfully upserted ${count || dbRecords.length} treasury rate records`);
 
     return {
       success: true,

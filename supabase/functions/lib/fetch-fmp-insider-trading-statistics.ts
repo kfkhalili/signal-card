@@ -176,9 +176,6 @@ export async function fetchInsiderTradingStatisticsLogic(
       throw new Error(`Failed to upsert insider trading statistics for ${job.symbol}: ${upsertError.message}`);
     }
 
-    console.log(
-      `[fetchInsiderTradingStatisticsLogic] Successfully upserted ${dbRecords.length} quarterly insider trading statistics records for ${job.symbol}`
-    );
 
     return {
       success: true,

@@ -130,6 +130,14 @@ export type TreasuryRatePayload =
 
 type TreasuryRateUpdateCallback = (payload: TreasuryRatePayload) => void;
 
+export type AnalystPriceTargetsDBRow =
+  Database["public"]["Tables"]["analyst_price_targets"]["Row"];
+
+export type AnalystPriceTargetsPayload =
+  RealtimePostgresChangesPayload<AnalystPriceTargetsDBRow>;
+
+type AnalystPriceTargetsUpdateCallback = (payload: AnalystPriceTargetsPayload) => void;
+
 const LIVE_QUOTE_TABLE_NAME = "live_quote_indicators";
 const FINANCIAL_STATEMENTS_TABLE_NAME = "financial_statements";
 const PROFILES_TABLE_NAME = "profiles";
@@ -143,6 +151,7 @@ const INSIDER_TRANSACTIONS_TABLE_NAME = "insider_transactions";
 const VALUATIONS_TABLE_NAME = "valuations";
 const MARKET_RISK_PREMIUMS_TABLE_NAME = "market_risk_premiums";
 const TREASURY_RATES_TABLE_NAME = "treasury_rates";
+const ANALYST_PRICE_TARGETS_TABLE_NAME = "analyst_price_targets";
 
 let supabaseClientInstance: SupabaseClient<Database> | null = null;
 let clientInitialized = false; // Flag to ensure createSupabaseBrowserClient is called only once if needed initially
@@ -173,6 +182,7 @@ export interface UnifiedSymbolSubscriptionCallbacks {
   onInsiderTradingStatisticsUpdate?: InsiderTradingStatisticsUpdateCallback;
   onInsiderTransactionsUpdate?: InsiderTransactionsUpdateCallback;
   onValuationsUpdate?: ValuationsUpdateCallback;
+  onAnalystPriceTargetsUpdate?: AnalystPriceTargetsUpdateCallback;
 }
 
 // Unified subscription function - ONE channel per symbol for ALL tables
@@ -390,6 +400,23 @@ export function subscribeToAllSymbolUpdates(
       (payload) => {
         if (callbacks.onValuationsUpdate) {
           callbacks.onValuationsUpdate(payload as ValuationsPayload);
+        }
+      }
+    );
+  }
+
+  if (callbacks.onAnalystPriceTargetsUpdate) {
+    channel.on<AnalystPriceTargetsDBRow>(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: ANALYST_PRICE_TARGETS_TABLE_NAME,
+        filter: topicFilter,
+      },
+      (payload) => {
+        if (callbacks.onAnalystPriceTargetsUpdate) {
+          callbacks.onAnalystPriceTargetsUpdate(payload as AnalystPriceTargetsPayload);
         }
       }
     );

@@ -1,5 +1,5 @@
-// supabase/functions/lib/fetch-fmp-dcf.ts
-// Library function for processing valuations (DCF) jobs from the queue
+// supabase/functions/lib/fetch-fmp-price-target-consensus.ts
+// Library function for processing analyst price target consensus jobs from the queue
 // CRITICAL: This function is imported directly by queue-processor-v2 (monofunction architecture)
 
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
@@ -7,26 +7,27 @@ import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import type { QueueJob, ProcessJobResult } from './types.ts';
 
 const FMP_API_KEY = Deno.env.get('FMP_API_KEY');
-const FMP_DCF_BASE_URL = 'https://financialmodelingprep.com/stable/discounted-cash-flow';
+const FMP_PRICE_TARGET_BASE_URL = 'https://financialmodelingprep.com/stable/price-target-consensus';
 
-// Zod schema for FMP DCF API response
-const FmpDcfSchema = z.object({
+// Zod schema for FMP Price Target Consensus API response
+const FmpPriceTargetSchema = z.object({
   symbol: z.string().min(1),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
-  dcf: z.number().positive(),
-  'Stock Price': z.number().positive(), // FMP API uses "Stock Price" as key
+  targetHigh: z.number().positive(),
+  targetLow: z.number().positive(),
+  targetConsensus: z.number().positive(),
+  targetMedian: z.number().positive(),
 });
 
-export async function fetchDcfLogic(
+export async function fetchPriceTargetConsensusLogic(
   job: QueueJob,
   supabase: SupabaseClient
 ): Promise<ProcessJobResult> {
   // CRITICAL VALIDATION #1: Data Type Check (Prevents Misconfiguration)
-  if (job.data_type !== 'valuations') {
+  if (job.data_type !== 'analyst-price-targets') {
     return {
       success: false,
       dataSizeBytes: 0,
-      error: `Configuration Error: fetchDcfLogic was called for job type ${job.data_type}. Expected 'valuations'.`,
+      error: `Configuration Error: fetchPriceTargetConsensusLogic was called for job type ${job.data_type}. Expected 'analyst-price-targets'.`,
     };
   }
 
@@ -41,8 +42,8 @@ export async function fetchDcfLogic(
 
     let response: Response;
     try {
-      const dcfUrl = `${FMP_DCF_BASE_URL}?symbol=${job.symbol}&apikey=${FMP_API_KEY}`;
-      response = await fetch(dcfUrl, { signal: controller.signal });
+      const priceTargetUrl = `${FMP_PRICE_TARGET_BASE_URL}?symbol=${job.symbol}&apikey=${FMP_API_KEY}`;
+      response = await fetch(priceTargetUrl, { signal: controller.signal });
     } catch (error) {
       clearTimeout(timeout);
       if (error instanceof Error && error.name === 'AbortError') {
@@ -62,7 +63,7 @@ export async function fetchDcfLogic(
     const contentLength = response.headers.get('Content-Length');
     let actualSizeBytes = contentLength ? parseInt(contentLength, 10) : 0;
     if (actualSizeBytes === 0) {
-      console.warn(`[fetchDcfLogic] Content-Length header missing for ${job.symbol}. Using fallback estimate.`);
+      console.warn(`[fetchPriceTargetConsensusLogic] Content-Length header missing for ${job.symbol}. Using fallback estimate.`);
       actualSizeBytes = 500; // 500 bytes conservative estimate
     }
 
@@ -74,7 +75,7 @@ export async function fetchDcfLogic(
     }
 
     if (fmpResult.length === 0) {
-      console.warn(`[fetchDcfLogic] No DCF data returned for ${job.symbol}. This may indicate the symbol is not supported or has no DCF calculation.`);
+      console.warn(`[fetchPriceTargetConsensusLogic] No price target data returned for ${job.symbol}. This may indicate the symbol is not supported or has no analyst coverage.`);
       return {
         success: true,
         dataSizeBytes: actualSizeBytes,
@@ -82,44 +83,24 @@ export async function fetchDcfLogic(
       };
     }
 
-    // Validate and transform the data
-    const validatedRecords = fmpResult
-      .map((record, index) => {
-        try {
-          return FmpDcfSchema.parse(record);
-        } catch (error) {
-          console.error(`[fetchDcfLogic] Validation error for ${job.symbol} record ${index}:`, error);
-          return null;
-        }
-      })
-      .filter((record): record is z.infer<typeof FmpDcfSchema> => record !== null);
+    // Validate and transform the data (FMP returns array with single object)
+    const validatedRecord = FmpPriceTargetSchema.parse(fmpResult[0]);
 
-    // If no records pass validation, treat it like an empty array (some symbols don't have valid DCF)
-    if (validatedRecords.length === 0) {
-      console.warn(`[fetchDcfLogic] No valid DCF records found for ${job.symbol} after validation. This may indicate the symbol is not supported or has invalid DCF data.`);
-      return {
-        success: true,
-        dataSizeBytes: actualSizeBytes,
-        error: null,
-      };
-    }
-
-    // Transform to database format
-    // Note: FMP typically returns a single record, but we handle arrays for robustness
-    const dbRecords = validatedRecords.map((record) => ({
-      symbol: record.symbol,
-      date: record.date,
-      valuation_type: 'dcf' as const,
-      value: record.dcf,
-      stock_price_at_calculation: record['Stock Price'],
+    // Transform to database format (one record per symbol, upsert on conflict)
+    const dbRecord = {
+      symbol: validatedRecord.symbol,
+      target_high: validatedRecord.targetHigh,
+      target_low: validatedRecord.targetLow,
+      target_consensus: validatedRecord.targetConsensus,
+      target_median: validatedRecord.targetMedian,
       fetched_at: new Date().toISOString(),
-    }));
+    };
 
-    // Upsert into valuations table
+    // Upsert into analyst_price_targets table (one record per symbol)
     const { error: upsertError } = await supabase
-      .from('valuations')
-      .upsert(dbRecords, {
-        onConflict: 'symbol,date,valuation_type',
+      .from('analyst_price_targets')
+      .upsert(dbRecord, {
+        onConflict: 'symbol',
       });
 
     if (upsertError) {
@@ -134,7 +115,7 @@ export async function fetchDcfLogic(
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`[fetchDcfLogic] Error processing ${job.symbol}:`, errorMessage);
+    console.error(`[fetchPriceTargetConsensusLogic] Error processing ${job.symbol}:`, errorMessage);
     return {
       success: false,
       dataSizeBytes: 0,

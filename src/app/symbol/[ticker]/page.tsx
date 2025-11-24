@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Option } from "effect";
 import { useAuth } from "@/contexts/AuthContext";
-import type { InsiderTradingStatisticsDBRow, InsiderTransactionsDBRow, ValuationsDBRow } from "@/lib/supabase/realtime-service";
+import type { InsiderTradingStatisticsDBRow, InsiderTransactionsDBRow, ValuationsDBRow, GradesHistoricalDBRow, AnalystPriceTargetsDBRow } from "@/lib/supabase/realtime-service";
 import type { Database } from "@/lib/supabase/database.types";
 
 type FinancialStatementDBRow = Database["public"]["Tables"]["financial_statements"]["Row"];
@@ -22,12 +22,9 @@ import Image from "next/image";
 import { useAddCardToWorkspace } from "@/hooks/useAddCardToWorkspace";
 import { useStockData, type ProfileDBRow } from "@/hooks/useStockData";
 import {
-  subscribeToMarketRiskPremiumUpdates,
-  subscribeToTreasuryRateUpdates,
   type MarketRiskPremiumDBRow,
   type TreasuryRateDBRow,
   type MarketRiskPremiumPayload,
-  type TreasuryRatePayload,
 } from "@/lib/supabase/realtime-service";
 import { formatFinancialValue } from "@/lib/formatters";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
@@ -483,6 +480,60 @@ function calculateSafetyStatus(
   }
 }
 
+function calculateContrarianIndicatorsStatus(
+  analystConsensus: Option.Option<string>,
+  priceTarget: Option.Option<number>,
+  currentPrice: Option.Option<number>
+): { status: string; color: string; borderColor: string } {
+  // If we don't have enough data, return neutral/unknown
+  if (Option.isNone(analystConsensus) && Option.isNone(priceTarget)) {
+    return { status: "Unknown", color: "text-muted-foreground", borderColor: "border-l-border" };
+  }
+
+  let bullishSignals = 0;
+  let bearishSignals = 0;
+
+  // Check analyst consensus
+  if (Option.isSome(analystConsensus)) {
+    const consensus = analystConsensus.value;
+    if (consensus === "Strong Buy" || consensus === "Buy") {
+      bullishSignals += consensus === "Strong Buy" ? 2 : 1;
+    } else if (consensus === "Sell" || consensus === "Strong Sell") {
+      bearishSignals += consensus === "Strong Sell" ? 2 : 1;
+    }
+  }
+
+  // Check price target vs current price
+  if (Option.isSome(priceTarget) && Option.isSome(currentPrice)) {
+    const target = priceTarget.value;
+    const current = currentPrice.value;
+    const upside = ((target - current) / current) * 100;
+
+    if (upside > 10) {
+      bullishSignals += 2; // Strong bullish signal
+    } else if (upside > 0) {
+      bullishSignals += 1; // Moderate bullish signal
+    } else if (upside < -10) {
+      bearishSignals += 2; // Strong bearish signal
+    } else if (upside < 0) {
+      bearishSignals += 1; // Moderate bearish signal
+    }
+  }
+
+  // Determine overall status
+  if (bullishSignals > bearishSignals && bullishSignals >= 2) {
+    return { status: "Bullish", color: "text-green-600", borderColor: "border-l-green-500" };
+  } else if (bearishSignals > bullishSignals && bearishSignals >= 2) {
+    return { status: "Bearish", color: "text-red-600", borderColor: "border-l-red-500" };
+  } else if (bullishSignals > bearishSignals) {
+    return { status: "Moderately Bullish", color: "text-green-600", borderColor: "border-l-green-500" };
+  } else if (bearishSignals > bullishSignals) {
+    return { status: "Moderately Bearish", color: "text-red-600", borderColor: "border-l-red-500" };
+  } else {
+    return { status: "Neutral", color: "text-yellow-600", borderColor: "border-l-yellow-500" };
+  }
+}
+
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
@@ -497,6 +548,7 @@ export default function SymbolAnalysisPage() {
 
   // State with Option types
   const { supabase } = useAuth();
+  const [symbolValid, setSymbolValid] = useState<boolean | null>(null); // null = checking, true = valid, false = invalid
   const [profile, setProfile] = useState<Option.Option<ProfileDBRow>>(Option.none());
   const [quote, setQuote] = useState<Option.Option<Database["public"]["Tables"]["live_quote_indicators"]["Row"]>>(Option.none());
   const [ratios, setRatios] = useState<Option.Option<RatiosTtmDBRow>>(Option.none());
@@ -516,6 +568,10 @@ export default function SymbolAnalysisPage() {
   // Global market data (for WACC calculations)
   const [marketRiskPremiums, setMarketRiskPremiums] = useState<MarketRiskPremiumDBRow[]>([]);
   const [treasuryRates, setTreasuryRates] = useState<TreasuryRateDBRow[]>([]);
+
+  // Analyst data (for Contrarian Indicators)
+  const [gradesHistorical, setGradesHistorical] = useState<GradesHistoricalDBRow[]>([]);
+  const [analystPriceTargets, setAnalystPriceTargets] = useState<Option.Option<AnalystPriceTargetsDBRow>>(Option.none());
 
   // Derived metrics (using real data from valuations table)
   const valuationMetrics: ValuationMetrics = (() => {
@@ -704,43 +760,19 @@ export default function SymbolAnalysisPage() {
   const safetyMetrics: SafetyMetrics = (() => {
     // Get the latest financial statement
     const latestStatement = Option.match(financialStatement, {
-      onNone: () => {
-        console.log(`[SafetyMetrics] No financial statement available for ${ticker}`);
-        return null;
-      },
-      onSome: (fs) => {
-        console.log(`[SafetyMetrics] Using financial statement for ${ticker}:`, {
-          date: fs.date,
-          period: fs.period,
-        });
-        return fs;
-      },
+      onNone: () => null,
+      onSome: (fs) => fs,
     });
 
     // Get market cap for Altman Z-Score
     const marketCap = Option.match(quote, {
-      onNone: () => {
-        console.log(`[SafetyMetrics] No market cap available for ${ticker}`);
-        return Option.none<number>();
-      },
-      onSome: (q) => {
-        const cap = q.market_cap ? Option.some(q.market_cap) : Option.none<number>();
-        if (Option.isSome(cap)) {
-          console.log(`[SafetyMetrics] Market cap for ${ticker}:`, cap.value);
-        }
-        return cap;
-      },
+      onNone: () => Option.none<number>(),
+      onSome: (q) => q.market_cap ? Option.some(q.market_cap) : Option.none<number>(),
     });
 
     const netDebtToEbitda = calculateNetDebtToEbitda(latestStatement);
     const altmanZScore = calculateAltmanZScore(latestStatement, marketCap);
     const interestCoverage = calculateInterestCoverage(latestStatement);
-
-    console.log(`[SafetyMetrics] Calculated metrics for ${ticker}:`, {
-      netDebtToEbitda: Option.match(netDebtToEbitda, { onNone: () => "None", onSome: (v) => v }),
-      altmanZScore: Option.match(altmanZScore, { onNone: () => "None", onSome: (v) => v }),
-      interestCoverage: Option.match(interestCoverage, { onNone: () => "None", onSome: (v) => v }),
-    });
 
     return {
       netDebtToEbitda,
@@ -825,11 +857,58 @@ export default function SymbolAnalysisPage() {
   //   notableOwners: [{ name: "Berkshire Hathaway", position: "New Position" }],
   // };
 
+  // Calculate analyst consensus from grades_historical
+  const analystConsensus = useMemo(() => {
+    if (gradesHistorical.length === 0) {
+      return Option.none<string>();
+    }
+
+    // Get the latest grades entry
+    const latestGrades = gradesHistorical
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+
+    if (!latestGrades) {
+      return Option.none<string>();
+    }
+
+    // Calculate weighted consensus
+    const strongBuy = latestGrades.analyst_ratings_strong_buy || 0;
+    const buy = latestGrades.analyst_ratings_buy || 0;
+    const hold = latestGrades.analyst_ratings_hold || 0;
+    const sell = latestGrades.analyst_ratings_sell || 0;
+    const strongSell = latestGrades.analyst_ratings_strong_sell || 0;
+
+    const total = strongBuy + buy + hold + sell + strongSell;
+    if (total === 0) {
+      return Option.none<string>();
+    }
+
+    // Weighted score: Strong Buy = 2, Buy = 1, Hold = 0, Sell = -1, Strong Sell = -2
+    const weightedScore = (strongBuy * 2 + buy * 1 + hold * 0 + sell * -1 + strongSell * -2) / total;
+
+    // Map to consensus string
+    if (weightedScore >= 1.5) return Option.some("Strong Buy");
+    if (weightedScore >= 0.5) return Option.some("Buy");
+    if (weightedScore >= -0.5) return Option.some("Hold");
+    if (weightedScore >= -1.5) return Option.some("Sell");
+    return Option.some("Strong Sell");
+  }, [gradesHistorical]);
+
   const contrarianIndicators: ContrarianIndicators = {
-    shortInterest: Option.some(2.1),
-    analystConsensus: Option.some("Buy"),
-    priceTarget: Option.some(180),
+    shortInterest: Option.none(), // Coming soon
+    analystConsensus,
+    priceTarget: Option.match(analystPriceTargets, {
+      onNone: () => Option.none<number>(),
+      onSome: (apt) => Option.some(apt.target_consensus),
+    }),
   };
+
+  // Calculate contrarian indicators status for border and badge
+  const contrarianStatus = calculateContrarianIndicatorsStatus(
+    analystConsensus,
+    contrarianIndicators.priceTarget,
+    valuationMetrics.currentPrice
+  );
 
   // Memoize callbacks to prevent infinite re-renders
   const handleProfileUpdate = useCallback((profileData: ProfileDBRow) => {
@@ -920,9 +999,32 @@ export default function SymbolAnalysisPage() {
     });
   }, []);
 
+  const handleGradesHistoricalUpdate = useCallback((gradesData: GradesHistoricalDBRow) => {
+    setGradesHistorical((prev) => {
+      const existing = prev.findIndex(
+        (g) => g.symbol === gradesData.symbol && g.date === gradesData.date
+      );
+      if (existing >= 0) {
+        const updated = [...prev];
+        updated[existing] = gradesData;
+        return updated.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      }
+      return [...prev, gradesData].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    });
+  }, []);
+
+  const handleAnalystPriceTargetsUpdate = useCallback((payload: { new: AnalystPriceTargetsDBRow | null; old: AnalystPriceTargetsDBRow | null }) => {
+    if (payload.new) {
+      setAnalystPriceTargets(Option.some(payload.new));
+    } else if (payload.old && !payload.new) {
+      setAnalystPriceTargets(Option.none());
+    }
+  }, []);
+
   // Use the existing useStockData hook for Realtime subscriptions
+  // MUST be called before any conditional returns to follow Rules of Hooks
   useStockData({
-    symbol: ticker,
+    symbol: symbolValid === true ? ticker : "", // Only subscribe if symbol is valid
     onProfileUpdate: handleProfileUpdate,
     onLiveQuoteUpdate: handleQuoteUpdate,
     onRatiosTTMUpdate: handleRatiosUpdate,
@@ -930,116 +1032,305 @@ export default function SymbolAnalysisPage() {
     onInsiderTransactionsUpdate: handleInsiderTransactionsUpdate,
     onValuationsUpdate: handleValuationsUpdate,
     onFinancialStatementUpdate: handleFinancialStatementUpdate,
+    onGradesHistoricalUpdate: handleGradesHistoricalUpdate,
   });
 
-  // Subscribe to global market data tables (market risk premiums and treasury rates)
-  // These are global tables, so we subscribe once per app instance
-  // The data can be used for WACC calculations or any other purpose
+  // Subscribe to analyst_price_targets separately (not in useStockData yet)
+  // MUST be called before any conditional returns to follow Rules of Hooks
   useEffect(() => {
-    const handleMarketRiskPremiumUpdate = (payload: MarketRiskPremiumPayload) => {
-      if (payload.new) {
-        const newItem = payload.new as MarketRiskPremiumDBRow;
-        setMarketRiskPremiums((prev) => {
-          // Update or add the country's market risk premium
-          const existing = prev.findIndex((mrp) => mrp.country === newItem.country);
-          if (existing >= 0) {
-            const updated = [...prev];
-            updated[existing] = newItem;
-            return updated;
-          }
-          return [...prev, newItem];
-        });
-      } else if (payload.old) {
-        // Handle deletion (unlikely but handle it)
-        const oldItem = payload.old as MarketRiskPremiumDBRow;
-        setMarketRiskPremiums((prev) => prev.filter((mrp) => mrp.country !== oldItem.country));
-      }
-    };
+    if (!supabase || !ticker || symbolValid !== true) return;
 
-    const handleTreasuryRateUpdate = (payload: TreasuryRatePayload) => {
-      if (payload.new) {
-        const newItem = payload.new as TreasuryRateDBRow;
-        setTreasuryRates((prev) => {
-          // Update or add the date's treasury rate
-          const existing = prev.findIndex((tr) => tr.date === newItem.date);
-          if (existing >= 0) {
-            const updated = [...prev];
-            updated[existing] = newItem;
-            return updated;
-          }
-          return [...prev, newItem];
-        });
-      } else if (payload.old) {
-        // Handle deletion (unlikely but handle it)
-        const oldItem = payload.old as TreasuryRateDBRow;
-        setTreasuryRates((prev) => prev.filter((tr) => tr.date !== oldItem.date));
-      }
-    };
-
-    const unsubscribeMRP = subscribeToMarketRiskPremiumUpdates(
-      handleMarketRiskPremiumUpdate,
-      (status, err) => {
-        if (status === "CHANNEL_ERROR" && err) {
-          console.error("[Symbol Page] Market Risk Premium subscription error:", err);
+    const channel = supabase
+      .channel(`analyst-price-targets-${ticker}`)
+      .on<AnalystPriceTargetsDBRow>(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "analyst_price_targets",
+          filter: `symbol=eq.${ticker}`,
+        },
+        (payload) => {
+          handleAnalystPriceTargetsUpdate({
+            new: (payload.new as AnalystPriceTargetsDBRow) || null,
+            old: (payload.old as AnalystPriceTargetsDBRow) || null,
+          });
         }
-      }
-    );
+      )
+      .subscribe();
 
-    const unsubscribeTR = subscribeToTreasuryRateUpdates(
-      handleTreasuryRateUpdate,
-      (status, err) => {
-        if (status === "CHANNEL_ERROR" && err) {
-          console.error("[Symbol Page] Treasury Rate subscription error:", err);
+    // Fetch initial data
+    supabase
+      .from("analyst_price_targets")
+      .select("*")
+      .eq("symbol", ticker)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) {
+          console.error(`[SymbolAnalysisPage] Error fetching analyst price targets:`, error);
+          return;
         }
-      }
-    );
+        if (data) {
+          handleAnalystPriceTargetsUpdate({ new: data, old: null });
+        }
+      });
+
+    // Fetch initial grades_historical
+    supabase
+      .from("grades_historical")
+      .select("*")
+      .eq("symbol", ticker)
+      .order("date", { ascending: false })
+      .limit(10)
+      .then(({ data, error }) => {
+        if (error) {
+          console.error(`[SymbolAnalysisPage] Error fetching grades historical:`, error);
+          return;
+        }
+        if (data) {
+          setGradesHistorical(data);
+        }
+      });
 
     return () => {
-      unsubscribeMRP();
-      unsubscribeTR();
+      supabase.removeChannel(channel);
     };
-  }, []);
+  }, [supabase, ticker, symbolValid, handleAnalystPriceTargetsUpdate]);
 
-  // Fetch initial global market data (market risk premiums and treasury rates)
+  // Subscribe to global tables (market_risk_premiums, treasury_rates) for WACC
+  // MUST be called before any conditional returns to follow Rules of Hooks
   useEffect(() => {
     if (!supabase) return;
 
-    // Fetch market risk premiums (all countries)
-    supabase
-      .from("market_risk_premiums")
-      .select("*")
-      .then(({ data, error }) => {
-        if (error) {
-          console.error(`[SymbolAnalysisPage] Error fetching market risk premiums:`, error);
-          return;
+    // Subscribe to market_risk_premiums (global table, no symbol filter)
+    const mrpChannel = supabase
+      .channel("market-risk-premiums-global")
+      .on<MarketRiskPremiumDBRow>(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "market_risk_premiums",
+        },
+        (payload: MarketRiskPremiumPayload) => {
+          if (payload.new) {
+            const newRecord = payload.new as MarketRiskPremiumDBRow;
+            setMarketRiskPremiums((prev): MarketRiskPremiumDBRow[] => {
+              const existing = prev.findIndex((m) => m.country === newRecord.country);
+              if (existing >= 0) {
+                const updated = [...prev];
+                updated[existing] = newRecord;
+                return updated;
+              }
+              return [...prev, newRecord];
+            });
+          } else if (payload.old && !payload.new) {
+            const oldRecord = payload.old as MarketRiskPremiumDBRow;
+            setMarketRiskPremiums((prev): MarketRiskPremiumDBRow[] =>
+              prev.filter((m) => m.country !== oldRecord.country)
+            );
+          }
         }
-        if (data) {
-          console.log(`[SymbolAnalysisPage] Fetched ${data.length} market risk premiums`);
-          setMarketRiskPremiums(data);
-        }
-      });
+      )
+      .subscribe();
 
-    // Fetch treasury rates (latest dates)
-    supabase
-      .from("treasury_rates")
-      .select("*")
-      .order("date", { ascending: false })
-      .limit(30) // Last 30 days
-      .then(({ data, error }) => {
-        if (error) {
-          console.error(`[SymbolAnalysisPage] Error fetching treasury rates:`, error);
-          return;
+    // Subscribe to treasury_rates (global table, no symbol filter)
+    const trChannel = supabase
+      .channel("treasury-rates-global")
+      .on<TreasuryRateDBRow>(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "treasury_rates",
+        },
+        (payload) => {
+          if (payload.new) {
+            const newRecord = payload.new as TreasuryRateDBRow;
+            setTreasuryRates((prev): TreasuryRateDBRow[] => {
+              const existing = prev.findIndex((t) => t.date === newRecord.date);
+              if (existing >= 0) {
+                const updated = [...prev];
+                updated[existing] = newRecord;
+                return updated.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+              }
+              return [...prev, newRecord].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            });
+          } else if (payload.old && !payload.new) {
+            const oldRecord = payload.old as TreasuryRateDBRow;
+            setTreasuryRates((prev): TreasuryRateDBRow[] =>
+              prev.filter((t) => t.date !== oldRecord.date)
+            );
+          }
         }
-        if (data) {
-          console.log(`[SymbolAnalysisPage] Fetched ${data.length} treasury rates`);
-          setTreasuryRates(data);
-        }
-      });
+      )
+      .subscribe();
+
+    // Fetch initial data for global tables
+    Promise.all([
+      supabase
+        .from("market_risk_premiums")
+        .select("*")
+        .then(({ data, error }) => {
+          if (error) {
+            console.error(`[SymbolAnalysisPage] Error fetching market risk premiums:`, error);
+            return;
+          }
+          if (data) {
+            setMarketRiskPremiums(data);
+          }
+        }),
+      supabase
+        .from("treasury_rates")
+        .select("*")
+        .order("date", { ascending: false })
+        .limit(30) // Get last 30 days
+        .then(({ data, error }) => {
+          if (error) {
+            console.error(`[SymbolAnalysisPage] Error fetching treasury rates:`, error);
+            return;
+          }
+          if (data) {
+            setTreasuryRates(data);
+          }
+        }),
+    ]);
+
+    return () => {
+      supabase.removeChannel(mrpChannel);
+      supabase.removeChannel(trChannel);
+    };
   }, [supabase]);
 
-  // Fetch initial insider trading data and valuations
+  // Fetch historical financial statements for ROIC chart
+  // MUST be called before any conditional returns to follow Rules of Hooks
   useEffect(() => {
-    if (!supabase || !ticker) return;
+    if (!supabase || !ticker || symbolValid !== true) return;
+
+    supabase
+      .from("financial_statements")
+      .select("*")
+      .eq("symbol", ticker)
+      .eq("period", "FY") // Only annual reports
+      .order("fetched_at", { ascending: false })
+      .order("date", { ascending: false })
+      .limit(20) // Get more than needed, then deduplicate
+      .then(({ data, error }) => {
+        if (error) {
+          console.error(`[SymbolAnalysisPage] Error fetching financial statements history:`, error);
+          return;
+        }
+        if (data) {
+          // Deduplicate: keep only the latest entry (by fetched_at) for each fiscal_year
+          const deduplicated = data
+            .reduce((acc: FinancialStatementDBRow[], item: FinancialStatementDBRow) => {
+              const existing = acc.find((a) => a.fiscal_year === item.fiscal_year);
+              if (!existing) {
+                acc.push(item);
+              } else {
+                // Keep the one with the latest fetched_at
+                const existingFetchedAt = new Date(existing.fetched_at).getTime();
+                const itemFetchedAt = new Date(item.fetched_at).getTime();
+                if (itemFetchedAt > existingFetchedAt) {
+                  const index = acc.indexOf(existing);
+                  acc[index] = item;
+                }
+              }
+              return acc;
+            }, [])
+            .sort((a: FinancialStatementDBRow, b: FinancialStatementDBRow) => {
+              // Sort by date descending
+              return new Date(b.date).getTime() - new Date(a.date).getTime();
+            })
+            .slice(0, 12); // Take latest 12 quarters (3 years)
+
+          setFinancialStatementsHistory(deduplicated);
+        }
+      });
+  }, [supabase, ticker, symbolValid]);
+
+  // Fetch initial insider trading data and valuations
+  // MUST be called before any conditional returns to follow Rules of Hooks
+  useEffect(() => {
+    if (!supabase || !ticker || symbolValid !== true) return;
+
+    // Fetch insider trading statistics (last 6 months = 2 quarters)
+    supabase
+      .from("insider_trading_statistics")
+      .select("*")
+      .eq("symbol", ticker)
+      .order("year", { ascending: false })
+      .order("quarter", { ascending: false })
+      .limit(8) // Last 2 years (8 quarters)
+      .then(({ data, error }) => {
+        if (error) {
+          console.error(`[SymbolAnalysisPage] Error fetching insider statistics:`, error);
+          return;
+        }
+        if (data) {
+          setInsiderStatistics(data);
+        }
+      });
+
+    // Fetch insider transactions (recent 100)
+    supabase
+      .from("insider_transactions")
+      .select("*")
+      .eq("symbol", ticker)
+      .order("transaction_date", { ascending: false, nullsFirst: false })
+      .order("filing_date", { ascending: false })
+      .limit(100)
+      .then(({ data, error }) => {
+        if (error) {
+          console.error(`[SymbolAnalysisPage] Error fetching insider transactions:`, error);
+          return;
+        }
+        if (data) {
+          setInsiderTransactions(data);
+        }
+      });
+
+    // Fetch valuations (DCF - last 180 days for chart)
+    supabase
+      .from("valuations")
+      .select("*")
+      .eq("symbol", ticker)
+      .eq("valuation_type", "dcf")
+      .order("date", { ascending: false })
+      .limit(180)
+      .then(({ data, error }) => {
+        if (error) {
+          console.error(`[SymbolAnalysisPage] Error fetching valuations:`, error);
+          return;
+        }
+        if (data) {
+          setValuations(data);
+        }
+      });
+
+    // Fetch latest financial statement for Safety metrics calculations (any period)
+    supabase
+      .from("financial_statements")
+      .select("*")
+      .eq("symbol", ticker)
+      .order("date", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) {
+          console.error(`[SymbolAnalysisPage] Error fetching latest financial statement:`, error);
+          return;
+        }
+        if (data) {
+          setFinancialStatement(Option.some(data));
+        }
+      });
+  }, [supabase, ticker, symbolValid]);
+
+  // Fetch initial insider trading data and valuations
+  // MUST be called before any conditional returns to follow Rules of Hooks
+  useEffect(() => {
+    if (!supabase || !ticker || symbolValid !== true) return;
 
     // Fetch insider trading statistics (last 6 months = 2 quarters)
     supabase
@@ -1109,16 +1400,7 @@ export default function SymbolAnalysisPage() {
           return;
         }
         if (data && data.length > 0) {
-          console.log(`[SymbolAnalysisPage] Fetched latest financial statement for ${ticker}:`, {
-            date: data[0].date,
-            period: data[0].period,
-            hasIncome: !!data[0].income_statement_payload,
-            hasBalance: !!data[0].balance_sheet_payload,
-            hasCashFlow: !!data[0].cash_flow_payload,
-          });
           setFinancialStatement(Option.some(data[0]));
-        } else {
-          console.warn(`[SymbolAnalysisPage] No financial statements found for ${ticker}`);
         }
       });
 
@@ -1164,7 +1446,83 @@ export default function SymbolAnalysisPage() {
           setFinancialStatementsHistory(sorted);
         }
       });
+  }, [supabase, ticker, symbolValid]);
+
+  // Validate symbol exists in listed_symbols before loading
+  // MUST be called before any conditional returns to follow Rules of Hooks
+  useEffect(() => {
+    if (!supabase || !ticker) return;
+
+    // Check if symbol exists in listed_symbols
+    supabase
+      .from("listed_symbols")
+      .select("symbol")
+      .eq("symbol", ticker)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) {
+          console.error(`[SymbolAnalysisPage] Error checking symbol validity:`, error);
+          setSymbolValid(true); // Allow page to load on error (graceful degradation)
+          return;
+        }
+
+        if (!data) {
+          // Symbol not found
+          setSymbolValid(false);
+        } else {
+          setSymbolValid(true);
+        }
+      });
   }, [supabase, ticker]);
+
+  // Don't render page content until symbol is validated
+  if (symbolValid === null) {
+    return (
+      <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
+        <div className="text-center">
+          <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Validating symbol...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show not-found UI if symbol is invalid
+  if (symbolValid === false) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] text-center">
+        <Card className="max-w-md w-full">
+          <CardHeader>
+            <div className="flex justify-center mb-4">
+              <AlertTriangle className="h-16 w-16 text-destructive" />
+            </div>
+            <CardTitle className="text-2xl font-semibold text-destructive">
+              Symbol Not Found
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              The symbol <strong className="text-foreground">{ticker}</strong> is not available in our database.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              This symbol may not be listed, may have been delisted, or may not be supported at this time.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
+              <Button asChild variant="default">
+                <a href="/compass">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Compass
+                </a>
+              </Button>
+              <Button asChild variant="outline">
+                <a href="/">Go to Homepage</a>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const handleAddToWorkspace = async () => {
     setAddingToWorkspace(true);
@@ -1339,11 +1697,18 @@ export default function SymbolAnalysisPage() {
               <ScorecardItem
                 icon={<Users className="h-4 w-4" />}
                 label="Sentiment"
-                status={Option.match(contrarianIndicators.analystConsensus, {
+                status={Option.match(analystConsensus, {
                   onNone: () => "Unknown",
                   onSome: (s) => s,
                 })}
-                statusColor="text-yellow-600"
+                statusColor={Option.match(analystConsensus, {
+                  onNone: () => "text-muted-foreground",
+                  onSome: (s) => {
+                    if (s === "Strong Buy" || s === "Buy") return "text-green-600";
+                    if (s === "Hold") return "text-yellow-600";
+                    return "text-red-600";
+                  },
+                })}
               />
             </div>
           </div>
@@ -1848,22 +2213,32 @@ export default function SymbolAnalysisPage() {
           </Card>
 
           {/* C3. Risk/Shorts */}
-          <Card>
+          <Card className={cn("border-l-4", contrarianStatus.borderColor)}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" />
-                Contrarian Indicators
-              </CardTitle>
+              <div className="flex items-start justify-between">
+                <div>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    Contrarian Indicators
+                  </CardTitle>
+                </div>
+                {contrarianStatus.status !== "Unknown" && (
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      contrarianStatus.status.includes("Bullish")
+                        ? "bg-green-50 text-green-700 border-green-300"
+                        : contrarianStatus.status.includes("Bearish")
+                        ? "bg-red-50 text-red-700 border-red-300"
+                        : "bg-yellow-50 text-yellow-700 border-yellow-300"
+                    )}
+                  >
+                    {contrarianStatus.status}
+                  </Badge>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <MetricRow
-                label="Short Interest"
-                value={Option.match(contrarianIndicators.shortInterest, {
-                  onNone: () => null,
-                  onSome: (v) => (v * 100).toFixed(1) + "%",
-                })}
-                subtext="Low Squeeze Risk"
-              />
               <MetricRow
                 label="Analyst Consensus"
                 value={Option.match(contrarianIndicators.analystConsensus, {
@@ -1890,6 +2265,7 @@ export default function SymbolAnalysisPage() {
                   },
                 })}
               />
+
             </CardContent>
           </Card>
         </div>

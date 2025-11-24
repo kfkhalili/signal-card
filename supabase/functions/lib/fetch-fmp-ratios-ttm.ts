@@ -237,7 +237,6 @@ export async function fetchRatiosTtmLogic(
       throw new Error(`Database upsert failed: ${upsertError.message}`);
     }
 
-    console.log(`[fetchRatiosTtmLogic] Successfully upserted TTM Ratios for ${job.symbol}. Count: ${count || 0}`);
 
     return {
       success: true,

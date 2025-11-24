@@ -7,7 +7,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { LogOut, LayoutDashboard, Loader2, AlertTriangle, Compass } from "lucide-react"; // Added Compass icon
+import { LogOut, LayoutDashboard, Loader2, AlertTriangle, Compass, TrendingUp } from "lucide-react"; // Added Compass icon
 import Avatar from "@/components/ui/Avatar";
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { Database } from '@/lib/supabase/database.types'
@@ -112,6 +112,12 @@ const Header: React.FC = () => {
                 title="Market Compass"
                 icon={Compass}
                 text="Compass"
+              />
+              <NavLinkItem
+                href="/symbol"
+                title="Analysis"
+                icon={TrendingUp}
+                text="Analysis"
               />
               <NavLinkItem
                 href="/workspace"

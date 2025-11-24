@@ -215,7 +215,6 @@ export async function fetchRevenueProductSegmentationLogic(
         throw new Error(`Database upsert failed: ${upsertError.message}`);
       }
 
-      console.log(`[fetchRevenueProductSegmentationLogic] Successfully upserted ${count || 0} revenue segmentation records for ${job.symbol}.`);
     }
 
     return {

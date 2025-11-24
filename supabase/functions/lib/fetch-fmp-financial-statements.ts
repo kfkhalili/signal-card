@@ -261,7 +261,6 @@ export async function fetchFinancialStatementsLogic(
         throw new Error(`Database upsert failed: ${upsertError.message}`);
       }
 
-      console.log(`[fetchFinancialStatementsLogic] Successfully upserted ${count || 0} statement periods for ${job.symbol}`);
     } else {
       console.warn(`[fetchFinancialStatementsLogic] No consolidated statement data to upsert for ${job.symbol}`);
     }

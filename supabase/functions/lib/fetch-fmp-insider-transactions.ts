@@ -24,13 +24,13 @@ const FmpInsiderTransactionSchema = z.object({
   reportingName: z.string().nullable().optional(),
   typeOfOwner: z.string().nullable().optional(), // e.g., "officer: SVP, GC and Secretary"
   acquisitionOrDisposition: z
-    .union([z.enum(['A', 'D']), z.literal(''), z.null()])
-    .transform((val) => (val === '' ? null : val))
+    .union([z.enum(['A', 'D', 'I']), z.literal(''), z.null()])
+    .transform((val) => (val === '' || val === 'I' ? null : val)) // I = Initial/Inherited, treat as null
     .nullable()
-    .optional(), // A = Acquisition, D = Disposition, empty string = null
+    .optional(), // A = Acquisition, D = Disposition, I = Initial/Inherited (treated as null), empty string = null
   directOrIndirect: z.enum(['D', 'I']).nullable().optional(), // D = Direct, I = Indirect
   formType: z.string().nullable().optional(), // e.g., "4"
-  securitiesTransacted: z.number().int().nonnegative(),
+  securitiesTransacted: z.number().nonnegative().nullable().optional(), // Accept float, convert to int when storing. Can be null for some transaction types
   price: z.number().nonnegative().nullable().optional(), // Can be 0 for gifts
   securityName: z.string().nullable().optional(), // e.g., "Common Stock"
   url: z.string().url().nullable().optional(),
@@ -154,27 +154,39 @@ export async function fetchInsiderTransactionsLogic(
     // Transform to database format
     // CRITICAL: Keep numbers as numbers (not BigInt) - PostgreSQL NUMERIC/BIGINT handles large numbers
     // Converting to JavaScript BigInt causes serialization errors when upserting to Supabase
-    const dbRecords = validatedRecords.map((record) => ({
-      symbol: record.symbol,
-      filing_date: record.filingDate,
-      transaction_date: record.transactionDate || null,
-      reporting_cik: record.reportingCik,
-      company_cik: record.companyCik || null,
-      transaction_type: record.transactionType || null,
-      securities_owned: record.securitiesOwned !== null && record.securitiesOwned !== undefined
-        ? Math.floor(record.securitiesOwned) // Convert float to int
-        : null,
-      reporting_name: record.reportingName || null,
-      type_of_owner: record.typeOfOwner || null,
-      acquisition_or_disposition: record.acquisitionOrDisposition || null,
-      direct_or_indirect: record.directOrIndirect || null,
-      form_type: record.formType || null,
-      securities_transacted: record.securitiesTransacted, // Keep as number, PostgreSQL will handle it
-      price: record.price ?? null,
-      security_name: record.securityName || null,
-      url: record.url || null,
-      fetched_at: new Date().toISOString(),
-    }));
+    // CRITICAL: Filter out records where securities_transacted is null (it's part of primary key and NOT NULL)
+    const dbRecords = validatedRecords
+      .filter((record) => {
+        // Skip records with null securities_transacted (required field, part of primary key)
+        if (record.securitiesTransacted === null || record.securitiesTransacted === undefined) {
+          console.warn(
+            `[fetchInsiderTransactionsLogic] Skipping transaction for ${job.symbol} with null securities_transacted. Filing date: ${record.filingDate}, Reporting CIK: ${record.reportingCik}`
+          );
+          return false;
+        }
+        return true;
+      })
+      .map((record) => ({
+        symbol: record.symbol,
+        filing_date: record.filingDate,
+        transaction_date: record.transactionDate || null,
+        reporting_cik: record.reportingCik,
+        company_cik: record.companyCik || null,
+        transaction_type: record.transactionType || null,
+        securities_owned: record.securitiesOwned !== null && record.securitiesOwned !== undefined
+          ? Math.floor(record.securitiesOwned) // Convert float to int
+          : null,
+        reporting_name: record.reportingName || null,
+        type_of_owner: record.typeOfOwner || null,
+        acquisition_or_disposition: record.acquisitionOrDisposition || null,
+        direct_or_indirect: record.directOrIndirect || null,
+        form_type: record.formType || null,
+        securities_transacted: Math.floor(record.securitiesTransacted!), // Convert float to int (non-null after filter)
+        price: record.price ?? null,
+        security_name: record.securityName || null,
+        url: record.url || null,
+        fetched_at: new Date().toISOString(),
+      }));
 
     // CRITICAL: Deduplicate records by primary key before upserting
     // PostgreSQL error "ON CONFLICT DO UPDATE command cannot affect row a second time" occurs
@@ -193,11 +205,7 @@ export async function fetchInsiderTransactionsLogic(
       return true;
     });
 
-    if (deduplicatedRecords.length < dbRecords.length) {
-      console.log(
-        `[fetchInsiderTransactionsLogic] Deduplicated ${dbRecords.length - deduplicatedRecords.length} duplicate transactions for ${job.symbol}`
-      );
-    }
+    // Deduplicate records silently
 
     // Upsert all records (multiple transactions per symbol)
     const { error: upsertError } = await supabase
@@ -211,9 +219,6 @@ export async function fetchInsiderTransactionsLogic(
       throw new Error(`Failed to upsert insider transactions for ${job.symbol}: ${upsertError.message}`);
     }
 
-    console.log(
-      `[fetchInsiderTransactionsLogic] Successfully upserted ${deduplicatedRecords.length} insider transaction records for ${job.symbol}`
-    );
 
     return {
       success: true,

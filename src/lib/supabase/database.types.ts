@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      analyst_price_targets: {
+        Row: {
+          fetched_at: string
+          symbol: string
+          target_consensus: number
+          target_high: number
+          target_low: number
+          target_median: number
+          updated_at: string
+        }
+        Insert: {
+          fetched_at?: string
+          symbol: string
+          target_consensus: number
+          target_high: number
+          target_low: number
+          target_median: number
+          updated_at?: string
+        }
+        Update: {
+          fetched_at?: string
+          symbol?: string
+          target_consensus?: number
+          target_high?: number
+          target_low?: number
+          target_median?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_analyst_price_targets_symbol"
+            columns: ["symbol"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["symbol"]
+          },
+        ]
+      }
       api_call_queue_v2: {
         Row: {
           actual_data_size_bytes: number | null

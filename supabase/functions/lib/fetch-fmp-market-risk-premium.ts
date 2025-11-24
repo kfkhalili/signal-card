@@ -124,7 +124,6 @@ export async function fetchMarketRiskPremiumLogic(
       throw new Error(`Database upsert failed: ${upsertError.message}`);
     }
 
-    console.log(`[fetchMarketRiskPremiumLogic] Successfully upserted ${count || dbRecords.length} market risk premium records`);
 
     return {
       success: true,

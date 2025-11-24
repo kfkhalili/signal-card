@@ -339,28 +339,11 @@ export function useStockData({
     realtimeManager.addSymbol(symbol);
 
     const handleQuoteUpdate = (quote: LiveQuoteIndicatorDBRow) => {
-      if (process.env.NODE_ENV === "development") {
-        console.log(
-          `[useStockData ${symbol}] Received quote update from RealtimeStockManager`,
-          quote
-        );
-      }
       if (quote.symbol === symbol) {
         if (isMountedRef.current) {
           setLatestQuote(Option.some(quote));
           if (onLiveQuoteUpdate) {
-            if (process.env.NODE_ENV === "development") {
-              console.log(
-                `[useStockData ${symbol}] Calling onLiveQuoteUpdate callback`
-              );
-            }
             onLiveQuoteUpdate(quote, "realtime");
-          } else {
-            if (process.env.NODE_ENV === "development") {
-              console.warn(
-                `[useStockData ${symbol}] onLiveQuoteUpdate callback is not provided`
-              );
-            }
           }
         }
       }

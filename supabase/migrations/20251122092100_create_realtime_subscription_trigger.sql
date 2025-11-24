@@ -28,6 +28,7 @@ BEGIN
     WHEN 'valuations' THEN v_data_type := 'valuations';
     WHEN 'market_risk_premiums' THEN v_data_type := 'market-risk-premium';
     WHEN 'treasury_rates' THEN v_data_type := 'treasury-rates';
+    WHEN 'analyst_price_targets' THEN v_data_type := 'analyst-price-targets';
     ELSE
       -- Not a tracked entity, skip
       RETURN NEW;
