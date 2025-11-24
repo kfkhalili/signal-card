@@ -20,6 +20,8 @@ import {
 import { cn, createSecureImageUrl } from "@/lib/utils";
 import Image from "next/image";
 import { useAddCardToWorkspace } from "@/hooks/useAddCardToWorkspace";
+import { useWorkspaceCards, removeSymbolFromWorkspace } from "@/hooks/useWorkspaceCards";
+import type { CardType } from "@/components/game/cards/base-card/base-card.types";
 import { useStockData, type ProfileDBRow } from "@/hooks/useStockData";
 import {
   type MarketRiskPremiumDBRow,
@@ -544,6 +546,8 @@ export default function SymbolAnalysisPage() {
   const ticker = (params.ticker as string)?.toUpperCase() || "";
   const { addCard } = useAddCardToWorkspace();
   const [addingToWorkspace, setAddingToWorkspace] = useState(false);
+  const [removingFromWorkspace, setRemovingFromWorkspace] = useState(false);
+  const { hasCards: hasCardsInWorkspace } = useWorkspaceCards(ticker);
   const exchangeRates = useExchangeRate();
 
   // State with Option types
@@ -1524,12 +1528,46 @@ export default function SymbolAnalysisPage() {
     );
   }
 
+  // Determine relevant cards based on data shown on this page
+  const relevantCardTypes = useMemo((): CardType[] => {
+    const cardTypes: CardType[] = ["profile", "price", "keyratios"];
+    
+    // Add financial statement cards if we have financial data
+    if (Option.isSome(financialStatement)) {
+      cardTypes.push("revenue", "solvency", "cashuse");
+    }
+    
+    // Add analyst grades if we have grades data
+    if (gradesHistorical.length > 0) {
+      cardTypes.push("analystgrades");
+    }
+    
+    // Note: dividendHistory, revenueSegmentation, and exchangeVariants
+    // are not currently tracked on this page, but cards can still be added
+    // The workspace will fetch the data when the cards are initialized
+    
+    return cardTypes;
+  }, [financialStatement, gradesHistorical]);
+
   const handleAddToWorkspace = async () => {
     setAddingToWorkspace(true);
     try {
-      await addCard(ticker, ["profile", "keyratios"]);
+      await addCard(ticker, relevantCardTypes);
     } finally {
       setAddingToWorkspace(false);
+    }
+  };
+
+  const handleRemoveFromWorkspace = async () => {
+    setRemovingFromWorkspace(true);
+    try {
+      const removed = removeSymbolFromWorkspace(ticker);
+      if (removed) {
+        // Navigate to workspace to see the change
+        router.push("/workspace");
+      }
+    } finally {
+      setRemovingFromWorkspace(false);
     }
   };
 
@@ -1583,10 +1621,23 @@ export default function SymbolAnalysisPage() {
         <Button variant="ghost" size="sm" onClick={() => router.back()} className="gap-2">
           <ArrowLeft className="h-4 w-4" /> Back
         </Button>
-        <Button onClick={handleAddToWorkspace} disabled={addingToWorkspace} size="sm" className="gap-2">
-          {addingToWorkspace ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlusCircle className="h-4 w-4" />}
-          Add to Workspace
-        </Button>
+        {hasCardsInWorkspace ? (
+          <Button 
+            onClick={handleRemoveFromWorkspace} 
+            disabled={removingFromWorkspace} 
+            size="sm" 
+            variant="destructive"
+            className="gap-2"
+          >
+            {removingFromWorkspace ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlertTriangle className="h-4 w-4" />}
+            Remove from Workspace
+          </Button>
+        ) : (
+          <Button onClick={handleAddToWorkspace} disabled={addingToWorkspace} size="sm" className="gap-2">
+            {addingToWorkspace ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlusCircle className="h-4 w-4" />}
+            Add to Workspace
+          </Button>
+        )}
       </div>
 
       {/* --- ZONE A: THE HERO (THESIS & CONTEXT) --- */}

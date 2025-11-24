@@ -344,6 +344,8 @@ export default function CompassPage() {
                         <div className="flex items-center gap-2">
                           <Link
                             href={`/symbol/${item.symbol}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="font-semibold text-base truncate hover:text-primary transition-colors"
                             title={`View detailed analysis for ${item.symbol}`}
                           >
