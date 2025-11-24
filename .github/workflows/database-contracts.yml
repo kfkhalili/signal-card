@@ -49,7 +49,7 @@ jobs:
         continue-on-error: false
 
       - name: Apply migrations
-        run: supabase db push
+        run: supabase migration up
         continue-on-error: false
 
       - name: Run contract tests
