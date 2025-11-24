@@ -706,8 +706,9 @@ BEGIN
     WHERE data_type = ANY(p_data_types)
   LOOP
     -- SECURITY: Validate identifiers before use (defense in depth)
+    -- CRITICAL: symbol_column can be NULL for global tables (e.g., market_risk_premiums, treasury_rates)
     IF NOT is_valid_identifier(reg_row.table_name) OR
-       NOT is_valid_identifier(reg_row.symbol_column) OR
+       (reg_row.symbol_column IS NOT NULL AND NOT is_valid_identifier(reg_row.symbol_column)) OR
        NOT is_valid_identifier(reg_row.timestamp_column) OR
        NOT is_valid_identifier(reg_row.staleness_function)
     THEN
@@ -857,22 +858,23 @@ BEGIN
         AND asub.data_type = r.data_type
       WHERE r.refresh_strategy = 'on-demand'
     LOOP
-    -- SECURITY: Validate identifiers before use (defense in depth)
-    IF NOT is_valid_identifier(reg_row.table_name) OR
-       NOT is_valid_identifier(reg_row.symbol_column) OR
-       NOT is_valid_identifier(reg_row.timestamp_column) OR
-       NOT is_valid_identifier(reg_row.staleness_function)
-    THEN
-      RAISE EXCEPTION 'Invalid identifier found in data_type_registry: %', reg_row.data_type;
-    END IF;
+      -- SECURITY: Validate identifiers before use (defense in depth)
+      -- CRITICAL: symbol_column can be NULL for global tables (e.g., market_risk_premiums, treasury_rates)
+      IF NOT is_valid_identifier(reg_row.table_name) OR
+         (reg_row.symbol_column IS NOT NULL AND NOT is_valid_identifier(reg_row.symbol_column)) OR
+         NOT is_valid_identifier(reg_row.timestamp_column) OR
+         NOT is_valid_identifier(reg_row.staleness_function)
+      THEN
+        RAISE EXCEPTION 'Invalid identifier found in data_type_registry: %', reg_row.data_type;
+      END IF;
 
       -- FAULT TOLERANCE: Wrap in exception handler so one bad symbol/data_type doesn't break the entire cron job
       BEGIN
         -- 4. Build dynamic SQL for THIS symbol and data type (100% generic, no hardcoding)
         -- CRITICAL: Query is now Symbol-by-Symbol, not Type-by-Type
         -- This creates tiny, fast, indexed queries instead of giant JOINs
-        -- Special handling for exchange-variants (multiple records per symbol)
-        IF reg_row.data_type = 'exchange-variants' THEN
+        -- Special handling for global tables (no symbol column)
+        IF reg_row.symbol_column IS NULL THEN
           sql_text := format(
             $SQL$
               INSERT INTO api_call_queue_v2 (symbol, data_type, status, priority, estimated_data_size_bytes)
