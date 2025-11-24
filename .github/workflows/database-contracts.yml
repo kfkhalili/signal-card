@@ -47,6 +47,10 @@ jobs:
           psql "$DB_URL" -c "CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;"
         continue-on-error: false
 
+      - name: Apply migrations
+        run: supabase db push
+        continue-on-error: false
+
       - name: Run contract tests
         run: npm run test:contracts
         # The script auto-detects DATABASE_URL from Supabase status if not set
