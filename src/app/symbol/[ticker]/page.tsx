@@ -577,6 +577,28 @@ export default function SymbolAnalysisPage() {
   const [gradesHistorical, setGradesHistorical] = useState<GradesHistoricalDBRow[]>([]);
   const [analystPriceTargets, setAnalystPriceTargets] = useState<Option.Option<AnalystPriceTargetsDBRow>>(Option.none());
 
+  // Determine relevant cards based on data shown on this page
+  // MUST be before any conditional returns to comply with Rules of Hooks
+  const relevantCardTypes = useMemo((): CardType[] => {
+    const cardTypes: CardType[] = ["profile", "price", "keyratios"];
+    
+    // Add financial statement cards if we have financial data
+    if (Option.isSome(financialStatement)) {
+      cardTypes.push("revenue", "solvency", "cashuse");
+    }
+    
+    // Add analyst grades if we have grades data
+    if (gradesHistorical.length > 0) {
+      cardTypes.push("analystgrades");
+    }
+    
+    // Note: dividendHistory, revenueSegmentation, and exchangeVariants
+    // are not currently tracked on this page, but cards can still be added
+    // The workspace will fetch the data when the cards are initialized
+    
+    return cardTypes;
+  }, [financialStatement, gradesHistorical]);
+
   // Derived metrics (using real data from valuations table)
   const valuationMetrics: ValuationMetrics = (() => {
     // Get latest DCF valuation
@@ -1527,27 +1549,6 @@ export default function SymbolAnalysisPage() {
       </div>
     );
   }
-
-  // Determine relevant cards based on data shown on this page
-  const relevantCardTypes = useMemo((): CardType[] => {
-    const cardTypes: CardType[] = ["profile", "price", "keyratios"];
-    
-    // Add financial statement cards if we have financial data
-    if (Option.isSome(financialStatement)) {
-      cardTypes.push("revenue", "solvency", "cashuse");
-    }
-    
-    // Add analyst grades if we have grades data
-    if (gradesHistorical.length > 0) {
-      cardTypes.push("analystgrades");
-    }
-    
-    // Note: dividendHistory, revenueSegmentation, and exchangeVariants
-    // are not currently tracked on this page, but cards can still be added
-    // The workspace will fetch the data when the cards are initialized
-    
-    return cardTypes;
-  }, [financialStatement, gradesHistorical]);
 
   const handleAddToWorkspace = async () => {
     setAddingToWorkspace(true);
