@@ -22,6 +22,7 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+        continue-on-error: false
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
@@ -57,7 +58,14 @@ jobs:
 
       - name: Stop Supabase
         if: always()
-        run: supabase stop
+        run: |
+          # Only stop if Supabase CLI is available and Supabase was started
+          if command -v supabase &>/dev/null && supabase status &>/dev/null; then
+            echo "Stopping Supabase..."
+            supabase stop || true
+          else
+            echo "Supabase not running or CLI not available, skipping stop"
+          fi
 
       - name: Upload test results
         if: failure()
