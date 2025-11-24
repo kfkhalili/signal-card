@@ -26,6 +26,7 @@ import {
   FormLabel,
 } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import {
   PlusCircle,
   ArrowLeft,
@@ -151,6 +152,7 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
   const [debouncedSearchQuery] = useDebounce(searchQuery, 300);
   const [searchResults, setSearchResults] = useState<SymbolSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [focusedSymbolIndex, setFocusedSymbolIndex] = useState<number>(-1);
 
   const form = useForm<AddCardFormValues>({
     resolver: zodResolver(AddCardFormSchema),
@@ -215,6 +217,8 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
 
       setSearchResults(results);
       setIsSearching(false);
+      // Reset focused index when search results change
+      setFocusedSymbolIndex(-1);
     };
 
     searchSymbols();
@@ -230,6 +234,7 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
       setIsSubmitting(false);
       setSearchQuery("");
       setSearchResults([]);
+      setFocusedSymbolIndex(-1);
     }
   }, [isOpen, form]);
 
@@ -254,6 +259,20 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
             placeholder="Type a symbol (e.g., AAPL, MSFT)..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowDown" && searchResults.length > 0) {
+                e.preventDefault();
+                const firstIndex = 0;
+                setFocusedSymbolIndex(firstIndex);
+                // Use setTimeout to ensure DOM is updated
+                setTimeout(() => {
+                  const firstButton = document.querySelector(
+                    `[data-symbol-index="${firstIndex}"]`
+                  ) as HTMLButtonElement;
+                  firstButton?.focus();
+                }, 0);
+              }
+            }}
             className="pl-9"
             autoFocus
           />
@@ -269,7 +288,7 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
               </div>
             ) : (
               <div className="divide-y">
-                {searchResults.map((result) => (
+                {searchResults.map((result, index) => (
                   <button
                     key={result.symbol}
                     type="button"
@@ -279,7 +298,43 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
                       });
                       setView("types");
                     }}
-                    className="w-full px-4 py-3 text-left hover:bg-accent transition-colors flex justify-between items-center">
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        form.setValue("symbol", result.symbol, {
+                          shouldValidate: true,
+                        });
+                        setView("types");
+                      } else if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        const nextIndex = Math.min(
+                          index + 1,
+                          searchResults.length - 1
+                        );
+                        setFocusedSymbolIndex(nextIndex);
+                        // Use setTimeout to ensure DOM is updated
+                        setTimeout(() => {
+                          const nextButton = document.querySelector(
+                            `[data-symbol-index="${nextIndex}"]`
+                          ) as HTMLButtonElement;
+                          nextButton?.focus();
+                        }, 0);
+                      } else if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        const prevIndex = Math.max(index - 1, 0);
+                        setFocusedSymbolIndex(prevIndex);
+                        // Use setTimeout to ensure DOM is updated
+                        setTimeout(() => {
+                          const prevButton = document.querySelector(
+                            `[data-symbol-index="${prevIndex}"]`
+                          ) as HTMLButtonElement;
+                          prevButton?.focus();
+                        }, 0);
+                      }
+                    }}
+                    data-symbol-index={index}
+                    className="w-full px-4 py-3 text-left hover:bg-accent focus:bg-accent focus:outline-none transition-colors flex justify-between items-center"
+                    tabIndex={focusedSymbolIndex === index ? 0 : -1}>
                     <span className="font-semibold">{result.symbol}</span>
                     {result.companyName && (
                       <span className="text-muted-foreground text-xs truncate ml-4">
@@ -336,11 +391,11 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
                     }}
                   />
                 </FormControl>
-                <FormLabel
+                <Label
                   htmlFor="select-all-card-types"
                   className="font-normal cursor-pointer w-full">
                   Select All
-                </FormLabel>
+                </Label>
               </FormItem>
 
               <div className="relative">

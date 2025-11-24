@@ -29,6 +29,12 @@ import { fetchDividendHistoryLogic } from '../lib/fetch-fmp-dividend-history.ts'
 import { fetchRevenueProductSegmentationLogic } from '../lib/fetch-fmp-revenue-product-segmentation.ts';
 import { fetchGradesHistoricalLogic } from '../lib/fetch-fmp-grades-historical.ts';
 import { fetchExchangeVariantsLogic } from '../lib/fetch-fmp-exchange-variants.ts';
+import { fetchInsiderTradingStatisticsLogic } from '../lib/fetch-fmp-insider-trading-statistics.ts';
+import { fetchInsiderTransactionsLogic } from '../lib/fetch-fmp-insider-transactions.ts';
+import { fetchDcfLogic } from '../lib/fetch-fmp-dcf.ts';
+import { fetchMarketRiskPremiumLogic } from '../lib/fetch-fmp-market-risk-premium.ts';
+import { fetchTreasuryRatesLogic } from '../lib/fetch-fmp-treasury-rates.ts';
+import { fetchPriceTargetConsensusLogic } from '../lib/fetch-fmp-price-target-consensus.ts';
 // All card data types have been migrated to the queue system
 
 interface QueueJob {
@@ -236,10 +242,6 @@ Deno.serve(async (req: Request) => {
               console.error(`[queue-processor-v2] Failed to complete job ${job.id}:`, completeError);
               processedJobs.push({ id: job.id, success: false, error: completeError.message });
             } else {
-              // Log informational message if present (e.g., stale data rejection)
-              if (result.message) {
-                console.log(`[queue-processor-v2] Job ${job.id} completed: ${result.message}`);
-              }
               processedJobs.push({ id: job.id, success: true });
               jobsProcessed++; // Count successful jobs toward rate limit
             }
@@ -369,6 +371,18 @@ async function processJob(
       return await fetchGradesHistoricalLogic(job, supabase);
     case 'exchange-variants':
       return await fetchExchangeVariantsLogic(job, supabase);
+    case 'insider-trading-statistics':
+      return await fetchInsiderTradingStatisticsLogic(job, supabase);
+    case 'insider-transactions':
+      return await fetchInsiderTransactionsLogic(job, supabase);
+    case 'valuations':
+      return await fetchDcfLogic(job, supabase);
+    case 'market-risk-premium':
+      return await fetchMarketRiskPremiumLogic(job, supabase);
+    case 'treasury-rates':
+      return await fetchTreasuryRatesLogic(job, supabase);
+    case 'analyst-price-targets':
+      return await fetchPriceTargetConsensusLogic(job, supabase);
     default:
       return {
         success: false,

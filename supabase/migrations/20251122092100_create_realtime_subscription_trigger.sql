@@ -13,20 +13,6 @@ DECLARE
   v_priority INTEGER := 1; -- High priority for user-facing subscriptions
   v_data_types TEXT[];
 BEGIN
-  -- Extract symbol from filters using the same logic as get_active_subscriptions_from_realtime
-  -- Format: filters::text contains 'symbol,eq,AAPL' or similar
-  v_symbol := SUBSTRING(NEW.filters::text FROM 'symbol,eq,([^)]+)');
-
-  -- If we couldn't extract a symbol, skip (might be a global subscription)
-  IF v_symbol IS NULL OR v_symbol = '' THEN
-    RETURN NEW;
-  END IF;
-
-  -- Only process if filters contain symbol filter (same check as get_active_subscriptions_from_realtime)
-  IF NEW.filters::text NOT LIKE '%symbol,eq,%' THEN
-    RETURN NEW;
-  END IF;
-
   -- Map entity (table name) to data_type (same mapping as get_active_subscriptions_from_realtime)
   CASE NEW.entity::text
     WHEN 'profiles' THEN v_data_type := 'profile';
@@ -37,10 +23,36 @@ BEGIN
     WHEN 'revenue_product_segmentation' THEN v_data_type := 'revenue-product-segmentation';
     WHEN 'grades_historical' THEN v_data_type := 'grades-historical';
     WHEN 'exchange_variants' THEN v_data_type := 'exchange-variants';
+    WHEN 'insider_trading_statistics' THEN v_data_type := 'insider-trading-statistics';
+    WHEN 'insider_transactions' THEN v_data_type := 'insider-transactions';
+    WHEN 'valuations' THEN v_data_type := 'valuations';
+    WHEN 'market_risk_premiums' THEN v_data_type := 'market-risk-premium';
+    WHEN 'treasury_rates' THEN v_data_type := 'treasury-rates';
+    WHEN 'analyst_price_targets' THEN v_data_type := 'analyst-price-targets';
     ELSE
       -- Not a tracked entity, skip
       RETURN NEW;
   END CASE;
+
+  -- For global tables (market_risk_premiums, treasury_rates), use 'GLOBAL' as symbol
+  -- These tables don't have symbol filters - they're global datasets
+  IF v_data_type IN ('market-risk-premium', 'treasury-rates') THEN
+    v_symbol := 'GLOBAL';
+  ELSE
+    -- Extract symbol from filters using the same logic as get_active_subscriptions_from_realtime
+    -- Format: filters::text contains 'symbol,eq,AAPL' or similar
+    v_symbol := SUBSTRING(NEW.filters::text FROM 'symbol,eq,([^)]+)');
+
+    -- If we couldn't extract a symbol, skip (might be a global subscription for symbol-specific table)
+    IF v_symbol IS NULL OR v_symbol = '' THEN
+      RETURN NEW;
+    END IF;
+
+    -- Only process if filters contain symbol filter (same check as get_active_subscriptions_from_realtime)
+    IF NEW.filters::text NOT LIKE '%symbol,eq,%' THEN
+      RETURN NEW;
+    END IF;
+  END IF;
 
   -- Build data_types array (single element for now)
   v_data_types := ARRAY[v_data_type];

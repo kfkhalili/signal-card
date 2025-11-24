@@ -122,10 +122,15 @@ ROLLBACK;
 - ✅ **Contract #1:** Atomic batch claiming (`get_queue_batch_v2`)
 - ✅ **Contract #2:** `SKIP LOCKED` in recovery (`recover_stuck_jobs_v2`)
 - ✅ **Contract #3:** Advisory locks on cron jobs
+- ✅ **Contract #4:** Exception blocks in `check_and_queue_stale_batch_v2`
 - ✅ **Contract #8:** Scheduled job priority = -1 (`queue_scheduled_refreshes_v2`)
+- ✅ **Contract #9:** TABLESAMPLE in `queue_scheduled_refreshes_v2`
+- ✅ **Contract #11:** Table partitioning (`api_call_queue_v2`)
+- ✅ **Contract #12:** Symbol-by-symbol query pattern (`check_and_queue_stale_data_from_presence_v2`)
 - ✅ **Contract #13:** No TTL defaults (`is_data_stale_v2`, `is_profile_stale_v2`)
 - ✅ **Contract #15:** Circuit breaker sensitivity (`invoke_processor_loop_v2`)
 - ✅ **Contract #16:** Polite partition maintenance (`maintain_queue_partitions_v2`)
+- ✅ **Contract #17:** Deadlock-aware error handling (processor)
 - ✅ **Contract #18:** `SECURITY DEFINER` on `check_and_queue_stale_batch_v2`
 
 ### TypeScript Contracts (ESLint Rules)

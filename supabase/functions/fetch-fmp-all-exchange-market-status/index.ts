@@ -68,15 +68,7 @@ function censorApiKey(url: string, apiKey: string | undefined): string {
 function parseLocalTime(
   fmpTimeString: string | undefined | null
 ): string | null {
-  // Log input for debugging
-  if (fmpTimeString && (fmpTimeString.includes("NASDAQ") || fmpTimeString.includes("9:30") || fmpTimeString.includes("4:00"))) {
-    console.log(`[parseLocalTime] Input: "${fmpTimeString}"`);
-  }
-
   if (!fmpTimeString || fmpTimeString.toUpperCase().includes("CLOSED")) {
-    if (fmpTimeString) {
-      console.log(`[parseLocalTime] Returning null - contains "CLOSED" or empty: "${fmpTimeString}"`);
-    }
     return null;
   }
 
@@ -85,7 +77,6 @@ function parseLocalTime(
     /^(\d{1,2}:\d{2}(?:\s*a\.?m\.?|\s*p\.?m\.?)?)/i
   );
   if (!coreTimeMatch) {
-    console.log(`[parseLocalTime] No regex match, returning fallback: "${fmpTimeString}"`);
     return fmpTimeString; // Fallback
   }
   // Remove periods from a.m./p.m. for compatibility with date-fns
@@ -94,10 +85,6 @@ function parseLocalTime(
   // Why: We determine the correct parsing format based on whether AM/PM is present.
   const hasAmPm = /am|pm/i.test(coreTime);
   const parseFormat = hasAmPm ? "h:mm a" : "HH:mm";
-
-  if (fmpTimeString && (fmpTimeString.includes("NASDAQ") || fmpTimeString.includes("9:30") || fmpTimeString.includes("4:00"))) {
-    console.log(`[parseLocalTime] Extracted coreTime: "${coreTime}", hasAmPm: ${hasAmPm}, parseFormat: "${parseFormat}"`);
-  }
 
   try {
     // Why: Using date-fns's `parse` and `format` is the most robust and correct
@@ -112,7 +99,6 @@ function parseLocalTime(
 
     const result = format(parsedDate, "HH:mm");
     if (fmpTimeString && (fmpTimeString.includes("NASDAQ") || fmpTimeString.includes("9:30") || fmpTimeString.includes("4:00"))) {
-      console.log(`[parseLocalTime] Successfully parsed "${fmpTimeString}" -> "${result}"`);
     }
     return result;
   } catch (error) {
@@ -220,19 +206,6 @@ Deno.serve(async (_req: Request) => {
         continue;
       }
 
-      // Log basic exchange info for NASDAQ
-      if (basicExchangeInfo.exchange === "NASDAQ") {
-        console.log("[NASDAQ] Basic exchange info from FMP:", {
-          exchange: basicExchangeInfo.exchange,
-          name: basicExchangeInfo.name,
-          openingHour: basicExchangeInfo.openingHour,
-          closingHour: basicExchangeInfo.closingHour,
-          openingAdditional: basicExchangeInfo.openingAdditional,
-          closingAdditional: basicExchangeInfo.closingAdditional,
-          isMarketOpen: basicExchangeInfo.isMarketOpen,
-          timezone: basicExchangeInfo.timezone,
-        });
-      }
 
       const detailUrl = `https://financialmodelingprep.com/api/v3/is-the-market-open?exchange=${basicExchangeInfo.exchange}&apikey=${fmpApiKey}`;
       const detailResponse = await fetch(detailUrl);
@@ -241,15 +214,6 @@ Deno.serve(async (_req: Request) => {
       if (detailResponse.ok) {
         detailedFmpData = await detailResponse.json();
 
-        // Log detailed data for NASDAQ
-        if (basicExchangeInfo.exchange === "NASDAQ") {
-          console.log("[NASDAQ] Detailed exchange data from FMP:", {
-            isTheStockMarketOpen: detailedFmpData?.isTheStockMarketOpen,
-            stockExchangeName: detailedFmpData?.stockExchangeName,
-            stockMarketHours: detailedFmpData?.stockMarketHours,
-            stockMarketHolidaysCount: detailedFmpData?.stockMarketHolidays?.length || 0,
-          });
-        }
       } else {
         // Log failed detailed API call for NASDAQ
         if (basicExchangeInfo.exchange === "NASDAQ") {
@@ -273,26 +237,10 @@ Deno.serve(async (_req: Request) => {
         detailedFmpData?.stockMarketHours?.closingHour ??
         basicExchangeInfo.closingHour;
 
-      // Log raw time strings for NASDAQ before parsing
-      if (basicExchangeInfo.exchange === "NASDAQ") {
-        console.log("[NASDAQ] Raw time strings before parsing:", {
-          rawOpeningHour,
-          rawClosingHour,
-          openingAdditional: basicExchangeInfo.openingAdditional,
-          closingAdditional: basicExchangeInfo.closingAdditional,
-        });
-      }
 
       let openingTimeLocal = parseLocalTime(rawOpeningHour);
       let closingTimeLocal = parseLocalTime(rawClosingHour);
 
-      // Log parsed times for NASDAQ
-      if (basicExchangeInfo.exchange === "NASDAQ") {
-        console.log("[NASDAQ] Parsed times:", {
-          openingTimeLocal,
-          closingTimeLocal,
-        });
-      }
 
       if (
         basicExchangeInfo.openingAdditional &&
@@ -339,19 +287,6 @@ Deno.serve(async (_req: Request) => {
         last_fetched_at: nowISO,
       };
 
-      // Log final record for NASDAQ
-      if (basicExchangeInfo.exchange === "NASDAQ") {
-        console.log("[NASDAQ] Final record to upsert:", {
-          exchange_code: record.exchange_code,
-          name: record.name,
-          opening_time_local: record.opening_time_local,
-          closing_time_local: record.closing_time_local,
-          is_market_open: record.is_market_open,
-          status_message: record.status_message,
-          current_day_is_holiday: record.current_day_is_holiday,
-          current_holiday_name: record.current_holiday_name,
-        });
-      }
 
       recordsToUpsert.push(record);
     }

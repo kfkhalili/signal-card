@@ -325,6 +325,65 @@ Data tables (e.g., `live_quote_indicators`, `profiles`) may optionally include a
 
 The staleness check uses: `COALESCE(t.cache_ttl_minutes, default_ttl_minutes)`, giving priority to the per-row override.
 
+**Global Tables (Symbol-Independent Data):**
+
+Some data types are **global** (not symbol-specific) and don't have a `symbol` column. Examples include:
+- `market_risk_premiums` - Country-specific market risk premiums (used for WACC calculations)
+- `treasury_rates` - US Treasury rates (used as risk-free rate in WACC calculations)
+
+**Special Handling for Global Tables:**
+- `symbol_column` in registry is set to `NULL` (not `'symbol'`)
+- Subscription trigger uses `'GLOBAL'` as the symbol when creating jobs
+- Staleness checks query the entire table (no symbol filter)
+- These tables are subscribed to at the table level (no symbol filter in Realtime subscription)
+
+**Example Registry Entry for Global Table:**
+```sql
+INSERT INTO data_type_registry_v2 (
+  data_type,
+  table_name,
+  timestamp_column,
+  staleness_function,
+  default_ttl_minutes,
+  edge_function_name,
+  refresh_strategy,
+  symbol_column,  -- NULL for global tables
+  estimated_data_size_bytes
+) VALUES (
+  'market-risk-premium',
+  'market_risk_premiums',
+  'fetched_at',
+  'is_data_stale_v2',
+  1440, -- 24 hours
+  'queue-processor-v2',
+  'on-demand',
+  NULL, -- CRITICAL: NULL indicates global table (no symbol column)
+  50000 -- 50KB estimate
+);
+```
+
+**Current Data Types in Registry:**
+
+The system currently supports the following data types:
+
+**Symbol-Specific Data Types:**
+- `profile` - Company profile data
+- `quote` - Live quote indicators (1-minute TTL)
+- `financial-statements` - Financial statement data (30-day TTL)
+- `ratios-ttm` - Trailing twelve months ratios (24-hour TTL)
+- `dividend-history` - Historical dividend data
+- `revenue-product-segmentation` - Revenue breakdown by segment
+- `grades-historical` - Historical analyst grades
+- `exchange-variants` - Exchange variant information
+- `insider-trading-statistics` - Quarterly insider trading statistics (7-day TTL)
+- `insider-transactions` - Individual insider transactions (24-hour TTL)
+- `valuations` - Valuation metrics (DCF, PEG, etc.) (24-hour TTL)
+- `analyst-price-targets` - Analyst price target consensus (24-hour TTL)
+
+**Global Data Types (No Symbol Column):**
+- `market-risk-premium` - Country-specific market risk premiums (24-hour TTL)
+- `treasury-rates` - US Treasury rates (24-hour TTL)
+
 **CRITICAL: TTL Validation**
 
 If using per-row TTL overrides, add a CHECK constraint to prevent negative values:
@@ -385,6 +444,22 @@ More complex staleness checks requiring multiple columns or different signatures
    // No manual registration needed
    ```
 
+   **For Global Tables (No Symbol Filter):**
+   ```typescript
+   // Global tables are subscribed to at the table level (no symbol filter)
+   const channel = supabase
+     .channel('global:market-risk-premium')
+     .on('postgres_changes', {
+       event: '*',
+       schema: 'public',
+       table: 'market_risk_premiums'
+       // No filter - subscribes to all rows
+     }, (payload) => {
+       // Handle real-time updates
+     })
+     .subscribe();
+   ```
+
 2. **Backend: Extract active subscriptions**
    ```sql
    -- Function to extract active subscriptions from realtime.subscription
@@ -427,10 +502,33 @@ More complex staleness checks requiring multiple columns or different signatures
    -- Trigger function checks staleness and creates jobs immediately (0 latency)
    CREATE OR REPLACE FUNCTION on_realtime_subscription_insert()
    RETURNS TRIGGER AS $$
+   DECLARE
+     v_symbol TEXT;
+     v_data_type TEXT;
    BEGIN
-     -- Extract symbol and data_type from NEW subscription
+     -- Map entity (table name) to data_type
+     CASE NEW.entity::text
+       WHEN 'profiles' THEN v_data_type := 'profile';
+       WHEN 'market_risk_premiums' THEN v_data_type := 'market-risk-premium';
+       WHEN 'treasury_rates' THEN v_data_type := 'treasury-rates';
+       -- ... other data types
+     END CASE;
+
+     -- For global tables, use 'GLOBAL' as symbol
+     IF v_data_type IN ('market-risk-premium', 'treasury-rates') THEN
+       v_symbol := 'GLOBAL';
+     ELSE
+       -- Extract symbol from filters for symbol-specific tables
+       v_symbol := SUBSTRING(NEW.filters::text FROM 'symbol,eq,([^)]+)');
+     END IF;
+
      -- Call check_and_queue_stale_batch_v2() immediately
      -- Job created with 0 latency (down from 60 seconds)
+     PERFORM check_and_queue_stale_batch_v2(
+       p_symbol := v_symbol,
+       p_data_types := ARRAY[v_data_type],
+       p_priority := 1
+     );
    END;
    $$ LANGUAGE plpgsql SECURITY DEFINER;
    ```
@@ -608,8 +706,9 @@ BEGIN
     WHERE data_type = ANY(p_data_types)
   LOOP
     -- SECURITY: Validate identifiers before use (defense in depth)
+    -- CRITICAL: symbol_column can be NULL for global tables (e.g., market_risk_premiums, treasury_rates)
     IF NOT is_valid_identifier(reg_row.table_name) OR
-       NOT is_valid_identifier(reg_row.symbol_column) OR
+       (reg_row.symbol_column IS NOT NULL AND NOT is_valid_identifier(reg_row.symbol_column)) OR
        NOT is_valid_identifier(reg_row.timestamp_column) OR
        NOT is_valid_identifier(reg_row.staleness_function)
     THEN
@@ -619,15 +718,28 @@ BEGIN
     -- FAULT TOLERANCE: Wrap in exception handler so one bad data type doesn't break the batch
     BEGIN
       -- Dynamically check staleness for this symbol
-      sql_text := format(
-        'SELECT %I(t.%I, COALESCE(t.cache_ttl_minutes, %L::INTEGER)) FROM %I t WHERE t.%I = %L',
-        reg_row.staleness_function,
-        reg_row.timestamp_column,
-        reg_row.default_ttl_minutes,
-        reg_row.table_name,
-        reg_row.symbol_column,
-        p_symbol
-      );
+      -- CRITICAL: Handle global tables (symbol_column IS NULL) differently
+      IF reg_row.symbol_column IS NULL THEN
+        -- Global table - query entire table (no symbol filter)
+        sql_text := format(
+          'SELECT %I(MAX(t.%I), %L::INTEGER) FROM %I t',
+          reg_row.staleness_function,
+          reg_row.timestamp_column,
+          reg_row.default_ttl_minutes,
+          reg_row.table_name
+        );
+      ELSE
+        -- Symbol-specific table - filter by symbol
+        sql_text := format(
+          'SELECT %I(t.%I, COALESCE(t.cache_ttl_minutes, %L::INTEGER)) FROM %I t WHERE t.%I = %L',
+          reg_row.staleness_function,
+          reg_row.timestamp_column,
+          reg_row.default_ttl_minutes,
+          reg_row.table_name,
+          reg_row.symbol_column,
+          p_symbol
+        );
+      END IF;
 
       EXECUTE sql_text INTO is_stale;
 
@@ -730,9 +842,11 @@ BEGIN
   -- At scale (100k users * 3 types = 300k rows), Type-by-Type creates 10 giant JOINs
   -- Symbol-by-Symbol creates 10k tiny, fast, indexed queries that scale linearly
   -- Outer loop: Iterate over distinct symbols from realtime.subscription
+  -- NOTE: Includes 'GLOBAL' symbol for global tables (market_risk_premiums, treasury_rates)
   FOR symbol_row IN
     SELECT DISTINCT symbol
     FROM get_active_subscriptions_from_realtime()
+    WHERE symbol IS NOT NULL  -- Filter out NULL symbols
     LIMIT 1000  -- Prevents timeout
   LOOP
     -- Inner loop: Get data types for THIS symbol from realtime.subscription
@@ -744,22 +858,23 @@ BEGIN
         AND asub.data_type = r.data_type
       WHERE r.refresh_strategy = 'on-demand'
     LOOP
-    -- SECURITY: Validate identifiers before use (defense in depth)
-    IF NOT is_valid_identifier(reg_row.table_name) OR
-       NOT is_valid_identifier(reg_row.symbol_column) OR
-       NOT is_valid_identifier(reg_row.timestamp_column) OR
-       NOT is_valid_identifier(reg_row.staleness_function)
-    THEN
-      RAISE EXCEPTION 'Invalid identifier found in data_type_registry: %', reg_row.data_type;
-    END IF;
+      -- SECURITY: Validate identifiers before use (defense in depth)
+      -- CRITICAL: symbol_column can be NULL for global tables (e.g., market_risk_premiums, treasury_rates)
+      IF NOT is_valid_identifier(reg_row.table_name) OR
+         (reg_row.symbol_column IS NOT NULL AND NOT is_valid_identifier(reg_row.symbol_column)) OR
+         NOT is_valid_identifier(reg_row.timestamp_column) OR
+         NOT is_valid_identifier(reg_row.staleness_function)
+      THEN
+        RAISE EXCEPTION 'Invalid identifier found in data_type_registry: %', reg_row.data_type;
+      END IF;
 
       -- FAULT TOLERANCE: Wrap in exception handler so one bad symbol/data_type doesn't break the entire cron job
       BEGIN
         -- 4. Build dynamic SQL for THIS symbol and data type (100% generic, no hardcoding)
         -- CRITICAL: Query is now Symbol-by-Symbol, not Type-by-Type
         -- This creates tiny, fast, indexed queries instead of giant JOINs
-        -- Special handling for exchange-variants (multiple records per symbol)
-        IF reg_row.data_type = 'exchange-variants' THEN
+        -- Special handling for global tables (no symbol column)
+        IF reg_row.symbol_column IS NULL THEN
           sql_text := format(
             $SQL$
               INSERT INTO api_call_queue_v2 (symbol, data_type, status, priority, estimated_data_size_bytes)

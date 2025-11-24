@@ -36,6 +36,8 @@ BEGIN
       WHEN rs.entity::text = 'revenue_product_segmentation' THEN 'revenue-product-segmentation'
       WHEN rs.entity::text = 'grades_historical' THEN 'grades-historical'
       WHEN rs.entity::text = 'exchange_variants' THEN 'exchange-variants'
+      WHEN rs.entity::text = 'insider_trading_statistics' THEN 'insider-trading-statistics'
+      WHEN rs.entity::text = 'insider_transactions' THEN 'insider-transactions'
     END AS data_type,
     rs.created_at AS subscribed_at,
     rs.created_at AS last_seen_at  -- Use created_at as proxy (subscription exists = active)
@@ -45,7 +47,7 @@ BEGIN
     AND rs.entity::text IN (
       'profiles', 'live_quote_indicators', 'financial_statements', 'ratios_ttm',
       'dividend_history', 'revenue_product_segmentation',
-      'grades_historical', 'exchange_variants'
+      'grades_historical', 'exchange_variants', 'insider_trading_statistics', 'insider_transactions'
     );
 END;
 $$;

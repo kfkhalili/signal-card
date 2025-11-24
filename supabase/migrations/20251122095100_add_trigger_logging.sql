@@ -38,6 +38,8 @@ BEGIN
     WHEN 'revenue_product_segmentation' THEN v_data_type := 'revenue-product-segmentation';
     WHEN 'grades_historical' THEN v_data_type := 'grades-historical';
     WHEN 'exchange_variants' THEN v_data_type := 'exchange-variants';
+    WHEN 'insider_trading_statistics' THEN v_data_type := 'insider-trading-statistics';
+    WHEN 'insider_transactions' THEN v_data_type := 'insider-transactions';
     ELSE
       RAISE NOTICE 'Entity % not tracked, skipping', NEW.entity::text;
       RETURN NEW;

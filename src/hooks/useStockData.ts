@@ -7,25 +7,26 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { Database } from "@/lib/supabase/database.types";
 import { useRealtimeStock } from "@/contexts/RealtimeStockContext";
 import {
-  subscribeToProfileUpdates,
+  subscribeToAllSymbolUpdates,
+  type UnifiedSymbolSubscriptionCallbacks,
   type ProfilePayload,
-  subscribeToRatiosTTMUpdates,
   type RatiosTtmPayload,
   type RatiosTtmDBRow,
-  subscribeToFinancialStatementUpdates,
   type FinancialStatementPayload,
-  subscribeToDividendHistoryUpdates,
   type DividendHistoryPayload,
   type DividendHistoryDBRow,
-  subscribeToRevenueProductSegmentationUpdates,
   type RevenueProductSegmentationPayload,
   type RevenueProductSegmentationDBRow,
-  subscribeToGradesHistoricalUpdates,
   type GradesHistoricalPayload,
   type GradesHistoricalDBRow,
-  subscribeToExchangeVariantsUpdates,
   type ExchangeVariantsPayload,
   type ExchangeVariantsDBRow,
+  type InsiderTradingStatisticsPayload,
+  type InsiderTradingStatisticsDBRow,
+  type InsiderTransactionsPayload,
+  type InsiderTransactionsDBRow,
+  type ValuationsDBRow,
+  type ValuationsPayload,
 } from "@/lib/supabase/realtime-service";
 
 export type ProfileDBRow = Database["public"]["Tables"]["profiles"]["Row"];
@@ -71,6 +72,9 @@ interface UseStockDataProps {
   onRevenueSegmentationUpdate?: (segmentation: RevenueProductSegmentationDBRow) => void;
   onGradesHistoricalUpdate?: (grades: GradesHistoricalDBRow) => void;
   onExchangeVariantsUpdate?: (variant: ExchangeVariantsDBRow) => void;
+  onInsiderTradingStatisticsUpdate?: (statistics: InsiderTradingStatisticsDBRow) => void;
+  onInsiderTransactionsUpdate?: (transaction: InsiderTransactionsDBRow) => void;
+  onValuationsUpdate?: (valuation: ValuationsDBRow) => void;
 }
 
 async function fetchInitialProfile(
@@ -233,6 +237,63 @@ async function fetchInitialExchangeVariants(
   );
 }
 
+async function fetchInitialInsiderTradingStatistics(
+  supabase: SupabaseClient<Database>,
+  symbol: string
+): Promise<Result<Option.Option<InsiderTradingStatisticsDBRow[]>, Error>> {
+  const result = await fromPromise(
+    supabase
+      .from("insider_trading_statistics")
+      .select("*")
+      .eq("symbol", symbol)
+      .order("year", { ascending: false })
+      .order("quarter", { ascending: false })
+      .limit(8), // Last 2 years (8 quarters)
+    (e) => e as Error
+  );
+  return result.map((response) =>
+    response.data && response.data.length > 0 ? Option.some(response.data) : Option.none()
+  );
+}
+
+async function fetchInitialInsiderTransactions(
+  supabase: SupabaseClient<Database>,
+  symbol: string
+): Promise<Result<Option.Option<InsiderTransactionsDBRow[]>, Error>> {
+  const result = await fromPromise(
+    supabase
+      .from("insider_transactions")
+      .select("*")
+      .eq("symbol", symbol)
+      .order("transaction_date", { ascending: false, nullsFirst: false })
+      .order("filing_date", { ascending: false })
+      .limit(100), // Recent 100 transactions
+    (e) => e as Error
+  );
+  return result.map((response) =>
+    response.data && response.data.length > 0 ? Option.some(response.data) : Option.none()
+  );
+}
+
+async function fetchInitialValuations(
+  supabase: SupabaseClient<Database>,
+  symbol: string
+): Promise<Result<Option.Option<ValuationsDBRow[]>, Error>> {
+  const result = await fromPromise(
+    supabase
+      .from("valuations")
+      .select("*")
+      .eq("symbol", symbol)
+      .eq("valuation_type", "dcf")
+      .order("date", { ascending: false })
+      .limit(90), // Last 90 days for chart
+    (e) => e as Error
+  );
+  return result.map((response) =>
+    response.data && response.data.length > 0 ? Option.some(response.data) : Option.none()
+  );
+}
+
 export function useStockData({
   symbol,
   onProfileUpdate,
@@ -244,6 +305,9 @@ export function useStockData({
   onRevenueSegmentationUpdate,
   onGradesHistoricalUpdate,
   onExchangeVariantsUpdate,
+  onInsiderTradingStatisticsUpdate,
+  onInsiderTransactionsUpdate,
+  onValuationsUpdate,
 }: UseStockDataProps): MarketStatusUpdate {
   const [profileData, setProfileData] = useState<Option.Option<ProfileDBRow>>(Option.none());
   const [latestQuote, setLatestQuote] = useState<Option.Option<LiveQuoteIndicatorDBRow>>(Option.none());
@@ -275,28 +339,11 @@ export function useStockData({
     realtimeManager.addSymbol(symbol);
 
     const handleQuoteUpdate = (quote: LiveQuoteIndicatorDBRow) => {
-      if (process.env.NODE_ENV === "development") {
-        console.log(
-          `[useStockData ${symbol}] Received quote update from RealtimeStockManager`,
-          quote
-        );
-      }
       if (quote.symbol === symbol) {
         if (isMountedRef.current) {
           setLatestQuote(Option.some(quote));
           if (onLiveQuoteUpdate) {
-            if (process.env.NODE_ENV === "development") {
-              console.log(
-                `[useStockData ${symbol}] Calling onLiveQuoteUpdate callback`
-              );
-            }
             onLiveQuoteUpdate(quote, "realtime");
-          } else {
-            if (process.env.NODE_ENV === "development") {
-              console.warn(
-                `[useStockData ${symbol}] onLiveQuoteUpdate callback is not provided`
-              );
-            }
           }
         }
       }
@@ -339,20 +386,106 @@ export function useStockData({
     };
   }, [profileData, realtimeManager, onExchangeStatusUpdate]);
 
-  // New effect for profile updates via Realtime
-  useEffect(() => {
-    if (!supabaseClient || !symbol) return;
+  // Use refs to store latest callbacks to avoid recreating subscription on every render
+  // This prevents infinite loops when callbacks are not memoized in parent components
+  // Note: We store the hook's callbacks (which expect row data), not payload callbacks
+  const callbacksRef = useRef<{
+    onProfileUpdate?: (profile: ProfileDBRow) => void;
+    onFinancialStatementUpdate?: (statement: FinancialStatementDBRow) => void;
+    onRatiosTTMUpdate?: (ratios: RatiosTtmDBRow) => void;
+    onDividendHistoryUpdate?: (dividend: DividendHistoryDBRow) => void;
+    onRevenueSegmentationUpdate?: (segmentation: RevenueProductSegmentationDBRow) => void;
+    onGradesHistoricalUpdate?: (grades: GradesHistoricalDBRow) => void;
+    onExchangeVariantsUpdate?: (variant: ExchangeVariantsDBRow) => void;
+    onInsiderTradingStatisticsUpdate?: (statistics: InsiderTradingStatisticsDBRow) => void;
+    onInsiderTransactionsUpdate?: (transaction: InsiderTransactionsDBRow) => void;
+    onValuationsUpdate?: (valuation: ValuationsDBRow) => void;
+  }>({});
+  const exchangeStatusRef = useRef(exchangeStatus);
+  const subscriptionRef = useRef<(() => void) | null>(null);
+  const isSubscribedRef = useRef(false);
+  const isSubscribingRef = useRef(false); // Prevent concurrent subscription attempts
 
-    const unsubscribe = subscribeToProfileUpdates(
-      symbol,
-      (payload: ProfilePayload) => {
+  // Update refs when props change (but don't trigger re-subscription)
+  useEffect(() => {
+    exchangeStatusRef.current = exchangeStatus;
+  }, [exchangeStatus]);
+
+  useEffect(() => {
+    callbacksRef.current = {
+      onProfileUpdate,
+      onFinancialStatementUpdate,
+      onRatiosTTMUpdate,
+      onDividendHistoryUpdate,
+      onRevenueSegmentationUpdate,
+      onGradesHistoricalUpdate,
+      onExchangeVariantsUpdate,
+      onInsiderTradingStatisticsUpdate,
+      onInsiderTransactionsUpdate,
+      onValuationsUpdate,
+    };
+  }, [
+    onProfileUpdate,
+    onFinancialStatementUpdate,
+    onRatiosTTMUpdate,
+    onDividendHistoryUpdate,
+    onRevenueSegmentationUpdate,
+    onGradesHistoricalUpdate,
+    onExchangeVariantsUpdate,
+    onInsiderTradingStatisticsUpdate,
+    onInsiderTransactionsUpdate,
+    onValuationsUpdate,
+  ]);
+
+  // Unified subscription - ONE channel per symbol for ALL tables
+  // This reduces channel count from ~8-9 per symbol to just 1 per symbol
+  // CRITICAL: Track current symbol to prevent re-subscription on every render
+  const currentSymbolRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!supabaseClient || !symbol) {
+      // Clean up if symbol becomes invalid
+      if (subscriptionRef.current) {
+        subscriptionRef.current();
+        subscriptionRef.current = null;
+        isSubscribedRef.current = false;
+        currentSymbolRef.current = null;
+      }
+      return;
+    }
+
+    // If already subscribed to this symbol, don't subscribe again
+    if (isSubscribedRef.current && currentSymbolRef.current === symbol) return;
+
+    // If currently subscribing, don't start another subscription
+    if (isSubscribingRef.current) return;
+
+    // If subscribed to a different symbol, unsubscribe first
+    if (subscriptionRef.current && currentSymbolRef.current !== symbol) {
+      subscriptionRef.current();
+      subscriptionRef.current = null;
+      isSubscribedRef.current = false;
+    }
+
+    // Mark as subscribing to prevent concurrent attempts
+    isSubscribingRef.current = true;
+
+    // Build callbacks object using refs to get latest callbacks
+    const callbacks: UnifiedSymbolSubscriptionCallbacks = {};
+
+    // Profile updates
+    if (callbacksRef.current.onProfileUpdate) {
+      callbacks.onProfileUpdate = (payload: ProfilePayload) => {
         if (payload.new && isMountedRef.current) {
           const updatedProfile = payload.new as ProfileDBRow;
           setProfileData(Option.some(updatedProfile));
-          if (onProfileUpdate) onProfileUpdate(updatedProfile);
+          if (callbacksRef.current.onProfileUpdate) {
+            callbacksRef.current.onProfileUpdate(updatedProfile);
+          }
 
           // If profile arrives via realtime and has an exchange, fetch exchange status if not already fetched
-          if (updatedProfile.exchange && Option.isNone(exchangeStatus)) {
+          // CRITICAL: Use ref to check current status to avoid dependency on exchangeStatus in useEffect
+          if (updatedProfile.exchange && Option.isNone(exchangeStatusRef.current)) {
             fetchExchangeStatus(supabaseClient, updatedProfile.exchange).then(
               (result) => {
                 result.match(
@@ -375,185 +508,151 @@ export function useStockData({
             );
           }
         }
-      },
-      (status, err) => {
-        if (status === "CHANNEL_ERROR" && err) {
-          console.error(
-            `[useStockData ${symbol}] Profile Realtime subscription error:`,
-            err
-          );
-        }
-      }
-    );
+      };
+    }
 
-    return () => {
-      unsubscribe();
-    };
-  }, [symbol, supabaseClient, onProfileUpdate, exchangeStatus, onExchangeStatusUpdate]);
+    // Quote updates (handled by RealtimeStockManager, but we can also subscribe here if needed)
+    // Note: Quote is typically handled by RealtimeStockManager, so we might skip this
+    // But leaving the option open if needed
 
-  // New effect for financial statement updates via Realtime
-  // Only subscribe if callback is provided
-  useEffect(() => {
-    if (!supabaseClient || !symbol || !onFinancialStatementUpdate) return;
-
-    const unsubscribe = subscribeToFinancialStatementUpdates(
-      symbol,
-      (payload: FinancialStatementPayload) => {
-        if (payload.new && isMountedRef.current && onFinancialStatementUpdate) {
+    // Financial statement updates
+    if (callbacksRef.current.onFinancialStatementUpdate) {
+      callbacks.onFinancialStatementUpdate = (payload: FinancialStatementPayload) => {
+        if (payload.new && isMountedRef.current && callbacksRef.current.onFinancialStatementUpdate) {
           const updatedStatement = payload.new as FinancialStatementDBRow;
-          onFinancialStatementUpdate(updatedStatement);
+          callbacksRef.current.onFinancialStatementUpdate(updatedStatement);
         }
-      },
-      (status, err) => {
-        if (status === "CHANNEL_ERROR" && err) {
-          console.error(
-            `[useStockData ${symbol}] Financial Statement Realtime subscription error:`,
-            err
-          );
+      };
         }
-      }
-    );
 
-    return () => {
-      unsubscribe();
-    };
-  }, [symbol, supabaseClient, onFinancialStatementUpdate]);
-
-  // New effect for ratios TTM updates via Realtime
-  // Only subscribe if callback is provided
-  useEffect(() => {
-    if (!supabaseClient || !symbol || !onRatiosTTMUpdate) return;
-
-    const unsubscribe = subscribeToRatiosTTMUpdates(
-      symbol,
-      (payload: RatiosTtmPayload) => {
-        if (payload.new && isMountedRef.current && onRatiosTTMUpdate) {
+    // Ratios TTM updates
+    if (callbacksRef.current.onRatiosTTMUpdate) {
+      callbacks.onRatiosTTMUpdate = (payload: RatiosTtmPayload) => {
+        if (payload.new && isMountedRef.current && callbacksRef.current.onRatiosTTMUpdate) {
           const updatedRatios = payload.new as RatiosTtmDBRow;
-          onRatiosTTMUpdate(updatedRatios);
+          callbacksRef.current.onRatiosTTMUpdate(updatedRatios);
         }
-      },
-      (status, err) => {
-        if (status === "CHANNEL_ERROR" && err) {
-          console.error(
-            `[useStockData ${symbol}] Ratios TTM Realtime subscription error:`,
-            err
-          );
+      };
         }
-      }
-    );
 
-    return () => {
-      unsubscribe();
-    };
-  }, [symbol, supabaseClient, onRatiosTTMUpdate]);
-
-  // New effect for dividend history updates via Realtime
-  useEffect(() => {
-    if (!supabaseClient || !symbol || !onDividendHistoryUpdate) return;
-
-    const unsubscribe = subscribeToDividendHistoryUpdates(
-      symbol,
-      (payload: DividendHistoryPayload) => {
-        if (payload.new && isMountedRef.current && onDividendHistoryUpdate) {
+    // Dividend history updates
+    if (callbacksRef.current.onDividendHistoryUpdate) {
+      callbacks.onDividendHistoryUpdate = (payload: DividendHistoryPayload) => {
+        if (payload.new && isMountedRef.current && callbacksRef.current.onDividendHistoryUpdate) {
           const updatedDividend = payload.new as DividendHistoryDBRow;
-          onDividendHistoryUpdate(updatedDividend);
+          callbacksRef.current.onDividendHistoryUpdate(updatedDividend);
         }
-      },
-      (status, err) => {
-        if (status === "CHANNEL_ERROR" && err) {
-          console.error(
-            `[useStockData ${symbol}] Dividend History Realtime subscription error:`,
-            err
-          );
+      };
         }
-      }
-    );
 
-    return () => {
-      unsubscribe();
-    };
-  }, [symbol, supabaseClient, onDividendHistoryUpdate]);
-
-  // New effect for revenue product segmentation updates via Realtime
-  useEffect(() => {
-    if (!supabaseClient || !symbol || !onRevenueSegmentationUpdate) return;
-
-    const unsubscribe = subscribeToRevenueProductSegmentationUpdates(
-      symbol,
-      (payload: RevenueProductSegmentationPayload) => {
-        if (payload.new && isMountedRef.current && onRevenueSegmentationUpdate) {
+    // Revenue segmentation updates
+    if (callbacksRef.current.onRevenueSegmentationUpdate) {
+      callbacks.onRevenueSegmentationUpdate = (payload: RevenueProductSegmentationPayload) => {
+        if (payload.new && isMountedRef.current && callbacksRef.current.onRevenueSegmentationUpdate) {
           const updatedSegmentation = payload.new as RevenueProductSegmentationDBRow;
-          onRevenueSegmentationUpdate(updatedSegmentation);
+          callbacksRef.current.onRevenueSegmentationUpdate(updatedSegmentation);
         }
-      },
-      (status, err) => {
-        if (status === "CHANNEL_ERROR" && err) {
-          console.error(
-            `[useStockData ${symbol}] Revenue Segmentation Realtime subscription error:`,
-            err
-          );
-        }
-      }
-    );
+      };
+    }
 
-    return () => {
-      unsubscribe();
-    };
-  }, [symbol, supabaseClient, onRevenueSegmentationUpdate]);
-
-  // New effect for grades historical updates via Realtime
-  useEffect(() => {
-    if (!supabaseClient || !symbol || !onGradesHistoricalUpdate) return;
-
-    const unsubscribe = subscribeToGradesHistoricalUpdates(
-      symbol,
-      (payload: GradesHistoricalPayload) => {
-        if (payload.new && isMountedRef.current && onGradesHistoricalUpdate) {
+    // Grades historical updates
+    if (callbacksRef.current.onGradesHistoricalUpdate) {
+      callbacks.onGradesHistoricalUpdate = (payload: GradesHistoricalPayload) => {
+        if (payload.new && isMountedRef.current && callbacksRef.current.onGradesHistoricalUpdate) {
           const updatedGrades = payload.new as GradesHistoricalDBRow;
-          onGradesHistoricalUpdate(updatedGrades);
+          callbacksRef.current.onGradesHistoricalUpdate(updatedGrades);
         }
-      },
-      (status, err) => {
-        if (status === "CHANNEL_ERROR" && err) {
-          console.error(
-            `[useStockData ${symbol}] Grades Historical Realtime subscription error:`,
-            err
-          );
-        }
-      }
-    );
+      };
+    }
 
-    return () => {
-      unsubscribe();
-    };
-  }, [symbol, supabaseClient, onGradesHistoricalUpdate]);
-
-  // New effect for exchange variants updates via Realtime
-  useEffect(() => {
-    if (!supabaseClient || !symbol || !onExchangeVariantsUpdate) return;
-
-    const unsubscribe = subscribeToExchangeVariantsUpdates(
-      symbol,
-      (payload: ExchangeVariantsPayload) => {
-        if (payload.new && isMountedRef.current && onExchangeVariantsUpdate) {
+    // Exchange variants updates
+    if (callbacksRef.current.onExchangeVariantsUpdate) {
+      callbacks.onExchangeVariantsUpdate = (payload: ExchangeVariantsPayload) => {
+        if (payload.new && isMountedRef.current && callbacksRef.current.onExchangeVariantsUpdate) {
           const updatedVariant = payload.new as ExchangeVariantsDBRow;
-          onExchangeVariantsUpdate(updatedVariant);
+          callbacksRef.current.onExchangeVariantsUpdate(updatedVariant);
         }
-      },
+      };
+    }
+
+    // Insider trading statistics updates
+    if (callbacksRef.current.onInsiderTradingStatisticsUpdate) {
+      callbacks.onInsiderTradingStatisticsUpdate = (payload: InsiderTradingStatisticsPayload) => {
+        if (payload.new && isMountedRef.current && callbacksRef.current.onInsiderTradingStatisticsUpdate) {
+          const updatedStats = payload.new as InsiderTradingStatisticsDBRow;
+          callbacksRef.current.onInsiderTradingStatisticsUpdate(updatedStats);
+        }
+      };
+    }
+
+    // Insider transactions updates
+    if (callbacksRef.current.onInsiderTransactionsUpdate) {
+      callbacks.onInsiderTransactionsUpdate = (payload: InsiderTransactionsPayload) => {
+        if (payload.new && isMountedRef.current && callbacksRef.current.onInsiderTransactionsUpdate) {
+          const updatedTransaction = payload.new as InsiderTransactionsDBRow;
+          callbacksRef.current.onInsiderTransactionsUpdate(updatedTransaction);
+        }
+    };
+    }
+
+    // Valuations updates
+    if (callbacksRef.current.onValuationsUpdate) {
+      callbacks.onValuationsUpdate = (payload: ValuationsPayload) => {
+        if (payload.new && isMountedRef.current && callbacksRef.current.onValuationsUpdate) {
+          const updatedValuation = payload.new as ValuationsDBRow;
+          callbacksRef.current.onValuationsUpdate(updatedValuation);
+        }
+      };
+    }
+
+    // Only subscribe if we have at least one callback
+    if (Object.keys(callbacks).length === 0) return;
+
+    // Mark as subscribed before creating subscription
+    isSubscribedRef.current = true;
+    currentSymbolRef.current = symbol;
+
+    const unsubscribe = subscribeToAllSymbolUpdates(
+      symbol,
+      callbacks,
       (status, err) => {
+        // Clear subscribing flag once subscription completes (success or error)
+        isSubscribingRef.current = false;
+
         if (status === "CHANNEL_ERROR" && err) {
           console.error(
-            `[useStockData ${symbol}] Exchange Variants Realtime subscription error:`,
+            `[useStockData ${symbol}] Unified symbol Realtime subscription error:`,
             err
           );
+          // On error, reset subscription state to allow retry
+          // But don't immediately retry - let the effect handle it on next render
+          isSubscribedRef.current = false;
+          currentSymbolRef.current = null;
+        } else if (status === "SUBSCRIBED") {
+          // Successfully subscribed
+          isSubscribingRef.current = false;
         }
       }
     );
 
+    subscriptionRef.current = unsubscribe;
+
     return () => {
-      unsubscribe();
+      isSubscribedRef.current = false;
+      isSubscribingRef.current = false;
+      currentSymbolRef.current = null;
+      if (subscriptionRef.current) {
+        subscriptionRef.current();
+        subscriptionRef.current = null;
+      }
     };
-  }, [symbol, supabaseClient, onExchangeVariantsUpdate]);
+  }, [
+    symbol,
+    supabaseClient,
+    // CRITICAL: Only depend on symbol and supabaseClient
+    // Callbacks are accessed via refs to prevent infinite re-subscriptions
+    // onExchangeStatusUpdate removed - accessed via closure in callback
+  ]);
 
   const fetchInitialData = useCallback(async (): Promise<Result<void, Error>> => {
     if (!isMountedRef.current || !supabaseClient || !symbol) {
@@ -765,6 +864,74 @@ export function useStockData({
       );
     }
 
+    // Fetch Insider Trading Statistics (only if callback is provided)
+    if (onInsiderTradingStatisticsUpdate) {
+      const statsResult = await fetchInitialInsiderTradingStatistics(
+        supabaseClient,
+        symbol
+      );
+      if (!isMountedRef.current) return ok(undefined);
+      statsResult.match(
+        (statsOption) => {
+          if (Option.isSome(statsOption) && statsOption.value.length > 0) {
+            // Call callback with the most recent quarter
+            onInsiderTradingStatisticsUpdate(statsOption.value[0]);
+          }
+        },
+        (error) => {
+          console.error(
+            `[useStockData ${symbol}] Error fetching initial insider trading statistics:`,
+            error
+          );
+        }
+      );
+    }
+
+    // Fetch Insider Transactions (only if callback is provided)
+    if (onInsiderTransactionsUpdate) {
+      const transactionsResult = await fetchInitialInsiderTransactions(
+        supabaseClient,
+        symbol
+      );
+      if (!isMountedRef.current) return ok(undefined);
+      transactionsResult.match(
+        (transactionsOption) => {
+          if (Option.isSome(transactionsOption) && transactionsOption.value.length > 0) {
+            // Call callback with the most recent transaction
+            onInsiderTransactionsUpdate(transactionsOption.value[0]);
+          }
+        },
+        (error) => {
+          console.error(
+            `[useStockData ${symbol}] Error fetching initial insider transactions:`,
+            error
+          );
+        }
+      );
+    }
+
+    if (onValuationsUpdate) {
+      const valuationsResult = await fetchInitialValuations(
+        supabaseClient,
+        symbol
+      );
+      if (!isMountedRef.current) return ok(undefined);
+      valuationsResult.match(
+        (valuationsOption) => {
+          if (Option.isSome(valuationsOption) && valuationsOption.value.length > 0) {
+            // Call callback with the most recent DCF valuation
+            onValuationsUpdate(valuationsOption.value[0]);
+          }
+        },
+        (error) => {
+          console.error(
+            `[useStockData ${symbol}] Error fetching initial valuations:`,
+            error
+          );
+        }
+      );
+    }
+
     return ok(undefined);
   }, [
     symbol,
@@ -778,6 +945,9 @@ export function useStockData({
     onRevenueSegmentationUpdate,
     onGradesHistoricalUpdate,
     onExchangeVariantsUpdate,
+    onInsiderTradingStatisticsUpdate,
+    onInsiderTransactionsUpdate,
+    onValuationsUpdate,
   ]);
 
   useEffect(() => {

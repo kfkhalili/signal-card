@@ -166,7 +166,6 @@ async function fetchAndProcessSymbolQuote(
     */
 
     if (ENV_CONTEXT === "DEV") {
-      console.log(`Successfully upserted quote data for ${actualFmpSymbol}.`);
     }
     return {
       symbol: actualFmpSymbol,

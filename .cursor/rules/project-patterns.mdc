@@ -313,29 +313,164 @@ async function fetchData(
 ```
 
 #### Real-time Subscription Pattern
+
+**CRITICAL PRINCIPLE: Subscriptions are about tables, not use cases.**
+
+When creating subscription functions in `src/lib/supabase/realtime-service.ts`:
+
+1. **Name subscriptions after the table**, not the use case
+   - ✅ `subscribeToMarketRiskPremiumUpdates()` - named after `market_risk_premiums` table
+   - ✅ `subscribeToTreasuryRateUpdates()` - named after `treasury_rates` table
+   - ❌ `subscribeToWaccDataUpdates()` - named after use case (WACC), not table
+   - ❌ `subscribeToValuationDataUpdates()` - too generic, doesn't reflect table
+
+2. **Follow the established pattern** in `realtime-service.ts`:
+   - Export DBRow and Payload types
+   - Create private callback type
+   - Use table name constant
+   - Check supabase client availability
+   - Create channel with descriptive name
+   - Chain `.on()` and `.subscribe()` methods
+   - Return cleanup function using `fromPromise()` for error handling
+
+3. **For symbol-specific tables**: Include `symbol` parameter and use filter
+4. **For global tables**: No symbol parameter, no filter
+
+**Example Pattern (Symbol-Specific):**
 ```typescript
-useEffect(() => {
-  const channel = supabase
-    .channel(`table_name:${symbol}`)
-    .on(
+export function subscribeTo[TableName]Updates(
+  symbol: string,
+  onData: [TableName]UpdateCallback,
+  onStatusChange?: SubscriptionStatusCallback
+): () => void {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    console.warn(`[realtime-service (${symbol})] Supabase client not available.`);
+    if (typeof onStatusChange === "function") {
+      onStatusChange("CLIENT_UNAVAILABLE", new Error("Supabase client not initialized."));
+    }
+    return noOpUnsubscribe;
+  }
+
+  const channelName = `[table-name]-${symbol.toLowerCase().replace(/[^a-z0-9_.-]/gi, "-")}-${Math.random().toString(36).substring(2, 7)}`;
+  const topicFilter = `symbol=eq.${symbol}`;
+
+  const channel: RealtimeChannel = supabase.channel(channelName, {
+    config: { broadcast: { ack: true } },
+  });
+
+  channel
+    .on<[TableName]DBRow>(
       "postgres_changes",
       {
         event: "*",
         schema: "public",
-        table: "table_name",
-        filter: `symbol=eq.${symbol}`,
+        table: [TABLE_NAME]_TABLE_NAME,
+        filter: topicFilter,
       },
       (payload) => {
-        // Handle update
+        if (typeof onData === "function") {
+          onData(payload as [TableName]Payload);
+        }
       }
     )
-    .subscribe();
+    .subscribe((status, err) => {
+      if (status === "CHANNEL_ERROR" && err) {
+        console.error(`[realtime-service (${symbol})] Channel error:`, err);
+      }
+      const castedStatus = status as SubscriptionStatus;
+      if (typeof onStatusChange === "function") {
+        onStatusChange(castedStatus, err);
+      }
+    });
 
   return () => {
-    supabase.removeChannel(channel);
+    if (supabase) {
+      void fromPromise(
+        supabase.removeChannel(channel),
+        (e) => e as Error
+      ).then((result) => {
+        result.mapErr((error) => {
+          console.error(
+            `[realtime-service] (${symbol}): Error removing channel ${channel.topic}:`,
+            error.message
+          );
+        });
+      });
+    }
   };
-}, [symbol, supabase]);
+}
 ```
+
+**Example Pattern (Global Tables):**
+```typescript
+export function subscribeTo[TableName]Updates(
+  onData: [TableName]UpdateCallback,
+  onStatusChange?: SubscriptionStatusCallback
+): () => void {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    console.warn(`[realtime-service] Supabase client not available.`);
+    if (typeof onStatusChange === "function") {
+      onStatusChange("CLIENT_UNAVAILABLE", new Error("Supabase client not initialized."));
+    }
+    return noOpUnsubscribe;
+  }
+
+  const channelName = `[table-name]-global`;
+  const channel: RealtimeChannel = supabase.channel(channelName, {
+    config: { broadcast: { ack: true } },
+  });
+
+  channel
+    .on<[TableName]DBRow>(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: [TABLE_NAME]_TABLE_NAME,
+        // No filter - this is a global table
+      },
+      (payload) => {
+        if (typeof onData === "function") {
+          onData(payload as [TableName]Payload);
+        }
+      }
+    )
+    .subscribe((status, err) => {
+      if (status === "CHANNEL_ERROR" && err) {
+        console.error(`[realtime-service] Channel error:`, err);
+      }
+      const castedStatus = status as SubscriptionStatus;
+      if (typeof onStatusChange === "function") {
+        onStatusChange(castedStatus, err);
+      }
+    });
+
+  return () => {
+    if (supabase) {
+      void fromPromise(
+        supabase.removeChannel(channel),
+        (e) => e as Error
+      ).then((result) => {
+        result.mapErr((error) => {
+          console.error(
+            `[realtime-service] Error removing channel ${channel.topic}:`,
+            error.message
+          );
+        });
+      });
+    }
+  };
+}
+```
+
+**Before editing subscription functions:**
+1. Read the entire `realtime-service.ts` file to understand existing patterns
+2. Identify whether the table is symbol-specific or global
+3. Follow the exact pattern used for similar tables
+4. Use the same error handling, channel naming, and cleanup patterns
+5. Remember: subscriptions are infrastructure - how the data is used is separate
 
 ### Supabase Operations
 

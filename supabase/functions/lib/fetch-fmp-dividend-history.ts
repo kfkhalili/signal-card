@@ -208,7 +208,6 @@ export async function fetchDividendHistoryLogic(
         throw new Error(`Database upsert failed: ${upsertError.message}`);
       }
 
-      console.log(`[fetchDividendHistoryLogic] Successfully upserted ${count || 0} dividend records for ${job.symbol}.`);
     }
 
     return {

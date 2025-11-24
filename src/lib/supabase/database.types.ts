@@ -10,10 +10,48 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "12.2.3 (519615d)"
+    PostgrestVersion: "13.0.5"
   }
   public: {
     Tables: {
+      analyst_price_targets: {
+        Row: {
+          fetched_at: string
+          symbol: string
+          target_consensus: number
+          target_high: number
+          target_low: number
+          target_median: number
+          updated_at: string
+        }
+        Insert: {
+          fetched_at?: string
+          symbol: string
+          target_consensus: number
+          target_high: number
+          target_low: number
+          target_median: number
+          updated_at?: string
+        }
+        Update: {
+          fetched_at?: string
+          symbol?: string
+          target_consensus?: number
+          target_high?: number
+          target_low?: number
+          target_median?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_analyst_price_targets_symbol"
+            columns: ["symbol"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["symbol"]
+          },
+        ]
+      }
       api_call_queue_v2: {
         Row: {
           actual_data_size_bytes: number | null
@@ -706,6 +744,117 @@ export type Database = {
           },
         ]
       }
+      insider_trading_statistics: {
+        Row: {
+          acquired_disposed_ratio: number | null
+          acquired_transactions: number | null
+          average_acquired: number | null
+          average_disposed: number | null
+          cik: string | null
+          disposed_transactions: number | null
+          fetched_at: string
+          quarter: number
+          symbol: string
+          total_acquired: number | null
+          total_disposed: number | null
+          total_purchases: number | null
+          total_sales: number | null
+          year: number
+        }
+        Insert: {
+          acquired_disposed_ratio?: number | null
+          acquired_transactions?: number | null
+          average_acquired?: number | null
+          average_disposed?: number | null
+          cik?: string | null
+          disposed_transactions?: number | null
+          fetched_at?: string
+          quarter: number
+          symbol: string
+          total_acquired?: number | null
+          total_disposed?: number | null
+          total_purchases?: number | null
+          total_sales?: number | null
+          year: number
+        }
+        Update: {
+          acquired_disposed_ratio?: number | null
+          acquired_transactions?: number | null
+          average_acquired?: number | null
+          average_disposed?: number | null
+          cik?: string | null
+          disposed_transactions?: number | null
+          fetched_at?: string
+          quarter?: number
+          symbol?: string
+          total_acquired?: number | null
+          total_disposed?: number | null
+          total_purchases?: number | null
+          total_sales?: number | null
+          year?: number
+        }
+        Relationships: []
+      }
+      insider_transactions: {
+        Row: {
+          acquisition_or_disposition: string | null
+          company_cik: string | null
+          direct_or_indirect: string | null
+          fetched_at: string
+          filing_date: string
+          form_type: string | null
+          price: number | null
+          reporting_cik: string
+          reporting_name: string | null
+          securities_owned: number | null
+          securities_transacted: number
+          security_name: string | null
+          symbol: string
+          transaction_date: string | null
+          transaction_type: string | null
+          type_of_owner: string | null
+          url: string | null
+        }
+        Insert: {
+          acquisition_or_disposition?: string | null
+          company_cik?: string | null
+          direct_or_indirect?: string | null
+          fetched_at?: string
+          filing_date: string
+          form_type?: string | null
+          price?: number | null
+          reporting_cik: string
+          reporting_name?: string | null
+          securities_owned?: number | null
+          securities_transacted: number
+          security_name?: string | null
+          symbol: string
+          transaction_date?: string | null
+          transaction_type?: string | null
+          type_of_owner?: string | null
+          url?: string | null
+        }
+        Update: {
+          acquisition_or_disposition?: string | null
+          company_cik?: string | null
+          direct_or_indirect?: string | null
+          fetched_at?: string
+          filing_date?: string
+          form_type?: string | null
+          price?: number | null
+          reporting_cik?: string
+          reporting_name?: string | null
+          securities_owned?: number | null
+          securities_transacted?: number
+          security_name?: string | null
+          symbol?: string
+          transaction_date?: string | null
+          transaction_type?: string | null
+          type_of_owner?: string | null
+          url?: string | null
+        }
+        Relationships: []
+      }
       listed_symbols: {
         Row: {
           added_at: string
@@ -787,6 +936,33 @@ export type Database = {
           volume?: number | null
           year_high?: number | null
           year_low?: number | null
+        }
+        Relationships: []
+      }
+      market_risk_premiums: {
+        Row: {
+          continent: string | null
+          country: string
+          country_risk_premium: number | null
+          fetched_at: string
+          total_equity_risk_premium: number
+          updated_at: string
+        }
+        Insert: {
+          continent?: string | null
+          country: string
+          country_risk_premium?: number | null
+          fetched_at?: string
+          total_equity_risk_premium: number
+          updated_at?: string
+        }
+        Update: {
+          continent?: string | null
+          country?: string
+          country_risk_premium?: number | null
+          fetched_at?: string
+          total_equity_risk_premium?: number
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1235,6 +1411,60 @@ export type Database = {
         }
         Relationships: []
       }
+      treasury_rates: {
+        Row: {
+          date: string
+          fetched_at: string
+          month1: number | null
+          month2: number | null
+          month3: number | null
+          month6: number | null
+          updated_at: string
+          year1: number | null
+          year10: number
+          year2: number | null
+          year20: number | null
+          year3: number | null
+          year30: number | null
+          year5: number | null
+          year7: number | null
+        }
+        Insert: {
+          date: string
+          fetched_at?: string
+          month1?: number | null
+          month2?: number | null
+          month3?: number | null
+          month6?: number | null
+          updated_at?: string
+          year1?: number | null
+          year10: number
+          year2?: number | null
+          year20?: number | null
+          year3?: number | null
+          year30?: number | null
+          year5?: number | null
+          year7?: number | null
+        }
+        Update: {
+          date?: string
+          fetched_at?: string
+          month1?: number | null
+          month2?: number | null
+          month3?: number | null
+          month6?: number | null
+          updated_at?: string
+          year1?: number | null
+          year10?: number
+          year2?: number | null
+          year20?: number | null
+          year3?: number | null
+          year30?: number | null
+          year5?: number | null
+          year7?: number | null
+        }
+        Relationships: []
+      }
       user_profiles: {
         Row: {
           avatar_url: string | null
@@ -1261,6 +1491,44 @@ export type Database = {
           username?: string | null
         }
         Relationships: []
+      }
+      valuations: {
+        Row: {
+          date: string
+          fetched_at: string
+          stock_price_at_calculation: number | null
+          symbol: string
+          updated_at: string
+          valuation_type: string
+          value: number
+        }
+        Insert: {
+          date: string
+          fetched_at?: string
+          stock_price_at_calculation?: number | null
+          symbol: string
+          updated_at?: string
+          valuation_type?: string
+          value: number
+        }
+        Update: {
+          date?: string
+          fetched_at?: string
+          stock_price_at_calculation?: number | null
+          symbol?: string
+          updated_at?: string
+          valuation_type?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_valuations_symbol"
+            columns: ["symbol"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["symbol"]
+          },
+        ]
       }
     }
     Views: {
@@ -1289,19 +1557,39 @@ export type Database = {
           last_run: string
         }[]
       }
-      complete_queue_job_v2:
-        | {
-            Args: { p_data_size_bytes: number; p_job_id: string }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              p_api_calls_made?: number
-              p_data_size_bytes: number
-              p_job_id: string
-            }
-            Returns: undefined
-          }
+      check_queue_success_rate_alert: {
+        Args: never
+        Returns: {
+          alert_status: string
+          completed_count: number
+          failed_count: number
+          success_rate_percent: number
+        }[]
+      }
+      check_quota_usage_alert: {
+        Args: never
+        Returns: {
+          alert_status: string
+          total_bytes: number
+          usage_percent: number
+        }[]
+      }
+      check_stuck_jobs_alert: {
+        Args: never
+        Returns: {
+          affected_data_types: number
+          alert_status: string
+          stuck_count: number
+        }[]
+      }
+      complete_queue_job_v2: {
+        Args: {
+          p_api_calls_made?: number
+          p_data_size_bytes: number
+          p_job_id: string
+        }
+        Returns: undefined
+      }
       fail_queue_job_v2: {
         Args: { p_error_message: string; p_job_id: string }
         Returns: undefined
@@ -1366,6 +1654,14 @@ export type Database = {
         Returns: boolean
       }
       is_feature_enabled: { Args: { p_flag_name: string }; Returns: boolean }
+      is_insider_trading_statistics_stale_v2: {
+        Args: { p_fetched_at: string; p_ttl_minutes: number }
+        Returns: boolean
+      }
+      is_insider_transactions_stale_v2: {
+        Args: { p_fetched_at: string; p_ttl_minutes: number }
+        Returns: boolean
+      }
       is_profile_stale_v2: {
         Args: { p_modified_at: string; p_ttl_minutes: number }
         Returns: boolean
@@ -1547,4 +1843,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

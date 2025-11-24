@@ -78,7 +78,6 @@ export async function fetchGradesHistoricalLogic(
         Object.keys(fmpGradesResult).length === 0
       ) {
         // No grades data found - this is a valid response
-        console.log(`[fetchGradesHistoricalLogic] No historical grades data found for ${job.symbol} (empty object returned by FMP).`);
         return {
           success: true,
           dataSizeBytes: actualSizeBytes,
@@ -89,7 +88,6 @@ export async function fetchGradesHistoricalLogic(
 
     if (fmpGradesResult.length === 0) {
       // Empty array - no grades found
-      console.log(`[fetchGradesHistoricalLogic] No historical grades entries found for ${job.symbol}.`);
       return {
         success: true,
         dataSizeBytes: actualSizeBytes,
@@ -143,7 +141,6 @@ export async function fetchGradesHistoricalLogic(
         throw new Error(`Database upsert failed: ${upsertError.message}`);
       }
 
-      console.log(`[fetchGradesHistoricalLogic] Successfully upserted ${count || 0} historical grade records for ${job.symbol}.`);
     }
 
     return {

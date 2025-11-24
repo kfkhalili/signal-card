@@ -259,7 +259,6 @@ export async function fetchExchangeVariantsLogic(
         throw new Error(`Database upsert failed: ${upsertError.message}`);
       }
 
-      console.log(`[fetchExchangeVariantsLogic] Successfully upserted ${count || 0} exchange variant records for ${job.symbol}.`);
     }
 
     return {

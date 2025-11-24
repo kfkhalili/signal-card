@@ -5,6 +5,11 @@ import { FlatCompat } from "@eslint/eslintrc";
 import path from "path";
 import { fileURLToPath } from "url";
 
+// Import custom ESLint rules for TypeScript contracts
+import enforceContract5StrictSchema from "./eslint-rules/enforce-contract-5-strict-schema.js";
+import enforceContract6aContentLength from "./eslint-rules/enforce-contract-6a-content-length.js";
+import enforceContract14SourceTimestamp from "./eslint-rules/enforce-contract-14-source-timestamp.js";
+
 // This provides a __dirname equivalent in ES modules.
 // It's important for FlatCompat to correctly resolve extended configurations.
 const __filename = fileURLToPath(import.meta.url);
@@ -34,13 +39,30 @@ export default tseslint.config(
   ...tseslint.configs.strict,
   ...tseslint.configs.stylistic,
 
-  // 4. Optional: Any custom rules or overrides for your project can go here.
-  // {
-  //   files: ["**/*.ts", "**/*.tsx"], // Apply only to TS/TSX files
-  //   rules: {
-  //     // Example: "@typescript-eslint/no-explicit-any": "warn",
-  //   },
-  // },
+  // 4. Custom ESLint rules for TypeScript contracts (Contract #5, #6a, #14)
+  //    These rules enforce Sacred Contracts from MASTER-ARCHITECTURE.md
+  //    They only apply to files in supabase/functions/lib/ to check data-fetching functions
+  {
+    files: ["supabase/functions/lib/**/*.ts"],
+    plugins: {
+      "tickered-contracts": {
+        meta: {
+          name: "tickered-contracts",
+          version: "1.0.0",
+        },
+        rules: {
+          "enforce-contract-5-strict-schema": enforceContract5StrictSchema,
+          "enforce-contract-6a-content-length": enforceContract6aContentLength,
+          "enforce-contract-14-source-timestamp": enforceContract14SourceTimestamp,
+        },
+      },
+    },
+    rules: {
+      "tickered-contracts/enforce-contract-5-strict-schema": "error",
+      "tickered-contracts/enforce-contract-6a-content-length": "error",
+      "tickered-contracts/enforce-contract-14-source-timestamp": "warn",
+    },
+  },
 
   // 5. Your global ignore patterns.
   //    This should be a standalone configuration object in the array.
@@ -48,7 +70,9 @@ export default tseslint.config(
     ignores: [
       ".next/",
       "node_modules/",
-      "supabase/", // Assuming this is a top-level directory you want to ignore
+      "supabase/migrations/", // Ignore SQL migration files
+      "supabase/functions/**/*.json", // Ignore Deno config files
+      "supabase/functions/**/*.lock", // Ignore lock files
       "src/lib/supabase/database.types.ts",
       "**/__tests__/**",
       "**/*.test.ts",
