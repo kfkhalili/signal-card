@@ -50,7 +50,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="manifest" href="/manifest.json" />
+        {/* Manifest link is automatically injected by Next.js from manifest.ts */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: structuredData }}

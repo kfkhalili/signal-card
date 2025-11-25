@@ -137,11 +137,13 @@ export const config = {
      * - favicon.ico (favicon file)
      * - fonts (fonts folder)
      * - images (images folder)
-     * - auth/auth-error (our specific auth error page) <--- ADDED EXCLUSION
+     * - manifest.json, manifest.webmanifest (PWA manifest files)
+     * - robots.txt, sitemap.xml (SEO files)
+     * - auth/auth-error (our specific auth error page)
      *
      * This ensures the middleware's auth logic runs on page navigation
      * including the complete-profile page so profile completion checks work properly.
      */
-    "/((?!api|_next/static|_next/image|favicon.ico|fonts|images|auth/auth-error).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|fonts|images|manifest\\.json|manifest\\.webmanifest|robots\\.txt|sitemap\\.xml|auth/auth-error).*)",
   ],
 };
