@@ -15,7 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   ArrowLeft, AlertTriangle, DollarSign,
   Activity, Shield, Users, PlusCircle, Loader2,
-  Briefcase, Landmark, TrendingUp, TrendingDown, Clock
+  Briefcase, Landmark, TrendingUp, TrendingDown
 } from "lucide-react";
 import { cn, createSecureImageUrl } from "@/lib/utils";
 import Image from "next/image";
@@ -549,9 +549,20 @@ export default function SymbolAnalysisPage() {
   const [removingFromWorkspace, setRemovingFromWorkspace] = useState(false);
   const { hasCards: hasCardsInWorkspace } = useWorkspaceCards(ticker);
   const exchangeRates = useExchangeRate();
+  const [hasMounted, setHasMounted] = useState<boolean>(false);
 
   // State with Option types
-  const { supabase } = useAuth();
+  const { supabase, user, isLoading: isAuthLoading } = useAuth();
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (hasMounted && !isAuthLoading && !user) {
+      router.push("/");
+    }
+  }, [user, isAuthLoading, router, hasMounted]);
   const [symbolValid, setSymbolValid] = useState<boolean | null>(null); // null = checking, true = valid, false = invalid
   const [profile, setProfile] = useState<Option.Option<ProfileDBRow>>(Option.none());
   const [quote, setQuote] = useState<Option.Option<Database["public"]["Tables"]["live_quote_indicators"]["Row"]>>(Option.none());
@@ -581,21 +592,21 @@ export default function SymbolAnalysisPage() {
   // MUST be before any conditional returns to comply with Rules of Hooks
   const relevantCardTypes = useMemo((): CardType[] => {
     const cardTypes: CardType[] = ["profile", "price", "keyratios"];
-    
+
     // Add financial statement cards if we have financial data
     if (Option.isSome(financialStatement)) {
       cardTypes.push("revenue", "solvency", "cashuse");
     }
-    
+
     // Add analyst grades if we have grades data
     if (gradesHistorical.length > 0) {
       cardTypes.push("analystgrades");
     }
-    
+
     // Note: dividendHistory, revenueSegmentation, and exchangeVariants
     // are not currently tracked on this page, but cards can still be added
     // The workspace will fetch the data when the cards are initialized
-    
+
     return cardTypes;
   }, [financialStatement, gradesHistorical]);
 
@@ -1623,10 +1634,10 @@ export default function SymbolAnalysisPage() {
           <ArrowLeft className="h-4 w-4" /> Back
         </Button>
         {hasCardsInWorkspace ? (
-          <Button 
-            onClick={handleRemoveFromWorkspace} 
-            disabled={removingFromWorkspace} 
-            size="sm" 
+          <Button
+            onClick={handleRemoveFromWorkspace}
+            disabled={removingFromWorkspace}
+            size="sm"
             variant="destructive"
             className="gap-2"
           >
@@ -2245,7 +2256,7 @@ export default function SymbolAnalysisPage() {
             </CardContent>
           </Card>
 
-          {/* C2. Institutional Holdings - Coming Soon */}
+          {/* C2. Institutional Holdings */}
           <Card className="border-dashed">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -2255,10 +2266,14 @@ export default function SymbolAnalysisPage() {
             </CardHeader>
             <CardContent>
               <div className="flex flex-col items-center justify-center py-8 text-center">
-                <Clock className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                <h3 className="text-lg font-semibold text-muted-foreground mb-2">Coming Soon</h3>
+                <Landmark className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                <h3 className="text-lg font-semibold text-muted-foreground mb-2">Institutional Holdings</h3>
                 <p className="text-sm text-muted-foreground max-w-xs">
-                  Institutional holdings and smart money tracking will be available in a future update.
+                  Institutional holdings and smart money tracking data is available through our Enterprise API. Contact{" "}
+                  <a href="mailto:support@tickered.com" className="text-primary hover:underline">
+                    support@tickered.com
+                  </a>
+                  {" "}for access.
                 </p>
               </div>
             </CardContent>

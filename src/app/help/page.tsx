@@ -1,5 +1,28 @@
+import type { Metadata } from "next";
 import { LifeBuoy, BookOpen, MessageSquare, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+
+export const metadata: Metadata = {
+  title: "Help Center - Tickered Financial Data Platform",
+  description:
+    "Get help with Tickered's financial data API, real-time market feeds, and platform features. Find answers to common questions about using our enterprise market services.",
+  alternates: {
+    canonical: "/help",
+  },
+  openGraph: {
+    title: "Help Center - Tickered",
+    description:
+      "Get help with Tickered's financial data API, real-time market feeds, and platform features.",
+    type: "website",
+    url: "/help",
+  },
+  twitter: {
+    card: "summary",
+    title: "Help Center - Tickered",
+    description:
+      "Get help with Tickered's financial data API, real-time market feeds, and platform features.",
+  },
+};
 
 export default function HelpPage() {
   return (
@@ -46,9 +69,12 @@ export default function HelpPage() {
         </div>
 
         <div className="text-center mt-16">
-          <h2 className="text-2xl font-bold">Content Coming Soon</h2>
           <p className="text-muted-foreground mt-2">
-            Our Help Center is currently under construction.
+            For immediate assistance, please contact our support team at{" "}
+            <a href="mailto:support@tickered.com" className="text-primary hover:underline">
+              support@tickered.com
+            </a>
+            . We&apos;re here to help you get the most out of Tickered.
           </p>
         </div>
       </main>

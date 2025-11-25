@@ -1,7 +1,7 @@
 // src/components/landing/DemoCardsGrid.tsx
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { fromPromise } from "neverthrow";
 import type { DisplayableCard } from "@/components/game/types";
@@ -15,10 +15,15 @@ const DemoCardsGrid: React.FC = () => {
   const router = useRouter();
   const [demoCards, setDemoCards] = useState<DisplayableCard[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-
-  const cardGenerationKey = useMemo(() => Date.now(), []);
+  const hasFetchedRef = useRef<boolean>(false);
 
   useEffect(() => {
+    // Prevent duplicate calls (e.g., from React Strict Mode)
+    if (hasFetchedRef.current) {
+      return;
+    }
+    hasFetchedRef.current = true;
+
     const generateDemoCards = async () => {
       setIsLoading(true);
       try {
@@ -49,7 +54,7 @@ const DemoCardsGrid: React.FC = () => {
     };
 
     generateDemoCards();
-  }, [cardGenerationKey]);
+  }, []);
 
   const handleInteraction = () => {
     router.push("/auth#auth-sign-up");

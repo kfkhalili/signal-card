@@ -29,8 +29,16 @@ import { CookieBanner } from "@/components/layout/CookieBanner";
 import { RealtimeStockProvider } from "@/contexts/RealtimeStockContext";
 
 import "./globals.css";
+import type { Viewport } from "next";
 
 export const metadata = homeMetadata;
+
+// Viewport must be exported separately in Next.js 15
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5, // Allow zooming up to 5x for accessibility
+};
 
 export default function RootLayout({
   children,
@@ -42,6 +50,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <link rel="manifest" href="/manifest.json" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: structuredData }}

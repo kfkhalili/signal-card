@@ -6,7 +6,7 @@ export const homeMetadata: Metadata = {
   ),
   title: "Tickered - Financial Data Visualization & Analysis Platform",
   description:
-    "Transform complex financial data into interactive, digestible experiences. Spot trends, see moves, and build your unique collection of market insights with our innovative card-based system.",
+    "Institutional-grade financial data API with real-time market feeds and enterprise market services. Transform complex financial data into interactive, digestible experiences through API integration. Spot trends, see moves, and build your unique collection of market insights with our innovative card-based system. Professional financial analytics platform for real-time market data delivery.",
   category: "finance",
   keywords: [
     "financial data visualization",
@@ -19,11 +19,31 @@ export const homeMetadata: Metadata = {
     "trading signals",
     "financial technology",
     "market trends",
+    "Financial Data API",
+    "Enterprise Market Services",
+    "Real-time Analytics",
+    "financial data API",
+    "enterprise market services",
+    "real-time financial analytics",
+    "market data API",
+    "financial services platform",
+    "enterprise financial solutions",
+    "real-time market data",
+    "institutional-grade data",
+    "real-time market feeds",
+    "API integration",
+    "financial services",
+    "market data feeds",
+    "institutional financial data",
+    "enterprise financial API",
+    "real-time financial data",
+    "financial market analytics",
+    "professional financial platform",
   ],
   openGraph: {
     title: "Tickered - Financial Data Visualization & Analysis Platform",
     description:
-      "Transform complex financial data into interactive, digestible experiences. Spot trends, see moves, and build your unique collection of market insights.",
+      "Institutional-grade financial data API with real-time market feeds and enterprise market services. Transform complex financial data into interactive experiences through API integration. Professional financial analytics platform.",
     type: "website",
     url: process.env.NEXT_PUBLIC_BASE_URL || "https://www.tickered.com",
     siteName: "Tickered",
@@ -40,9 +60,21 @@ export const homeMetadata: Metadata = {
     card: "summary_large_image",
     title: "Tickered - Financial Data Visualization & Analysis Platform",
     description:
-      "Transform complex financial data into interactive, digestible experiences. Spot trends, see moves, and build your unique collection of market insights.",
+      "Institutional-grade financial data API with real-time market feeds and enterprise market services. Transform complex financial data into interactive experiences through API integration. Professional financial analytics platform.",
     creator: "@TickeredApp",
-    images: ["/images/tickered-twitter-image.png"],
+    images: ["/images/tickered-og-image.png"],
+  },
+  alternates: {
+    canonical: process.env.NEXT_PUBLIC_BASE_URL || "https://www.tickered.com",
+  },
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/images/tickered.png", type: "image/png" },
+    ],
+    apple: [
+      { url: "/images/tickered.png", sizes: "180x180", type: "image/png" },
+    ],
   },
   other: {
     "application-name": "Tickered",
@@ -52,14 +84,15 @@ export const homeMetadata: Metadata = {
 };
 
 export function generateStructuredData(metadata: Metadata): string {
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://www.tickered.com";
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "WebApplication",
     name: metadata.title,
     description: metadata.description,
-    url: process.env.NEXT_PUBLIC_BASE_URL || "https://www.tickered.com",
-    applicationCategory: "Finance",
-    operatingSystem: "All",
+    url: baseUrl,
+    applicationCategory: "FinanceApplication",
+    operatingSystem: "Web",
     browserRequirements: "Requires modern browser",
     offers: {
       "@type": "Offer",
@@ -69,10 +102,18 @@ export function generateStructuredData(metadata: Metadata): string {
     publisher: {
       "@type": "Organization",
       name: "Tickered",
+      url: baseUrl,
       logo: {
         "@type": "ImageObject",
-        url: "https://www.tickered.com/images/tickered.png",
+        url: `${baseUrl}/images/tickered.png`,
       },
+      address: {
+        "@type": "PostalAddress",
+        addressCountry: "DE",
+      },
+      sameAs: [
+        "https://www.reddit.com/r/tickered/",
+      ],
     },
   };
   return JSON.stringify(structuredData);

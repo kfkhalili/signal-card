@@ -16,12 +16,23 @@ interface SymbolSearchResult {
 
 export default function AnalysisPage() {
   const router = useRouter();
-  const { supabase } = useAuth();
+  const { supabase, user, isLoading: isAuthLoading } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery] = useDebounce(searchQuery, 300);
   const [searchResults, setSearchResults] = useState<SymbolSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [focusedSymbolIndex, setFocusedSymbolIndex] = useState<number>(-1);
+  const [hasMounted, setHasMounted] = useState<boolean>(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (hasMounted && !isAuthLoading && !user) {
+      router.push("/");
+    }
+  }, [user, isAuthLoading, router, hasMounted]);
 
   // Search for symbols as user types
   useEffect(() => {

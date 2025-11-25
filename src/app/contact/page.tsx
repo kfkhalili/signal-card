@@ -1,8 +1,31 @@
+import type { Metadata } from "next";
 import { Mail, MessageSquare, Building } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+
+export const metadata: Metadata = {
+  title: "Contact Us - Tickered Financial Data Platform",
+  description:
+    "Get in touch with Tickered for support, partnerships, or general inquiries. Contact our team for enterprise financial data API access, integration support, and institutional-grade market data services.",
+  alternates: {
+    canonical: "/contact",
+  },
+  openGraph: {
+    title: "Contact Us - Tickered Financial Data Platform",
+    description:
+      "Get in touch with Tickered for support, partnerships, or general inquiries about our financial data API and market analytics platform.",
+    type: "website",
+    url: "/contact",
+  },
+  twitter: {
+    card: "summary",
+    title: "Contact Us - Tickered",
+    description:
+      "Get in touch with Tickered for support, partnerships, or general inquiries about our financial data API and market analytics platform.",
+  },
+};
 
 export default function ContactPage() {
   return (
@@ -95,16 +118,9 @@ export default function ContactPage() {
               <div>
                 <h3 className="font-semibold text-lg">Mailing Address</h3>
                 <p className="text-muted-foreground">
-                  Tickered Inc.
+                  Tickered
                   <br />
-                  123 Market Street
-                  <br />
-                  San Francisco, CA 94105
-                  <br />
-                  United States
-                </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  (Please note this is a placeholder address)
+                  Germany
                 </p>
               </div>
             </div>

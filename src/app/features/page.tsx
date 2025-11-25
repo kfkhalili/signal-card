@@ -1,4 +1,27 @@
+import type { Metadata } from "next";
 import { Shield, Zap, BarChart3, Users } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "Features - Tickered Financial Data Platform",
+  description:
+    "Discover Tickered's powerful features: institutional-grade financial data API, real-time market feeds, interactive data visualization, and enterprise market services for modern investors.",
+  alternates: {
+    canonical: "/features",
+  },
+  openGraph: {
+    title: "Features - Tickered Financial Data Platform",
+    description:
+      "Discover Tickered's powerful features: institutional-grade financial data API, real-time market feeds, and interactive data visualization.",
+    type: "website",
+    url: "/features",
+  },
+  twitter: {
+    card: "summary",
+    title: "Features - Tickered",
+    description:
+      "Discover Tickered's powerful features: institutional-grade financial data API, real-time market feeds, and interactive data visualization.",
+  },
+};
 
 export default function FeaturesPage() {
   return (
@@ -70,10 +93,12 @@ export default function FeaturesPage() {
         </div>
 
         <div className="text-center mt-16">
-          <h2 className="text-2xl font-bold">Content Coming Soon</h2>
           <p className="text-muted-foreground mt-2">
-            This page is currently under construction. More detailed feature
-            descriptions and visuals will be added shortly.
+            Explore our platform to experience these features firsthand. For detailed information about enterprise features and API integration, contact{" "}
+            <a href="mailto:support@tickered.com" className="text-primary hover:underline">
+              support@tickered.com
+            </a>
+            .
           </p>
         </div>
       </main>

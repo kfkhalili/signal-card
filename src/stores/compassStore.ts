@@ -44,9 +44,6 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
 
       const weightsPayload = get().weights;
 
-      // --- ADD THIS LOG ---
-      console.log("Sending payload to RPC:", weightsPayload);
-
       const rpcResult = await fromPromise(
         supabase.rpc("get_weighted_leaderboard", {
           weights: weightsPayload,

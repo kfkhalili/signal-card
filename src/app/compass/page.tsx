@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useLeaderboardStore } from "@/stores/compassStore";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDebounce } from "use-debounce";
@@ -145,7 +146,8 @@ interface ProfileData {
 }
 
 export default function CompassPage() {
-  const { supabase, user } = useAuth();
+  const { supabase, user, isLoading: isAuthLoading } = useAuth();
+  const router = useRouter();
   const {
     weights,
     leaderboardData,
@@ -157,6 +159,17 @@ export default function CompassPage() {
   const { addCard, addCards } = useAddCardToWorkspace();
   const [addingSymbols, setAddingSymbols] = useState<Set<string>>(new Set());
   const [profileData, setProfileData] = useState<Record<string, ProfileData>>({});
+  const [hasMounted, setHasMounted] = useState<boolean>(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (hasMounted && !isAuthLoading && !user) {
+      router.push("/");
+    }
+  }, [user, isAuthLoading, router, hasMounted]);
 
   useEffect(() => {
     if (supabase) {
