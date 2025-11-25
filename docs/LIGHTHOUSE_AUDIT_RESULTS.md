@@ -1,8 +1,8 @@
 # Lighthouse Audit Results
 
-**Date:** November 25, 2025
-**URL Tested (Dev):** http://localhost:3000/
-**URL Tested (Production Preview):** https://signal-card-git-improve-domai-fb048c-khalid-alkhalilis-projects.vercel.app/
+**Date:** November 25, 2025  
+**URL Tested (Dev):** http://localhost:3000/  
+**URL Tested (Production Preview):** https://signal-card-git-improve-domai-fb048c-khalid-alkhalilis-projects.vercel.app/  
 **Lighthouse Version:** 12.8.2
 
 ## Overall Scores
