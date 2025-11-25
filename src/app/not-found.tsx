@@ -1,17 +1,8 @@
-import type { Metadata } from "next";
+"use client";
+
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Home, Search, ArrowLeft } from "lucide-react";
-
-export const metadata: Metadata = {
-  title: "404 - Page Not Found | Tickered",
-  description:
-    "The page you're looking for doesn't exist. Return to Tickered's financial data platform to explore stock analysis, market data, and real-time market feeds.",
-  robots: {
-    index: false,
-    follow: false,
-  },
-};
 
 export default function NotFound() {
   return (
