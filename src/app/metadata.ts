@@ -76,11 +76,6 @@ export const homeMetadata: Metadata = {
       { url: "/images/tickered.png", sizes: "180x180", type: "image/png" },
     ],
   },
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 5, // Allow zooming up to 5x for accessibility
-  },
   other: {
     "application-name": "Tickered",
     "msapplication-TileColor": "#ffffff",
