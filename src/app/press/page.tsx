@@ -1,5 +1,28 @@
+import type { Metadata } from "next";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+export const metadata: Metadata = {
+  title: "Press & Media - Tickered Financial Data Platform",
+  description:
+    "Press resources, media kit, and information for journalists covering Tickered's financial data API, real-time market feeds, and enterprise market services.",
+  alternates: {
+    canonical: "/press",
+  },
+  openGraph: {
+    title: "Press & Media - Tickered",
+    description:
+      "Press resources, media kit, and information for journalists covering Tickered's financial data platform.",
+    type: "website",
+    url: "/press",
+  },
+  twitter: {
+    card: "summary",
+    title: "Press & Media - Tickered",
+    description:
+      "Press resources, media kit, and information for journalists covering Tickered's financial data platform.",
+  },
+};
 
 export default function PressPage() {
   return (
@@ -37,9 +60,12 @@ export default function PressPage() {
         </div>
 
         <div className="text-center mt-16">
-          <h2 className="text-2xl font-bold">Content Coming Soon</h2>
           <p className="text-muted-foreground mt-2">
-            This page is currently under construction.
+            For media inquiries, press releases, or interview requests, please contact{" "}
+            <a href="mailto:support@tickered.com" className="text-primary hover:underline">
+              support@tickered.com
+            </a>
+            .
           </p>
         </div>
       </main>

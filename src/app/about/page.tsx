@@ -36,6 +36,9 @@ export const metadata: Metadata = {
     "market analysis software",
     "financial education platform",
   ],
+  alternates: {
+    canonical: "/about",
+  },
   openGraph: {
     title: "About Tickered - Financial Data Visualization & Analysis Platform",
     description:
@@ -67,7 +70,7 @@ const AboutPage = () => {
     numberOfEmployees: "1-10",
     address: {
       "@type": "PostalAddress",
-      addressCountry: "US",
+      addressCountry: "DE",
     },
     sameAs: [
       "https://twitter.com/tickered",

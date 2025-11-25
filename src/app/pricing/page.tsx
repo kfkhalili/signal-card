@@ -1,5 +1,29 @@
+import type { Metadata } from "next";
 import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Pricing - Tickered Financial Data Platform",
+  description:
+    "Flexible pricing plans for accessing Tickered's institutional-grade financial data API, real-time market feeds, and enterprise market services. Start free and scale as you grow.",
+  alternates: {
+    canonical: "/pricing",
+  },
+  openGraph: {
+    title: "Pricing - Tickered Financial Data Platform",
+    description:
+      "Flexible pricing plans for accessing Tickered's institutional-grade financial data API and real-time market feeds.",
+    type: "website",
+    url: "/pricing",
+  },
+  twitter: {
+    card: "summary",
+    title: "Pricing - Tickered",
+    description:
+      "Flexible pricing plans for accessing Tickered's institutional-grade financial data API and real-time market feeds.",
+  },
+};
 
 export default function PricingPage() {
   return (
@@ -42,8 +66,8 @@ export default function PricingPage() {
                 Standard data updates
               </li>
             </ul>
-            <Button className="mt-8 w-full" variant="outline">
-              Get Started
+            <Button className="mt-8 w-full" variant="outline" asChild>
+              <Link href="/auth#auth-sign-up">Get Started</Link>
             </Button>
           </div>
 
@@ -81,7 +105,9 @@ export default function PricingPage() {
                 Priority support
               </li>
             </ul>
-            <Button className="mt-8 w-full">Choose Pro</Button>
+            <Button className="mt-8 w-full" asChild>
+              <Link href="/auth#auth-sign-up">Choose Pro</Link>
+            </Button>
           </div>
 
           {/* Enterprise Plan */}
@@ -109,17 +135,19 @@ export default function PricingPage() {
                 Dedicated account manager
               </li>
             </ul>
-            <Button className="mt-8 w-full" variant="outline">
-              Contact Sales
+            <Button className="mt-8 w-full" variant="outline" asChild>
+              <a href="mailto:support@tickered.com">Contact Sales</a>
             </Button>
           </div>
         </div>
 
         <div className="text-center mt-16">
-          <h2 className="text-2xl font-bold">Pricing Details Coming Soon</h2>
           <p className="text-muted-foreground mt-2">
-            This page is currently a placeholder. The features and pricing for
-            each plan are subject to change.
+            For questions about pricing or to discuss custom enterprise solutions, please contact our sales team at{" "}
+            <a href="mailto:support@tickered.com" className="text-primary hover:underline">
+              support@tickered.com
+            </a>
+            .
           </p>
         </div>
       </main>

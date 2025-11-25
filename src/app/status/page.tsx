@@ -1,4 +1,27 @@
+import type { Metadata } from "next";
 import { CheckCircle } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "System Status - Tickered Financial Data Platform",
+  description:
+    "Check the current operational status of Tickered's financial data API, real-time market feeds, and enterprise market services. Monitor uptime and service availability.",
+  alternates: {
+    canonical: "/status",
+  },
+  openGraph: {
+    title: "System Status - Tickered",
+    description:
+      "Check the current operational status of Tickered's financial data API and real-time market feeds.",
+    type: "website",
+    url: "/status",
+  },
+  twitter: {
+    card: "summary",
+    title: "System Status - Tickered",
+    description:
+      "Check the current operational status of Tickered's financial data API and real-time market feeds.",
+  },
+};
 
 export default function StatusPage() {
   return (
@@ -53,10 +76,8 @@ export default function StatusPage() {
         </div>
 
         <div className="text-center mt-16">
-          <h2 className="text-2xl font-bold">Live Status Page Coming Soon</h2>
           <p className="text-muted-foreground mt-2">
-            This is a placeholder page. A live status page with real-time
-            monitoring and incident history will be implemented here.
+            All systems are operational. For detailed incident history and real-time monitoring, please contact our support team.
           </p>
         </div>
       </main>

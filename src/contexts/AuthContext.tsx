@@ -97,15 +97,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         (e) => new Error(`Failed to sign out: ${(e as Error).message}`)
       );
 
-      signOutResult.mapErr((error) => {
-        console.error("[AuthContext] Error signing out:", error.message);
-      });
+      signOutResult.match(
+        () => {
+          // Sign out successful - redirect to landing page
+          window.location.href = "/";
+        },
+        (error) => {
+          console.error("[AuthContext] Error signing out:", error.message);
+        }
+      );
     } else {
       console.warn(
         "[AuthContext] Sign out called, but Supabase client is not initialized."
       );
       setSession(Option.none());
       setUser(Option.none());
+      // Still redirect even if client is not initialized
+      window.location.href = "/";
     }
   };
 

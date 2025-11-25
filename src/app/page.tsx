@@ -36,8 +36,7 @@ export default function LandingPage() {
             See the Moves
           </h2>
           <p className="text-base sm:text-lg md:text-xl text-foreground/80 max-w-xl md:max-w-2xl mb-8">
-            Market Signals, Simplified. Dive into dynamic financial data,
-            capture key market events, and build your unique collection.
+            Market Signals, Simplified. Access institutional-grade data and real-time market feeds through our financial services platform. Dive into dynamic financial data, capture key market events, and build your unique collection with API integration.
           </p>
           <Button
             size="lg"

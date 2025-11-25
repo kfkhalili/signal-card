@@ -1,5 +1,28 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "Blog - Tickered Financial Data Platform",
+  description:
+    "Read insights, guides, and updates about financial data analysis, market trends, and investment strategies. Learn how to leverage institutional-grade market data and real-time analytics.",
+  alternates: {
+    canonical: "/blog",
+  },
+  openGraph: {
+    title: "Blog - Tickered Financial Data Platform",
+    description:
+      "Read insights, guides, and updates about financial data analysis, market trends, and investment strategies.",
+    type: "website",
+    url: "/blog",
+  },
+  twitter: {
+    card: "summary",
+    title: "Blog - Tickered",
+    description:
+      "Read insights, guides, and updates about financial data analysis, market trends, and investment strategies.",
+  },
+};
 
 const placeholderPosts = [
   {
@@ -8,7 +31,11 @@ const placeholderPosts = [
     excerpt:
       "The Price-to-Earnings ratio is a fundamental metric for stock valuation. In this post, we break down what it means and how to use it.",
     category: "Investing 101",
-    date: "June 15, 2025",
+    date: new Date().toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }),
   },
   {
     id: 2,
@@ -16,7 +43,11 @@ const placeholderPosts = [
     excerpt:
       "The information gap between professional and retail investors is shrinking. Discover the impact of having real-time data at your fingertips.",
     category: "Market Trends",
-    date: "June 10, 2025",
+    date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }),
   },
   {
     id: 3,
@@ -24,7 +55,11 @@ const placeholderPosts = [
     excerpt:
       "Learn about the vision behind Tickered and how our interactive card-based system is designed to make financial analysis more intuitive.",
     category: "Product Updates",
-    date: "June 1, 2025",
+    date: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }),
   },
 ];
 
@@ -67,9 +102,16 @@ export default function BlogPage() {
         </div>
 
         <div className="text-center mt-16">
-          <h2 className="text-2xl font-bold">More Content Coming Soon</h2>
           <p className="text-muted-foreground mt-2">
-            Our blog is just getting started. Check back soon for more articles.
+            Stay updated with the latest insights on investing, market trends, and platform updates. Subscribe to our newsletter or follow us on{" "}
+            <a
+              href="https://twitter.com/tickered"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline">
+              Twitter
+            </a>
+            {" "}for regular updates.
           </p>
         </div>
       </main>

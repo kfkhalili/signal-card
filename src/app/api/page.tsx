@@ -1,4 +1,27 @@
+import type { Metadata } from "next";
 import { Code, Book, Key } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "API Documentation - Tickered Financial Data API",
+  description:
+    "Integrate Tickered's institutional-grade financial data API into your applications. Access real-time market feeds, enterprise market services, and comprehensive financial data through our RESTful API.",
+  alternates: {
+    canonical: "/api",
+  },
+  openGraph: {
+    title: "API Documentation - Tickered Financial Data API",
+    description:
+      "Integrate Tickered's institutional-grade financial data API into your applications. Access real-time market feeds and enterprise market services.",
+    type: "website",
+    url: "/api",
+  },
+  twitter: {
+    card: "summary",
+    title: "API Documentation - Tickered",
+    description:
+      "Integrate Tickered's institutional-grade financial data API into your applications. Access real-time market feeds and enterprise market services.",
+  },
+};
 
 export default function ApiPage() {
   return (
@@ -60,10 +83,12 @@ export default function ApiPage() {
         </div>
 
         <div className="text-center mt-16">
-          <h2 className="text-2xl font-bold">API Coming Soon</h2>
           <p className="text-muted-foreground mt-2">
-            This documentation is a placeholder. The API is currently in
-            development.
+            API access is available for Pro and Enterprise plans. For API documentation, authentication details, and integration support, please contact{" "}
+            <a href="mailto:support@tickered.com" className="text-primary hover:underline">
+              support@tickered.com
+            </a>
+            .
           </p>
         </div>
       </main>

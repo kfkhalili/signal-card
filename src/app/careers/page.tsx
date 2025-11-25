@@ -1,4 +1,27 @@
+import type { Metadata } from "next";
 import { Briefcase, Building, Users } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "Careers - Join Tickered",
+  description:
+    "Join Tickered and help build the future of financial analysis. We're creating a more accessible and powerful platform for investors with institutional-grade financial data API and real-time market feeds.",
+  alternates: {
+    canonical: "/careers",
+  },
+  openGraph: {
+    title: "Careers - Join Tickered",
+    description:
+      "Join Tickered and help build the future of financial analysis with institutional-grade financial data API and real-time market feeds.",
+    type: "website",
+    url: "/careers",
+  },
+  twitter: {
+    card: "summary",
+    title: "Careers - Join Tickered",
+    description:
+      "Join Tickered and help build the future of financial analysis with institutional-grade financial data API and real-time market feeds.",
+  },
+};
 
 export default function CareersPage() {
   return (
