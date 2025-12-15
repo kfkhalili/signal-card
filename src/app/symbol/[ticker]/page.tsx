@@ -1602,11 +1602,9 @@ export default function SymbolAnalysisPage() {
   const handleRemoveFromWorkspace = async () => {
     setRemovingFromWorkspace(true);
     try {
-      const removed = removeSymbolFromWorkspace(ticker);
-      if (removed) {
-        // Navigate to workspace to see the change
-        router.push("/workspace");
-      }
+      removeSymbolFromWorkspace(ticker);
+      // Symbol removed from workspace - stay on analysis page
+      // The button will automatically update to "Add to Workspace" via hasCardsInWorkspace hook
     } finally {
       setRemovingFromWorkspace(false);
     }

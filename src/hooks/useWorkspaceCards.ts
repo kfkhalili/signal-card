@@ -112,8 +112,9 @@ export function removeSymbolFromWorkspace(symbol: string): boolean {
       JSON.stringify(filteredCards)
     );
 
-    // Trigger storage event so workspace page can update
-    window.dispatchEvent(new Event("storage"));
+    // Trigger storage event so workspace page and analysis page can update
+    // Use "local-storage" event to match useAddCardToWorkspace pattern
+    window.dispatchEvent(new Event("local-storage"));
 
     return filteredCards.length < cards.length;
   } catch (error) {
