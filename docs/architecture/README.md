@@ -84,6 +84,13 @@ This directory contains the canonical architecture and operational documentation
     - `analysis-page-calculations/` - Analysis page calculation fixes (2025-01-26)
       - Fix plan, critical review, threshold research, and completion summary
   - `completed-implementations/` - Implementation documentation (completed)
+    - `custom-cards/` - Custom card implementation and refactoring (2025-01-26)
+      - Original implementation docs and refactoring summary
+  - `completed-evaluations/` - Completed evaluation and verification documents (2025-01-26)
+    - On-demand API progress evaluation
+    - Architecture checklist verification
+  - `future-enhancements/` - Planning documents for future work (2025-01-26)
+    - WACC full implementation plan (simplified version is already implemented)
   - `historical-analysis/` - Historical error analysis and reports
   - `outdated-status/` - Build planning docs (system is complete)
     - Implementation plans
