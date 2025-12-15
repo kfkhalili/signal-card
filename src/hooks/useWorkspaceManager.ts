@@ -42,7 +42,8 @@ import {
   type CardUpdateEventType,
 } from "@/components/game/cardUpdateHandler.types";
 import "@/components/game/cards/updateHandlerInitializer";
-import type { CustomCardData } from "@/components/game/cards/custom-card/custom-card.types";
+import { createCustomCard } from "@/lib/custom-cards/createCustomCard";
+import { findSourceCardForItem } from "@/lib/custom-cards/utils";
 
 type ExchangeMarketStatusRecord =
   Database["public"]["Tables"]["exchange_market_status"]["Row"];
@@ -202,43 +203,47 @@ export function useWorkspaceManager() {
     [displayedCards]
   );
 
+  /**
+   * Creates a custom card from selected data items.
+   *
+   * This function uses the isolated custom card creation logic from
+   * src/lib/custom-cards/createCustomCard.ts, making it reusable
+   * and easier to maintain.
+   *
+   * @param narrative - User-defined title for the card
+   * @param description - Optional description for the back of the card
+   * @returns The created custom card, or null if creation failed
+   */
   const createCustomStaticCard = useCallback(
-    (narrative: string, description: string) => {
+    (narrative: string, description?: string) => {
       if (selectedDataItems.length === 0) {
-        return;
+        return null;
       }
 
       const firstItem = selectedDataItems[0];
-      const sourceCard = activeCards.find(
-        (c) => c.id === firstItem.sourceCardId
+      const sourceCard = findSourceCardForItem(firstItem, activeCards);
+
+      const newCustomCard = createCustomCard(
+        {
+          narrative,
+          description,
+          selectedItems: selectedDataItems,
+          sourceCard: sourceCard ?? undefined,
+        },
+        {
+          // Use default options - can be customized if needed
+        }
       );
 
-      const newCustomCard: CustomCardData & DisplayableCardState = {
-        id: `custom-${Date.now()}`,
-        type: "custom",
-        symbol: sourceCard?.symbol ?? "CUSTOM",
-        companyName: sourceCard?.companyName ?? narrative,
-        displayCompanyName:
-          sourceCard?.displayCompanyName ??
-          sourceCard?.companyName ??
-          narrative,
-        logoUrl: sourceCard?.logoUrl ?? null,
-        createdAt: Date.now(),
-        isFlipped: false,
-        websiteUrl: null,
-        backData: {
-          description:
-            description ||
-            `A custom card for ${sourceCard?.companyName ?? "a company"}.`,
-        },
-        narrative: narrative,
-        items: selectedDataItems,
-      };
+      if (!newCustomCard) {
+        return null;
+      }
 
       setActiveCards((prev) => [newCustomCard, ...prev]);
-
       setSelectedDataItems([]);
       setIsSelectionMode(false);
+
+      return newCustomCard;
     },
     [activeCards, selectedDataItems]
   );
@@ -618,6 +623,20 @@ export function useWorkspaceManager() {
     setActiveCards(INITIAL_ACTIVE_CARDS);
   }, []);
 
+  /**
+   * Removes all cards for a specific symbol from the workspace.
+   *
+   * @param symbol - The symbol whose cards should be removed
+   */
+  const removeCardsBySymbol = useCallback(
+    (symbol: string) => {
+      setActiveCards((prev) =>
+        prev.filter((card) => card.symbol !== symbol)
+      );
+    },
+    []
+  );
+
   const handleDividendHistoryUpdate = useCallback(
     (updatedDividendDBRow: DividendHistoryDBRow) => {
       const eventType: CardUpdateEventType = "DIVIDEND_ROW_UPDATE";
@@ -829,6 +848,7 @@ export function useWorkspaceManager() {
     isAddingCardInProgress,
     addCardToWorkspace,
     clearWorkspace,
+    removeCardsBySymbol,
     stockDataCallbacks,
     uniqueSymbolsInWorkspace,
     exchangeStatuses,

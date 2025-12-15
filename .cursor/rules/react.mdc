@@ -5,7 +5,14 @@ globs: **/*.tsx, **/*.jsx, components/**/*
 
 # React Best Practices
 
-**Version:** React 19 RC (react: ^19.0.0-rc.1)
+**Version:** React 19.2.3+ (stable)
+
+## React 19 Compatibility
+
+### Direct Imports Required
+- **NEVER use React namespace** (e.g., `React.useState`, `React.FC`)
+- Always use direct imports: `import { useState, type FC } from "react"`
+- See `eslint-and-migration-best-practices.mdc` for complete patterns
 
 ## React 19 Features
 

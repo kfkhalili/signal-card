@@ -1,5 +1,5 @@
 // src/components/game/cards/analyst-grades-card/AnalystGradesCard.stories.tsx
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { action } from "storybook/actions";
 import { AnalystGradesCardContent } from "./AnalystGradesCardContent";
 import type {

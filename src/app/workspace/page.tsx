@@ -1,15 +1,15 @@
 // src/app/workspace/page.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { AddCardForm } from "@/components/workspace/AddCardForm";
 import type { CardType } from "@/components/game/cards/base-card/base-card.types";
 import { StockDataHandler } from "@/components/workspace/StockDataHandler";
 import MarketDataStatusBanner from "@/components/workspace/MarketStatusBanner";
-import { CustomCardCreatorPanel } from "@/components/workspace/CustomCardCreatorPanel";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -21,10 +21,9 @@ import {
   PlusCircle,
   RefreshCw,
   Loader2,
-  Edit,
-  X,
   ArrowUpDown,
   Undo2,
+  X,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -66,14 +65,13 @@ export default function WorkspacePage() {
     isAddingCardInProgress,
     addCardToWorkspace,
     clearWorkspace,
+    removeCardsBySymbol,
     stockDataCallbacks,
     uniqueSymbolsInWorkspace,
     onGenericInteraction,
     isSelectionMode,
-    setIsSelectionMode,
     selectedDataItems,
     handleToggleItemSelection,
-    createCustomStaticCard,
     sortConfig,
     setSortConfig,
     onDragEnd,
@@ -82,10 +80,12 @@ export default function WorkspacePage() {
   const [marketStatuses, setMarketStatuses] = useState<MarketStatus>({});
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState<boolean>(false);
   const [hasMounted, setHasMounted] = useState<boolean>(false);
-  const [isCreatorPanelOpen, setIsCreatorPanelOpen] = useState<boolean>(false);
 
   useEffect(() => {
-    setHasMounted(true);
+    // Schedule state update to avoid cascading renders
+    queueMicrotask(() => {
+      setHasMounted(true);
+    });
   }, []);
 
   useEffect(() => {
@@ -147,11 +147,6 @@ export default function WorkspacePage() {
     }
   }, [hasMounted, user, isAuthLoading, addCardToWorkspace]);
 
-  useEffect(() => {
-    if (!isSelectionMode) {
-      setIsCreatorPanelOpen(false);
-    }
-  }, [isSelectionMode]);
 
   const handleSortChange = (value: string) => {
     const [key, order] = value.split("-");
@@ -162,25 +157,6 @@ export default function WorkspacePage() {
     setSortConfig({ key: "createdAt", order: "desc" });
   };
 
-  const handleCreateCustomCard = (narrative: string, description: string) => {
-    createCustomStaticCard(narrative, description);
-    setIsSelectionMode(false);
-  };
-
-  const handleToggleSelectionMode = () => {
-    setIsSelectionMode((prev) => !prev);
-  };
-
-  const handleOpenCreatorPanel = () => {
-    setIsCreatorPanelOpen(true);
-  };
-
-  const handleDeselectItem = (itemId: string) => {
-    const itemToDeselect = selectedDataItems.find((item) => item.id === itemId);
-    if (itemToDeselect) {
-      handleToggleItemSelection(itemToDeselect);
-    }
-  };
 
   const handleMarketStatusChange = useCallback(
     (symbol: string, statusInfo: MarketStatusUpdate) => {
@@ -196,6 +172,16 @@ export default function WorkspacePage() {
     clearWorkspace();
     setMarketStatuses({});
     setIsClearConfirmOpen(false);
+  };
+
+  const handleRemoveSymbol = (symbol: string) => {
+    removeCardsBySymbol(symbol);
+    // Clean up market status for removed symbol
+    setMarketStatuses((prev) => {
+      return Object.fromEntries(
+        Object.entries(prev).filter(([key]) => key !== symbol)
+      );
+    });
   };
 
   if (!hasMounted || isAuthLoading) {
@@ -258,33 +244,42 @@ export default function WorkspacePage() {
                 Reset Order
               </Button>
             )}
-            <Button
-              variant={isSelectionMode ? "destructive" : "outline"}
-              size="sm"
-              onClick={handleToggleSelectionMode}
-              disabled={isAddingCardInProgress}>
-              {isSelectionMode ? (
-                <X className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-              ) : (
-                <Edit className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-              )}
-              {isSelectionMode ? "Cancel" : "Create Custom"}
-            </Button>
-            {isSelectionMode && (
-              <Button
-                variant="default"
-                size="sm"
-                onClick={handleOpenCreatorPanel}
-                disabled={selectedDataItems.length === 0}>
-                Review ({selectedDataItems.length})
-              </Button>
+            {uniqueSymbolsInWorkspace.length > 0 && (
+              <div className="flex gap-1.5 items-center flex-wrap">
+                {uniqueSymbolsInWorkspace.map((symbol) => (
+                  <Badge
+                    key={symbol}
+                    variant="outline"
+                    className="flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 text-xs group">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveSymbol(symbol);
+                      }}
+                      className="cursor-pointer hover:bg-destructive/10 rounded-full p-0.5 transition-colors"
+                      title={`Remove all cards for ${symbol}`}
+                      aria-label={`Remove all cards for ${symbol}`}>
+                      <X className="h-3 w-3 text-muted-foreground group-hover:text-destructive transition-colors" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/symbol/${symbol}`);
+                      }}
+                      className="cursor-pointer hover:text-primary transition-colors font-medium"
+                      title={`View analysis for ${symbol}`}
+                      aria-label={`View analysis for ${symbol}`}>
+                      {symbol}
+                    </button>
+                  </Badge>
+                ))}
+              </div>
             )}
-
             <Button
               variant="outline"
               size="sm"
               onClick={() => setIsClearConfirmOpen(true)}
-              disabled={isAddingCardInProgress || isSelectionMode}>
+              disabled={isAddingCardInProgress}>
               <RefreshCw className="mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Clear All
             </Button>
             <AddCardForm
@@ -412,13 +407,6 @@ export default function WorkspacePage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <CustomCardCreatorPanel
-        isOpen={isCreatorPanelOpen}
-        onClose={() => setIsCreatorPanelOpen(false)}
-        selectedItems={selectedDataItems}
-        onDeselectItem={handleDeselectItem}
-        onCreateCard={handleCreateCustomCard}
-      />
     </div>
   );
 }

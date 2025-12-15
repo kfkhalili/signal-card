@@ -1,7 +1,7 @@
 // src/components/game/ActiveCardsSection.tsx
 "use client";
 
-import React, { useCallback, useState } from "react";
+import { useCallback, useState, type FC, type Dispatch, type SetStateAction } from "react";
 import type { DisplayableCard } from "./types";
 import { ActiveCards as ActiveCardsPresentational } from "./ActiveCards";
 import type { OnGenericInteraction } from "./cards/base-card/base-card.types";
@@ -10,7 +10,7 @@ import { DragEndEvent } from "@dnd-kit/core";
 
 interface ActiveCardsSectionProps {
   activeCards: DisplayableCard[];
-  setActiveCards: React.Dispatch<React.SetStateAction<DisplayableCard[]>>;
+  setActiveCards: Dispatch<SetStateAction<DisplayableCard[]>>;
   onGenericInteraction: OnGenericInteraction;
   onDragEnd: (event: DragEndEvent) => void;
   isSelectionMode: boolean;
@@ -18,7 +18,7 @@ interface ActiveCardsSectionProps {
   onToggleItemSelection: (item: SelectedDataItem) => void;
 }
 
-const ActiveCardsSection: React.FC<ActiveCardsSectionProps> = ({
+const ActiveCardsSection: FC<ActiveCardsSectionProps> = ({
   activeCards,
   setActiveCards,
   onGenericInteraction,

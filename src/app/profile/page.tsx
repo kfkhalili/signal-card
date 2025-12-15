@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { fromPromise } from "neverthrow";
 import { Option } from "effect";
-import { useState, useEffect, FormEvent } from "react";
+import { useState, useEffect, FormEvent, type ReactElement } from "react";
 import {
   Card,
   CardContent,
@@ -34,7 +34,7 @@ import { Tables } from "@/lib/supabase/database.types";
 
 type UserProfile = Tables<"user_profiles">;
 
-export default function ProfilePage(): JSX.Element {
+export default function ProfilePage(): ReactElement {
   const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const [profile, setProfile] = useState<Option.Option<UserProfile>>(Option.none());
@@ -43,7 +43,10 @@ export default function ProfilePage(): JSX.Element {
 
   useEffect(() => {
     if (!supabase) {
-        setPageLoading(false);
+        // Schedule state update to avoid cascading renders
+        queueMicrotask(() => {
+          setPageLoading(false);
+        });
         return;
     }
     const fetchProfile = async () => {

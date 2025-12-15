@@ -1,7 +1,7 @@
 // src/app/auth/page.tsx
 "use client";
 
-import React, { Suspense, useEffect } from "react"; // Import Suspense and useEffect
+import { Suspense, useEffect } from "react"; // Import Suspense and useEffect
 import AuthForm from "./AuthForm"; // Import the new component
 
 // Define a simple loading fallback

@@ -34,8 +34,12 @@ export default function AuthForm() {
       newView = "sign_in";
     }
 
+    // Use a callback to avoid synchronous setState in effect
     if (authView !== newView) {
-      setAuthView(newView);
+      // Schedule state update to avoid cascading renders
+      queueMicrotask(() => {
+        setAuthView(newView);
+      });
     }
   }, [pathname, searchParams, authView]);
 

@@ -229,7 +229,7 @@ export async function fetchRatiosTtmLogic(
       fetched_at: new Date().toISOString(), // CRITICAL: Update fetched_at on upsert to prevent infinite job creation
     } as SupabaseRatiosTtmRecord;
 
-    const { error: upsertError, count } = await supabase
+    const { error: upsertError } = await supabase
       .from('ratios_ttm')
       .upsert(recordToUpsert, { onConflict: 'symbol', count: 'exact' });
 

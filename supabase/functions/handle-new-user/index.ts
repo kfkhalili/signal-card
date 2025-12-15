@@ -20,8 +20,15 @@ Deno.serve(async (_req: Request) => {
 
   try {
     // Create Supabase client with service role key
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return new Response(
+        JSON.stringify({ error: "Missing required environment variables" }),
+        { headers: { ...CORS_HEADERS, "Content-Type": "application/json" }, status: 500 }
+      );
+    }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 

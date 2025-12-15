@@ -1,5 +1,5 @@
 // src/components/game/cards/price-card/PriceCard.stories.tsx
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { action } from "storybook/actions";
 import { PriceCardContent } from "./PriceCardContent";
 import type { PriceCardData } from "./price-card.types";

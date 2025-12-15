@@ -11,7 +11,7 @@
  * - /all-alerts - Returns all alert statuses in one response
  */
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -119,17 +119,19 @@ Deno.serve(async (req: Request) => {
 /**
  * Check queue success rate (alert if <90%)
  */
-async function checkQueueSuccessRate(supabase: any): Promise<AlertResult> {
+async function checkQueueSuccessRate(supabase: SupabaseClient): Promise<AlertResult> {
   const { data, error } = await supabase.rpc("check_queue_success_rate_alert");
 
   if (error) {
     throw new Error(`Failed to check queue success rate: ${error.message}`);
   }
 
-  const result = (data as any[])?.[0];
+  interface QueueSuccessRateResult {
+    success_rate_percent?: string;
+    alert_status?: string;
+  }
+  const result = (data as QueueSuccessRateResult[])?.[0];
   const successRate = parseFloat(result?.success_rate_percent ?? "100");
-  const completed = parseInt(result?.completed_count ?? "0", 10);
-  const failed = parseInt(result?.failed_count ?? "0", 10);
   const alertStatus = result?.alert_status ?? "healthy";
 
   return {
@@ -147,16 +149,19 @@ async function checkQueueSuccessRate(supabase: any): Promise<AlertResult> {
 /**
  * Check quota usage (alert if >80%)
  */
-async function checkQuotaUsage(supabase: any): Promise<AlertResult> {
+async function checkQuotaUsage(supabase: SupabaseClient): Promise<AlertResult> {
   const { data, error } = await supabase.rpc("check_quota_usage_alert");
 
   if (error) {
     throw new Error(`Failed to check quota usage: ${error.message}`);
   }
 
-  const result = (data as any[])?.[0];
+  interface QuotaUsageResult {
+    usage_percent?: string;
+    alert_status?: string;
+  }
+  const result = (data as QuotaUsageResult[])?.[0];
   const usagePercent = parseFloat(result?.usage_percent ?? "0");
-  const totalBytes = parseInt(result?.total_bytes ?? "0", 10);
   const alertStatus = result?.alert_status ?? "healthy";
 
   return {
@@ -174,14 +179,19 @@ async function checkQuotaUsage(supabase: any): Promise<AlertResult> {
 /**
  * Check stuck jobs (alert if >10)
  */
-async function checkStuckJobs(supabase: any): Promise<AlertResult> {
+async function checkStuckJobs(supabase: SupabaseClient): Promise<AlertResult> {
   const { data, error } = await supabase.rpc("check_stuck_jobs_alert");
 
   if (error) {
     throw new Error(`Failed to check stuck jobs: ${error.message}`);
   }
 
-  const result = (data as any[])?.[0];
+  interface StuckJobsResult {
+    stuck_count?: string;
+    affected_data_types?: string;
+    alert_status?: string;
+  }
+  const result = (data as StuckJobsResult[])?.[0];
   const stuckCount = parseInt(result?.stuck_count ?? "0", 10);
   const affectedTypes = parseInt(result?.affected_data_types ?? "0", 10);
   const alertStatus = result?.alert_status ?? "healthy";
@@ -201,7 +211,7 @@ async function checkStuckJobs(supabase: any): Promise<AlertResult> {
 /**
  * Get all alerts in one response
  */
-async function getAllAlerts(supabase: any) {
+async function getAllAlerts(supabase: SupabaseClient) {
   const [queueSuccess, quotaUsage, stuckJobs] = await Promise.all([
     checkQueueSuccessRate(supabase),
     checkQuotaUsage(supabase),

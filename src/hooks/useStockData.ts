@@ -646,12 +646,13 @@ export function useStockData({
         subscriptionRef.current = null;
       }
     };
-  }, [
-    symbol,
-    supabaseClient,
     // CRITICAL: Only depend on symbol and supabaseClient
     // Callbacks are accessed via refs to prevent infinite re-subscriptions
     // onExchangeStatusUpdate removed - accessed via closure in callback
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    symbol,
+    supabaseClient,
   ]);
 
   const fetchInitialData = useCallback(async (): Promise<Result<void, Error>> => {
@@ -980,32 +981,41 @@ export function useStockData({
     if (!relevantExchangeCode) return;
 
     if (exchangeStatusValue) {
-      setOpeningTime(
-        exchangeStatusValue.opening_time_local
-          ? Option.some(exchangeStatusValue.opening_time_local)
-          : Option.none()
-      );
-      setClosingTime(
-        exchangeStatusValue.closing_time_local
-          ? Option.some(exchangeStatusValue.closing_time_local)
-          : Option.none()
-      );
-      setTimezone(
-        exchangeStatusValue.timezone
-          ? Option.some(exchangeStatusValue.timezone)
-          : Option.none()
-      );
+      // Schedule state updates to avoid cascading renders
+      queueMicrotask(() => {
+        setOpeningTime(
+          exchangeStatusValue.opening_time_local
+            ? Option.some(exchangeStatusValue.opening_time_local)
+            : Option.none()
+        );
+        setClosingTime(
+          exchangeStatusValue.closing_time_local
+            ? Option.some(exchangeStatusValue.closing_time_local)
+            : Option.none()
+        );
+        setTimezone(
+          exchangeStatusValue.timezone
+            ? Option.some(exchangeStatusValue.timezone)
+            : Option.none()
+        );
+      });
     } else {
-      setOpeningTime(Option.none());
-      setClosingTime(Option.none());
-      setTimezone(Option.none());
+      // Schedule state updates to avoid cascading renders
+      queueMicrotask(() => {
+        setOpeningTime(Option.none());
+        setClosingTime(Option.none());
+        setTimezone(Option.none());
+      });
     }
 
     if (!exchangeStatusValue) {
-      setDerivedMarketStatus("Connecting");
-      setMarketStatusMessage(
-        Option.some(`Connecting to market status for ${relevantExchangeCode}...`)
-      );
+      // Schedule state updates to avoid cascading renders
+      queueMicrotask(() => {
+        setDerivedMarketStatus("Connecting");
+        setMarketStatusMessage(
+          Option.some(`Connecting to market status for ${relevantExchangeCode}...`)
+        );
+      });
       return;
     }
 
@@ -1039,14 +1049,17 @@ export function useStockData({
       newMessage = Option.fromNullable(status.status_message);
     }
 
-    setDerivedMarketStatus((prevStatus) =>
-      prevStatus !== newStatus ? newStatus : prevStatus
-    );
-    setMarketStatusMessage((prevMessage) =>
-      Option.isSome(prevMessage) && Option.isSome(newMessage) && prevMessage.value === newMessage.value
-        ? prevMessage
-        : newMessage
-    );
+    // Schedule state updates to avoid cascading renders
+    queueMicrotask(() => {
+      setDerivedMarketStatus((prevStatus) =>
+        prevStatus !== newStatus ? newStatus : prevStatus
+      );
+      setMarketStatusMessage((prevMessage) =>
+        Option.isSome(prevMessage) && Option.isSome(newMessage) && prevMessage.value === newMessage.value
+          ? prevMessage
+          : newMessage
+      );
+    });
   }, [profileExchange, quoteExchange, exchangeStatusValue, latestQuoteValue]);
 
   return {

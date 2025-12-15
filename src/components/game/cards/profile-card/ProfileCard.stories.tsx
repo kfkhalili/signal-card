@@ -1,5 +1,5 @@
 // src/components/game/cards/profile-card/ProfileCard.stories.tsx
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { action } from "storybook/actions";
 import { ProfileCardContent } from "./ProfileCardContent";
 import type { ProfileCardData } from "./profile-card.types";

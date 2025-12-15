@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDebounce } from "use-debounce";
@@ -23,9 +23,17 @@ export default function AnalysisPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [focusedSymbolIndex, setFocusedSymbolIndex] = useState<number>(-1);
   const [hasMounted, setHasMounted] = useState<boolean>(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setHasMounted(true);
+    // Schedule state update to avoid cascading renders
+    queueMicrotask(() => {
+      setHasMounted(true);
+      // Focus search input when page loads (replaces autoFocus for accessibility)
+      if (searchInputRef.current) {
+        searchInputRef.current.focus();
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -37,8 +45,11 @@ export default function AnalysisPage() {
   // Search for symbols as user types
   useEffect(() => {
     if (!supabase || !debouncedSearchQuery.trim()) {
-      setSearchResults([]);
-      setIsSearching(false);
+      // Schedule state updates to avoid cascading renders
+      queueMicrotask(() => {
+        setSearchResults([]);
+        setIsSearching(false);
+      });
       return;
     }
 
@@ -140,13 +151,13 @@ export default function AnalysisPage() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
+                ref={searchInputRef}
                 type="text"
                 placeholder="Type a symbol (e.g., AAPL, MSFT)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
                 className="pl-9"
-                autoFocus
               />
               {isSearching && (
                 <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />

@@ -53,6 +53,7 @@ function saveWorkspaceCards(cards: DisplayableCard[]): void {
   try {
     // Convert DisplayableCard to storage format (remove isFlipped)
     const cardsToStore = cards.map((card) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { isFlipped, ...cardData } = card;
       return cardData;
     });

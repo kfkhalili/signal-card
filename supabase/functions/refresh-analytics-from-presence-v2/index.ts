@@ -86,11 +86,8 @@ Deno.serve(async (req: Request) => {
     // 1. Client-side cleanup (on unmount)
     // 2. Stale subscription cleanup (this function, 5+ minutes old)
 
-    const successCount = 0; // No updates performed
-    const errorCount = 0;
-
     // Get count of remaining subscriptions for reporting
-    const { count: remainingCount, error: countError } = await supabase
+    const { count: remainingCount } = await supabase
       .from('active_subscriptions_v2')
       .select('*', { count: 'exact', head: true });
 

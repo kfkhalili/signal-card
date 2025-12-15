@@ -17,7 +17,7 @@ export default function NotFound() {
               Page Not Found
             </h2>
             <p className="text-lg text-muted-foreground mb-8">
-              The page you're looking for doesn't exist or has been moved.
+              The page you&apos;re looking for doesn&apos;t exist or has been moved.
               Return to our financial data platform to explore stock analysis,
               institutional-grade market data, and real-time market feeds.
             </p>

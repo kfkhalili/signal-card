@@ -1,7 +1,7 @@
 // src/components/ui/WorldMap.tsx
 "use client";
 
-import React, { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, memo, useCallback, type FC } from "react";
 import { Option } from "effect";
 import { MapContainer, TileLayer, Marker, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
@@ -42,13 +42,16 @@ const customIcon = createCustomIcon();
 
 // Separate component for markers that uses useMap hook to ensure map context is available
 // CRITICAL: This component must only render when map is fully ready to prevent _leaflet_pos errors
-const MarkersLayer: React.FC<{ markers: { label: string; position: [number, number]; countryCode: string; countryName?: string | null }[] }> = ({ markers }) => {
+const MarkersLayer: FC<{ markers: { label: string; position: [number, number]; countryCode: string; countryName?: string | null }[] }> = ({ markers }) => {
   const map = useMap();
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     if (!map) {
-      setIsReady(false);
+      // Schedule state update to avoid cascading renders
+      queueMicrotask(() => {
+        setIsReady(false);
+      });
       return;
     }
 
@@ -216,7 +219,7 @@ const locationCoordinates: Record<string, [number, number]> = {
 };
 
 // --- Main Component ---
-export const WorldMap: React.FC<WorldMapProps> = React.memo(({ markers, className }) => {
+export const WorldMap: FC<WorldMapProps> = memo(({ markers, className }) => {
   const [map, setMap] = useState<Option.Option<L.Map>>(Option.none());
   const [isMapReady, setIsMapReady] = useState(false);
 
@@ -237,7 +240,7 @@ export const WorldMap: React.FC<WorldMapProps> = React.memo(({ markers, classNam
   // Handle map initialization
   // NOTE: React-Leaflet's MapContainer handles map cleanup automatically.
   // We only need to track the map instance for our own state management.
-  const handleMapRef = React.useCallback((mapInstance: L.Map | null) => {
+  const handleMapRef = useCallback((mapInstance: L.Map | null) => {
     if (mapInstance) {
       // Wait for map to be fully ready before setting state
       mapInstance.whenReady(() => {

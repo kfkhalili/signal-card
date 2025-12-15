@@ -1,7 +1,7 @@
 // src/components/workspace/StockDataHandler.tsx
 "use client";
 
-import React, { useEffect } from "react";
+import { useEffect, type FC } from "react";
 import {
   useStockData,
   type MarketStatusUpdate,
@@ -39,7 +39,7 @@ interface StockDataHandlerProps {
   onExchangeVariantsUpdate?: (variant: ExchangeVariantsDBRow) => void;
 }
 
-export const StockDataHandler: React.FC<StockDataHandlerProps> = ({
+export const StockDataHandler: FC<StockDataHandlerProps> = ({
   symbol,
   activeCardTypes = [],
   onQuoteReceived,

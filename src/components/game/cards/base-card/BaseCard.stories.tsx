@@ -1,6 +1,6 @@
 // src/components/game/cards/base-card/BaseCard.stories.tsx
-import React, { useState, useCallback, useEffect } from "react";
-import type { Meta, StoryObj } from "@storybook/react";
+import { useState, useCallback, useEffect, type FC, type ComponentProps, type ReactNode } from "react";
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { action } from "storybook/actions";
 import BaseCard from "./BaseCard";
 import type {
@@ -39,15 +39,15 @@ export default meta;
 
 interface BaseCardStoryWrapperProps
   extends Omit<
-    React.ComponentProps<typeof BaseCard>,
+    ComponentProps<typeof BaseCard>,
     "isFlipped" | "onFlip" | "faceContent" | "backContent"
   > {
   initialIsFlipped: boolean;
-  initialFaceContent: React.ReactNode;
-  initialBackContent: React.ReactNode;
+  initialFaceContent: ReactNode;
+  initialBackContent: ReactNode;
 }
 
-const BaseCardStoryWrapper: React.FC<BaseCardStoryWrapperProps> = ({
+const BaseCardStoryWrapper: FC<BaseCardStoryWrapperProps> = ({
   initialIsFlipped,
   initialFaceContent,
   initialBackContent,

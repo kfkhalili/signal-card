@@ -1,5 +1,5 @@
 // src/components/workspace/MarketStatusBanner.tsx
-import React, { useMemo } from "react";
+import { useMemo, type FC } from "react";
 import type { MarketStatusUpdate } from "@/hooks/useStockData";
 
 type MarketStatus = Record<string, MarketStatusUpdate>;
@@ -76,7 +76,7 @@ interface GroupedStatus {
   exchangeName: string;
 }
 
-const MarketStatusBanner: React.FC<MarketStatusBannerProps> = ({
+const MarketStatusBanner: FC<MarketStatusBannerProps> = ({
   uniqueSymbolsInWorkspace,
   marketStatuses,
   isAddingCardInProgress,

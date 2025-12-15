@@ -181,7 +181,9 @@ export async function fetchInsiderTransactionsLogic(
         acquisition_or_disposition: record.acquisitionOrDisposition || null,
         direct_or_indirect: record.directOrIndirect || null,
         form_type: record.formType || null,
-        securities_transacted: Math.floor(record.securitiesTransacted!), // Convert float to int (non-null after filter)
+        securities_transacted: record.securitiesTransacted !== null && record.securitiesTransacted !== undefined
+          ? Math.floor(record.securitiesTransacted) // Convert float to int
+          : 0, // Fallback (should never happen due to filter above)
         price: record.price ?? null,
         security_name: record.securityName || null,
         url: record.url || null,

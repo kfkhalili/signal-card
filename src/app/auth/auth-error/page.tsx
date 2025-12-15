@@ -3,13 +3,13 @@
 
 export const dynamic = 'force-dynamic';
 
-import React, { Suspense } from "react";
+import { Suspense, type FC } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle } from "lucide-react";
 
-const AuthErrorContent: React.FC = () => {
+const AuthErrorContent: FC = () => {
   const searchParams = useSearchParams();
   const message = searchParams.get("message");
   const defaultMessage =
