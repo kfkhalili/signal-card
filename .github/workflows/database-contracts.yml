@@ -53,8 +53,11 @@ jobs:
         continue-on-error: false
 
       - name: Run contract tests
-        run: npm run test:contracts
-        # The script auto-detects DATABASE_URL from Supabase status if not set
+        run: |
+          # Get DATABASE_URL from Supabase status and export it
+          export DATABASE_URL=$(supabase status --output json | jq -r '.DB_URL')
+          echo "Using DATABASE_URL: $DATABASE_URL"
+          npm run test:contracts
 
       - name: Stop Supabase
         if: always()

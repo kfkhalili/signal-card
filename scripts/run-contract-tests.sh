@@ -26,9 +26,17 @@ if [ -z "$DATABASE_URL" ]; then
 
   # Try to get it from Supabase status
   if command -v supabase &> /dev/null; then
-    SUPABASE_DB_URL=$(supabase status 2>/dev/null | grep -i 'database url' | awk '{print $NF}' | head -1)
+    # Try JSON output first (more reliable)
+    if command -v jq &> /dev/null; then
+      SUPABASE_DB_URL=$(supabase status --output json 2>/dev/null | jq -r '.DB_URL' 2>/dev/null)
+    fi
 
-    if [ -n "$SUPABASE_DB_URL" ]; then
+    # Fallback to grep/awk method if JSON parsing failed or jq not available
+    if [ -z "$SUPABASE_DB_URL" ]; then
+      SUPABASE_DB_URL=$(supabase status 2>/dev/null | grep -i 'database url' | awk '{print $NF}' | head -1)
+    fi
+
+    if [ -n "$SUPABASE_DB_URL" ] && [ "$SUPABASE_DB_URL" != "null" ]; then
       export DATABASE_URL="$SUPABASE_DB_URL"
       echo -e "${GREEN}✓ Found DATABASE_URL from Supabase (LOCAL): $DATABASE_URL${NC}"
       echo -e "${GREEN}  ✓ Running tests against LOCAL database (safe)${NC}"
@@ -40,7 +48,7 @@ if [ -z "$DATABASE_URL" ]; then
       echo ""
       echo "For local Supabase:"
       echo "  supabase start  # Start local Supabase"
-      echo "  export DATABASE_URL=\$(supabase status | grep -i 'database url' | awk '{print \$NF}')"
+      echo "  export DATABASE_URL=\$(supabase status --output json | jq -r '.DB_URL')"
       echo ""
       echo "See tests/contracts/DATABASE_URL_SETUP.md for detailed instructions."
       exit 1
