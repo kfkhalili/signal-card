@@ -1,7 +1,7 @@
 // src/components/workspace/CustomCardCreatorPanel.tsx
 "use client";
 
-import React, { useState } from "react";
+import { useState, type FC } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -26,7 +26,7 @@ interface CustomCardCreatorPanelProps {
   onCreateCard: (narrative: string, description: string) => void;
 }
 
-export const CustomCardCreatorPanel: React.FC<CustomCardCreatorPanelProps> = ({
+export const CustomCardCreatorPanel: FC<CustomCardCreatorPanelProps> = ({
   isOpen,
   onClose,
   selectedItems,

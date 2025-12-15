@@ -1,5 +1,4 @@
 // src/components/game/cards/GenericCardContainerRenderer.tsx
-import React from "react";
 import BaseCard from "./base-card/BaseCard";
 import type { ConcreteCardData } from "../types";
 import { cn } from "@/lib/utils";

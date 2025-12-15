@@ -1,5 +1,5 @@
 // src/components/game/cards/exchange-variants-card/ExchangeVariantsCardContent.tsx
-import React, { useMemo } from "react";
+import { useMemo, memo, type FC } from "react";
 import { CardContent as ShadCardContent } from "@/components/ui/card";
 import type {
   ExchangeVariantsCardData,
@@ -39,7 +39,7 @@ interface ExchangeVariantsCardContentProps {
   onToggleItemSelection: (item: SelectedDataItem) => void;
 }
 
-const VariantRow: React.FC<{
+const VariantRow: FC<{
   variant: ExchangeVariant;
   isSelectionMode: boolean;
   isSelected: boolean;
@@ -54,6 +54,12 @@ const VariantRow: React.FC<{
       isBase && "bg-muted/50"
     )}
     onClick={isSelectionMode && !isBase ? onSelect : undefined}
+    onKeyDown={isSelectionMode && !isBase ? (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        onSelect();
+      }
+    } : undefined}
     role={isSelectionMode && !isBase ? "button" : undefined}
     tabIndex={isSelectionMode && !isBase ? 0 : undefined}
     aria-label={`Select ${variant.variantSymbol}`}>
@@ -97,8 +103,8 @@ const VariantRow: React.FC<{
   </div>
 );
 
-export const ExchangeVariantsCardContent: React.FC<ExchangeVariantsCardContentProps> =
-  React.memo(
+export const ExchangeVariantsCardContent: FC<ExchangeVariantsCardContentProps> =
+  memo(
     ({
       cardData,
       isBackFace,
@@ -198,6 +204,8 @@ export const ExchangeVariantsCardContent: React.FC<ExchangeVariantsCardContentPr
             className="relative flex-grow w-full bg-muted/30"
             onPointerDownCapture={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            role="presentation"
           >
             <DynamicWorldMap
               key={`${symbol}-exchange-variants-map`}

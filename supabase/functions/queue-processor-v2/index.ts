@@ -157,7 +157,7 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      const processedJobs: Array<{ id: string; success: boolean; error?: string }> = [];
+      const processedJobs: { id: string; success: boolean; error?: string }[] = [];
       const processingStartTime = Date.now();
       let jobsProcessed = 0;
 

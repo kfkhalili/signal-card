@@ -272,7 +272,22 @@ export const RevenueBreakdownCardContent: React.FC<RevenueBreakdownCardContentPr
                           currency: staticData.currencySymbol,
                         })
                     : undefined
-                }>
+                }
+                onKeyDown={isSelectionMode ? (e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onSelect({
+                      sourceCardId: id,
+                      sourceCardSymbol: symbol,
+                      label: `Total Revenue (${staticData.latestPeriodLabel})`,
+                      value: liveData.totalRevenueLatestPeriod,
+                      isMonetary: true,
+                      currency: staticData.currencySymbol,
+                    });
+                  }
+                } : undefined}
+                role={isSelectionMode ? "button" : undefined}
+                tabIndex={isSelectionMode ? 0 : undefined}>
                 <span className="text-sm font-medium text-muted-foreground block">
                   Total Revenue
                 </span>

@@ -75,6 +75,12 @@ const RatingDetailRow: React.FC<RatingDetailRowProps> = ({
         isSelected && "bg-primary/20"
       )}
       onClick={isSelectionMode ? onSelect : undefined}
+      onKeyDown={isSelectionMode && onSelect ? (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect();
+        }
+      } : undefined}
       role={isSelectionMode ? "button" : undefined}
       tabIndex={isSelectionMode ? 0 : undefined}>
       <div className="flex items-center">
@@ -192,7 +198,19 @@ export const AnalystGradesCardContent: React.FC<AnalystGradesCardContentProps> =
                                   sourceCardSymbol: symbol,
                                 })
                             : undefined
-                        }>
+                        }
+                        onKeyDown={isSelectionMode ? (e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            onSelect({
+                              ...item,
+                              sourceCardId: id,
+                              sourceCardSymbol: symbol,
+                            });
+                          }
+                        } : undefined}
+                        role={isSelectionMode ? "button" : undefined}
+                        tabIndex={isSelectionMode ? 0 : undefined}>
                         <span className="font-medium text-muted-foreground">
                           {item.label}:
                         </span>
@@ -253,7 +271,20 @@ export const AnalystGradesCardContent: React.FC<AnalystGradesCardContentProps> =
                           value: consensusLabelCurrent,
                         })
                     : undefined
-                }>
+                }
+                onKeyDown={isSelectionMode ? (e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onSelect({
+                      sourceCardId: id,
+                      sourceCardSymbol: symbol,
+                      label: "Analyst Consensus",
+                      value: consensusLabelCurrent,
+                    });
+                  }
+                } : undefined}
+                role={isSelectionMode ? "button" : undefined}
+                tabIndex={isSelectionMode ? 0 : undefined}>
                 {staticData.currentPeriodDate && staticData.currentPeriodDate !== "N/A" && (
                   <p className="text-xs text-muted-foreground">
                     {staticData.currentPeriodDate}

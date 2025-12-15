@@ -54,11 +54,6 @@ function getErrorMessage(error: unknown): string {
   return "An unknown error occurred in the Edge Function.";
 }
 
-function censorApiKey(url: string, apiKey: string | undefined): string {
-  if (!apiKey || apiKey.length < 5) return url;
-  const apiKeyPattern = new RegExp(`(apikey=)(${apiKey})([&]|$)`, "i");
-  return url.replace(apiKeyPattern, "$1[CENSORED_API_KEY]$3");
-}
 
 /**
  * Parses a time string from FMP and reliably converts it to a 24-hour "HH:MM" format
@@ -98,7 +93,9 @@ function parseLocalTime(
     }
 
     const result = format(parsedDate, "HH:mm");
+    // Note: Additional validation for specific exchange times can be added here if needed
     if (fmpTimeString && (fmpTimeString.includes("NASDAQ") || fmpTimeString.includes("9:30") || fmpTimeString.includes("4:00"))) {
+      // Validation logic can be added here
     }
     return result;
   } catch (error) {

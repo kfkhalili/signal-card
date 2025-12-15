@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Option } from "effect";
 import { useAuth } from "@/contexts/AuthContext";
@@ -736,9 +737,10 @@ export default function SymbolAnalysisPage() {
         onSome: (r) => r.gross_profit_margin_ttm ? Option.some(r.gross_profit_margin_ttm) : Option.none<number>(),
       }),
       fcfYield,
-      roicHistory: useMemo(() => {
-        // Build ROIC history from multiple financial statements
-        // Calculate ROIC for each statement and pair with WACC
+      // Build ROIC history from multiple financial statements
+      // Calculate ROIC for each statement and pair with WACC
+      // Note: Cannot use useMemo here as it's inside an IIFE - calculate directly
+      roicHistory: (() => {
         const history = financialStatementsHistory
           .map((fs) => {
             const roic = calculateROIC(fs);
@@ -789,7 +791,7 @@ export default function SymbolAnalysisPage() {
           .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()); // Sort chronologically
 
         return history;
-      }, [financialStatementsHistory, wacc]),
+      })(),
     };
   })();
 
@@ -1546,13 +1548,13 @@ export default function SymbolAnalysisPage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
               <Button asChild variant="default">
-                <a href="/compass">
+                <Link href="/compass">
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Back to Compass
-                </a>
+                </Link>
               </Button>
               <Button asChild variant="outline">
-                <a href="/">Go to Homepage</a>
+                <Link href="/">Go to Homepage</Link>
               </Button>
             </div>
           </CardContent>

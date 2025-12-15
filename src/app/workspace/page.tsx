@@ -1,7 +1,7 @@
 // src/app/workspace/page.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { AddCardForm } from "@/components/workspace/AddCardForm";
@@ -85,7 +85,10 @@ export default function WorkspacePage() {
   const [isCreatorPanelOpen, setIsCreatorPanelOpen] = useState<boolean>(false);
 
   useEffect(() => {
-    setHasMounted(true);
+    // Schedule state update to avoid cascading renders
+    queueMicrotask(() => {
+      setHasMounted(true);
+    });
   }, []);
 
   useEffect(() => {
@@ -149,7 +152,10 @@ export default function WorkspacePage() {
 
   useEffect(() => {
     if (!isSelectionMode) {
-      setIsCreatorPanelOpen(false);
+      // Schedule state update to avoid cascading renders
+      queueMicrotask(() => {
+        setIsCreatorPanelOpen(false);
+      });
     }
   }, [isSelectionMode]);
 

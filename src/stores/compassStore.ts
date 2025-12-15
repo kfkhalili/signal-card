@@ -10,7 +10,7 @@ type Pillar = "valuation" | "quality" | "safety";
 export interface LeaderboardEntry {
   rank: number;
   symbol: string;
-  composite_score: number;
+  composite_score: number | null; // Can be null if calculation fails or data is missing
 }
 
 interface LeaderboardState {

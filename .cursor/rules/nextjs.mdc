@@ -5,7 +5,19 @@ globs: **/*.tsx, **/*.ts, src/**/*.ts, src/**/*.tsx
 
 # Next.js Best Practices
 
-**Version:** Next.js 15.3.2+ (App Router)
+**Version:** Next.js 16.0.10+ (App Router)
+
+## Next.js 16 Changes
+
+### Middleware → Proxy Migration
+- Middleware has been replaced with Proxy pattern
+- Use `src/proxy.ts` instead of `src/middleware.ts`
+- Export `proxy` function instead of `middleware` function
+- See `eslint-and-migration-best-practices.mdc` for migration details
+
+### Configuration Updates
+- `eslint` property removed from `next.config.ts` (configure in `eslint.config.mjs` instead)
+- All other configuration patterns remain the same
 
 ## Project Structure
 - Use the App Router directory structure

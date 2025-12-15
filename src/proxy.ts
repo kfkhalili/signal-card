@@ -1,9 +1,9 @@
-// src/middleware.ts
+// src/proxy.ts
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { fromPromise } from "neverthrow";
 import { NextResponse, type NextRequest } from "next/server";
 
-export async function middleware(request: NextRequest): Promise<NextResponse> {
+export async function proxy(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
 
   let supabaseResponse = NextResponse.next({

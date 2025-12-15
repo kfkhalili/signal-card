@@ -59,7 +59,10 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, SetValue<T>] {
   );
 
   useEffect(() => {
-    setStoredValue(readValueFromStorage());
+    // Schedule state update to avoid cascading renders
+    queueMicrotask(() => {
+      setStoredValue(readValueFromStorage());
+    });
   }, [key, readValueFromStorage]);
 
   useEffect(() => {

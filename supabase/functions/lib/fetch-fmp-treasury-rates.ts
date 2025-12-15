@@ -130,7 +130,7 @@ export async function fetchTreasuryRatesLogic(
     }));
 
     // Upsert all records (one per date)
-    const { error: upsertError, count } = await supabase
+    const { error: upsertError } = await supabase
       .from('treasury_rates')
       .upsert(dbRecords, {
         onConflict: 'date',

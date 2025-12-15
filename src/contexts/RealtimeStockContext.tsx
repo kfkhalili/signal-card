@@ -27,9 +27,17 @@ export function RealtimeStockProvider({ children }: { children: ReactNode }) {
     let newManager: RealtimeStockManager | null = null;
     if (supabase) {
       newManager = RealtimeStockManager.getInstance(supabase);
-      setManager(Option.some(newManager));
+      // Schedule state update to avoid cascading renders
+      queueMicrotask(() => {
+        if (newManager) {
+          setManager(Option.some(newManager));
+        }
+      });
     } else {
-      setManager(Option.none());
+      // Schedule state update to avoid cascading renders
+      queueMicrotask(() => {
+        setManager(Option.none());
+      });
     }
 
     return () => {

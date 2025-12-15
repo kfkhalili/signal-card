@@ -13,15 +13,21 @@ export function CookieBanner() {
   useEffect(() => {
     try {
       const storedConsent = localStorage.getItem(COOKIE_CONSENT_KEY);
-      if (storedConsent) {
-        setConsent(Option.some(JSON.parse(storedConsent)));
-      } else {
-        setConsent(Option.some(false));
-      }
+      // Schedule state update to avoid cascading renders
+      queueMicrotask(() => {
+        if (storedConsent) {
+          setConsent(Option.some(JSON.parse(storedConsent)));
+        } else {
+          setConsent(Option.some(false));
+        }
+      });
     } catch {
       // If localStorage is not available (e.g., SSR or private browsing)
       // we can default to not showing the banner until client-side hydration.
-      setConsent(Option.some(false));
+      // Schedule state update to avoid cascading renders
+      queueMicrotask(() => {
+        setConsent(Option.some(false));
+      });
     }
   }, []);
 

@@ -286,9 +286,12 @@ Deno.serve(async (_req: Request) => {
     // Fetch and process exchanges sequentially to reduce memory usage
     const results: ExchangeQuoteProcessingResult[] = [];
     for (const exchange of EXCHANGES) {
+      if (!FMP_API_KEY) {
+        throw new Error("FMP_API_KEY is not set");
+      }
       const result = await fetchAndProcessExchangeQuotes(
         exchange,
-        FMP_API_KEY!,
+        FMP_API_KEY,
         supabaseAdmin
       );
       results.push(result);

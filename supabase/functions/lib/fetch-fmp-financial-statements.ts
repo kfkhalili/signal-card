@@ -250,7 +250,7 @@ export async function fetchFinancialStatementsLogic(
     }
 
     if (statementsForSymbolUpsert.length > 0) {
-      const { error: upsertError, count } = await supabase
+      const { error: upsertError } = await supabase
         .from('financial_statements')
         .upsert(statementsForSymbolUpsert, {
           onConflict: 'symbol,date,period',

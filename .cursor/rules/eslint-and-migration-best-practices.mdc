@@ -1,0 +1,399 @@
+---
+description: ESLint rule management and migration best practices learned from Next.js 16 upgrade
+globs: **/*.ts, **/*.tsx, **/*.js, **/*.jsx, eslint.config.*, next.config.*
+---
+
+# ESLint and Migration Best Practices
+
+## Core Principle: Fix Code, Don't Disable Rules
+
+**NEVER disable ESLint rules unless absolutely necessary and properly documented.** Always fix the underlying issue instead of suppressing the warning.
+
+### When ESLint Disable is Acceptable
+
+Only use `eslint-disable` comments in these specific cases:
+
+1. **Intentional Design Patterns** (must be documented):
+   - Empty interfaces for future extensibility (marker interfaces)
+   - Destructuring to remove properties (with comment explaining why)
+   - Intentional dependency omissions in useEffect (with explanation)
+
+2. **Environment-Specific Code**:
+   - Node.js scripts (use ESLint config to add globals instead of disabling)
+   - Test files (use proper test environment configuration)
+
+3. **Legacy Code** (temporary, with TODO to fix):
+   - Only when refactoring is blocked by dependencies
+   - Must include TODO comment with issue reference
+
+### When ESLint Disable is NOT Acceptable
+
+❌ **DO NOT disable rules for:**
+- Unused variables → Remove them or use them
+- Type errors → Fix the types
+- Accessibility issues → Add proper handlers/attributes
+- Code quality issues → Fix the code
+- Non-null assertions → Add proper null checks
+- Empty blocks → Add comments or remove the block
+- Any issues that can be fixed with proper code
+
+## React 19 Compatibility Patterns
+
+### Direct Imports (Not React Namespace)
+
+```typescript
+// ❌ BAD: React 19 doesn't support React namespace
+import React from "react";
+const Component: React.FC = () => { ... };
+React.useState(...);
+React.memo(...);
+
+// ✅ GOOD: Direct imports
+import { useState, useEffect, memo, type FC } from "react";
+const Component: FC = () => { ... };
+useState(...);
+memo(...);
+```
+
+### Common React 19 Import Patterns
+
+```typescript
+// ✅ GOOD: Named imports for hooks and utilities
+import { useState, useEffect, useCallback, useMemo, useRef, type FC, type ReactNode, type ComponentProps } from "react";
+
+// ✅ GOOD: Type imports
+import type { ReactElement, ElementType, CSSProperties } from "react";
+
+// ✅ GOOD: Memo and other utilities
+import { memo } from "react";
+export default memo(Component);
+```
+
+### setState-in-Effect Pattern
+
+```typescript
+// ❌ BAD: Synchronous setState in effect
+useEffect(() => {
+  setValue(newValue); // Triggers cascading renders
+}, [dependency]);
+
+// ✅ GOOD: Defer state updates to avoid cascading renders
+useEffect(() => {
+  queueMicrotask(() => {
+    setValue(newValue);
+  });
+}, [dependency]);
+
+// ✅ GOOD: Multiple state updates in one microtask
+useEffect(() => {
+  queueMicrotask(() => {
+    setValue1(newValue1);
+    setValue2(newValue2);
+    setValue3(newValue3);
+  });
+}, [dependency]);
+```
+
+### Accessibility Patterns
+
+```typescript
+// ❌ BAD: Click handler without keyboard support
+<div onClick={handleClick}>
+  Click me
+</div>
+
+// ✅ GOOD: Full keyboard and mouse support
+<div
+  onClick={handleClick}
+  onKeyDown={(e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleClick();
+    }
+  }}
+  role="button"
+  tabIndex={0}
+  aria-label="Descriptive label">
+  Click me
+</div>
+```
+
+### AutoFocus Pattern
+
+```typescript
+// ❌ BAD: Using autoFocus prop
+<Input autoFocus />
+
+// ✅ GOOD: Programmatic focus with ref
+const inputRef = useRef<HTMLInputElement>(null);
+
+useEffect(() => {
+  if (inputRef.current) {
+    inputRef.current.focus();
+  }
+}, []);
+
+<Input ref={inputRef} />
+```
+
+## Next.js 16 Migration Patterns
+
+### Middleware to Proxy Migration
+
+```typescript
+// ❌ OLD: src/middleware.ts (Next.js 15)
+import { NextResponse, type NextRequest } from "next/server";
+export async function middleware(request: NextRequest) {
+  // middleware logic
+}
+
+// ✅ NEW: src/proxy.ts (Next.js 16)
+import { NextResponse, type NextRequest } from "next/server";
+export async function proxy(request: NextRequest): Promise<NextResponse> {
+  // proxy logic
+}
+```
+
+### Next.js Config Updates
+
+```typescript
+// ❌ BAD: Deprecated eslint config (Next.js 15)
+const nextConfig = {
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+};
+
+// ✅ GOOD: Removed in Next.js 16 (use ESLint config file instead)
+const nextConfig = {
+  // eslint property removed - configure in eslint.config.mjs
+};
+```
+
+## ESLint Configuration Best Practices
+
+### Flat Config Pattern (ESLint 9+)
+
+```javascript
+// ✅ GOOD: Direct plugin configuration (no FlatCompat)
+import nextPlugin from "@next/eslint-plugin-next";
+import reactPlugin from "eslint-plugin-react";
+import reactHooksPlugin from "eslint-plugin-react-hooks";
+
+export default tseslint.config(
+  {
+    plugins: {
+      "@next/next": nextPlugin,
+      react: reactPlugin,
+      "react-hooks": reactHooksPlugin,
+    },
+    rules: {
+      ...nextPlugin.configs.recommended.rules,
+      ...reactPlugin.configs.recommended.rules,
+    },
+  }
+);
+```
+
+### Node.js Scripts Configuration
+
+```javascript
+// ✅ GOOD: Add Node.js globals to ESLint config
+{
+  files: ["scripts/**/*.js"],
+  languageOptions: {
+    globals: {
+      console: "readonly",
+      process: "readonly",
+      Buffer: "readonly",
+      __dirname: "readonly",
+      __filename: "readonly",
+      module: "readonly",
+      require: "readonly",
+      exports: "readonly",
+      global: "readonly",
+    },
+  },
+}
+
+// ❌ BAD: Disabling rules in script files
+// eslint-disable-next-line no-undef
+console.log(...);
+```
+
+## Code Quality Fixes (Not Suppressions)
+
+### Non-Null Assertions
+
+```typescript
+// ❌ BAD: Non-null assertion
+const value = data!.property;
+
+// ✅ GOOD: Proper null check
+const value = data?.property ?? defaultValue;
+
+// ✅ GOOD: Type guard
+if (data && data.property) {
+  const value = data.property;
+}
+```
+
+### Unused Variables
+
+```typescript
+// ❌ BAD: Disabling unused vars
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const unused = computeValue();
+
+// ✅ GOOD: Remove unused code
+// (removed unused variable)
+
+// ✅ GOOD: Destructuring to remove property (documented)
+// Remove isFlipped from card data before storage
+const { isFlipped, ...cardData } = card;
+```
+
+### Empty Blocks
+
+```typescript
+// ❌ BAD: Empty block
+if (condition) {
+}
+
+// ✅ GOOD: Add comment explaining why
+if (condition) {
+  // Validation logic can be added here if needed
+}
+
+// ✅ GOOD: Remove if truly unnecessary
+// (removed empty block)
+```
+
+### Type Safety
+
+```typescript
+// ❌ BAD: Using any
+function process(data: any) { ... }
+
+// ✅ GOOD: Proper types
+function process(data: Record<string, unknown>) { ... }
+
+// ✅ GOOD: Type from library
+function process(supabase: SupabaseClient) { ... }
+
+// ✅ GOOD: Generic types
+function process<T>(data: T): Result<T, Error> { ... }
+```
+
+## Migration Verification Checklist
+
+After any major migration (Next.js, React, ESLint, etc.):
+
+1. **Build Verification**
+   ```bash
+   npm run build
+   # Must complete successfully with no errors
+   ```
+
+2. **Type Checking**
+   ```bash
+   npm run typecheck
+   # Must pass with 0 errors
+   ```
+
+3. **Linting**
+   ```bash
+   npm run lint
+   # Must pass with 0 errors, 0 warnings
+   ```
+
+4. **Tests**
+   ```bash
+   npm test
+   # All tests must pass
+   ```
+
+5. **ESLint Disable Audit**
+   ```bash
+   grep -r "eslint-disable" --include="*.ts" --include="*.tsx" .
+   # Review all instances, ensure they're legitimate
+   ```
+
+## Documentation Requirements
+
+When an `eslint-disable` comment is necessary:
+
+1. **Must include explanation comment**:
+   ```typescript
+   // CRITICAL: Only depend on symbol and supabaseClient
+   // Callbacks are accessed via refs to prevent infinite re-subscriptions
+   // onExchangeStatusUpdate removed - accessed via closure in callback
+   // eslint-disable-next-line react-hooks/exhaustive-deps
+   ```
+
+2. **Must be scoped** (use `eslint-disable-next-line` not file-level):
+   ```typescript
+   // ✅ GOOD: Scoped to specific line
+   // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   const { unused, ...rest } = data;
+
+   // ❌ BAD: File-level disable
+   /* eslint-disable @typescript-eslint/no-unused-vars */
+   ```
+
+3. **Must be reviewed periodically**:
+   - Check if the reason still applies
+   - Look for alternative solutions
+   - Update documentation if pattern changes
+
+## Common Patterns to Fix
+
+### Pattern 1: setState-in-Effect
+- **Issue**: Synchronous state updates in useEffect cause cascading renders
+- **Fix**: Wrap in `queueMicrotask(() => { setState(...) })`
+
+### Pattern 2: Missing Keyboard Handlers
+- **Issue**: Click handlers without keyboard support
+- **Fix**: Add `onKeyDown`, `role="button"`, `tabIndex={0}`
+
+### Pattern 3: AutoFocus
+- **Issue**: `autoFocus` prop reduces accessibility
+- **Fix**: Use ref and programmatic focus in `useEffect`
+
+### Pattern 4: Non-Null Assertions
+- **Issue**: Using `!` operator bypasses type safety
+- **Fix**: Add proper null checks or use optional chaining
+
+### Pattern 5: Unused Variables
+- **Issue**: Variables declared but never used
+- **Fix**: Remove them or use them (don't disable the rule)
+
+### Pattern 6: Empty Blocks
+- **Issue**: Empty if/catch blocks
+- **Fix**: Add explanatory comments or remove the block
+
+## Migration Workflow
+
+When upgrading dependencies:
+
+1. **Read official migration guides** first
+2. **Run codemods** when available (`npx @next/codemod`)
+3. **Fix errors systematically** (one type at a time)
+4. **Never disable rules** to make builds pass
+5. **Verify everything** (build, lint, test, typecheck)
+6. **Document learnings** in cursor rules
+
+## Summary
+
+- ✅ **Fix code, don't disable rules**
+- ✅ **Use React 19 direct imports**
+- ✅ **Handle setState-in-effect with queueMicrotask**
+- ✅ **Add proper accessibility support**
+- ✅ **Use proper null checks, not assertions**
+- ✅ **Remove unused code**
+- ✅ **Document legitimate eslint-disable comments**
+- ✅ **Verify builds after migrations**
+- ❌ **Never disable rules for convenience**
+- ❌ **Never use React namespace in React 19**
+- ❌ **Never suppress accessibility warnings**
+- ❌ **Never use non-null assertions without checks**

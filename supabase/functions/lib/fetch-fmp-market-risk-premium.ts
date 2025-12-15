@@ -112,7 +112,7 @@ export async function fetchMarketRiskPremiumLogic(
     }));
 
     // Upsert all records (one per country)
-    const { error: upsertError, count } = await supabase
+    const { error: upsertError } = await supabase
       .from('market_risk_premiums')
       .upsert(dbRecords, {
         onConflict: 'country',

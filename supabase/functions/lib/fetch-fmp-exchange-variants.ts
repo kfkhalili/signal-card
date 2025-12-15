@@ -90,7 +90,7 @@ export async function fetchExchangeVariantsLogic(
       // Derive exchange_short_name from profile data
       // The exchange field in profiles is usually the short name (e.g., "NYSE", "NASDAQ")
       // Use it directly, or 'N/A' if not available
-      let exchangeShortName = profileData?.exchange ?? 'N/A';
+      const exchangeShortName = profileData?.exchange ?? 'N/A';
 
       const sentinelRecord: SupabaseExchangeVariantRecord = {
         symbol: job.symbol,
@@ -135,7 +135,7 @@ export async function fetchExchangeVariantsLogic(
 
       if (!existingSentinel) {
         // Insert sentinel record
-        const { error: upsertError, count } = await supabase
+        const { error: upsertError } = await supabase
           .from('exchange_variants')
           .upsert(sentinelRecord, {
             onConflict: 'symbol_variant,exchange_short_name',
@@ -248,7 +248,7 @@ export async function fetchExchangeVariantsLogic(
       }));
 
     if (recordsToUpsert.length > 0) {
-      const { error: upsertError, count } = await supabase
+      const { error: upsertError } = await supabase
         .from('exchange_variants')
         .upsert(recordsToUpsert, {
           onConflict: 'symbol_variant,exchange_short_name',

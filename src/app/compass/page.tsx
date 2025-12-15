@@ -383,7 +383,9 @@ export default function CompassPage() {
                     {/* Score */}
                     <div className="flex items-center justify-end">
                       <span className="font-semibold text-sm">
-                        {item.composite_score.toFixed(2)}
+                        {item.composite_score !== null && item.composite_score !== undefined
+                          ? item.composite_score.toFixed(2)
+                          : "—"}
                       </span>
                     </div>
 

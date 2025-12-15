@@ -1,41 +1,56 @@
 // eslint.config.mjs
 import eslintJs from "@eslint/js";
 import tseslint from "typescript-eslint";
-import { FlatCompat } from "@eslint/eslintrc";
-import path from "path";
-import { fileURLToPath } from "url";
+import nextPlugin from "@next/eslint-plugin-next";
+import reactPlugin from "eslint-plugin-react";
+import reactHooksPlugin from "eslint-plugin-react-hooks";
+import jsxA11yPlugin from "eslint-plugin-jsx-a11y";
 
 // Import custom ESLint rules for TypeScript contracts
 import enforceContract5StrictSchema from "./eslint-rules/enforce-contract-5-strict-schema.js";
 import enforceContract6aContentLength from "./eslint-rules/enforce-contract-6a-content-length.js";
 import enforceContract14SourceTimestamp from "./eslint-rules/enforce-contract-14-source-timestamp.js";
 
-// This provides a __dirname equivalent in ES modules.
-// It's important for FlatCompat to correctly resolve extended configurations.
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname, // Ensures "next" and other extends are resolved from your project's node_modules
-  // recommendedConfig: eslintJs.configs.recommended, // Not strictly needed here as 'next/core-web-vitals' includes it.
-});
-
 export default tseslint.config(
-  // 1. ESLint's recommended base rules (good starting point)
+  // 1. ESLint's recommended base rules
   eslintJs.configs.recommended,
 
-  // 2. Next.js specific configurations using FlatCompat
-  //    "next/core-web-vitals" is generally recommended as it includes "next" and more.
-  //    This will set up the necessary parser, plugins (React, Next.js, a11y), and Next.js specific rules.
-  //    `compat.config()` returns an array, so it needs to be spread.
-  ...compat.config({
-    extends: ["next/core-web-vitals"],
-  }),
+  // 2. Next.js Core Web Vitals configuration (manual flat config)
+  //    This replaces FlatCompat to avoid circular dependency issues
+  {
+    plugins: {
+      "@next/next": nextPlugin,
+      react: reactPlugin,
+      "react-hooks": reactHooksPlugin,
+      "jsx-a11y": jsxA11yPlugin,
+    },
+    rules: {
+      // Next.js recommended rules
+      ...nextPlugin.configs.recommended.rules,
+      ...nextPlugin.configs["core-web-vitals"].rules,
+      // React recommended rules
+      ...reactPlugin.configs.recommended.rules,
+      ...reactPlugin.configs["jsx-runtime"].rules,
+      // React Hooks rules
+      ...reactHooksPlugin.configs.recommended.rules,
+      // JSX A11y rules
+      ...jsxA11yPlugin.configs.recommended.rules,
+      // Disable prop-types since we use TypeScript
+      "react/prop-types": "off",
+      // Allow component creation during render for dynamic renderers (GameCard pattern)
+      "react-hooks/static-components": "off",
+    },
+    settings: {
+      react: {
+        version: "detect",
+      },
+      next: {
+        rootDir: ".",
+      },
+    },
+  },
 
-  // 3. Your stricter TypeScript ESLint configurations.
-  //    These will apply on top of (and potentially override) rules from `eslintJs.configs.recommended`
-  //    and those included in "next/core-web-vitals".
-  //    `tseslint.configs.strict` and `tseslint.configs.stylistic` are arrays of config objects.
+  // 3. TypeScript ESLint configurations
   ...tseslint.configs.strict,
   ...tseslint.configs.stylistic,
 
@@ -64,8 +79,25 @@ export default tseslint.config(
     },
   },
 
-  // 5. Your global ignore patterns.
-  //    This should be a standalone configuration object in the array.
+  // 5. Node.js scripts configuration
+  {
+    files: ["scripts/**/*.js"],
+    languageOptions: {
+      globals: {
+        console: "readonly",
+        process: "readonly",
+        Buffer: "readonly",
+        __dirname: "readonly",
+        __filename: "readonly",
+        module: "readonly",
+        require: "readonly",
+        exports: "readonly",
+        global: "readonly",
+      },
+    },
+  },
+
+  // 6. Global ignore patterns
   {
     ignores: [
       ".next/",
@@ -79,8 +111,6 @@ export default tseslint.config(
       "**/*.test.tsx",
       "**/*.spec.ts",
       "**/*.spec.tsx",
-      // "dist/", // If you have a build output folder
-      // Add any other files or directories you want ESLint to ignore
     ],
   }
 );

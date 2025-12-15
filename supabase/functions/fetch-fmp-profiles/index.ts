@@ -4,7 +4,6 @@ import { CORS_HEADERS, ensureCronAuth } from "../_shared/auth.ts";
 
 import type {
   FmpProfileData,
-  SupabaseProfileRecord,
   SupportedSymbol,
   SymbolProcessingResult,
   FunctionResponse,

@@ -16,12 +16,19 @@ serve(async (_req) => {
   // --- ✅ Auth Check Passed ---
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const authHeader = _req.headers.get("Authorization");
+
+    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey || !authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Missing required environment variables or authorization header" }),
+        { headers: { ...CORS_HEADERS, "Content-Type": "application/json" }, status: 500 }
+      );
+    }
 
     // First, create a client with the user's auth token to verify their identity
-    const authHeader = _req.headers.get("Authorization")!;
     const userSupabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });

@@ -1,7 +1,7 @@
 // src/components/game/ActiveCards.tsx
 "use client";
 
-import React, { useEffect } from "react";
+import { useEffect, useState, type ComponentProps, type CSSProperties, type FC } from "react";
 import GameCard from "@/components/game/GameCard";
 import type { DisplayableCard } from "./types";
 import type { OnGenericInteraction } from "./cards/base-card/base-card.types";
@@ -39,7 +39,7 @@ const SortableGameCard = ({
   card,
   ...props
 }: { card: DisplayableCard } & Omit<
-  React.ComponentProps<typeof GameCard>,
+  ComponentProps<typeof GameCard>,
   "card"
 >) => {
   const {
@@ -56,7 +56,7 @@ const SortableGameCard = ({
     setIsDraggingState(isDragging);
   }, [isDragging, setIsDraggingState]);
 
-  const style: React.CSSProperties = {
+  const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
     ...(transition && { transition }),
     zIndex: isDragging ? 10 : undefined,
@@ -84,7 +84,7 @@ interface ActiveCardsProps {
   onDragEnd: (event: DragEndEvent) => void;
 }
 
-export const ActiveCards: React.FC<ActiveCardsProps> = ({
+export const ActiveCards: FC<ActiveCardsProps> = ({
   cards,
   onToggleFlipCard,
   onDeleteCardRequest,
@@ -98,9 +98,12 @@ export const ActiveCards: React.FC<ActiveCardsProps> = ({
   onToggleItemSelection,
   onDragEnd,
 }) => {
-  const [hasMounted, setHasMounted] = React.useState(false);
-  React.useEffect(() => {
-    setHasMounted(true);
+  const [hasMounted, setHasMounted] = useState(false);
+  useEffect(() => {
+    // Schedule state update to avoid cascading renders
+    queueMicrotask(() => {
+      setHasMounted(true);
+    });
   }, []);
 
   const sensors = useSensors(

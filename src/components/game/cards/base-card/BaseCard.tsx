@@ -1,7 +1,7 @@
 // src/components/game/cards/base-card/BaseCard.tsx
 "use client";
 
-import React, { useRef } from "react";
+import { useRef, type FC } from "react";
 import {
   Card as ShadCard,
   CardTitle,
@@ -74,7 +74,7 @@ const capitalize = (s: string): string => {
   return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 };
 
-const CardTypeHeaderBadge: React.FC<{
+const CardTypeHeaderBadge: FC<{
   cardContext: CardActionContext;
   onGenericInteraction: OnGenericInteraction;
 }> = ({ cardContext, onGenericInteraction }) => {
@@ -123,7 +123,7 @@ const CardTypeHeaderBadge: React.FC<{
   );
 };
 
-const BaseCard: React.FC<BaseCardProps> = ({
+const BaseCard: FC<BaseCardProps> = ({
   isFlipped,
   faceContent,
   backContent,

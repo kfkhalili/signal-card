@@ -1,5 +1,5 @@
 // src/components/game/cards/dividends-history-card/DividendsHistoryCard.stories.tsx
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { action } from "storybook/actions";
 import { DividendsHistoryCardContent } from "./DividendsHistoryCardContent";
 import type {

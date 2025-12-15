@@ -1,5 +1,5 @@
 // src/components/game/storybook/CardStoryWrapper.tsx
-import React, { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, type ComponentType } from "react";
 import { action } from "storybook/actions";
 import type {
   CardActionContext,
@@ -28,7 +28,7 @@ interface SpecificCardContentComponentProps<
 
 // Type for the ContentComponent itself
 type SpecificCardContentComponent<TCardDataType extends ConcreteCardData> =
-  React.ComponentType<SpecificCardContentComponentProps<TCardDataType>>;
+  ComponentType<SpecificCardContentComponentProps<TCardDataType>>;
 
 export interface CardStoryWrapperProps<TCardData extends ConcreteCardData> {
   initialCardData: TCardData & { isFlipped: boolean };
@@ -64,7 +64,10 @@ export const CardStoryWrapper = <TCardData extends ConcreteCardData>({
   >([]);
 
   useEffect(() => {
-    setCurrentCardData(initialCardData as DisplayableCard);
+    // Schedule state update to avoid cascading renders
+    queueMicrotask(() => {
+      setCurrentCardData(initialCardData as DisplayableCard);
+    });
   }, [initialCardData]);
 
   const handleFlip = useCallback(() => {

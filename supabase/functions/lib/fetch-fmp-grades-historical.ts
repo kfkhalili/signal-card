@@ -130,7 +130,7 @@ export async function fetchGradesHistoricalLogic(
     }
 
     if (recordsToUpsert.length > 0) {
-      const { error: upsertError, count } = await supabase
+      const { error: upsertError } = await supabase
         .from('grades_historical')
         .upsert(recordsToUpsert, {
           onConflict: 'symbol,date',

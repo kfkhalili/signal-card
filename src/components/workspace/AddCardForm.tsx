@@ -1,7 +1,7 @@
 // src/components/workspace/AddCardForm.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState, useRef, type FC, type ElementType, type ReactNode } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -53,7 +53,7 @@ const AVAILABLE_CARD_TYPES: {
   value: CardType;
   label: string;
   description: string;
-  icon: React.ElementType;
+  icon: ElementType;
 }[] = [
   {
     value: "profile",
@@ -137,10 +137,10 @@ interface SymbolSearchResult {
 
 interface AddCardFormProps {
   onAddCard: (values: AddCardFormValues) => Promise<void>;
-  triggerButton?: React.ReactNode;
+  triggerButton?: ReactNode;
 }
 
-export const AddCardForm: React.FC<AddCardFormProps> = ({
+export const AddCardForm: FC<AddCardFormProps> = ({
   onAddCard,
   triggerButton,
 }) => {
@@ -153,6 +153,7 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
   const [searchResults, setSearchResults] = useState<SymbolSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [focusedSymbolIndex, setFocusedSymbolIndex] = useState<number>(-1);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<AddCardFormValues>({
     resolver: zodResolver(AddCardFormSchema),
@@ -165,7 +166,10 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
   // Search for symbols as user types
   useEffect(() => {
     if (!supabase || !debouncedSearchQuery.trim()) {
-      setSearchResults([]);
+      // Schedule state update to avoid cascading renders
+      queueMicrotask(() => {
+        setSearchResults([]);
+      });
       return;
     }
 
@@ -230,11 +234,14 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
         symbol: "",
         cardTypes: [],
       });
-      setView("symbol");
-      setIsSubmitting(false);
-      setSearchQuery("");
-      setSearchResults([]);
-      setFocusedSymbolIndex(-1);
+      // Schedule state updates to avoid cascading renders
+      queueMicrotask(() => {
+        setView("symbol");
+        setIsSubmitting(false);
+        setSearchQuery("");
+        setSearchResults([]);
+        setFocusedSymbolIndex(-1);
+      });
     }
   }, [isOpen, form]);
 
@@ -255,6 +262,7 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
+            ref={searchInputRef}
             type="text"
             placeholder="Type a symbol (e.g., AAPL, MSFT)..."
             value={searchQuery}
@@ -274,7 +282,6 @@ export const AddCardForm: React.FC<AddCardFormProps> = ({
               }
             }}
             className="pl-9"
-            autoFocus
           />
           {isSearching && (
             <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />

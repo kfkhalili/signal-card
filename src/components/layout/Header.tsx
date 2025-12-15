@@ -1,7 +1,7 @@
 // src/components/layout/Header.tsx
 "use client";
 
-import React,  { useState, useEffect } from "react";
+import { useState, useEffect, memo, type FC, type ElementType } from "react";
 import { Option } from "effect";
 import Link from "next/link";
 import Image from "next/image";
@@ -15,10 +15,10 @@ import { fromPromise } from "neverthrow";
 
 type Profile = Database['public']['Tables']['user_profiles']['Row'];
 
-const NavLinkItem: React.FC<{
+const NavLinkItem: FC<{
   href: string;
   title: string;
-  icon: React.ElementType;
+  icon: ElementType;
   text: string;
 }> = ({ href, title, icon: Icon, text }) => (
   <>
@@ -36,7 +36,7 @@ const NavLinkItem: React.FC<{
   </>
 );
 
-const Header: React.FC = () => {
+const Header: FC = () => {
   const { user, signOut, isLoading, clientInitError } = useAuth();
   const [profile, setProfile] = useState<Option.Option<Profile>>(Option.none());
   const supabase = createSupabaseBrowserClient();
@@ -167,4 +167,4 @@ const Header: React.FC = () => {
   );
 };
 
-export default React.memo(Header);
+export default memo(Header);

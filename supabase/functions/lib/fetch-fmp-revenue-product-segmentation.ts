@@ -204,7 +204,7 @@ export async function fetchRevenueProductSegmentationLogic(
     }
 
     if (recordsToUpsert.length > 0) {
-      const { error: upsertError, count } = await supabase
+      const { error: upsertError } = await supabase
         .from('revenue_product_segmentation')
         .upsert(recordsToUpsert, {
           onConflict: 'symbol,fiscal_year,period,date', // Composite PK

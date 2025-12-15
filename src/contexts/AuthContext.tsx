@@ -1,12 +1,13 @@
 // src/contexts/AuthContext.tsx
 "use client";
 
-import React, {
+import {
   createContext,
   useState,
   useEffect,
   useContext,
   type ReactNode,
+  type FC,
 } from "react";
 import { Option } from "effect";
 import { fromPromise } from "neverthrow";
@@ -27,7 +28,7 @@ export const AuthContext = createContext<AuthContextType | undefined>(
   undefined
 );
 
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({
+export const AuthProvider: FC<{ children: ReactNode }> = ({
   children,
 }) => {
   const supabase = createSupabaseBrowserClient(false);
@@ -38,17 +39,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
   useEffect(() => {
     if (!supabase) {
-      setClientInitError(
-        Option.some("Authentication service is currently unavailable due to a configuration issue.")
-      );
-      setIsLoading(false);
-      setSession(Option.none());
-      setUser(Option.none());
+      // Schedule state updates to avoid cascading renders
+      queueMicrotask(() => {
+        setClientInitError(
+          Option.some("Authentication service is currently unavailable due to a configuration issue.")
+        );
+        setIsLoading(false);
+        setSession(Option.none());
+        setUser(Option.none());
+      });
       return;
     }
 
-    setClientInitError(Option.none());
-    setIsLoading(true);
+    // Schedule state updates to avoid cascading renders
+    queueMicrotask(() => {
+      setClientInitError(Option.none());
+      setIsLoading(true);
+    });
 
     const getSession = async () => {
       const sessionResult = await fromPromise(

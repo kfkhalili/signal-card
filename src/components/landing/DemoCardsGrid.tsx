@@ -1,17 +1,17 @@
 // src/components/landing/DemoCardsGrid.tsx
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type FC } from "react";
 import { useRouter } from "next/navigation";
 import { fromPromise } from "neverthrow";
 import type { DisplayableCard } from "@/components/game/types";
 import { ActiveCards } from "@/components/game/ActiveCards";
 
-const CardSkeleton: React.FC = () => (
+const CardSkeleton: FC = () => (
   <div className="w-full aspect-[63/88] rounded-2xl bg-card/50 animate-pulse shadow-lg" />
 );
 
-const DemoCardsGrid: React.FC = () => {
+const DemoCardsGrid: FC = () => {
   const router = useRouter();
   const [demoCards, setDemoCards] = useState<DisplayableCard[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);

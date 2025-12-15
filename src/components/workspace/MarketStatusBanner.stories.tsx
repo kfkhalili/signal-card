@@ -1,6 +1,5 @@
 // src/components/workspace/MarketStatusBanner.stories.tsx
-import React from "react";
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import MarketStatusBanner from "./MarketStatusBanner";
 import type { MarketStatusBannerProps } from "./MarketStatusBanner";
 

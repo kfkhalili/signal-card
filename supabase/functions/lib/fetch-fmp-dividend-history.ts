@@ -197,7 +197,7 @@ export async function fetchDividendHistoryLogic(
     }
 
     if (recordsToUpsert.length > 0) {
-      const { error: upsertError, count } = await supabase
+      const { error: upsertError } = await supabase
         .from('dividend_history')
         .upsert(recordsToUpsert, {
           onConflict: 'symbol,date',

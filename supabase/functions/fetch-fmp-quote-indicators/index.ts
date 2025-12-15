@@ -29,6 +29,7 @@ function getErrorMessage(error: unknown): string {
   try {
     return JSON.stringify(error);
   } catch {
+    // JSON.stringify failed, return fallback message
     return "An unknown error occurred.";
   }
 }
@@ -166,6 +167,7 @@ async function fetchAndProcessSymbolQuote(
     */
 
     if (ENV_CONTEXT === "DEV") {
+      // Development-only code can be added here
     }
     return {
       symbol: actualFmpSymbol,

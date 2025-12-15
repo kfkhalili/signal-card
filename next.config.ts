@@ -8,9 +8,6 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
-  eslint: {
-    ignoreDuringBuilds: true, // Temporarily ignore ESLint errors during build due to ESLint 9 compatibility issue with next/config
-  },
   poweredByHeader: false, // Remove X-Powered-By header
   async headers() {
     return [
