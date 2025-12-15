@@ -304,6 +304,85 @@ describe('Financial Calculations', () => {
       const result = calculateROIC(statement as FinancialStatementDBRow);
       expect(Option.isNone(result)).toBe(true);
     });
+
+    it('should handle loss-making companies correctly (tax rate = 0 for losses)', () => {
+      const statement: Partial<FinancialStatementDBRow> = {
+        income_statement_payload: {
+          operatingIncome: -50000000, // Loss-making company
+          incomeBeforeTax: -100000000, // Negative income before tax
+          incomeTaxExpense: -20000000, // Negative tax expense (tax benefit)
+        },
+        balance_sheet_payload: {
+          totalStockholdersEquity: 500000000,
+          shortTermDebt: 50000000,
+          longTermDebt: 200000000,
+          cashAndCashEquivalents: 100000000,
+        },
+      };
+
+      const result = calculateROIC(statement as FinancialStatementDBRow);
+      expect(Option.isSome(result)).toBe(true);
+      if (Option.isSome(result)) {
+        // NOPAT = Operating Income × (1 - 0) = -50M (tax rate is 0 for losses)
+        // Invested Capital = 500M + 50M + 200M - 100M = 650M
+        // ROIC = -50M / 650M = -0.077 (-7.7%)
+        expect(result.value).toBeCloseTo(-0.077, 3);
+      }
+    });
+
+    it('should handle loss-making companies with positive tax expense (tax rate = 0 for losses)', () => {
+      const statement: Partial<FinancialStatementDBRow> = {
+        income_statement_payload: {
+          operatingIncome: -50000000, // Loss-making company
+          incomeBeforeTax: -100000000, // Negative income before tax
+          incomeTaxExpense: 5000000, // Positive tax expense (unusual but possible)
+        },
+        balance_sheet_payload: {
+          totalStockholdersEquity: 500000000,
+          shortTermDebt: 50000000,
+          longTermDebt: 200000000,
+          cashAndCashEquivalents: 100000000,
+        },
+      };
+
+      const result = calculateROIC(statement as FinancialStatementDBRow);
+      expect(Option.isSome(result)).toBe(true);
+      if (Option.isSome(result)) {
+        // NOPAT = Operating Income × (1 - 0) = -50M (tax rate is 0 for losses)
+        // Invested Capital = 500M + 50M + 200M - 100M = 650M
+        // ROIC = -50M / 650M = -0.077 (-7.7%)
+        expect(result.value).toBeCloseTo(-0.077, 3);
+      }
+    });
+
+    it('should not apply tax rate when incomeBeforeTax is negative (loss-making)', () => {
+      // Verify that tax rate calculation doesn't incorrectly inflate NOPAT for losses
+      const statement: Partial<FinancialStatementDBRow> = {
+        income_statement_payload: {
+          operatingIncome: -50000000,
+          incomeBeforeTax: -100000000,
+          incomeTaxExpense: -20000000, // Both negative
+        },
+        balance_sheet_payload: {
+          totalStockholdersEquity: 500000000,
+          shortTermDebt: 50000000,
+          longTermDebt: 200000000,
+          cashAndCashEquivalents: 100000000,
+        },
+      };
+
+      const result = calculateROIC(statement as FinancialStatementDBRow);
+      expect(Option.isSome(result)).toBe(true);
+      if (Option.isSome(result)) {
+        // If tax rate were incorrectly calculated as -20M / -100M = 0.2,
+        // NOPAT would be -50M × (1 - 0.2) = -40M (incorrect - less negative)
+        // Correct behavior: NOPAT = -50M × (1 - 0) = -50M
+        // ROIC = -50M / 650M = -0.077
+        expect(result.value).toBeCloseTo(-0.077, 3);
+        // Verify it's not -40M / 650M = -0.062 (which would be incorrect)
+        expect(result.value).not.toBeCloseTo(-0.062, 3);
+      }
+    });
   });
 
   describe('calculateFCFYield', () => {

@@ -250,11 +250,27 @@ export default function WorkspacePage() {
                   <Badge
                     key={symbol}
                     variant="outline"
-                    className="cursor-pointer hover:bg-destructive/10 hover:border-destructive/50 transition-colors pl-1.5 pr-2.5 py-1 text-xs"
-                    onClick={() => handleRemoveSymbol(symbol)}
-                    title={`Remove all cards for ${symbol}`}>
-                    <X className="mr-1.5 h-3 w-3" />
-                    {symbol}
+                    className="flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 text-xs group">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveSymbol(symbol);
+                      }}
+                      className="cursor-pointer hover:bg-destructive/10 rounded-full p-0.5 transition-colors"
+                      title={`Remove all cards for ${symbol}`}
+                      aria-label={`Remove all cards for ${symbol}`}>
+                      <X className="h-3 w-3 text-muted-foreground group-hover:text-destructive transition-colors" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/symbol/${symbol}`);
+                      }}
+                      className="cursor-pointer hover:text-primary transition-colors font-medium"
+                      title={`View analysis for ${symbol}`}
+                      aria-label={`View analysis for ${symbol}`}>
+                      {symbol}
+                    </button>
                   </Badge>
                 ))}
               </div>

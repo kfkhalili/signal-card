@@ -41,6 +41,21 @@ This directory contains the canonical architecture and operational documentation
   - What should be in migrations vs direct SQL operations
   - Decision tree and examples
 
+### Analysis Page Calculations
+
+- **[ANALYSIS_PAGE_CALCULATIONS.md](./ANALYSIS_PAGE_CALCULATIONS.md)** - Complete documentation of all calculations on the Symbol Analysis Page
+  - ROIC, NOPAT, Invested Capital calculations
+  - Valuation metrics (DCF, P/E, PEG)
+  - Quality metrics (ROIC, WACC, FCF Yield)
+  - Safety metrics (Net Debt/EBITDA, Altman Z-Score, Interest Coverage)
+  - Status classification algorithms
+  - **Primary reference for calculation logic**
+
+- **[ANALYSIS_PAGE_CALCULATIONS_CORRECTNESS.md](./ANALYSIS_PAGE_CALCULATIONS_CORRECTNESS.md)** - Original correctness analysis
+  - Issue identification and edge case analysis
+  - Recommendations and testing coverage
+  - **Reference for calculation validation**
+
 
 ### Monitoring & Operations
 
@@ -66,6 +81,8 @@ This directory contains the canonical architecture and operational documentation
 - **[archived/](./archived/)** - Historical and completed documents
   - `completed-migrations/` - Migration plans (completed)
   - `completed-fixes/` - Fix documentation (completed)
+    - `analysis-page-calculations/` - Analysis page calculation fixes (2025-01-26)
+      - Fix plan, critical review, threshold research, and completion summary
   - `completed-implementations/` - Implementation documentation (completed)
   - `historical-analysis/` - Historical error analysis and reports
   - `outdated-status/` - Build planning docs (system is complete)

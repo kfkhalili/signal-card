@@ -104,8 +104,16 @@ export function calculateROIC(
   // Calculate NOPAT
   const nopat = Option.all([operatingIncome, incomeBeforeTax, incomeTaxExpense]).pipe(
     Option.map(([opInc, ibt, taxExp]) => {
-      // Calculate tax rate
-      const taxRate = ibt !== 0 ? taxExp / ibt : 0;
+      // Calculate tax rate - only for profitable companies
+      // For loss-making companies, tax rate is 0 (no tax benefit in simplified NOPAT model)
+      let taxRate = 0;
+      if (ibt > 0 && taxExp > 0) {
+        // Only calculate tax rate for profitable companies
+        taxRate = taxExp / ibt;
+      } else if (ibt < 0) {
+        // For loss-making companies, tax rate is 0 (no tax benefit in NOPAT)
+        taxRate = 0;
+      }
       // NOPAT = Operating Income × (1 - Tax Rate)
       return opInc * (1 - taxRate);
     })

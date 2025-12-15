@@ -145,8 +145,16 @@ function calculateValuationStatus(
   }
 
   // Signal 2: P/E Ratio (weight: 30%)
-  // Compare to typical market average (~20-25) and consider if we have historical context
-  // Lower P/E = better (cheaper), Higher P/E = worse (expensive)
+  // Thresholds are market-average based (15, 20, 25, 30)
+  // - < 15: Very Cheap (below market average)
+  // - 15-20: Reasonable (market average range)
+  // - 20-25: Fair Value (slightly above average)
+  // - 25-30: Expensive (high growth expectations)
+  // - > 30: Very Expensive (very high growth or overvaluation)
+  // Note: Industry-adjusted thresholds would improve accuracy for:
+  //   - Technology companies (typically 20-40 P/E, may be fairly valued at 25-30)
+  //   - Financial companies (typically 10-15 P/E, may be fairly valued at 12-15)
+  // Current approach works for general-purpose analysis across most industries
   // Edge case: Negative P/E (loss-making companies) = very expensive (no earnings yield)
   if (Option.isSome(peRatio)) {
     const pe = peRatio.value;
@@ -443,7 +451,9 @@ function calculateSafetyStatus(
   // Higher is better - indicates ability to pay interest obligations
   if (Option.isSome(interestCoverage)) {
     const coverage = interestCoverage.value;
-    // Special case: 999 indicates perfect coverage (no interest expense)
+    // Special case: 999 indicates perfect/infinite coverage (no interest expense)
+    // This is returned by calculateInterestCoverage when interestExpense <= 0
+    // Both 999 and >10x give +25 points, but 999 is explicitly handled first for clarity
     if (coverage >= 999) {
       score += 25; // Perfect coverage (no interest expense) - Exceptional
       signals++;
@@ -623,23 +633,24 @@ export default function SymbolAnalysisPage() {
       : Option.none<number>();
 
     // Build price history for chart (last 90 days of DCF + price)
+    // Only use stock_price_at_calculation - skip entries without historical price
+    // Using current price for historical data points would create incorrect chart data
     const priceHistory = valuations
       .filter(v => v.valuation_type === 'dcf')
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       .map(v => {
-        const currentPrice = Option.match(quote, {
-          onNone: () => null,
-          onSome: (q) => q.current_price || null,
-        });
-        // Use stock_price_at_calculation if available, otherwise use current price
-        const price = v.stock_price_at_calculation || currentPrice || 0;
+        // Only include entries with stock_price_at_calculation
+        // Skip entries without historical price to avoid showing incorrect data
+        if (!v.stock_price_at_calculation || v.stock_price_at_calculation <= 0) {
+          return null;
+        }
         return {
           date: v.date,
-          price,
+          price: v.stock_price_at_calculation,
           dcf: v.value,
         };
       })
-      .filter(h => h.price > 0); // Only include entries with valid price
+      .filter((h): h is { date: string; price: number; dcf: number } => h !== null);
 
     return {
       dcfFairValue,
@@ -747,7 +758,7 @@ export default function SymbolAnalysisPage() {
             return Option.match(roic, {
               onNone: () => null,
               onSome: (r) => {
-                // Parse date to calculate quarter label
+                // Parse date to calculate label
                 // Use explicit parsing to avoid timezone issues
                 const parts = fs.date.split('-');
                 if (parts.length !== 3) {
@@ -771,13 +782,22 @@ export default function SymbolAnalysisPage() {
                   return null;
                 }
 
-                const quarter = Math.floor(date.getMonth() / 3) + 1;
-                const yearShort = String(date.getFullYear()).slice(-2);
-                const quarterLabel = `Q${quarter}/${yearShort}`;
+                // For annual statements (FY period), use year labels
+                // For quarterly statements, use quarter labels
+                let dateLabel: string;
+                if (fs.period === 'FY') {
+                  // Annual statements: use full year (e.g., "2024")
+                  dateLabel = String(date.getFullYear());
+                } else {
+                  // Quarterly statements: use quarter label (e.g., "Q3/24")
+                  const quarter = Math.floor(date.getMonth() / 3) + 1;
+                  const yearShort = String(date.getFullYear()).slice(-2);
+                  dateLabel = `Q${quarter}/${yearShort}`;
+                }
 
                 return {
                   date: fs.date,
-                  dateLabel: quarterLabel, // Pre-formatted quarter label
+                  dateLabel, // Pre-formatted label (year for annual, quarter for quarterly)
                   roic: r * 100, // Convert to percentage for display
                   wacc: Option.match(wacc, {
                     onNone: () => 0,
@@ -860,23 +880,30 @@ export default function SymbolAnalysisPage() {
               : latestTransaction.transaction_type || "Traded",
           shares: Number(latestTransaction.securities_transacted || 0),
           date: (() => {
-            if (latestTransaction.transaction_date) {
-              const date = new Date(latestTransaction.transaction_date);
-              const now = new Date();
-              const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-              if (diffDays === 0) return "Today";
-              if (diffDays === 1) return "1 day ago";
-              return `${diffDays} days ago`;
-            }
-            if (latestTransaction.filing_date) {
-              const date = new Date(latestTransaction.filing_date);
-              const now = new Date();
-              const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-              if (diffDays === 0) return "Today";
-              if (diffDays === 1) return "1 day ago";
-              return `${diffDays} days ago`;
-            }
-            return "Unknown";
+            // Use UTC dates for consistent timezone handling
+            // Parse date string (YYYY-MM-DD) and create UTC dates for comparison
+            const dateStr = latestTransaction.transaction_date || latestTransaction.filing_date;
+            if (!dateStr) return "Unknown";
+
+            // Parse date string explicitly
+            const parts = dateStr.split('-');
+            if (parts.length !== 3) return "Unknown";
+
+            const year = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10);
+            const day = parseInt(parts[2], 10);
+
+            if (isNaN(year) || isNaN(month) || isNaN(day)) return "Unknown";
+
+            // Create UTC dates for comparison (avoids timezone issues)
+            const dateUTC = new Date(Date.UTC(year, month - 1, day));
+            const now = new Date();
+            const nowUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+
+            const diffDays = Math.floor((nowUTC.getTime() - dateUTC.getTime()) / (1000 * 60 * 60 * 24));
+            if (diffDays === 0) return "Today";
+            if (diffDays === 1) return "1 day ago";
+            return `${diffDays} days ago`;
           })(),
         })
       : Option.none<{ name: string; action: string; shares: number; date: string }>();
@@ -2011,7 +2038,7 @@ export default function SymbolAnalysisPage() {
                     onNone: () => null,
                     onSome: (v) => (v * 100).toFixed(1) + "%",
                   })}
-                  subtext="Cost of Capital"
+                  subtext="Cost of Capital (Equity-only)"
                 />
               </div>
               {/* ROIC vs WACC Trend Chart */}
