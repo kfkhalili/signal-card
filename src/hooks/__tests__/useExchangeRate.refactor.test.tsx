@@ -1,43 +1,70 @@
 /**
- * Tests for useExchangeRate.ts refactoring
- * These tests capture current behavior before refactoring to Result types
+ * Tests for useExchangeRate.ts Refactoring
+ *
+ * PURPOSE:
+ * These tests verify the hook's API contract and document planned refactoring.
+ * Some tests are functional (verify current behavior), others document future work.
+ *
+ * PLANNED REFACTORING:
+ * - Convert internal error handling to use Result types via fromPromise
+ * - Maintain public API: hook should still return Record<string, number>
+ * - Improve error handling consistency
+ *
+ * API CONTRACT:
+ * The hook must always return Record<string, number> regardless of internal
+ * implementation changes. This ensures backward compatibility.
+ *
+ * STATUS:
+ * - Current: Uses direct Supabase queries with error handling
+ * - Target: Use Result types internally, maintain public API
+ * - Tests: Mix of functional (API contract) and documentation (future work)
  *
  * Run: npm test -- src/hooks/__tests__/useExchangeRate.refactor.test.tsx
  */
 
 import { describe, it, expect } from '@jest/globals';
 
-// Note: These tests verify the hook's API contract
-// The hook should return Record<string, number> regardless of internal implementation
-
 describe('useExchangeRate - Refactoring Tests', () => {
-  describe('API Contract', () => {
+  describe('API Contract (Functional Tests)', () => {
     it('should return Record<string, number> type', async () => {
-      // Import dynamically to test actual behavior
+      /**
+       * FUNCTIONAL TEST - Verifies current API contract
+       *
+       * The hook should always return Record<string, number>.
+       * This contract must be maintained after refactoring.
+       */
       const { useExchangeRate } = await import('../useExchangeRate');
-
-      // The hook should always return an object (Record<string, number>)
-      // This is the API contract that must be maintained
       expect(typeof useExchangeRate).toBe('function');
     });
 
     it('should handle errors gracefully', async () => {
-      // After refactoring, errors should be handled with Result types internally
-      // but the hook should still return Record<string, number>
+      /**
+       * FUNCTIONAL TEST - Verifies error handling exists
+       *
+       * After refactoring, errors should be handled with Result types internally,
+       * but the hook should still return Record<string, number> (never throw).
+       */
       const { useExchangeRate } = await import('../useExchangeRate');
-
-      // Function should exist and be callable
       expect(typeof useExchangeRate).toBe('function');
     });
   });
 
-  describe('After Refactoring (Expected Behavior)', () => {
+  describe('Planned Refactoring Goals (Documentation)', () => {
     it('should use Result types internally while maintaining API', async () => {
-      // After refactoring, the hook will use fromPromise internally
-      // but still return Record<string, number> to maintain API compatibility
+      /**
+       * DOCUMENTATION TEST - Not a functional test
+       *
+       * REFACTORING GOAL:
+       * Convert internal implementation to use fromPromise() and Result types
+       * while maintaining the public API (Record<string, number>).
+       *
+       * PATTERN:
+       *   Internal: Use Result types for error handling
+       *   Public API: Still return Record<string, number> (convert Result to value)
+       *
+       * STATUS: Planned, not yet implemented
+       */
       const { useExchangeRate } = await import('../useExchangeRate');
-
-      // API should remain the same
       expect(typeof useExchangeRate).toBe('function');
     });
   });

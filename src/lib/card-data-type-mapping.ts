@@ -6,8 +6,8 @@ import type { CardType } from '@/components/game/cards/base-card/base-card.types
 /**
  * Maps a card type to the data types it requires from the database
  *
- * This is used by useTrackSubscription to determine which data types
- * to track for a given card.
+ * This is used by useStockData to determine which data types
+ * to subscribe to for a given card.
  *
  * CRITICAL: These data types must match the data_type values in
  * data_type_registry_v2 table.

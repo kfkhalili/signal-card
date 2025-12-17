@@ -1,39 +1,79 @@
 /**
- * Tests for useStockData.ts refactoring
- * These tests verify the hook's API contract
+ * Documentation Tests for useStockData.ts Future Refactoring
  *
- * Note: Full refactoring tests will be added when useStockData is refactored
- * to use Option<T> instead of useState<... | null>
+ * PURPOSE:
+ * These tests document the planned refactoring goals for useStockData.ts.
+ * They are NOT functional tests - they serve as documentation and test structure
+ * for when the refactoring is implemented.
  *
- * Note: This test avoids importing useStockData directly due to TextEncoder
- * dependency issues in Jest environment. Full tests will be added during refactoring.
+ * PLANNED REFACTORING:
+ * - Convert useState<... | null> patterns to Option<T> from Effect library
+ * - Improve type safety and functional programming patterns
+ * - Better error handling with Result types
+ *
+ * TECHNICAL BLOCKER:
+ * - Direct import of useStockData causes Jest environment issues with TextEncoder
+ *   (required by Effect library's Option type)
+ * - Full tests will be implemented once Jest environment is properly configured
+ *   or when refactoring is complete
+ *
+ * STATUS:
+ * - Current: useStockData uses useState<... | null> patterns
+ * - Target: useStockData will use Option<T> internally
+ * - Tests: Placeholder structure ready for implementation
  *
  * Run: npm test -- src/hooks/__tests__/useStockData.refactor.test.tsx
  */
 
 import { describe, it, expect } from '@jest/globals';
 
-describe('useStockData - Refactoring Tests', () => {
-  describe('API Contract', () => {
-    it('should be a valid hook function', () => {
-      // Note: Direct import is avoided due to TextEncoder dependency in Effect library
-      // This will be properly tested when useStockData is refactored
-      // For now, verify the test structure is correct
+describe('useStockData - Future Refactoring Documentation', () => {
+  describe('Planned API Contract', () => {
+    it('should be a valid hook function with Option<T> types', () => {
+      /**
+       * DOCUMENTATION TEST - Not a functional test
+       *
+       * When refactored, useStockData should:
+       * - Accept symbol and callback parameters (current behavior)
+       * - Use Option<T> internally instead of useState<... | null>
+       * - Return properly typed values
+       *
+       * Technical blocker: Cannot import useStockData in Jest due to TextEncoder
+       * dependency in Effect library. Will be resolved during refactoring.
+       */
       expect(true).toBe(true);
     });
 
     it('should accept symbol and callback parameters', () => {
-      // Verify the test structure is correct
-      // Full testing will be done when refactoring is complete
+      /**
+       * DOCUMENTATION TEST - Not a functional test
+       *
+       * Current signature: useStockData({ symbol, onProfileUpdate?, ... })
+       * This should remain unchanged after refactoring for backward compatibility.
+       */
       expect(true).toBe(true);
     });
   });
 
-  describe('Future Refactoring', () => {
+  describe('Planned Refactoring Goals', () => {
     it('will be refactored to use Option<T> instead of useState<... | null>', () => {
-      // This test documents the future refactoring goal
-      // When useStockData is refactored, these tests will be expanded
-      // For now, verify the test structure is correct
+      /**
+       * DOCUMENTATION TEST - Not a functional test
+       *
+       * REFACTORING GOAL:
+       * Replace patterns like:
+       *   const [profile, setProfile] = useState<ProfileDBRow | null>(null);
+       *
+       * With:
+       *   const [profile, setProfile] = useState<Option.Option<ProfileDBRow>>(Option.none());
+       *
+       * BENEFITS:
+       * - Better type safety (no null checks needed)
+       * - Functional programming patterns
+       * - Consistent with other refactored code
+       *
+       * STATUS: Planned, not yet implemented
+       */
       expect(true).toBe(true);
     });
   });

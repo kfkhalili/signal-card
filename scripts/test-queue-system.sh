@@ -46,8 +46,11 @@ run_test_suite "Feature Flags Integration" "npm test -- src/lib/__tests__/featur
 echo ""
 
 # 3. Unit Tests: useTrackSubscription Hook
-echo "3️⃣  Unit Tests: useTrackSubscription Hook"
-run_test_suite "useTrackSubscription Hook" "npm test -- src/hooks/__tests__/useTrackSubscription.test.tsx"
+# NOTE: useTrackSubscription was migrated to useStockData. Subscription tracking is now automatic via realtime.subscription.
+# This test suite is skipped as the functionality is tested through useStockData tests.
+echo "3️⃣  Unit Tests: useTrackSubscription Hook (Migrated - Skipped)"
+echo "   ⚠️  useTrackSubscription functionality migrated to useStockData"
+echo "   ⚠️  Subscription tracking is now automatic via Supabase realtime.subscription"
 echo ""
 
 # 4. SQL Integration Tests (if Supabase MCP is available)
