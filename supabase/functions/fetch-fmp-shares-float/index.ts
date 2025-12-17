@@ -79,15 +79,6 @@ async function fetchPageAndUpsert(
   let skippedCount = 0;
 
   try {
-    if (ENV_CONTEXT === "DEV") {
-      console.log(
-        `Fetching shares float data page ${page} from: ${censorApiKey(
-          sharesFloatUrl,
-          apiKey
-        )}`
-      );
-    }
-
     const response: Response = await fetch(sharesFloatUrl);
 
     if (!response.ok) {
@@ -129,12 +120,6 @@ async function fetchPageAndUpsert(
         !data.symbol.trim() ||
         !parsedDate // Ensure date was successfully parsed to "YYYY-MM-DD"
       ) {
-        if (ENV_CONTEXT === "DEV") {
-          console.warn(
-            `Skipping invalid record on page ${page} due to missing symbol, invalid date, or parsing failure: Original date: "${data.date}", Parsed: "${parsedDate}", Symbol: "${data.symbol}"`,
-            data
-          );
-        }
         skippedCount++;
         continue;
       }
@@ -165,29 +150,11 @@ async function fetchPageAndUpsert(
           `Supabase upsert error for shares_float page ${page}:`,
           upsertError
         );
-        // Log some of the records that failed to upsert for easier debugging
-        if (ENV_CONTEXT === "DEV" && recordsToUpsert.length > 0) {
-          console.error(
-            "First record that might have caused upsert error:",
-            JSON.stringify(recordsToUpsert[0])
-          );
-        }
         throw new Error(
           `Supabase upsert failed for page ${page}: ${upsertError.message}`
         );
       }
       upsertedCount = count || 0;
-      if (ENV_CONTEXT === "DEV") {
-        console.log(
-          `Page ${page}: Successfully upserted ${upsertedCount} of ${recordsToUpsert.length} prepared records (original fetched: ${fetchedCount}). Skipped: ${skippedCount}.`
-        );
-      }
-    } else {
-      if (ENV_CONTEXT === "DEV") {
-        console.log(
-          `Page ${page}: No valid records to upsert out of ${fetchedCount} fetched. Skipped: ${skippedCount}.`
-        );
-      }
     }
 
     return {
@@ -276,12 +243,6 @@ Deno.serve(async (_req: Request) => {
       totalFetched += pageResult.fetchedCount;
       totalUpserted += pageResult.upsertedCount;
       totalSkipped += pageResult.skippedCount;
-
-      if (!pageResult.success && ENV_CONTEXT === "DEV") {
-        console.error(
-          `Failed to process page ${currentPage}. Details: ${pageResult.message}`
-        );
-      }
 
       // Stop if no records fetched on a page (usual end condition)
       // or if fetched less than limit (also indicates end for some APIs, though FMP is usually consistent)

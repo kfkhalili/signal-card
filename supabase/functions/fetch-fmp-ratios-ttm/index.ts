@@ -52,15 +52,6 @@ async function fetchAndProcessSymbolRatiosTtm(
   const ratiosUrl = `${FMP_RATIOS_TTM_BASE_URL}?symbol=${symbolToRequest}&apikey=${apiKey}`;
 
   try {
-    if (ENV_CONTEXT === "DEV") {
-      console.log(
-        `Fetching TTM ratios for ${symbolToRequest} from: ${censorApiKey(
-          ratiosUrl,
-          apiKey
-        )}`
-      );
-    }
-
     const ratiosResponse: Response = await fetch(ratiosUrl);
 
     if (!ratiosResponse.ok) {
@@ -186,11 +177,6 @@ async function fetchAndProcessSymbolRatiosTtm(
       );
     }
 
-    if (ENV_CONTEXT === "DEV") {
-      console.log(
-        `Successfully upserted TTM Ratios for ${ratiosData.symbol}. Count: ${count}`
-      );
-    }
     return {
       symbol: ratiosData.symbol,
       success: true,
@@ -277,12 +263,6 @@ Deno.serve(async (_req: Request) => {
         status: 200,
       });
     }
-
-    console.log(
-      `Found ${activeSymbols.length} active symbols to process: ${activeSymbols
-        .map((s: SupportedSymbol) => s.symbol)
-        .join(", ")}`
-    );
 
     const processingPromises = activeSymbols.map(
       (s, index) =>

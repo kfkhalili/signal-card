@@ -60,15 +60,6 @@ async function fetchAndProcessExchangeQuotes(
   const exchangeUrl = `${FMP_EXCHANGE_QUOTE_BASE_URL}/${exchange}?apikey=${apiKey}`;
 
   try {
-    if (ENV_CONTEXT === "DEV") {
-      console.log(
-        `Fetching quotes for ${exchange} from: ${censorApiKey(
-          exchangeUrl,
-          apiKey
-        )}`
-      );
-    }
-
     const exchangeResponse: Response = await fetch(exchangeUrl);
 
     if (!exchangeResponse.ok) {
@@ -118,11 +109,6 @@ async function fetchAndProcessExchangeQuotes(
         typeof quoteData.price !== "number" ||
         typeof quoteData.timestamp !== "number"
       ) {
-        if (ENV_CONTEXT === "DEV") {
-          console.warn(
-            `Skipping invalid quote data from FMP for ${exchange}: ${JSON.stringify(quoteData)}`
-          );
-        }
         continue;
       }
 
@@ -215,12 +201,6 @@ async function fetchAndProcessExchangeQuotes(
     }
 
     if (totalProcessed > 0) {
-      if (ENV_CONTEXT === "DEV") {
-        console.log(
-          `Successfully upserted ${totalProcessed} quote records for ${exchange} in batches.`
-        );
-      }
-
       return {
         exchange,
         success: true,
@@ -279,9 +259,6 @@ Deno.serve(async (_req: Request) => {
   );
 
   try {
-    console.log(
-      `Processing ${EXCHANGES.length} exchanges: ${EXCHANGES.join(", ")}`
-    );
 
     // Fetch and process exchanges sequentially to reduce memory usage
     const results: ExchangeQuoteProcessingResult[] = [];

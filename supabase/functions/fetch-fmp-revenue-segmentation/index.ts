@@ -59,15 +59,6 @@ async function fetchAndProcessSymbolRevenueSegmentation(
   let upsertedCount = 0;
 
   try {
-    if (ENV_CONTEXT === "DEV") {
-      console.log(
-        `Fetching revenue segmentation for ${symbolToRequest} from: ${censorApiKey(
-          segmentationUrl,
-          apiKey
-        )}`
-      );
-    }
-
     const response: Response = await fetch(segmentationUrl);
 
     if (!response.ok) {
@@ -85,11 +76,6 @@ async function fetchAndProcessSymbolRevenueSegmentation(
         fmpSegmentationResult !== null &&
         Object.keys(fmpSegmentationResult).length === 0
       ) {
-        if (ENV_CONTEXT === "DEV") {
-          console.log(
-            `No revenue segmentation data found for ${symbolToRequest} (empty object returned by FMP).`
-          );
-        }
         return {
           symbol: symbolToRequest,
           success: true,
@@ -107,11 +93,6 @@ async function fetchAndProcessSymbolRevenueSegmentation(
 
     fetchedCount = fmpSegmentationResult.length;
     if (fetchedCount === 0) {
-      if (ENV_CONTEXT === "DEV") {
-        console.log(
-          `No revenue segmentation entries found for ${symbolToRequest}.`
-        );
-      }
       return {
         symbol: symbolToRequest,
         success: true,
@@ -167,11 +148,6 @@ async function fetchAndProcessSymbolRevenueSegmentation(
         );
       }
       upsertedCount = count || 0;
-      if (ENV_CONTEXT === "DEV") {
-        console.log(
-          `Successfully upserted ${upsertedCount} revenue segmentation records for ${symbolToRequest}.`
-        );
-      }
     }
 
     return {
@@ -263,14 +239,6 @@ Deno.serve(async (_req: Request) => {
         status: 200,
       });
     }
-
-    console.log(
-      `Found ${
-        activeSymbols.length
-      } active symbols to process for revenue segmentation: ${activeSymbols
-        .map((s: SupportedSymbol) => s.symbol)
-        .join(", ")}`
-    );
 
     const processingResults: SymbolProcessingResult[] = [];
     let totalFetched = 0;

@@ -59,15 +59,6 @@ async function fetchAndProcessSymbolGradesHistorical(
   let upsertedCount = 0;
 
   try {
-    if (ENV_CONTEXT === "DEV") {
-      console.log(
-        `Fetching historical grades for ${symbolToRequest} from: ${censorApiKey(
-          gradesUrl,
-          apiKey
-        )}`
-      );
-    }
-
     const response: Response = await fetch(gradesUrl);
 
     if (!response.ok) {
@@ -85,11 +76,6 @@ async function fetchAndProcessSymbolGradesHistorical(
         fmpGradesResult !== null &&
         Object.keys(fmpGradesResult).length === 0
       ) {
-        if (ENV_CONTEXT === "DEV") {
-          console.log(
-            `No historical grades data found for ${symbolToRequest} (empty object returned by FMP).`
-          );
-        }
         return {
           symbol: symbolToRequest,
           success: true,
@@ -107,11 +93,6 @@ async function fetchAndProcessSymbolGradesHistorical(
 
     fetchedCount = fmpGradesResult.length;
     if (fetchedCount === 0) {
-      if (ENV_CONTEXT === "DEV") {
-        console.log(
-          `No historical grades entries found for ${symbolToRequest}.`
-        );
-      }
       return {
         symbol: symbolToRequest,
         success: true,
@@ -179,11 +160,6 @@ async function fetchAndProcessSymbolGradesHistorical(
         );
       }
       upsertedCount = count || 0;
-      if (ENV_CONTEXT === "DEV") {
-        console.log(
-          `Successfully upserted ${upsertedCount} historical grade records for ${symbolToRequest}.`
-        );
-      }
     }
 
     return {
@@ -275,14 +251,6 @@ Deno.serve(async (_req: Request) => {
         status: 200,
       });
     }
-
-    console.log(
-      `Found ${
-        activeSymbols.length
-      } active symbols to process for historical grades: ${activeSymbols
-        .map((s: SupportedSymbol) => s.symbol)
-        .join(", ")}`
-    );
 
     const processingResults: SymbolProcessingResult[] = [];
     let totalFetched = 0;

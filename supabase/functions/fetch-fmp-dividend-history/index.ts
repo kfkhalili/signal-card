@@ -59,15 +59,6 @@ async function fetchAndProcessSymbolDividends(
   let upsertedCount = 0;
 
   try {
-    if (ENV_CONTEXT === "DEV") {
-      console.log(
-        `Fetching dividend history for ${symbolToRequest} from: ${censorApiKey(
-          dividendsUrl,
-          apiKey
-        )}`
-      );
-    }
-
     const response: Response = await fetch(dividendsUrl);
 
     if (!response.ok) {
@@ -86,11 +77,6 @@ async function fetchAndProcessSymbolDividends(
         fmpDividendResult !== null &&
         Object.keys(fmpDividendResult).length === 0
       ) {
-        if (ENV_CONTEXT === "DEV") {
-          console.log(
-            `No dividend data found for ${symbolToRequest} (empty object returned by FMP).`
-          );
-        }
         return {
           symbol: symbolToRequest,
           success: true,
@@ -108,9 +94,6 @@ async function fetchAndProcessSymbolDividends(
 
     fetchedCount = fmpDividendResult.length;
     if (fetchedCount === 0) {
-      if (ENV_CONTEXT === "DEV") {
-        console.log(`No dividend entries found for ${symbolToRequest}.`);
-      }
       return {
         symbol: symbolToRequest,
         success: true,
@@ -175,11 +158,6 @@ async function fetchAndProcessSymbolDividends(
         );
       }
       upsertedCount = count || 0;
-      if (ENV_CONTEXT === "DEV") {
-        console.log(
-          `Successfully upserted ${upsertedCount} dividend records for ${symbolToRequest}.`
-        );
-      }
     }
 
     return {
@@ -271,14 +249,6 @@ Deno.serve(async (_req: Request) => {
         status: 200,
       });
     }
-
-    console.log(
-      `Found ${
-        activeSymbols.length
-      } active symbols to process for dividends: ${activeSymbols
-        .map((s: SupportedSymbol) => s.symbol)
-        .join(", ")}`
-    );
 
     const processingResults: SymbolProcessingResult[] = [];
     let totalFetched = 0;

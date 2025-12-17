@@ -61,15 +61,6 @@ async function fetchAndProcessSymbolProfile(
   const profileUrl = `${FMP_PROFILE_BASE_URL}?symbol=${symbolToRequest}&apikey=${apiKey}`;
 
   try {
-    if (ENV_CONTEXT === "DEV") {
-      console.log(
-        `Fetching profile for ${symbolToRequest} from: ${censorApiKey(
-          profileUrl,
-          apiKey
-        )}`
-      );
-    }
-
     const profileResponse: Response = await fetch(profileUrl);
 
     if (!profileResponse.ok) {
@@ -208,11 +199,6 @@ async function fetchAndProcessSymbolProfile(
       );
     }
 
-    if (ENV_CONTEXT === "DEV") {
-      console.log(
-        `Successfully processed profile data for ${profileData.symbol} via RPC.`
-      );
-    }
     return {
       symbol: profileData.symbol,
       success: true,
@@ -299,12 +285,6 @@ Deno.serve(async (_req: Request) => {
         status: 200,
       });
     }
-
-    console.log(
-      `Found ${activeSymbols.length} active symbols to process: ${activeSymbols
-        .map((s: SupportedSymbol) => s.symbol)
-        .join(", ")}`
-    );
 
     const processingPromises = activeSymbols.map(
       (s, index) =>

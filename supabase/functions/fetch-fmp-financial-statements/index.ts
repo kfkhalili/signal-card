@@ -66,15 +66,6 @@ async function fetchFmpData<T extends FmpStatementEntryBase>(
   // For now, assuming ?symbol= works with /stable/ based on initial prompt.
   const fullUrl = `${baseUrl}?symbol=${symbol}&apikey=${apiKey}`;
 
-  if (ENV_CONTEXT === "DEV") {
-    console.log(
-      `Fetching ${statementType} for ${symbol} from ${censorApiKey(
-        fullUrl,
-        apiKey
-      )}`
-    );
-  }
-
   const response: Response = await fetch(fullUrl);
 
   if (!response.ok) {
@@ -297,12 +288,6 @@ Deno.serve(async (_req: Request) => {
       });
     }
 
-    console.log(
-      `Found ${activeSymbols.length} active symbols to process: ${activeSymbols
-        .map((s: SupportedSymbol) => s.symbol)
-        .join(", ")}`
-    );
-
     // Process symbols sequentially to manage API rate limits and logging clarity
     const symbolProcessingResults: SymbolProcessingResult[] = [];
     for (const { symbol } of activeSymbols) {
@@ -326,9 +311,6 @@ Deno.serve(async (_req: Request) => {
 
     const overallMessage = `Financial statements processing complete. Total records upserted across all symbols: ${totalUpsertedCount}.`;
     console.log(overallMessage);
-    if (ENV_CONTEXT === "DEV") {
-      symbolProcessingResults.forEach((r) => console.log(r.message));
-    }
 
     const response: FunctionResponse = {
       message: overallMessage,

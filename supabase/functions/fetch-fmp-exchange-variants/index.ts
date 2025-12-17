@@ -40,12 +40,6 @@ async function fetchAndProcessSymbolExchangeVariants(
   let upsertedCount = 0;
 
   try {
-    if (ENV_CONTEXT === "DEV") {
-      console.log(
-        `Fetching exchange variants for ${baseSymbol} from: ${variantsUrl}`
-      );
-    }
-
     const response: Response = await fetch(variantsUrl);
 
     if (!response.ok) {

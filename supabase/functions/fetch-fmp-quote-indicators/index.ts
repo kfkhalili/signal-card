@@ -57,15 +57,6 @@ async function fetchAndProcessSymbolQuote(
   const quoteUrl = `${FMP_QUOTE_BASE_URL}?symbol=${symbolToRequest}&apikey=${apiKey}`;
 
   try {
-    if (ENV_CONTEXT === "DEV") {
-      console.log(
-        `Fetching quote for ${symbolToRequest} from: ${censorApiKey(
-          quoteUrl,
-          apiKey
-        )}`
-      );
-    }
-
     const quoteResponse: Response = await fetch(quoteUrl);
 
     if (!quoteResponse.ok) {
@@ -255,12 +246,6 @@ Deno.serve(async (_req: Request) => {
         status: 200,
       });
     }
-
-    console.log(
-      `Found ${activeSymbols.length} active symbols to process: ${activeSymbols
-        .map((s: SupportedSymbol) => s.symbol)
-        .join(", ")}`
-    );
 
     const processingPromises = activeSymbols.map(
       (s, index) =>
