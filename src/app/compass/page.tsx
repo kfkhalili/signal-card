@@ -15,33 +15,37 @@ import { PlusCircle, Sparkles, TrendingUp, Loader2 } from "lucide-react";
 import { cn, createSecureImageUrl } from "@/lib/utils";
 import { fromPromise } from "neverthrow";
 
-type Pillar = "valuation" | "quality" | "safety";
+type Pillar = "value" | "growth" | "profitability" | "income" | "health";
 type Weights = Record<Pillar, number>;
 
 const investorProfiles: { name: string; weights: Weights }[] = [
   {
     name: "Value Investor",
-    weights: { valuation: 0.6, quality: 0.2, safety: 0.2 },
+    weights: { value: 0.5, growth: 0.1, profitability: 0.2, income: 0.1, health: 0.1 },
   },
   {
-    name: "Quality Investor",
-    weights: { valuation: 0.2, quality: 0.6, safety: 0.2 },
+    name: "Growth Investor",
+    weights: { value: 0.1, growth: 0.5, profitability: 0.3, income: 0.0, health: 0.1 },
   },
   {
-    name: "Defensive Investor",
-    weights: { valuation: 0.2, quality: 0.2, safety: 0.6 },
+    name: "Smart Growth", // Formerly "GARP"
+    weights: { value: 0.3, growth: 0.4, profitability: 0.2, income: 0.0, health: 0.1 },
+  },
+  {
+    name: "Income Investor",
+    weights: { value: 0.1, growth: 0.1, profitability: 0.2, income: 0.5, health: 0.1 },
+  },
+  {
+    name: "Quality Investing",
+    weights: { value: 0.1, growth: 0.1, profitability: 0.4, income: 0.1, health: 0.3 },
+  },
+  {
+    name: "Defensive",
+    weights: { value: 0.2, growth: 0.1, profitability: 0.2, income: 0.2, health: 0.3 },
   },
   {
     name: "Balanced",
-    weights: { valuation: 0.33, quality: 0.33, safety: 0.34 },
-  },
-  {
-    name: "Growth at Value",
-    weights: { valuation: 0.4, quality: 0.4, safety: 0.2 },
-  },
-  {
-    name: "Quality & Safety",
-    weights: { valuation: 0.1, quality: 0.45, safety: 0.45 },
+    weights: { value: 0.2, growth: 0.2, profitability: 0.2, income: 0.2, health: 0.2 },
   },
 ];
 
@@ -112,13 +116,15 @@ const WeightSliders = () => {
   };
 
   const pillarLabels: Record<Pillar, string> = {
-    valuation: "Valuation",
-    quality: "Quality",
-    safety: "Safety",
+    value: "Value",
+    growth: "Growth",
+    profitability: "Profitability",
+    income: "Income",
+    health: "Health",
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded-lg">
+    <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 border rounded-lg">
       {Object.entries(weights).map(([pillar, value]) => (
         <div key={pillar}>
           <label className="font-medium">{pillarLabels[pillar as Pillar]}</label>
@@ -254,8 +260,7 @@ export default function CompassPage() {
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">Market Compass</h1>
         <p className="text-muted-foreground">
-          Discover stocks ranked by your investment style. Rankings are aligned with the Symbol Analysis Page metrics:
-          Valuation (DCF discount, P/E, PEG), Quality (ROIC, Gross Margin, FCF Yield), and Safety (Net Debt/EBITDA, Altman Z-Score, Interest Coverage).
+          Discover stocks ranked by your investment style. Adjust the weights for Value, Growth, Profitability, Income, and Health to find stocks that match your preferences.
         </p>
       </div>
 
