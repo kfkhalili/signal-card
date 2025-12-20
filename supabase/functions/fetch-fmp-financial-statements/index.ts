@@ -13,8 +13,6 @@ import type {
   FunctionResponse,
 } from "./types.ts";
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const ENV_CONTEXT: string = Deno.env.get("ENV_CONTEXT") || "PROD";
 const FMP_API_KEY: string | undefined = Deno.env.get("FMP_API_KEY");
 const SUPABASE_URL: string | undefined = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY: string | undefined = Deno.env.get(
