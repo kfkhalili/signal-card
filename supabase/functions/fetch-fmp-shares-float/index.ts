@@ -30,20 +30,6 @@ function getErrorMessage(error: unknown): string {
   }
 }
 
-function censorApiKey(url: string, apiKey: string | undefined): string {
-  if (!apiKey || apiKey.length < 8) return url;
-  const censoredPart = apiKey
-    .substring(4, apiKey.length - 4)
-    .replace(/./g, "*");
-  const displayApiKey =
-    apiKey.substring(0, 4) + censoredPart + apiKey.substring(apiKey.length - 4);
-  const apiKeyPattern = new RegExp(
-    `(apikey=)(${encodeURIComponent(apiKey)})([&]|$)`,
-    "i"
-  );
-  return url.replace(apiKeyPattern, `$1${displayApiKey}$3`);
-}
-
 /**
  * Parses a date string (potentially "YYYY-MM-DD HH:MM:SS") to "YYYY-MM-DD".
  * Returns null if the date string is invalid or cannot be parsed.

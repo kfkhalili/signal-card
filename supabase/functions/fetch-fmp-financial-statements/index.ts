@@ -13,6 +13,7 @@ import type {
   FunctionResponse,
 } from "./types.ts";
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const ENV_CONTEXT: string = Deno.env.get("ENV_CONTEXT") || "PROD";
 const FMP_API_KEY: string | undefined = Deno.env.get("FMP_API_KEY");
 const SUPABASE_URL: string | undefined = Deno.env.get("SUPABASE_URL");
@@ -36,21 +37,6 @@ function getErrorMessage(error: unknown): string {
   } catch {
     return "An unknown error occurred.";
   }
-}
-
-function censorApiKey(url: string, apiKey: string | undefined): string {
-  if (!apiKey || apiKey.length < 8) return url; // Check for a reasonable API key length
-  // Censor all but the first and last few characters for better security logging
-  const censoredPart = apiKey
-    .substring(4, apiKey.length - 4)
-    .replace(/./g, "*");
-  const displayApiKey =
-    apiKey.substring(0, 4) + censoredPart + apiKey.substring(apiKey.length - 4);
-  const apiKeyPattern = new RegExp(
-    `(apikey=)(${encodeURIComponent(apiKey)})([&]|$)`,
-    "i"
-  );
-  return url.replace(apiKeyPattern, `$1${displayApiKey}$3`);
 }
 
 async function fetchFmpData<T extends FmpStatementEntryBase>(
