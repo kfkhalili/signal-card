@@ -30,19 +30,6 @@ function getErrorMessage(error: unknown): string {
   }
 }
 
-function censorApiKey(url: string, apiKey: string | undefined): string {
-  if (!apiKey || apiKey.length < 8) return url;
-  const censoredPart = apiKey
-    .substring(4, apiKey.length - 4)
-    .replace(/./g, "*");
-  const displayApiKey =
-    apiKey.substring(0, 4) + censoredPart + apiKey.substring(apiKey.length - 4);
-  const apiKeyPattern = new RegExp(
-    `(apikey=)(${encodeURIComponent(apiKey)})([&]|$)`,
-    "i"
-  );
-  return url.replace(apiKeyPattern, `$1${displayApiKey}$3`);
-}
 
 async function fetchAndProcessSymbolRatiosTtm(
   symbolToRequest: string,
@@ -163,9 +150,9 @@ async function fetchAndProcessSymbolRatiosTtm(
       dividend_per_share_ttm: ratiosData.dividendPerShareTTM,
     };
 
-    const { error: upsertError, count } = await supabaseAdmin
+    const { error: upsertError } = await supabaseAdmin
       .from("ratios_ttm")
-      .upsert(recordToUpsert, { onConflict: "symbol", count: "exact" });
+      .upsert(recordToUpsert, { onConflict: "symbol" });
 
     if (upsertError) {
       console.error(
@@ -207,7 +194,7 @@ Deno.serve(async (_req: Request) => {
     return authError; // Return the 401/500 response
   }
   // --- ✅ Auth Check Passed ---
-  
+
   const invocationTime: string = new Date().toISOString();
   console.log(
     `Edge function 'fetch-fmp-ratios-ttm' invoked at: ${invocationTime}`
