@@ -35,6 +35,7 @@ import { fetchDcfLogic } from '../lib/fetch-fmp-dcf.ts';
 import { fetchMarketRiskPremiumLogic } from '../lib/fetch-fmp-market-risk-premium.ts';
 import { fetchTreasuryRatesLogic } from '../lib/fetch-fmp-treasury-rates.ts';
 import { fetchPriceTargetConsensusLogic } from '../lib/fetch-fmp-price-target-consensus.ts';
+import { fetchSecFilingsLogic } from '../lib/fetch-sec-outstanding-shares.ts';
 // All card data types have been migrated to the queue system
 
 interface QueueJob {
@@ -383,6 +384,8 @@ async function processJob(
       return await fetchTreasuryRatesLogic(job, supabase);
     case 'analyst-price-targets':
       return await fetchPriceTargetConsensusLogic(job, supabase);
+    case 'sec-outstanding-shares':
+      return await fetchSecFilingsLogic(job, supabase);
     default:
       return {
         success: false,
