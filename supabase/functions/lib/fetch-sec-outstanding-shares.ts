@@ -173,7 +173,7 @@ export async function fetchSecOutstandingSharesLogic(
       response = await fetch(secUrl, {
         signal: controller.signal,
         headers: {
-          'User-Agent': 'StockScreener/1.0 (admin@example.com)',
+          'User-Agent': 'StockScreener/1.0 (support@tickered.com)',
           'Accept-Encoding': 'gzip, deflate',
           'Host': 'data.sec.gov'
         }
