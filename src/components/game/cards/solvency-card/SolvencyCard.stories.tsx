@@ -1,5 +1,5 @@
 // src/components/game/cards/solvency-card/SolvencyCard.stories.tsx
-import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import type { Meta, StoryObj } from "@storybook/nextjs";
 import { action } from "storybook/actions";
 import { SolvencyCardContent } from "./SolvencyCardContent";
 import type { SolvencyCardData } from "./solvency-card.types";

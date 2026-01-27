@@ -1,5 +1,5 @@
 // src/components/game/cards/cash-use-card/CashUseCard.stories.tsx
-import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import type { Meta, StoryObj } from "@storybook/nextjs";
 import { action } from "storybook/actions";
 import { CashUseCardContent } from "./CashUseCardContent";
 import type { CashUseCardData } from "./cash-use-card.types";

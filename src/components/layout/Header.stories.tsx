@@ -1,6 +1,6 @@
 // src/components/layout/Header.stories.tsx
 import React from "react";
-import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import type { Meta, StoryObj } from "@storybook/nextjs";
 import { action } from "storybook/actions";
 import Header from "./Header";
 import { AuthContext, type AuthContextType } from "@/contexts/AuthContext";
