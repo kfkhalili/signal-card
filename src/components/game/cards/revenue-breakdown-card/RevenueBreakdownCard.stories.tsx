@@ -1,5 +1,5 @@
 // src/components/game/cards/revenue-breakdown-card/RevenueBreakdownCard.stories.tsx
-import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import type { Meta, StoryObj } from "@storybook/nextjs";
 import { action } from "storybook/actions";
 import { RevenueBreakdownCardContent } from "./RevenueBreakdownCardContent";
 import type {

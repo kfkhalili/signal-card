@@ -189,6 +189,15 @@ const BaseCard: FC<BaseCardProps> = ({
       | React.KeyboardEvent<HTMLDivElement>
   ) => {
     event.stopPropagation();
+    const payload: RequestNewCardInteraction = {
+      intent: "REQUEST_NEW_CARD",
+      sourceCardId,
+      sourceCardSymbol,
+      sourceCardType,
+      targetCardType: "profile",
+      originatingElement: "cardHeaderNameSymbol",
+    };
+    onGenericInteraction(payload);
     router.push(`/symbol/${sourceCardSymbol}`);
   };
 
@@ -274,39 +283,29 @@ const BaseCard: FC<BaseCardProps> = ({
           "flex flex-col justify-center"
         )}>
         {companyName ? (
-          <>
-            <ClickableDataItem
-              isInteractive={true}
-              onClickHandler={handleHeaderTextClick}
-              className="flex flex-col justify-center cursor-pointer hover:text-primary transition-colors"
-              aria-label={`View analysis for ${companyName}`}
-              data-interactive-child="true"
-              data-testid="header-text-clickable"
-              title={`View analysis for ${companyName}`}>
-              <CardTitle
-                className={cn(
-                  "text-sm sm:text-base md:text-lg font-semibold leading-tight line-clamp-2 text-right"
-                )}
-                title={companyName}>
-                {displayCompanyName || companyName}
-              </CardTitle>
-            </ClickableDataItem>
+          <ClickableDataItem
+            isInteractive={true}
+            onClickHandler={handleHeaderTextClick}
+            className="flex flex-col justify-center cursor-pointer hover:text-primary transition-colors"
+            aria-label={`View analysis for ${companyName}`}
+            data-interactive-child="true"
+            data-testid="header-text-clickable"
+            title={`View analysis for ${companyName}`}>
+            <CardTitle
+              className={cn(
+                "text-sm sm:text-base md:text-lg font-semibold leading-tight line-clamp-2 text-right"
+              )}
+              title={companyName}>
+              {displayCompanyName || companyName}
+            </CardTitle>
             <div className="h-[1.1em] sm:h-[1.2em] md:h-[1.25em] flex items-end justify-end">
-              <ClickableDataItem
-                isInteractive={true}
-                onClickHandler={handleSymbolClick}
-                className="cursor-pointer hover:text-primary transition-colors"
-                aria-label={`View analysis for ${sourceCardSymbol}`}
-                data-interactive-child="true"
-                title={`View analysis for ${sourceCardSymbol}`}>
-                <p
-                  className="text-xs sm:text-sm text-muted-foreground truncate leading-tight pt-[1px] sm:pt-[2px] hover:text-primary"
-                  title={sourceCardSymbol}>
-                  ({sourceCardSymbol})
-                </p>
-              </ClickableDataItem>
+              <p
+                className="text-xs sm:text-sm text-muted-foreground truncate leading-tight pt-[1px] sm:pt-[2px] hover:text-primary"
+                title={sourceCardSymbol}>
+                ({sourceCardSymbol})
+              </p>
             </div>
-          </>
+          </ClickableDataItem>
         ) : (
           <ClickableDataItem
             isInteractive={true}

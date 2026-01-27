@@ -1,10 +1,18 @@
-// This file has been automatically migrated to valid ESM format by Storybook.
-import type { StorybookConfig } from "@storybook/nextjs-vite";
+import type { StorybookConfig } from "@storybook/nextjs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Set environment variables for Storybook if not already set
+// These are mock values for Storybook - components should use mocked contexts
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  process.env.NEXT_PUBLIC_SUPABASE_URL = "https://mock.supabase.co";
+}
+if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "mock-anon-key-for-storybook";
+}
 
 const config: StorybookConfig = {
   core: {
@@ -14,15 +22,14 @@ const config: StorybookConfig = {
   addons: [
     "@storybook/addon-onboarding",
     "@chromatic-com/storybook",
-    "@storybook/addon-vitest",
     "@storybook/addon-docs"
   ],
   framework: {
-    name: "@storybook/nextjs-vite",
+    name: "@storybook/nextjs",
     options: {
       nextConfigPath: resolve(__dirname, '../next.config.ts'),
     },
   },
-  // Storybook 10.1.8 has native Next.js 16 support, no workarounds needed
 };
+
 export default config;

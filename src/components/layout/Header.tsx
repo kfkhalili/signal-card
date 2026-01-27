@@ -39,7 +39,8 @@ const NavLinkItem: FC<{
 const Header: FC = () => {
   const { user, signOut, isLoading, clientInitError } = useAuth();
   const [profile, setProfile] = useState<Option.Option<Profile>>(Option.none());
-  const supabase = createSupabaseBrowserClient();
+  // Pass false to throwOnError to handle missing env vars gracefully (e.g., in Storybook)
+  const supabase = createSupabaseBrowserClient(false);
 
   useEffect(() => {
     if (user && supabase) {

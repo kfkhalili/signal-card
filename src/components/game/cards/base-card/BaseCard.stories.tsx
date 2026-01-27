@@ -1,6 +1,6 @@
 // src/components/game/cards/base-card/BaseCard.stories.tsx
 import { useState, useCallback, useEffect, type FC, type ComponentProps, type ReactNode } from "react";
-import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import type { Meta, StoryObj } from "@storybook/nextjs";
 import { action } from "storybook/actions";
 import BaseCard from "./BaseCard";
 import type {
