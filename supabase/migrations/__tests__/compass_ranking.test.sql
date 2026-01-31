@@ -25,7 +25,7 @@ DECLARE
   has_composite_score BOOLEAN;
 BEGIN
   SELECT COUNT(*) INTO result_count
-  FROM public.get_weighted_leaderboard('{"valuation": 0.33, "quality": 0.33, "safety": 0.34}'::jsonb);
+  FROM public.get_weighted_leaderboard('{"value": 0.2, "growth": 0.2, "profitability": 0.2, "income": 0.2, "health": 0.2}'::jsonb);
 
   IF result_count = 0 THEN
     RAISE EXCEPTION 'Function returned no results';
@@ -47,7 +47,7 @@ DECLARE
   result_count INTEGER;
 BEGIN
   SELECT COUNT(*) INTO result_count
-  FROM public.get_weighted_leaderboard('{"valuation": 0.33, "quality": 0.33, "safety": 0.34}'::jsonb);
+  FROM public.get_weighted_leaderboard('{"value": 0.2, "growth": 0.2, "profitability": 0.2, "income": 0.2, "health": 0.2}'::jsonb);
 
   IF result_count > 50 THEN
     RAISE EXCEPTION 'Function returned more than 50 results: %', result_count;
@@ -70,7 +70,7 @@ DECLARE
 BEGIN
   SELECT MIN(rank), MAX(rank), COUNT(*)
   INTO min_rank, max_rank, actual_count
-  FROM public.get_weighted_leaderboard('{"valuation": 0.33, "quality": 0.33, "safety": 0.34}'::jsonb);
+  FROM public.get_weighted_leaderboard('{"value": 0.2, "growth": 0.2, "profitability": 0.2, "income": 0.2, "health": 0.2}'::jsonb);
 
   IF min_rank != 1 THEN
     RAISE EXCEPTION 'Expected minimum rank to be 1, got %', min_rank;
@@ -92,7 +92,7 @@ DECLARE
 BEGIN
   SELECT MIN(composite_score), MAX(composite_score)
   INTO min_score, max_score
-  FROM public.get_weighted_leaderboard('{"valuation": 0.33, "quality": 0.33, "safety": 0.34}'::jsonb);
+  FROM public.get_weighted_leaderboard('{"value": 0.2, "growth": 0.2, "profitability": 0.2, "income": 0.2, "health": 0.2}'::jsonb);
 
   IF min_score < 0 OR max_score > 100 THEN
     RAISE EXCEPTION 'Composite scores out of range. Min: %, Max: %', min_score, max_score;
@@ -108,7 +108,7 @@ DECLARE
 BEGIN
   SELECT bool_and(composite_score >= lag(composite_score, 1, composite_score) OVER (ORDER BY rank))
   INTO is_ordered
-  FROM public.get_weighted_leaderboard('{"valuation": 0.33, "quality": 0.33, "safety": 0.34}'::jsonb);
+  FROM public.get_weighted_leaderboard('{"value": 0.2, "growth": 0.2, "profitability": 0.2, "income": 0.2, "health": 0.2}'::jsonb);
 
   IF NOT is_ordered THEN
     RAISE EXCEPTION 'Results are not ordered by composite_score descending';
@@ -117,33 +117,33 @@ BEGIN
   RAISE NOTICE 'Test 6 PASSED: Results are ordered by composite_score descending';
 END $$;
 
--- Test 7: Function accepts different weight configurations
+-- Test 7: Function accepts different weight configurations (5-pillar keys)
 DO $$
 DECLARE
   result_count INTEGER;
 BEGIN
   -- Test with value-focused weights
   SELECT COUNT(*) INTO result_count
-  FROM public.get_weighted_leaderboard('{"valuation": 0.6, "quality": 0.2, "safety": 0.2}'::jsonb);
+  FROM public.get_weighted_leaderboard('{"value": 0.6, "growth": 0.1, "profitability": 0.1, "income": 0.1, "health": 0.1}'::jsonb);
 
   IF result_count = 0 THEN
     RAISE EXCEPTION 'Function failed with value-focused weights';
   END IF;
 
-  -- Test with quality-focused weights
+  -- Test with growth-focused weights
   SELECT COUNT(*) INTO result_count
-  FROM public.get_weighted_leaderboard('{"valuation": 0.2, "quality": 0.6, "safety": 0.2}'::jsonb);
+  FROM public.get_weighted_leaderboard('{"value": 0.1, "growth": 0.6, "profitability": 0.1, "income": 0.1, "health": 0.1}'::jsonb);
 
   IF result_count = 0 THEN
-    RAISE EXCEPTION 'Function failed with quality-focused weights';
+    RAISE EXCEPTION 'Function failed with growth-focused weights';
   END IF;
 
-  -- Test with safety-focused weights
+  -- Test with profitability-focused weights
   SELECT COUNT(*) INTO result_count
-  FROM public.get_weighted_leaderboard('{"valuation": 0.2, "quality": 0.2, "safety": 0.6}'::jsonb);
+  FROM public.get_weighted_leaderboard('{"value": 0.1, "growth": 0.1, "profitability": 0.6, "income": 0.1, "health": 0.1}'::jsonb);
 
   IF result_count = 0 THEN
-    RAISE EXCEPTION 'Function failed with safety-focused weights';
+    RAISE EXCEPTION 'Function failed with profitability-focused weights';
   END IF;
 
   RAISE NOTICE 'Test 7 PASSED: Function accepts different weight configurations';
@@ -156,7 +156,7 @@ DECLARE
 BEGIN
   SELECT COUNT(*)
   INTO inactive_count
-  FROM public.get_weighted_leaderboard('{"valuation": 0.33, "quality": 0.33, "safety": 0.34}'::jsonb) l
+  FROM public.get_weighted_leaderboard('{"value": 0.2, "growth": 0.2, "profitability": 0.2, "income": 0.2, "health": 0.2}'::jsonb) l
   INNER JOIN public.listed_symbols ls ON l.symbol = ls.symbol
   WHERE ls.is_active = FALSE;
 
@@ -175,7 +175,7 @@ DECLARE
 BEGIN
   SELECT COUNT(*), COUNT(DISTINCT symbol)
   INTO total_count, unique_count
-  FROM public.get_weighted_leaderboard('{"valuation": 0.33, "quality": 0.33, "safety": 0.34}'::jsonb);
+  FROM public.get_weighted_leaderboard('{"value": 0.2, "growth": 0.2, "profitability": 0.2, "income": 0.2, "health": 0.2}'::jsonb);
 
   IF total_count != unique_count THEN
     RAISE EXCEPTION 'Duplicate symbols found. Total: %, Unique: %', total_count, unique_count;

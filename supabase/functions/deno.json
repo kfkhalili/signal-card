@@ -3,12 +3,5 @@
     "zod": "https://deno.land/x/zod@v3.22.4/mod.ts",
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.50.0",
     "deno_dom": "https://deno.land/x/deno_dom@v0.1.43/deno-dom-wasm.ts"
-  },
-  "lint": {
-    "files": {
-      "exclude": ["**/*.test.ts", "**/*.spec.ts"]
-    }
-  },
-  "exclude": ["**/*.test.ts", "**/*.spec.ts"]
+  }
 }
-

@@ -2,8 +2,8 @@
 // Library function for processing quote jobs from the queue
 // CRITICAL: This function is imported directly by queue-processor-v2 (monofunction architecture)
 
-import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
-import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { z } from 'zod';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { QueueJob, ProcessJobResult } from './types.ts';
 
 const FMP_API_KEY = Deno.env.get('FMP_API_KEY');

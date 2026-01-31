@@ -2,7 +2,7 @@
 // Library function for processing revenue-product-segmentation jobs from the queue
 // CRITICAL: This function is imported directly by queue-processor-v2 (monofunction architecture)
 
-import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { QueueJob, ProcessJobResult } from './types.ts';
 
 // Import types from the original Edge Function

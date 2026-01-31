@@ -1,6 +1,7 @@
--- Restore the 5-pillar leaderboard function to match the original design
--- This migration reverts from the 3-pillar system back to the 5-pillar system
--- and ensures the function matches the frontend expectations
+-- 5-pillar leaderboard function for Market Compass (authoritative definition).
+-- Ensures the function matches frontend expectations; single source of truth.
+
+DROP FUNCTION IF EXISTS public.get_weighted_leaderboard(jsonb);
 
 CREATE OR REPLACE FUNCTION public.get_weighted_leaderboard(weights jsonb)
  RETURNS TABLE(rank bigint, symbol text, composite_score numeric)
