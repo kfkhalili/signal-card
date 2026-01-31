@@ -1,7 +1,7 @@
 // functions/lib/fetch-sec-outstanding-shares.ts
-import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
-import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.43/deno-dom-wasm.ts';
-import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { z } from 'zod';
+import { DOMParser } from 'deno_dom';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { QueueJob, ProcessJobResult } from './types.ts';
 
 // Define the expected structure of the SEC Submissions JSON

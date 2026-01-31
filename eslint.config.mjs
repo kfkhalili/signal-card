@@ -102,6 +102,7 @@ export default tseslint.config(
     ignores: [
       ".next/",
       "node_modules/",
+      "storybook-static/", // Built Storybook output, not source
       "supabase/migrations/", // Ignore SQL migration files
       "supabase/functions/**/*.json", // Ignore Deno config files
       "supabase/functions/**/*.lock", // Ignore lock files
