@@ -15,37 +15,37 @@ import { PlusCircle, Sparkles, TrendingUp, Loader2 } from "lucide-react";
 import { cn, createSecureImageUrl } from "@/lib/utils";
 import { fromPromise } from "neverthrow";
 
-type Pillar = "value" | "growth" | "profitability" | "income" | "health";
+type Pillar = "value" | "growth" | "profitability" | "income" | "health"| "revenue" | "sentiment" | "buyback";
 type Weights = Record<Pillar, number>;
 
 const investorProfiles: { name: string; weights: Weights }[] = [
   {
     name: "Value Investor",
-    weights: { value: 0.5, growth: 0.1, profitability: 0.2, income: 0.1, health: 0.1 },
+    weights: { value: 0.4, growth: 0.1, profitability: 0.2, income: 0.0, health: 0.1, revenue: 0.1, sentiment: 0.1, buyback: 0.0 },
   },
   {
     name: "Growth Investor",
-    weights: { value: 0.1, growth: 0.5, profitability: 0.3, income: 0.0, health: 0.1 },
+    weights: { value: 0.05, growth: 0.45, profitability: 0.35, income: 0.0, health: 0.15, revenue: 0.0, sentiment: 0.0, buyback: 0.0 },
   },
   {
     name: "Smart Growth", // Formerly "GARP"
-    weights: { value: 0.3, growth: 0.4, profitability: 0.2, income: 0.0, health: 0.1 },
+    weights: { value: 0.05, growth: 0.4, profitability: 0.25, income: 0.0, health: 0.1, revenue: 0.0, sentiment: 0.1, buyback: 0.1 },
   },
   {
     name: "Income Investor",
-    weights: { value: 0.1, growth: 0.1, profitability: 0.2, income: 0.5, health: 0.1 },
+    weights: { value: 0.0, growth: 0.0, profitability: 0.3, income: 0.5, health: 0.2, revenue: 0.0, sentiment: 0.0, buyback: 0.0 },
   },
   {
     name: "Quality Investing",
-    weights: { value: 0.1, growth: 0.1, profitability: 0.4, income: 0.1, health: 0.3 },
+    weights: { value: 0.1, growth: 0.0, profitability: 0.4, income: 0.1, health: 0.3, revenue: 0.0, sentiment: 0.05, buyback: 0.05 },
   },
   {
     name: "Defensive",
-    weights: { value: 0.2, growth: 0.1, profitability: 0.2, income: 0.2, health: 0.3 },
+    weights: { value: 0.2, growth: 0.0, profitability: 0.2, income: 0.0, health: 0.3, revenue: 0.0, sentiment: 0.2, buyback: 0.1 },
   },
   {
     name: "Balanced",
-    weights: { value: 0.2, growth: 0.2, profitability: 0.2, income: 0.2, health: 0.2 },
+    weights: { value: 0.12, growth: 0.12, profitability: 0.12, income: 0.12, health: 0.13, revenue: 0.13, sentiment: 0.13, buyback: 0.13 },
   },
 ];
 
@@ -121,10 +121,13 @@ const WeightSliders = () => {
     profitability: "Profitability",
     income: "Income",
     health: "Health",
+    revenue: "Revenue",
+    sentiment: "Sentiment",
+    buyback: "Buybacks",
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 border rounded-lg">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 p-4 border rounded-lg">
       {Object.entries(weights).map(([pillar, value]) => (
         <div key={pillar}>
           <label className="font-medium">{pillarLabels[pillar as Pillar]}</label>

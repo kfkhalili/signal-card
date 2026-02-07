@@ -4,7 +4,7 @@ import { fromPromise } from "neverthrow";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 
-type Pillar = "value" | "growth" | "profitability" | "income" | "health";
+type Pillar = "value" | "growth" | "profitability" | "income" | "health" | "revenue" | "sentiment" | "buyback";
 
 // This interface must match the structure of the data returned by the SQL function.
 export interface LeaderboardEntry {
@@ -28,11 +28,14 @@ interface LeaderboardState {
 
 export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
   weights: {
-    value: 0.2,
-    growth: 0.2,
-    profitability: 0.2,
-    income: 0.2,
-    health: 0.2,
+    value: 0.12,
+    growth: 0.12,
+    profitability: 0.12,
+    income: 0.12,
+    health: 0.13,
+    revenue: 0.13,
+    sentiment: 0.13,
+    buyback: 0.13
   },
   leaderboardData: [],
   isLoading: false,
