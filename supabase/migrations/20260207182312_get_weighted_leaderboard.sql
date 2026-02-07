@@ -25,19 +25,19 @@ BEGIN
   WITH insider_impact AS (
     -- Calculate Net Insider Value Bought (Last 12 Months)
     SELECT 
-      symbol, 
+      it.symbol, 
       SUM(
         CASE 
-          WHEN acquisition_or_disposition = 'A' THEN (securities_transacted * price)
-          WHEN acquisition_or_disposition = 'D' THEN -(securities_transacted * price)
+          WHEN it.acquisition_or_disposition = 'A' THEN (it.securities_transacted * it.price)
+          WHEN it.acquisition_or_disposition = 'D' THEN -(it.securities_transacted * it.price)
           ELSE 0 
         END
       ) as net_value_bought
-    FROM public.insider_transactions
+    FROM public.insider_transactions it
     WHERE 
-      transaction_date >= (CURRENT_DATE - INTERVAL '1 year')
-      AND price > 0 
-    GROUP BY symbol
+      it.transaction_date >= (CURRENT_DATE - INTERVAL '1 year')
+      AND it.price > 0 
+    GROUP BY it.symbol
   ),
   annual_stats AS (
     -- Get Latest Annual Data: Revenue (for fallback), converted to USD
@@ -58,30 +58,30 @@ BEGIN
   historical_shares AS (
     -- Get Historical Shares for Buyback Calc (Last 5 Years FY)
     SELECT
-      symbol,
-      date,
-      (income_statement_payload->>'weightedAverageShsOut')::numeric AS shares
-    FROM public.financial_statements
-    WHERE period = 'FY'
-    AND date >= (CURRENT_DATE - INTERVAL '5 years')
+      fs.symbol,
+      fs.date,
+      (fs.income_statement_payload->>'weightedAverageShsOut')::numeric AS shares
+    FROM public.financial_statements fs
+    WHERE fs.period = 'FY'
+    AND fs.date >= (CURRENT_DATE - INTERVAL '5 years')
   ),
   prev_year_shares AS (
     -- Calculate previous year's shares for change computation
     SELECT
-      symbol,
-      date,
-      shares,
-      LAG(shares) OVER (PARTITION BY symbol ORDER BY date) as prev_shares
-    FROM historical_shares
+      hs.symbol,
+      hs.date,
+      hs.shares,
+      LAG(hs.shares) OVER (PARTITION BY hs.symbol ORDER BY hs.date) as prev_shares
+    FROM historical_shares hs
   ),
   avg_buyback_stats AS (
     -- Average the percentage changes
     SELECT
-      symbol,
-      AVG(CASE WHEN prev_shares > 0 THEN (shares - prev_shares) / prev_shares ELSE 0 END) as avg_share_change
-    FROM prev_year_shares
-    WHERE prev_shares IS NOT NULL
-    GROUP BY symbol
+      pys.symbol,
+      AVG(CASE WHEN pys.prev_shares > 0 THEN (pys.shares - pys.prev_shares) / pys.prev_shares ELSE 0 END) as avg_share_change
+    FROM prev_year_shares pys
+    WHERE pys.prev_shares IS NOT NULL
+    GROUP BY pys.symbol
   ),
   revenue_calc AS (
     -- Calculate Revenue TTM with Currency Conversion
@@ -98,12 +98,12 @@ BEGIN
         COUNT(*) as q_count
       FROM (
         SELECT
-          symbol,
-          income_statement_payload,
-          reported_currency,
-          ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY date DESC) as rn
-        FROM public.financial_statements
-        WHERE period IS DISTINCT FROM 'FY'
+          fs.symbol,
+          fs.income_statement_payload,
+          fs.reported_currency,
+          ROW_NUMBER() OVER (PARTITION BY fs.symbol ORDER BY fs.date DESC) as rn
+        FROM public.financial_statements fs
+        WHERE fs.period IS DISTINCT FROM 'FY'
       ) sub
       LEFT JOIN public.exchange_rates er 
         ON sub.reported_currency = er.base_code 
@@ -149,16 +149,16 @@ BEGIN
       -- METRIC 2: EV / EBITDA
       (1 - PERCENT_RANK() OVER (ORDER BY 
         CASE 
-          WHEN enterprise_value_multiple_ttm > 0 AND enterprise_value_ttm > 0 THEN enterprise_value_multiple_ttm 
-          WHEN enterprise_value_multiple_ttm < 0 AND enterprise_value_ttm < 0 THEN enterprise_value_multiple_ttm
+          WHEN rt.enterprise_value_multiple_ttm > 0 AND rt.enterprise_value_ttm > 0 THEN rt.enterprise_value_multiple_ttm 
+          WHEN rt.enterprise_value_multiple_ttm < 0 AND rt.enterprise_value_ttm < 0 THEN rt.enterprise_value_multiple_ttm
           ELSE NULL 
         END ASC NULLS LAST
       )) * 100 AS norm_evm,
 
       RANK() OVER (ORDER BY 
         CASE 
-          WHEN enterprise_value_multiple_ttm > 0 AND enterprise_value_ttm > 0 THEN enterprise_value_multiple_ttm 
-          WHEN enterprise_value_multiple_ttm < 0 AND enterprise_value_ttm < 0 THEN enterprise_value_multiple_ttm
+          WHEN rt.enterprise_value_multiple_ttm > 0 AND rt.enterprise_value_ttm > 0 THEN rt.enterprise_value_multiple_ttm 
+          WHEN rt.enterprise_value_multiple_ttm < 0 AND rt.enterprise_value_ttm < 0 THEN rt.enterprise_value_multiple_ttm
           ELSE NULL 
         END ASC NULLS LAST
       ) as evm_rank,
@@ -181,9 +181,9 @@ BEGIN
       ) * 100 AS norm_buyback_yield,
 
       -- Other Metrics
-      (1 - PERCENT_RANK() OVER (ORDER BY price_to_earnings_growth_ratio_ttm ASC)) * 100 AS norm_peg,
-      PERCENT_RANK() OVER (ORDER BY dividend_yield_ttm ASC) * 100 AS norm_div_yield,
-      (1 - PERCENT_RANK() OVER (ORDER BY debt_to_equity_ratio_ttm ASC)) * 100 AS norm_de
+      (1 - PERCENT_RANK() OVER (ORDER BY rt.price_to_earnings_growth_ratio_ttm ASC)) * 100 AS norm_peg,
+      PERCENT_RANK() OVER (ORDER BY rt.dividend_yield_ttm ASC) * 100 AS norm_div_yield,
+      (1 - PERCENT_RANK() OVER (ORDER BY rt.debt_to_equity_ratio_ttm ASC)) * 100 AS norm_de
 
     FROM
       public.ratios_ttm as rt
