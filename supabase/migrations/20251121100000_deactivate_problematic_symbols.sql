@@ -22,7 +22,6 @@ WITH problematic_symbols AS (
   SELECT DISTINCT p.symbol
   FROM profiles p
   WHERE p.is_fund = TRUE
-     OR p.is_adr = TRUE
      OR p.is_etf = TRUE
      OR p.is_actively_trading = FALSE
      OR p.volume IS NULL
