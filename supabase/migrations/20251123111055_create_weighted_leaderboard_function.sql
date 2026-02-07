@@ -273,3 +273,5 @@ Metrics:
 - Income: Dividend Yield
 - Health: Debt/Equity
 Weights defaults: Revenue(0.15), Profitability(0.20), Health(0.35), Sentiment(0.15), Buyback(0.15).';
+
+GRANT EXECUTE ON FUNCTION public.get_weighted_leaderboard(jsonb) TO anon, authenticated, service_role;
