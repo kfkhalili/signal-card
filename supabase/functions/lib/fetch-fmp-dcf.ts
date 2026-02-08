@@ -13,7 +13,7 @@ const FMP_DCF_BASE_URL = 'https://financialmodelingprep.com/stable/discounted-ca
 const FmpDcfSchema = z.object({
   symbol: z.string().min(1),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
-  dcf: z.number().positive(),
+  dcf: z.number(),
   'Stock Price': z.number().positive(), // FMP API uses "Stock Price" as key
 });
 

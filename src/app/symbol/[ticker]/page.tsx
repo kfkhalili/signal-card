@@ -2343,7 +2343,7 @@ export default function SymbolAnalysisPage() {
               <MetricRow
                 label="Price Target"
                 value={Option.match(contrarianIndicators.priceTarget, {
-                  onNone: () => null,
+                  onNone: () => "N/A",
                   onSome: (v) => formatFinancialValue(v, "USD", 2, exchangeRates),
                 })}
                 subtext={Option.match(contrarianIndicators.priceTarget, {
