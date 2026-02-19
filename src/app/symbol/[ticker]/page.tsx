@@ -2194,10 +2194,18 @@ export default function SymbolAnalysisPage() {
                     <div className="h-8 w-20 bg-muted animate-pulse rounded mx-auto mb-1" />
                   ),
                   onSome: (v) => (
-                    <div className={cn(
-                      "text-2xl font-bold",
-                      v >= 999 ? "text-green-600" : v > 10 ? "text-green-600" : v > 5 ? "text-yellow-600" : "text-red-600"
-                    )}>
+                    <div
+                      className={cn(
+                        "text-2xl font-bold",
+                        v >= 999
+                          ? "text-green-600"
+                          : v > 10
+                            ? "text-green-600"
+                            : v > 5
+                              ? "text-yellow-600"
+                              : "text-red-600"
+                      )}
+                    >
                       {v >= 999 ? "∞" : v.toFixed(0) + "x"}
                     </div>
                   ),
@@ -2205,7 +2213,17 @@ export default function SymbolAnalysisPage() {
                 <div className="text-xs text-muted-foreground">
                   {Option.match(safetyMetrics.interestCoverage, {
                     onNone: () => "Can pay debts",
-                    onSome: (v) => v >= 999 ? "No interest expense" : "Can pay debts",
+                    onSome: (v) => {
+                      if (v >= 999) {
+                        return "No interest expense";
+                      } else if (v > 5) {
+                        return "Comfortable coverage";
+                      } else if (v > 1.5) {
+                        return "Tight coverage";
+                      } else {
+                        return "Inadequate coverage";
+                      }
+                    },
                   })}
                 </div>
               </div>
