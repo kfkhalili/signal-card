@@ -172,13 +172,13 @@ export async function fetchInsiderTransactionsLogic(
         transaction_date: record.transactionDate || null,
         reporting_cik: record.reportingCik,
         company_cik: record.companyCik || null,
-        transaction_type: record.transactionType || null,
+        transaction_type: record.transactionType || '',
         securities_owned: record.securitiesOwned !== null && record.securitiesOwned !== undefined
           ? Math.floor(record.securitiesOwned) // Convert float to int
           : null,
         reporting_name: record.reportingName || null,
         type_of_owner: record.typeOfOwner || null,
-        acquisition_or_disposition: record.acquisitionOrDisposition || null,
+        acquisition_or_disposition: record.acquisitionOrDisposition || 'U',
         direct_or_indirect: record.directOrIndirect || null,
         form_type: record.formType || null,
         securities_transacted: record.securitiesTransacted !== null && record.securitiesTransacted !== undefined
@@ -196,7 +196,7 @@ export async function fetchInsiderTransactionsLogic(
     // We keep the first occurrence of each unique primary key combination
     const seenKeys = new Set<string>();
     const deduplicatedRecords = dbRecords.filter((record) => {
-      const key = `${record.symbol}|${record.filing_date}|${record.reporting_cik}|${record.securities_transacted}`;
+      const key = `${record.symbol}|${record.filing_date}|${record.reporting_cik}|${record.securities_transacted}|${record.transaction_type}|${record.acquisition_or_disposition}`;
       if (seenKeys.has(key)) {
         console.warn(
           `[fetchInsiderTransactionsLogic] Duplicate transaction detected for ${job.symbol}: ${key}. Skipping duplicate.`
@@ -213,7 +213,7 @@ export async function fetchInsiderTransactionsLogic(
     const { error: upsertError } = await supabase
       .from('insider_transactions')
       .upsert(deduplicatedRecords, {
-        onConflict: 'symbol,filing_date,reporting_cik,securities_transacted',
+        onConflict: 'symbol,filing_date,reporting_cik,securities_transacted,transaction_type,acquisition_or_disposition',
         ignoreDuplicates: false,
       });
 
