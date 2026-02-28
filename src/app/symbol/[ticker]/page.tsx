@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Option } from "effect";
 import { useAuth } from "@/contexts/AuthContext";
-import type { InsiderTradingStatisticsDBRow, InsiderTransactionsDBRow, ValuationsDBRow, GradesHistoricalDBRow, AnalystPriceTargetsDBRow } from "@/lib/supabase/realtime-service";
+import type { InsiderTransactionsDBRow, ValuationsDBRow, GradesHistoricalDBRow, AnalystPriceTargetsDBRow } from "@/lib/supabase/realtime-service";
 import type { Database } from "@/lib/supabase/database.types";
 
 type FinancialStatementDBRow = Database["public"]["Tables"]["financial_statements"]["Row"];
@@ -73,6 +73,8 @@ interface SafetyMetrics {
   netDebtToEbitda: Option.Option<number>;
   altmanZScore: Option.Option<number>;
   interestCoverage: Option.Option<number>;
+  ebitda: Option.Option<number>;
+  netDebt: Option.Option<number>;
 }
 
 interface InsiderActivity {
@@ -580,7 +582,6 @@ export default function SymbolAnalysisPage() {
   const [ratios, setRatios] = useState<Option.Option<RatiosTtmDBRow>>(Option.none());
 
   // Insider trading data (arrays for multiple records)
-  const [insiderStatistics, setInsiderStatistics] = useState<InsiderTradingStatisticsDBRow[]>([]);
   const [insiderTransactions, setInsiderTransactions] = useState<InsiderTransactionsDBRow[]>([]);
 
   // Valuations data (array for historical DCF data)
@@ -833,40 +834,85 @@ export default function SymbolAnalysisPage() {
     const altmanZScore = calculateAltmanZScore(latestStatement, marketCap);
     const interestCoverage = calculateInterestCoverage(latestStatement);
 
+    let ebitda = Option.none<number>();
+    let netDebt = Option.none<number>();
+
+    if (latestStatement) {
+      const incomePayload = latestStatement.income_statement_payload as { 
+        ebitda?: number; 
+        operatingIncome?: number; 
+        depreciationAndAmortization?: number; 
+        [key: string]: unknown; 
+      };
+      const balancePayload = latestStatement.balance_sheet_payload as { 
+        shortTermDebt?: number; 
+        longTermDebt?: number; 
+        cashAndCashEquivalents?: number; 
+        [key: string]: unknown; 
+      };
+
+      if (incomePayload && balancePayload) {
+        const std = typeof balancePayload.shortTermDebt === 'number' ? balancePayload.shortTermDebt : 0;
+        const ltd = typeof balancePayload.longTermDebt === 'number' ? balancePayload.longTermDebt : 0;
+        const cash = typeof balancePayload.cashAndCashEquivalents === 'number' ? balancePayload.cashAndCashEquivalents : 0;
+        netDebt = Option.some((std + ltd) - cash);
+        const ebitdaVal = incomePayload.ebitda;
+        const opInc = typeof incomePayload.operatingIncome === 'number' ? incomePayload.operatingIncome : 0;
+        const depAmort = typeof incomePayload.depreciationAndAmortization === 'number' ? incomePayload.depreciationAndAmortization : 0;
+        
+        if (typeof ebitdaVal === 'number') {
+          ebitda = Option.some(ebitdaVal);
+        } else {
+          ebitda = Option.some(opInc + depAmort);
+        }
+      }
+    }      
+
     return {
       netDebtToEbitda,
       altmanZScore,
       interestCoverage,
+      ebitda,
+      netDebt
     };
   })();
 
   // Calculate insider activity from real data
   const insiderActivity: InsiderActivity = (() => {
-    // Get current price for dollar value calculations
-    const currentPrice = Option.match(quote, {
-      onNone: () => null,
-      onSome: (q) => q.current_price || null,
+    // Determine the cutoff date for the "Last 6 Months" window
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    let totalAcquiredDollars = 0;
+    let totalDisposedDollars = 0;
+    let netSentiment = 0; // Net shares (bought - sold) for sentiment calculation
+    // Calculate using ACTUAL transaction prices from the last 6 months
+    insiderTransactions.forEach((t) => {
+      const dateStr = t.transaction_date || t.filing_date;
+      if (!dateStr) return;
+      const tDate = new Date(dateStr);
+      if (tDate >= sixMonthsAgo) {
+        const shares = Number(t.securities_transacted || 0);
+        const price = Number(t.price || 0);
+        const type = t.transaction_type || "";
+
+        // Standardize transaction types to filter out Option Exercises (M-Exempt) and Grants (A-Award)
+        const isPurchase = type.includes("Purchase") || type === "P";
+        const isSale = type.includes("Sale") || type === "S";
+
+        if (t.acquisition_or_disposition === "A" && isPurchase) {
+          netSentiment += shares;
+
+          if (price > 0) {
+            totalAcquiredDollars += (shares * price);
+          }
+        } else if (t.acquisition_or_disposition === "D" && isSale) {
+          netSentiment -= shares;
+          if (price > 0) {
+            totalDisposedDollars += (shares * price);
+          }
+        }
+      }
     });
-
-    // Calculate net buy/sell volumes from last 6 months (2 quarters)
-    const last6Months = insiderStatistics.slice(0, 2);
-    const totalAcquiredShares = last6Months.reduce((sum, s) => sum + Number(s.total_acquired || 0), 0);
-    const totalDisposedShares = last6Months.reduce((sum, s) => sum + Number(s.total_disposed || 0), 0);
-
-    // Calculate net insider sentiment (shares bought - shares sold)
-    const netSentiment = totalAcquiredShares - totalDisposedShares;
-
-    // Convert to dollar values using current price
-    // ⚠️ NOTE: This calculates current market value, not actual purchase/sale price
-    // If an insider bought at $10 and price is now $100, this shows 10x the actual amount
-    // Future enhancement: Use transaction_price from API if available for accurate volume
-    const totalAcquiredDollars = currentPrice && totalAcquiredShares > 0
-      ? totalAcquiredShares * currentPrice
-      : null;
-    const totalDisposedDollars = currentPrice && totalDisposedShares > 0
-      ? totalDisposedShares * currentPrice
-      : null;
-
     // Get latest transaction
     const latestTransaction = insiderTransactions[0];
     const latestTrade = latestTransaction
@@ -909,8 +955,8 @@ export default function SymbolAnalysisPage() {
       : Option.none<{ name: string; action: string; shares: number; date: string }>();
 
     return {
-      netBuyVolume: totalAcquiredDollars !== null ? Option.some(totalAcquiredDollars) : Option.none(),
-      netSellVolume: totalDisposedDollars !== null ? Option.some(totalDisposedDollars) : Option.none(),
+      netBuyVolume: Option.some(totalAcquiredDollars),
+      netSellVolume: Option.some(totalDisposedDollars),
       netSentiment, // Net shares (bought - sold) for sentiment calculation
       latestTrade,
     };
@@ -989,21 +1035,8 @@ export default function SymbolAnalysisPage() {
     setRatios(Option.some(ratiosData));
   }, []);
 
-  const handleInsiderStatisticsUpdate = useCallback((statsData: InsiderTradingStatisticsDBRow) => {
-    setInsiderStatistics((prev) => {
-      const existing = prev.findIndex(
-        (s) => s.symbol === statsData.symbol && s.year === statsData.year && s.quarter === statsData.quarter
-      );
-      if (existing >= 0) {
-        const updated = [...prev];
-        updated[existing] = statsData;
-        return updated;
-      }
-      return [...prev, statsData].sort((a, b) => {
-        if (a.year !== b.year) return b.year - a.year;
-        return b.quarter - a.quarter;
-      });
-    });
+  const handleInsiderStatisticsUpdate = useCallback(() => {
+    return null
   }, []);
 
   const handleInsiderTransactionsUpdate = useCallback((transactionData: InsiderTransactionsDBRow) => {
@@ -1315,48 +1348,31 @@ export default function SymbolAnalysisPage() {
       });
   }, [supabase, ticker, symbolValid]);
 
-  // Fetch initial insider trading data and valuations
+  // Fetch initial insider trading data, valuations, and financials
   // MUST be called before any conditional returns to follow Rules of Hooks
   useEffect(() => {
     if (!supabase || !ticker || symbolValid !== true) return;
 
-    // Fetch insider trading statistics (last 6 months = 2 quarters)
-    supabase
-      .from("insider_trading_statistics")
-      .select("*")
-      .eq("symbol", ticker)
-      .order("year", { ascending: false })
-      .order("quarter", { ascending: false })
-      .limit(8) // Last 2 years (8 quarters)
-      .then(({ data, error }) => {
-        if (error) {
-          console.error(`[SymbolAnalysisPage] Error fetching insider statistics:`, error);
-          return;
-        }
-        if (data) {
-          setInsiderStatistics(data);
-        }
-      });
+    // 1. Fetch insider trading statistics
 
-    // Fetch insider transactions (recent 100)
+    // 2. Fetch insider transactions (Last 6 Months, No Limit)
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    const sixMonthsAgoStr = sixMonthsAgo.toISOString().split('T')[0];
+
     supabase
       .from("insider_transactions")
       .select("*")
       .eq("symbol", ticker)
+      .gte("transaction_date", sixMonthsAgoStr)
       .order("transaction_date", { ascending: false, nullsFirst: false })
       .order("filing_date", { ascending: false })
-      .limit(100)
       .then(({ data, error }) => {
-        if (error) {
-          console.error(`[SymbolAnalysisPage] Error fetching insider transactions:`, error);
-          return;
-        }
-        if (data) {
-          setInsiderTransactions(data);
-        }
+        if (error) console.error(`[SymbolAnalysisPage] Error fetching insider transactions:`, error);
+        if (data) setInsiderTransactions(data);
       });
 
-    // Fetch valuations (DCF - last 180 days for chart)
+    // 3. Fetch valuations (DCF - last 180 days for chart)
     supabase
       .from("valuations")
       .select("*")
@@ -1365,94 +1381,11 @@ export default function SymbolAnalysisPage() {
       .order("date", { ascending: false })
       .limit(180)
       .then(({ data, error }) => {
-        if (error) {
-          console.error(`[SymbolAnalysisPage] Error fetching valuations:`, error);
-          return;
-        }
-        if (data) {
-          setValuations(data);
-        }
+        if (error) console.error(`[SymbolAnalysisPage] Error fetching valuations:`, error);
+        if (data) setValuations(data);
       });
 
-    // Fetch latest financial statement for Safety metrics calculations (any period)
-    supabase
-      .from("financial_statements")
-      .select("*")
-      .eq("symbol", ticker)
-      .order("date", { ascending: false })
-      .limit(1)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (error) {
-          console.error(`[SymbolAnalysisPage] Error fetching latest financial statement:`, error);
-          return;
-        }
-        if (data) {
-          setFinancialStatement(Option.some(data));
-        }
-      });
-  }, [supabase, ticker, symbolValid]);
-
-  // Fetch initial insider trading data and valuations
-  // MUST be called before any conditional returns to follow Rules of Hooks
-  useEffect(() => {
-    if (!supabase || !ticker || symbolValid !== true) return;
-
-    // Fetch insider trading statistics (last 6 months = 2 quarters)
-    supabase
-      .from("insider_trading_statistics")
-      .select("*")
-      .eq("symbol", ticker)
-      .order("year", { ascending: false })
-      .order("quarter", { ascending: false })
-      .limit(8) // Last 2 years (8 quarters)
-      .then(({ data, error }) => {
-        if (error) {
-          console.error(`[SymbolAnalysisPage] Error fetching insider statistics:`, error);
-          return;
-        }
-        if (data) {
-          setInsiderStatistics(data);
-        }
-      });
-
-    // Fetch insider transactions (recent 100)
-    supabase
-      .from("insider_transactions")
-      .select("*")
-      .eq("symbol", ticker)
-      .order("transaction_date", { ascending: false, nullsFirst: false })
-      .order("filing_date", { ascending: false })
-      .limit(100)
-      .then(({ data, error }) => {
-        if (error) {
-          console.error(`[SymbolAnalysisPage] Error fetching insider transactions:`, error);
-          return;
-        }
-        if (data) {
-          setInsiderTransactions(data);
-        }
-      });
-
-    // Fetch valuations (DCF - last 180 days for chart)
-    supabase
-      .from("valuations")
-      .select("*")
-      .eq("symbol", ticker)
-      .eq("valuation_type", "dcf")
-      .order("date", { ascending: false })
-      .limit(180)
-      .then(({ data, error }) => {
-        if (error) {
-          console.error(`[SymbolAnalysisPage] Error fetching valuations:`, error);
-          return;
-        }
-        if (data) {
-          setValuations(data);
-        }
-      });
-
-    // Fetch latest financial statement for Safety metrics calculations (any period)
+    // 4. Fetch latest financial statement for Safety metrics
     supabase
       .from("financial_statements")
       .select("*")
@@ -1461,23 +1394,16 @@ export default function SymbolAnalysisPage() {
       .order("fetched_at", { ascending: false })
       .limit(1)
       .then(({ data, error }) => {
-        if (error) {
-          console.error(`[SymbolAnalysisPage] Error fetching latest financial statement:`, error);
-          return;
-        }
-        if (data && data.length > 0) {
-          setFinancialStatement(Option.some(data[0]));
-        }
+        if (error) console.error(`[SymbolAnalysisPage] Error fetching latest financial statement:`, error);
+        if (data && data.length > 0) setFinancialStatement(Option.some(data[0]));
       });
 
-    // Fetch historical financial statements for ROIC history chart (last 12 annual reports)
-    // Filter for annual reports (FY period) to get end-of-year dates (September for AAPL)
-    // Handle duplicates by taking the latest fetched_at for each fiscal_year
+    // 5. Fetch historical financial statements for ROIC history chart
     supabase
       .from("financial_statements")
       .select("*")
       .eq("symbol", ticker)
-      .eq("period", "FY") // Only annual reports (fiscal year end)
+      .eq("period", "FY") // Only annual reports
       .order("fetched_at", { ascending: false })
       .order("date", { ascending: false })
       .then(({ data, error }) => {
@@ -1486,17 +1412,14 @@ export default function SymbolAnalysisPage() {
           return;
         }
         if (data) {
-          // Deduplicate: For each fiscal_year, keep only the one with the latest fetched_at
           const deduplicated = data.reduce((acc: typeof data, current: typeof data[0]) => {
             const existing = acc.find((item: typeof data[0]) => item.fiscal_year === current.fiscal_year);
             if (!existing) {
               acc.push(current);
             } else {
-              // Compare fetched_at dates - keep the one with the latest fetched_at
               const existingFetchedAt = existing.fetched_at ? new Date(existing.fetched_at).getTime() : 0;
               const currentFetchedAt = current.fetched_at ? new Date(current.fetched_at).getTime() : 0;
               if (currentFetchedAt > existingFetchedAt) {
-                // Replace with the newer one
                 const index = acc.indexOf(existing);
                 acc[index] = current;
               }
@@ -1504,7 +1427,6 @@ export default function SymbolAnalysisPage() {
             return acc;
           }, [] as typeof data);
 
-          // Sort by date descending and take the latest 12
           const sorted = deduplicated
             .sort((a: typeof data[0], b: typeof data[0]) => new Date(b.date).getTime() - new Date(a.date).getTime())
             .slice(0, 12);
@@ -2155,19 +2077,38 @@ export default function SymbolAnalysisPage() {
             <CardContent className="flex justify-between gap-4">
               <div className="flex-1 text-center p-4 border rounded">
                 <div className="text-muted-foreground text-sm mb-1">Net Debt / EBITDA</div>
-                {Option.match(safetyMetrics.netDebtToEbitda, {
-                  onNone: () => (
-                    <div className="h-8 w-20 bg-muted animate-pulse rounded mx-auto mb-1" />
-                  ),
-                  onSome: (v) => (
-                    <div className={cn(
-                      "text-2xl font-bold",
-                      v < 3 ? "text-green-600" : v < 5 ? "text-yellow-600" : "text-red-600"
-                    )}>
-                      {v.toFixed(1)}x
-                    </div>
-                  ),
-                })}
+                {(() => {
+                 const isNegativeEbitda = Option.match(safetyMetrics.ebitda, {
+                   onNone: () => false,
+                   onSome: (v) => v <= 0
+                 });
+                 const isNetCash = Option.match(safetyMetrics.netDebt, {
+                   onNone: () => false,
+                   onSome: (v) => v < 0
+                 });
+                  
+                if (isNegativeEbitda) {
+                    return <div className="text-lg font-bold text-red-600 leading-tight py-1">High Risk<br/><span className="text-xs font-normal">(Negative EBITDA)</span></div>;
+                  }
+                  
+                if (isNetCash) {
+                    return <div className="text-2xl font-bold text-green-600">Net Cash</div>;
+                  }
+                  
+                  return Option.match(safetyMetrics.netDebtToEbitda, {
+                    onNone: () => (
+                      <div className="h-8 w-20 bg-muted animate-pulse rounded mx-auto mb-1" />
+                    ),
+                    onSome: (v) => (
+                      <div className={cn(
+                        "text-2xl font-bold",
+                        v < 3 ? "text-green-600" : v < 5 ? "text-yellow-600" : "text-red-600"
+                      )}>
+                        {v.toFixed(1)}x
+                      </div>
+                    ),
+                  });
+                })()}
                 <div className="text-xs text-muted-foreground">Safe (&lt; 3.0x)</div>
               </div>
               <div className="flex-1 text-center p-4 border rounded">
