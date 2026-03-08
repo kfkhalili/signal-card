@@ -57,7 +57,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${GeistSans.variable} ${GeistMono.variable} font-sans`}>
+        className={`${GeistSans.variable} ${GeistMono.variable} font-sans overflow-y-scroll`}>
         <AuthProvider>
           <RealtimeStockProvider>
             <div className="flex flex-col min-h-screen">

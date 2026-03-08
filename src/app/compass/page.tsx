@@ -129,8 +129,13 @@ const WeightSliders = () => {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 p-4 border rounded-lg">
       {Object.entries(weights).map(([pillar, value]) => (
-        <div key={pillar}>
-          <label className="font-medium">{pillarLabels[pillar as Pillar]}</label>
+        <div key={pillar} className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <label className="font-medium text-sm">{pillarLabels[pillar as Pillar]}</label>
+            <span className="text-sm font-medium tabular-nums w-10 text-right text-muted-foreground">
+              {(value * 100).toFixed(0)}%
+            </span>
+          </div>
           <input
             type="range"
             min="0"
@@ -142,9 +147,8 @@ const WeightSliders = () => {
                 parseInt(e.target.value, 10)
               )
             }
-            className="w-full"
+            className="w-full cursor-pointer"
           />
-          <span>{(value * 100).toFixed(0)}%</span>
         </div>
       ))}
     </div>
@@ -154,6 +158,7 @@ const WeightSliders = () => {
 interface ProfileData {
   company_name: string | null;
   image: string | null;
+  industry: string | null;
 }
 
 export default function CompassPage() {
@@ -198,7 +203,7 @@ export default function CompassPage() {
       const profileResult = await fromPromise(
         supabase
           .from("profiles")
-          .select("symbol, company_name, image")
+          .select("symbol, company_name, image, industry")
           .in("symbol", symbols),
         (e) => new Error(`Failed to fetch profiles: ${(e as Error).message}`)
       );
@@ -217,6 +222,7 @@ export default function CompassPage() {
               profileMap[profile.symbol] = {
                 company_name: profile.company_name,
                 image: profile.image,
+                industry: profile.industry,
               };
             });
           }
@@ -324,7 +330,7 @@ export default function CompassPage() {
                   <div
                     key={item.symbol}
                     className={cn(
-                      "grid grid-cols-[50px_1fr_120px_140px] gap-4 px-4 py-3 hover:bg-muted/30 transition-colors",
+                      "grid grid-cols-[50px_1fr_120px_140px] gap-4 px-4 py-3 hover:bg-muted/30 transition-colors items-center",
                       isTop3 && "bg-primary/5"
                     )}
                   >
@@ -373,17 +379,22 @@ export default function CompassPage() {
                             className="font-semibold text-base truncate hover:text-primary transition-colors"
                             title={`View detailed analysis for ${item.symbol}`}
                           >
-                            {companyName ? (
-                              <>
-                                {companyName} <span className="text-muted-foreground font-normal">({item.symbol})</span>
-                              </>
-                            ) : (
-                              item.symbol
-                            )}
+                            {companyName || item.symbol}
                           </Link>
                           {isTop3 && (
                             <TrendingUp className="h-4 w-4 text-primary shrink-0" />
                           )}
+                          </div>
+                          <div className="flex items-center text-xs text-muted-foreground mt-0.5 truncate">
+                            <span className="font-medium tracking-wider">{item.symbol}</span>
+                            {profile?.industry && (
+                              <>
+                                <span className="mx-1.5 opacity-40">•</span>
+                                <span className="truncate" title={profile.industry}>
+                                  {profile.industry}
+                                </span>
+                              </>
+                            )}
                         </div>
                       </div>
                     </div>
