@@ -4,13 +4,12 @@
 --
 -- Deactivation Criteria:
 -- 1. Funds (is_fund = TRUE)
--- 2. ADRs (is_adr = TRUE)
--- 3. ETFs (is_etf = TRUE)
--- 4. Not actively trading (is_actively_trading = FALSE)
--- 5. No volume (volume IS NULL OR volume = 0)
--- 6. No market cap (market_cap IS NULL OR market_cap = 0)
--- 7. Company name variants (keep shortest symbol, deactivate others)
--- 8. Missing critical company data (no employees AND no website)
+-- 2. ETFs (is_etf = TRUE)
+-- 3. Not actively trading (is_actively_trading = FALSE)
+-- 4. No volume (volume IS NULL OR volume = 0)
+-- 5. No market cap (market_cap IS NULL OR market_cap = 0)
+-- 6. Company name variants (keep shortest symbol, deactivate others)
+-- 7. Missing critical company data (no employees AND no website)
 --
 -- Rationale: The Compass is designed for stock discovery, focusing on legitimate
 -- operating companies. Symbols are deactivated if they are funds, ETFs, ADRs,

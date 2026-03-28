@@ -11,7 +11,8 @@ import { useDebounce } from "use-debounce";
 import type { LeaderboardEntry } from "@/stores/compassStore";
 import { Button } from "@/components/ui/button";
 import { useAddCardToWorkspace } from "@/hooks/useAddCardToWorkspace";
-import { PlusCircle, Sparkles, TrendingUp, Loader2 } from "lucide-react";
+import { PlusCircle, Sparkles, TrendingUp, Loader2, Filter, Check, ChevronsUpDown, X, Search } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { cn, createSecureImageUrl } from "@/lib/utils";
 import { fromPromise } from "neverthrow";
 
@@ -161,11 +162,185 @@ interface ProfileData {
   industry: string | null;
 }
 
+function IndustryMultiSelect({
+  availableIndustries,
+  selectedIndustries,
+  onChange,
+}: {
+  availableIndustries: string[];
+  selectedIndustries: string[];
+  onChange: (industries: string[]) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const filteredIndustries = availableIndustries.filter((i) =>
+    i.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const toggleIndustry = (industry: string) => {
+    if (selectedIndustries.includes(industry)) {
+      onChange(selectedIndustries.filter((i) => i !== industry));
+    } else {
+      onChange([...selectedIndustries, industry]);
+    }
+  };
+
+  const clearAll = (e: React.MouseEvent | React.KeyboardEvent) => {
+    e.stopPropagation();
+    onChange([]);
+  };
+
+  const isAllSelected = 
+    selectedIndustries.length > 0 && 
+    selectedIndustries.length === availableIndustries.length;
+
+  const toggleAll = () => {
+    if (isAllSelected) {
+      onChange([]);
+    } else {
+      onChange([...availableIndustries]);
+    }
+  };
+
+  return (
+    <div className="relative inline-block w-full md:w-auto">
+      <Button
+        type="button"
+        variant="outline"
+        role="combobox"
+        aria-expanded={isOpen}
+        className="w-full md:w-[320px] justify-between h-auto min-h-10 py-2 border-dashed z-50 relative"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <div className="flex items-center flex-wrap gap-1">
+          <Filter className="mr-2 h-4 w-4 shrink-0" />
+          {selectedIndustries.length === 0 ? (
+            <span className="font-medium">All Industries</span>
+          ) : (
+            <>
+              <span className="font-medium mr-1">Industries</span>
+              <div className="hidden space-x-1 lg:flex flex-wrap gap-y-1">
+                {selectedIndustries.length > 2 ? (
+                  <Badge variant="secondary" className="rounded-sm px-1 font-normal">
+                    {selectedIndustries.length} selected
+                  </Badge>
+                ) : (
+                  selectedIndustries.map((option) => (
+                    <Badge variant="secondary" key={option} className="rounded-sm px-1 font-normal">
+                      {option}
+                    </Badge>
+                  ))
+                )}
+              </div>
+              <Badge variant="secondary" className="rounded-sm px-1 font-normal lg:hidden">
+                {selectedIndustries.length}
+              </Badge>
+            </>
+          )}
+        </div>
+        <div className="flex items-center shrink-0 ml-2">
+          {selectedIndustries.length > 0 && (
+            <div
+              role="button"
+              tabIndex={0}
+              className="mr-1 hover:bg-muted p-1 rounded-sm text-muted-foreground hover:text-foreground transition-colors"
+              onClick={clearAll}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  clearAll(e);
+                }
+              }}
+            >
+              <X className="h-4 w-4 shrink-0" />
+            </div>
+          )}
+          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+        </div>
+      </Button>
+
+      {isOpen && (
+        <>
+          {/* INVISIBLE BACKDROP CATCHES CLICKS OUTSIDE THE DROPDOWN */}
+          {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
+          <div 
+            className="fixed inset-0 z-[90]" 
+            onClick={() => setIsOpen(false)} 
+          />
+          
+          <div className="absolute top-full mt-2 w-full md:w-[360px] md:right-0 z-[100] rounded-md border bg-popover text-popover-foreground shadow-lg outline-none animate-in fade-in-0 zoom-in-95">
+            <div className="flex items-center border-b px-3">
+              <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+              <input
+                className="flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                placeholder="Search industries..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                // eslint-disable-next-line jsx-a11y/no-autofocus
+                autoFocus
+              />
+            </div>
+            <div className="max-h-[300px] overflow-y-auto p-1 relative z-[100]">
+            {availableIndustries.length > 0 && (
+              <button
+                type="button"
+                className={cn(
+                  "w-full relative flex cursor-pointer select-none items-center rounded-sm px-2 py-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground mb-1 border-b pb-2 text-left",
+                  isAllSelected && "bg-accent/50 text-accent-foreground font-medium"
+                )}
+                onClick={toggleAll}
+              >
+                <div className={cn(
+                  "mr-3 flex h-4 w-4 items-center justify-center rounded-sm border border-primary transition-colors",
+                  isAllSelected ? "bg-primary text-primary-foreground" : "opacity-50"
+                )}>
+                  {isAllSelected && <Check className="h-3 w-3" />}
+                </div>
+                {isAllSelected ? "Unselect All" : "Select All"}
+              </button>
+            )}
+
+              {filteredIndustries.length === 0 ? (
+                <p className="p-4 text-center text-sm text-muted-foreground">No industries found.</p>
+              ) : (
+                filteredIndustries.map((industry) => {
+                  const isSelected = selectedIndustries.includes(industry);
+                  return (
+                    <button
+                      type="button"
+                      key={industry}
+                      className={cn(
+                        "w-full relative flex cursor-pointer select-none items-center rounded-sm px-2 py-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground text-left",
+                        isSelected && "bg-accent/50 text-accent-foreground font-medium"
+                      )}
+                      onClick={() => toggleIndustry(industry)}
+                    >
+                      <div className={cn(
+                        "mr-3 flex h-4 w-4 items-center justify-center rounded-sm border border-primary transition-colors",
+                        isSelected ? "bg-primary text-primary-foreground" : "opacity-50"
+                      )}>
+                        {isSelected && <Check className="h-3 w-3" />}
+                      </div>
+                      {industry}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function CompassPage() {
   const { supabase, user, isLoading: isAuthLoading } = useAuth();
   const router = useRouter();
   const {
     weights,
+    industryFilters,
     leaderboardData,
     isLoading,
     error,
@@ -175,6 +350,7 @@ export default function CompassPage() {
   const { addCard, addCards } = useAddCardToWorkspace();
   const [addingSymbols, setAddingSymbols] = useState<Set<string>>(new Set());
   const [profileData, setProfileData] = useState<Record<string, ProfileData>>({});
+  const [availableIndustries, setAvailableIndustries] = useState<string[]>([]);
   const [hasMounted, setHasMounted] = useState<boolean>(false);
 
   useEffect(() => {
@@ -188,10 +364,32 @@ export default function CompassPage() {
   }, [user, isAuthLoading, router, hasMounted]);
 
   useEffect(() => {
+    if (!supabase) return;
+    const fetchIndustries = async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("industry")
+        .not("industry", "is", null);
+        
+      if (data && !error) {
+        const uniqueIndustries = Array.from(
+          new Set(
+            data
+              .map((item) => item.industry?.trim())
+              .filter(Boolean) // Drops empty strings, undefined, and null
+          )
+        ).sort();
+        setAvailableIndustries(uniqueIndustries as string[]);
+      }
+    };
+    fetchIndustries();
+  }, [supabase]);
+
+  useEffect(() => {
     if (supabase) {
       actions.fetchLeaderboard(supabase);
     }
-  }, [debouncedWeights, supabase, actions]);
+  }, [debouncedWeights, industryFilters, supabase, actions]);
 
   // Fetch profile data for all symbols in leaderboard
   useEffect(() => {
@@ -266,11 +464,21 @@ export default function CompassPage() {
 
   return (
     <div className="container mx-auto p-4 max-w-7xl">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">Market Compass</h1>
-        <p className="text-muted-foreground">
-          Discover stocks ranked by your investment style. Adjust the weights for Value, Growth, Profitability, Income, and Health to find stocks that match your preferences.
-        </p>
+      <div className="mb-6 flex flex-col md:flex-row md:items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Market Compass</h1>
+          <p className="text-muted-foreground">
+            Discover stocks ranked by your investment style. Adjust the weights for Value, Growth, Profitability, Income, and Health to find stocks that match your preferences.
+          </p>
+        </div>
+        
+        <div className="w-full md:w-auto z-[90]">
+          <IndustryMultiSelect
+            availableIndustries={availableIndustries}
+            selectedIndustries={industryFilters}
+            onChange={(selected) => actions.setIndustryFilters(selected)}
+          />
+        </div>
       </div>
 
       <InvestorProfileButtons />
