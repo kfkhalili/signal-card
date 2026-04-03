@@ -15,11 +15,13 @@ export interface LeaderboardEntry {
 
 interface LeaderboardState {
   weights: Record<Pillar, number>;
+  industryFilters: string[];
   leaderboardData: LeaderboardEntry[];
   isLoading: boolean;
   error: string | null;
   actions: {
     setWeights: (newWeights: Record<Pillar, number>) => void;
+    setIndustryFilters: (industries: string[]) => void;
     fetchLeaderboard: (
       supabase: SupabaseClient<Database>
     ) => Promise<void>;
@@ -37,19 +39,23 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
     sentiment: 0.13,
     buyback: 0.13
   },
+  industryFilters: [],
   leaderboardData: [],
   isLoading: false,
   error: null,
   actions: {
     setWeights: (newWeights) => set({ weights: newWeights }),
+    setIndustryFilters: (industries) => set({ industryFilters: industries }),
     fetchLeaderboard: async (supabase) => {
       set({ isLoading: true, error: null });
 
       const weightsPayload = get().weights;
+      const industryPayload = get().industryFilters;
 
       const rpcResult = await fromPromise(
         supabase.rpc("get_weighted_leaderboard", {
           weights: weightsPayload,
+          p_industries: industryPayload.length > 0 ? industryPayload : null,
         }),
         (e) => new Error(`Failed to fetch leaderboard: ${(e as Error).message}`)
       );
