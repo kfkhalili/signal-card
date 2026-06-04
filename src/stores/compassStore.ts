@@ -1,5 +1,6 @@
 // src/stores/leaderboardStore.ts
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import { fromPromise } from "neverthrow";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
@@ -28,8 +29,10 @@ interface LeaderboardState {
   };
 }
 
-export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
-  weights: {
+export const useLeaderboardStore = create<LeaderboardState>()(
+  persist(
+    (set, get) => ({
+      weights: {
     value: 0.12,
     growth: 0.12,
     profitability: 0.12,
@@ -82,4 +85,12 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
       );
     },
   },
-}));
+  }),
+  {
+    name: "compass-storage",
+    partialize: (state) => ({
+      weights: state.weights,
+      industryFilters: state.industryFilters,
+    }),
+  }
+));
