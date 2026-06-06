@@ -11,10 +11,12 @@ import { useDebounce } from "use-debounce";
 import type { LeaderboardEntry } from "@/stores/compassStore";
 import { Button } from "@/components/ui/button";
 import { useAddCardToWorkspace } from "@/hooks/useAddCardToWorkspace";
-import { PlusCircle, Sparkles, TrendingUp, Loader2, Filter, Check, ChevronsUpDown, X, Search } from "lucide-react";
+import { PlusCircle, Sparkles, TrendingUp, Loader2, Filter, Check, ChevronsUpDown, X, Search, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn, createSecureImageUrl } from "@/lib/utils";
 import { fromPromise } from "neverthrow";
+import { formatDistanceToNow } from "date-fns";
+import { useCompassFreshness } from "@/hooks/useCompassFreshness";
 
 type Pillar = "value" | "growth" | "profitability" | "income" | "health"| "revenue" | "sentiment" | "buyback";
 type Weights = Record<Pillar, number>;
@@ -353,6 +355,13 @@ export default function CompassPage() {
   const [availableIndustries, setAvailableIndustries] = useState<string[]>([]);
   const [hasMounted, setHasMounted] = useState<boolean>(false);
 
+  const { 
+    data: lastUpdated, 
+    isLoading: isFreshnessLoading, 
+    isFetching: isFreshnessFetching, 
+    isError: isFreshnessError 
+  } = useCompassFreshness(supabase);
+
   useEffect(() => {
     setHasMounted(true);
   }, []);
@@ -470,9 +479,27 @@ export default function CompassPage() {
           <p className="text-muted-foreground">
             Discover stocks ranked by your investment style. Adjust the weights for Value, Growth, Profitability, Income, and Health to find stocks that match your preferences.
           </p>
+          <div className="flex items-center text-sm text-muted-foreground mt-2 min-h-6">
+            <Clock className="h-4 w-4 mr-1.5 shrink-0" />
+            {isFreshnessLoading ? (
+              <span className="flex items-center">
+                <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
+                Checking for updates...
+              </span>
+            ) : isFreshnessError ? (
+              <span>Last updated status unavailable</span>
+            ) : lastUpdated ? (
+              <span className="flex items-center">
+                Rankings updated {formatDistanceToNow(new Date(lastUpdated), { addSuffix: true })}
+                {isFreshnessFetching && <Loader2 className="h-3 w-3 animate-spin ml-2 text-muted-foreground/50" />}
+              </span>
+            ) : (
+              <span>Update time unknown</span>
+            )}
+          </div>
         </div>
         
-        <div className="w-full md:w-auto z-[90]">
+        <div className="w-full md:w-auto z-40 relative">
           <IndustryMultiSelect
             availableIndustries={availableIndustries}
             selectedIndustries={industryFilters}

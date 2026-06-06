@@ -31,6 +31,8 @@ import { RealtimeStockProvider } from "@/contexts/RealtimeStockContext";
 import "./globals.css";
 import type { Viewport } from "next";
 
+import { QueryProvider } from "@/components/providers/QueryProvider";
+
 export const metadata = homeMetadata;
 
 // Viewport must be exported separately in Next.js 15
@@ -58,18 +60,20 @@ export default function RootLayout({
       </head>
       <body
         className={`${GeistSans.variable} ${GeistMono.variable} font-sans overflow-y-scroll`}>
-        <AuthProvider>
-          <RealtimeStockProvider>
-            <div className="flex flex-col min-h-screen">
-              <Header />
-              <main className="flex-grow container mx-auto px-4 py-8">
-                {children}
-              </main>
-              <Footer />
-            </div>
-          </RealtimeStockProvider>
-        </AuthProvider>
-        <CookieBanner />
+        <QueryProvider>
+          <AuthProvider>
+            <RealtimeStockProvider>
+              <div className="flex flex-col min-h-screen">
+                <Header />
+                <main className="flex-grow container mx-auto px-4 py-8">
+                  {children}
+                </main>
+                <Footer />
+              </div>
+            </RealtimeStockProvider>
+          </AuthProvider>
+          <CookieBanner />
+        </QueryProvider>
       </body>
     </html>
   );
