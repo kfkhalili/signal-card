@@ -260,7 +260,11 @@ GRANT EXECUTE ON FUNCTION public.get_weighted_leaderboard(jsonb, text[]) TO anon
 -- 5. Update the cron job to use the new refresh function
 DO $$
 BEGIN
-  PERFORM cron.unschedule('refresh-compass-leaderboard-mv');
+  BEGIN
+    PERFORM cron.unschedule('refresh-compass-leaderboard-mv');
+  EXCEPTION WHEN OTHERS THEN
+    -- Job doesn't exist, ignore
+  END;
   PERFORM cron.schedule(
     'refresh-compass-leaderboard-mv',
     '0 * * * *',
