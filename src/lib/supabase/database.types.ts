@@ -1620,7 +1620,11 @@ export type Database = {
         }[]
       }
       get_weighted_leaderboard: {
-        Args: { weights: Json }
+        Args: {
+          weights: Json
+          p_industries?: string[] | null
+          p_exchanges?: string[] | null
+        }
         Returns: {
           composite_score: number
           rank: number
