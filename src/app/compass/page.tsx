@@ -337,12 +337,189 @@ function IndustryMultiSelect({
   );
 }
 
+function ExchangeMultiSelect({
+  availableExchanges,
+  selectedExchanges,
+  onChange,
+}: {
+  availableExchanges: string[];
+  selectedExchanges: string[];
+  onChange: (exchanges: string[]) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const filteredExchanges = availableExchanges.filter((e) =>
+    e.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const toggleExchange = (exchange: string) => {
+    if (selectedExchanges.includes(exchange)) {
+      onChange(selectedExchanges.filter((e) => e !== exchange));
+    } else {
+      onChange([...selectedExchanges, exchange]);
+    }
+  };
+
+  const clearAll = (e: React.MouseEvent | React.KeyboardEvent) => {
+    e.stopPropagation();
+    onChange([]);
+  };
+
+  const isAllSelected =
+    selectedExchanges.length > 0 &&
+    selectedExchanges.length === availableExchanges.length;
+
+  const toggleAll = () => {
+    if (isAllSelected) {
+      onChange([]);
+    } else {
+      onChange([...availableExchanges]);
+    }
+  };
+
+  return (
+    <div className="relative inline-block w-full md:w-auto">
+      <Button
+        type="button"
+        variant="outline"
+        role="combobox"
+        aria-expanded={isOpen}
+        className="w-full md:w-[260px] justify-between h-auto min-h-10 py-2 border-dashed z-50 relative"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <div className="flex items-center flex-wrap gap-1">
+          <Filter className="mr-2 h-4 w-4 shrink-0" />
+          {selectedExchanges.length === 0 ? (
+            <span className="font-medium">All Exchanges</span>
+          ) : (
+            <>
+              <span className="font-medium mr-1">Exchanges</span>
+              <div className="hidden space-x-1 lg:flex flex-wrap gap-y-1">
+                {selectedExchanges.length > 2 ? (
+                  <Badge variant="secondary" className="rounded-sm px-1 font-normal">
+                    {selectedExchanges.length} selected
+                  </Badge>
+                ) : (
+                  selectedExchanges.map((option) => (
+                    <Badge variant="secondary" key={option} className="rounded-sm px-1 font-normal">
+                      {option}
+                    </Badge>
+                  ))
+                )}
+              </div>
+              <Badge variant="secondary" className="rounded-sm px-1 font-normal lg:hidden">
+                {selectedExchanges.length}
+              </Badge>
+            </>
+          )}
+        </div>
+        <div className="flex items-center shrink-0 ml-2">
+          {selectedExchanges.length > 0 && (
+            <div
+              role="button"
+              tabIndex={0}
+              className="mr-1 hover:bg-muted p-1 rounded-sm text-muted-foreground hover:text-foreground transition-colors"
+              onClick={clearAll}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  clearAll(e);
+                }
+              }}
+            >
+              <X className="h-4 w-4 shrink-0" />
+            </div>
+          )}
+          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+        </div>
+      </Button>
+
+      {isOpen && (
+        <>
+          {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
+          <div
+            className="fixed inset-0 z-[90]"
+            onClick={() => setIsOpen(false)}
+          />
+
+          <div className="absolute top-full mt-2 w-full md:w-[320px] md:right-0 z-[100] rounded-md border bg-popover text-popover-foreground shadow-lg outline-none animate-in fade-in-0 zoom-in-95">
+            <div className="flex items-center border-b px-3">
+              <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+              <input
+                className="flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                placeholder="Search exchanges..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                // eslint-disable-next-line jsx-a11y/no-autofocus
+                autoFocus
+              />
+            </div>
+            <div className="max-h-[300px] overflow-y-auto p-1 relative z-[100]">
+              {availableExchanges.length > 0 && (
+                <button
+                  type="button"
+                  className={cn(
+                    "w-full relative flex cursor-pointer select-none items-center rounded-sm px-2 py-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground mb-1 border-b pb-2 text-left",
+                    isAllSelected && "bg-accent/50 text-accent-foreground font-medium"
+                  )}
+                  onClick={toggleAll}
+                >
+                  <div
+                    className={cn(
+                      "mr-3 flex h-4 w-4 items-center justify-center rounded-sm border border-primary transition-colors",
+                      isAllSelected ? "bg-primary text-primary-foreground" : "opacity-50"
+                    )}
+                  >
+                    {isAllSelected && <Check className="h-3 w-3" />}
+                  </div>
+                  {isAllSelected ? "Unselect All" : "Select All"}
+                </button>
+              )}
+
+              {filteredExchanges.length === 0 ? (
+                <p className="p-4 text-center text-sm text-muted-foreground">No exchanges found.</p>
+              ) : (
+                filteredExchanges.map((exchange) => {
+                  const isSelected = selectedExchanges.includes(exchange);
+                  return (
+                    <button
+                      type="button"
+                      key={exchange}
+                      className={cn(
+                        "w-full relative flex cursor-pointer select-none items-center rounded-sm px-2 py-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground text-left",
+                        isSelected && "bg-accent/50 text-accent-foreground font-medium"
+                      )}
+                      onClick={() => toggleExchange(exchange)}
+                    >
+                      <div
+                        className={cn(
+                          "mr-3 flex h-4 w-4 items-center justify-center rounded-sm border border-primary transition-colors",
+                          isSelected ? "bg-primary text-primary-foreground" : "opacity-50"
+                        )}
+                      >
+                        {isSelected && <Check className="h-3 w-3" />}
+                      </div>
+                      {exchange}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function CompassPage() {
   const { supabase, user, isLoading: isAuthLoading } = useAuth();
   const router = useRouter();
   const {
     weights,
     industryFilters,
+    exchangeFilters,
     leaderboardData,
     isLoading,
     error,
@@ -353,6 +530,7 @@ export default function CompassPage() {
   const [addingSymbols, setAddingSymbols] = useState<Set<string>>(new Set());
   const [profileData, setProfileData] = useState<Record<string, ProfileData>>({});
   const [availableIndustries, setAvailableIndustries] = useState<string[]>([]);
+  const [availableExchanges, setAvailableExchanges] = useState<string[]>([]);
   const [hasMounted, setHasMounted] = useState<boolean>(false);
 
   const { 
@@ -374,31 +552,47 @@ export default function CompassPage() {
 
   useEffect(() => {
     if (!supabase) return;
-    const fetchIndustries = async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("industry")
-        .not("industry", "is", null);
-        
-      if (data && !error) {
+    const fetchFilterOptions = async () => {
+      const [indResponse, exchResponse] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("industry")
+          .not("industry", "is", null),
+        supabase
+          .from("available_exchanges")
+          .select("exchange"),
+      ]);
+
+      if (indResponse.data && !indResponse.error) {
         const uniqueIndustries = Array.from(
           new Set(
-            data
+            indResponse.data
               .map((item) => item.industry?.trim())
-              .filter(Boolean) // Drops empty strings, undefined, and null
+              .filter(Boolean)
           )
         ).sort();
         setAvailableIndustries(uniqueIndustries as string[]);
       }
+
+      if (exchResponse.data && !exchResponse.error) {
+        const uniqueExchanges = Array.from(
+          new Set(
+            exchResponse.data
+              .map((item) => item.exchange?.trim())
+              .filter(Boolean)
+          )
+        ).sort();
+        setAvailableExchanges(uniqueExchanges as string[]);
+      }
     };
-    fetchIndustries();
+    fetchFilterOptions();
   }, [supabase]);
 
   useEffect(() => {
     if (supabase) {
       actions.fetchLeaderboard(supabase);
     }
-  }, [debouncedWeights, industryFilters, supabase, actions]);
+  }, [debouncedWeights, industryFilters, exchangeFilters, supabase, actions]);
 
   // Fetch profile data for all symbols in leaderboard
   useEffect(() => {
@@ -499,7 +693,12 @@ export default function CompassPage() {
           </div>
         </div>
         
-        <div className="w-full md:w-auto z-40 relative">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto z-40 relative">
+          <ExchangeMultiSelect
+            availableExchanges={availableExchanges}
+            selectedExchanges={exchangeFilters || []}
+            onChange={(selected) => actions.setExchangeFilters(selected)}
+          />
           <IndustryMultiSelect
             availableIndustries={availableIndustries}
             selectedIndustries={industryFilters}
@@ -544,10 +743,9 @@ export default function CompassPage() {
         {!isLoading && !error && leaderboardData.length > 0 && (
           <div className="bg-card border rounded-lg overflow-hidden">
             {/* Table Header */}
-            <div className="grid grid-cols-[50px_1fr_120px_140px] gap-4 px-4 py-3 bg-muted/50 border-b text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              <div>#</div>
-              <div>Name</div>
-              <div className="text-right">Score</div>
+            <div className="grid grid-cols-[30px_1fr_auto] sm:grid-cols-[50px_1fr_140px] gap-2 sm:gap-4 px-2 sm:px-4 py-3 bg-muted/50 border-b text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <div className="text-center sm:text-left">#</div>
+              <div>Name & Rankings</div>
               <div className="text-right">Action</div>
             </div>
 
@@ -565,12 +763,12 @@ export default function CompassPage() {
                   <div
                     key={item.symbol}
                     className={cn(
-                      "grid grid-cols-[50px_1fr_120px_140px] gap-4 px-4 py-3 hover:bg-muted/30 transition-colors items-center",
+                      "grid grid-cols-[30px_1fr_auto] sm:grid-cols-[50px_1fr_140px] gap-2 sm:gap-4 px-2 sm:px-4 py-3 hover:bg-muted/30 transition-colors items-center",
                       isTop3 && "bg-primary/5"
                     )}
                   >
                     {/* Rank Number */}
-                    <div className="flex items-center">
+                    <div className="flex items-center justify-center sm:justify-start">
                       <span className={cn(
                         "text-sm font-semibold",
                         isTop3 && "text-primary",
@@ -630,18 +828,39 @@ export default function CompassPage() {
                                 </span>
                               </>
                             )}
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                            <span className="inline-flex items-center rounded border px-1 text-[9px] font-medium text-muted-foreground bg-muted/50" title="Enterprise Value Multiple Rank">
+                              EVM: {item.evm_rank ?? "—"}
+                            </span>
+                            <span className="inline-flex items-center rounded border px-1 text-[9px] font-medium text-muted-foreground bg-muted/50" title="PEG Rank">
+                              PEG: {item.peg_rank ?? "—"}
+                            </span>
+                            <span className="inline-flex items-center rounded border px-1 text-[9px] font-medium text-muted-foreground bg-muted/50" title="Profitability Rank">
+                              Prof: {item.profitability_rank ?? "—"}
+                            </span>
+                            <span className="inline-flex items-center rounded border px-1 text-[9px] font-medium text-muted-foreground bg-muted/50" title="Dividend Yield Rank">
+                              Div: {item.div_yield_rank ?? "—"}
+                            </span>
+                            <span className="inline-flex items-center rounded border px-1 text-[9px] font-medium text-muted-foreground bg-muted/50" title="Health Rank">
+                              Hlt: {item.health_rank ?? "—"}
+                            </span>
+                            <span className="inline-flex items-center rounded border px-1 text-[9px] font-medium text-muted-foreground bg-muted/50" title="Price to Sales Rank">
+                              P/S: {item.ps_rank ?? "—"}
+                            </span>
+                            <span className="inline-flex items-center rounded border px-1 text-[9px] font-medium text-muted-foreground bg-muted/50" title="Sentiment Rank">
+                              Sent: {item.sentiment_rank ?? "—"}
+                            </span>
+                            <span className="inline-flex items-center rounded border px-1 text-[9px] font-medium text-muted-foreground bg-muted/50" title="Buyback Yield Rank">
+                              Buy: {item.buyback_rank ?? "—"}
+                            </span>
+                          </div>
                         </div>
-                      </div>
                     </div>
 
-                    {/* Score */}
-                    <div className="flex items-center justify-end">
-                      <span className="font-semibold text-sm">
-                        {item.composite_score !== null && item.composite_score !== undefined
-                          ? item.composite_score.toFixed(2)
-                          : "—"}
-                      </span>
-                    </div>
+
+
+
 
                     {/* Action Button */}
                     <div className="flex items-center justify-end">
@@ -650,17 +869,17 @@ export default function CompassPage() {
                         disabled={isAdding || !user}
                         size="sm"
                         variant={isTop3 ? "default" : "outline"}
-                        className="whitespace-nowrap"
+                        className="whitespace-nowrap px-2 sm:px-3"
                       >
                         {isAdding ? (
                           <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Adding...
+                            <Loader2 className="sm:mr-2 h-4 w-4 animate-spin shrink-0" />
+                            <span className="hidden sm:inline">Adding...</span>
                           </>
                         ) : (
                           <>
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Add
+                            <PlusCircle className="sm:mr-2 h-4 w-4 shrink-0" />
+                            <span className="hidden sm:inline">Add</span>
                           </>
                         )}
                       </Button>

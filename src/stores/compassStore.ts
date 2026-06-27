@@ -12,17 +12,30 @@ export interface LeaderboardEntry {
   rank: number;
   symbol: string;
   composite_score: number | null; // Can be null if calculation fails or data is missing
+  market_cap: number | null;
+  revenue: number | null;
+  ps_rank: number | null;
+  evm_rank: number | null;
+  sentiment_rank: number | null;
+  profitability_rank: number | null;
+  buyback_rank: number | null;
+  peg_rank: number | null;
+  div_yield_rank: number | null;
+  health_rank: number | null;
+  industry: string | null;
 }
 
 interface LeaderboardState {
   weights: Record<Pillar, number>;
   industryFilters: string[];
+  exchangeFilters: string[];
   leaderboardData: LeaderboardEntry[];
   isLoading: boolean;
   error: string | null;
   actions: {
     setWeights: (newWeights: Record<Pillar, number>) => void;
     setIndustryFilters: (industries: string[]) => void;
+    setExchangeFilters: (exchanges: string[]) => void;
     fetchLeaderboard: (
       supabase: SupabaseClient<Database>
     ) => Promise<void>;
@@ -43,22 +56,26 @@ export const useLeaderboardStore = create<LeaderboardState>()(
     buyback: 0.13
   },
   industryFilters: [],
+  exchangeFilters: [],
   leaderboardData: [],
   isLoading: false,
   error: null,
   actions: {
     setWeights: (newWeights) => set({ weights: newWeights }),
     setIndustryFilters: (industries) => set({ industryFilters: industries }),
+    setExchangeFilters: (exchanges) => set({ exchangeFilters: exchanges }),
     fetchLeaderboard: async (supabase) => {
       set({ isLoading: true, error: null });
 
       const weightsPayload = get().weights;
       const industryPayload = get().industryFilters;
+      const exchangePayload = get().exchangeFilters;
 
       const rpcResult = await fromPromise(
         supabase.rpc("get_weighted_leaderboard", {
           weights: weightsPayload,
           p_industries: industryPayload.length > 0 ? industryPayload : null,
+          p_exchanges: exchangePayload.length > 0 ? exchangePayload : null,
         }),
         (e) => new Error(`Failed to fetch leaderboard: ${(e as Error).message}`)
       );
@@ -75,7 +92,7 @@ export const useLeaderboardStore = create<LeaderboardState>()(
             return;
           }
 
-          set({ leaderboardData: data ?? [], isLoading: false });
+          set({ leaderboardData: (data as unknown as LeaderboardEntry[]) ?? [], isLoading: false });
         },
         (err) => {
           // Handle Result error (network/exception errors)
@@ -91,6 +108,7 @@ export const useLeaderboardStore = create<LeaderboardState>()(
     partialize: (state) => ({
       weights: state.weights,
       industryFilters: state.industryFilters,
+      exchangeFilters: state.exchangeFilters,
     }),
   }
 ));
