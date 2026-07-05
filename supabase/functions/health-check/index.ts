@@ -37,7 +37,6 @@ serve(async (req: Request) => {
         'check-stale-data-v2',
         'invoke-processor-v2',
         'queue-scheduled-refreshes-v2',
-        'refresh-analytics-v2',
         'maintain-queue-partitions-v2',
       ],
     });
@@ -72,8 +71,7 @@ serve(async (req: Request) => {
         const isFrequentJob =
           job.jobname === 'invoke-processor-v2' ||
           job.jobname === 'check-stale-data-v2' ||
-          job.jobname === 'queue-scheduled-refreshes-v2' ||
-          job.jobname === 'refresh-analytics-v2';
+          job.jobname === 'queue-scheduled-refreshes-v2';
 
         // Frequent jobs should have run by now, weekly jobs are OK if they haven't run yet
         return isFrequentJob;
@@ -83,7 +81,6 @@ serve(async (req: Request) => {
         job.jobname === 'invoke-processor-v2' ? 2 : // 2 minutes (runs every 1 min, allow 1 min buffer)
         job.jobname === 'check-stale-data-v2' ? 10 : // 10 minutes (runs every 1 min, allow 9 min buffer)
         job.jobname === 'queue-scheduled-refreshes-v2' ? 5 : // 5 minutes (runs every 1 min, allow 4 min buffer)
-        job.jobname === 'refresh-analytics-v2' ? 20 : // 20 minutes (runs every 1 min, allow 19 min buffer)
         job.jobname === 'maintain-queue-partitions-v2' ? 10080 : // 1 week (runs weekly, allow 1 day buffer)
         10; // Default 10 minutes
 

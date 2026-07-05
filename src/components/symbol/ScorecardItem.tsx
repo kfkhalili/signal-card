@@ -14,7 +14,7 @@ export function ScorecardItem({ icon, label, status, statusColor }: ScorecardIte
       <div className="flex items-center gap-2 text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wider">
         {icon} {label}
       </div>
-      <div className={cn("font-bold text-lg truncate", statusColor)}>
+      <div className={cn("font-bold text-lg leading-tight", statusColor)}>
         {status}
       </div>
     </div>
