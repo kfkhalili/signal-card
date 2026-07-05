@@ -13,7 +13,8 @@ import { Separator } from "@/components/ui/separator";
 import {
   ArrowLeft, AlertTriangle, DollarSign,
   Activity, Shield, Users, PlusCircle, Loader2,
-  Briefcase, Landmark, TrendingUp, TrendingDown
+  Briefcase, Landmark, TrendingUp, TrendingDown,
+  BarChart3, Building2, Ratio, Clock
 } from "lucide-react";
 import { cn, createSecureImageUrl } from "@/lib/utils";
 import Image from "next/image";
@@ -23,6 +24,7 @@ import type { CardType } from "@/components/game/cards/base-card/base-card.types
 import { useSymbolAnalysisData } from "@/hooks/useSymbolAnalysisData";
 import { MetricRow } from "@/components/symbol/MetricRow";
 import { ScorecardItem } from "@/components/symbol/ScorecardItem";
+import { formatDistanceToNow } from "date-fns";
 
 import { formatFinancialValue } from "@/lib/formatters";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
@@ -46,7 +48,11 @@ import {
   XAxis,
   YAxis,
   ComposedChart,
-  Area
+  Area,
+  Bar,
+  CartesianGrid,
+  Legend,
+  ReferenceLine
 } from "recharts";
 
 // ============================================================================
@@ -137,6 +143,15 @@ export default function SymbolAnalysisPage() {
     gradesHistorical,
     analystPriceTargets,
   } = useSymbolAnalysisData(ticker);
+
+  const formatFreshness = (dateVal: string | number | null | undefined) => {
+    if (!dateVal) return "Unknown";
+    try {
+      return formatDistanceToNow(new Date(dateVal), { addSuffix: true });
+    } catch {
+      return "Unknown";
+    }
+  };
 
   // Determine relevant cards based on data shown on this page
   // MUST be before any conditional returns to comply with Rules of Hooks
@@ -560,6 +575,122 @@ export default function SymbolAnalysisPage() {
     valuationMetrics.currentPrice
   );
 
+  // --- Calculate Growth & Scale Data ---
+  const growthScaleData = useMemo(() => {
+    return financialStatementsHistory
+      .slice()
+      .reverse() // from oldest to newest
+      .map(fs => {
+        const inc = fs.income_statement_payload as Record<string, unknown>;
+        const cf = fs.cash_flow_payload as Record<string, unknown>;
+        const bal = fs.balance_sheet_payload as Record<string, unknown>;
+        
+        const revenue = (inc?.revenue as number) || 0;
+        const grossProfit = (inc?.grossProfit as number) || 0;
+        const operatingIncome = (inc?.operatingIncome as number) || 0;
+        const netIncome = (inc?.netIncome as number) || 0;
+        const operatingCashFlow = (cf?.operatingCashFlow as number) || 0;
+        const freeCashFlow = (cf?.freeCashFlow as number) || 0;
+        
+        // Net Assets = Net Debt * -1
+        const netDebt = (bal?.netDebt as number) || 0;
+        const netAssets = netDebt * -1;
+
+        const grossMargin = revenue > 0 ? grossProfit / revenue : 0;
+        const operatingMargin = revenue > 0 ? operatingIncome / revenue : 0;
+        const netMargin = revenue > 0 ? netIncome / revenue : 0;
+        const operatingCashFlowMargin = revenue > 0 ? operatingCashFlow / revenue : 0;
+        const freeCashFlowMargin = revenue > 0 ? freeCashFlow / revenue : 0;
+        
+        return {
+          date: fs.date,
+          fiscalYear: fs.fiscal_year || new Date(fs.date).getFullYear().toString(),
+          revenue,
+          operatingIncome,
+          netIncome,
+          freeCashFlow,
+          netAssets,
+          grossMargin,
+          operatingMargin,
+          netMargin,
+          operatingCashFlowMargin,
+          freeCashFlowMargin
+        };
+      });
+  }, [financialStatementsHistory]);
+
+  const maxFcf = useMemo(() => {
+    return Math.max(...growthScaleData.map(d => Math.abs(d.freeCashFlow || 0)), 1);
+  }, [growthScaleData]);
+
+  const incomeYAxisTicks = useMemo(() => {
+    let max = 0;
+    growthScaleData.forEach(d => {
+      max = Math.max(max, Math.abs(d.grossMargin || 0), Math.abs(d.operatingMargin || 0), Math.abs(d.netMargin || 0), Math.abs(d.operatingCashFlowMargin || 0), Math.abs(d.freeCashFlowMargin || 0));
+    });
+    
+    if (max === 0) return [-1, 0, 1]; // fallback
+    
+    // Calculate a nice round step size for 4 intervals (5 ticks)
+    const roughStep = (max * 2) / 4;
+    let step = 0.05;
+    if (roughStep > 0.5) step = 0.5;
+    else if (roughStep > 0.25) step = 0.25;
+    else if (roughStep > 0.2) step = 0.2;
+    else if (roughStep > 0.1) step = 0.1;
+    else if (roughStep > 0.05) step = 0.05;
+    else if (roughStep > 0.02) step = 0.02;
+    else if (roughStep > 0.01) step = 0.01;
+    else step = Math.max(roughStep, 0.005);
+    
+    const maxTick = Math.ceil(max / step) * step;
+    
+    const ticks = [];
+    for (let i = -maxTick; i <= maxTick + (step / 10); i += step) {
+      // Avoid floating point precision issues near 0
+      ticks.push(Math.abs(i) < step / 100 ? 0 : Number(i.toFixed(3)));
+    }
+    return ticks;
+  }, [growthScaleData]);
+
+  interface FcfArrowProps {
+    cx?: number;
+    cy?: number;
+    payload?: {
+      freeCashFlow?: number;
+      fiscalYear?: string;
+    };
+  }
+
+  const renderFcfArrow = (props: FcfArrowProps) => {
+    const { cx = 0, cy = 0, payload = {} } = props;
+    const fcf = payload.freeCashFlow;
+    if (!fcf) return <g />;
+
+    const isPositive = fcf > 0;
+    const color = isPositive ? "#10b981" : "#ef4444";
+    const sign = isPositive ? 1 : -1;
+    
+    // Scale magnitude to a pixel height (min 10px, max 50px)
+    const magnitudePx = Math.max(10, (Math.abs(fcf) / maxFcf) * 50);
+    
+    // SVG y-axis is inverted (0 is at top)
+    const endY = cy - (sign * magnitudePx);
+    const baseY = endY + (sign * 6);
+
+    return (
+      <g key={`arrow-${payload.fiscalYear}`}>
+        {/* Arrow line */}
+        <line x1={cx} y1={cy} x2={cx} y2={endY} stroke={color} strokeWidth={3} strokeLinecap="round" />
+        {/* Arrow head */}
+        <polygon 
+          points={`${cx - 5},${baseY} ${cx + 5},${baseY} ${cx},${endY}`} 
+          fill={color} 
+        />
+      </g>
+    );
+  };
+
   // Don't render page content until symbol is validated
   if (symbolValid === null) {
     return (
@@ -672,6 +803,32 @@ export default function SymbolAnalysisPage() {
     onSome: (q) => q.change_percentage || null,
   });
 
+  // Get market cap from live quotes
+  const marketCapValue = Option.match(quote, {
+    onNone: () => null,
+    onSome: (q) => q.market_cap || null,
+  });
+
+  // Get revenue (TTM) from the latest financial statement
+  const revenueValue = Option.match(financialStatement, {
+    onNone: () => null,
+    onSome: (fs) => {
+      const incomePayload = fs.income_statement_payload as {
+        revenue?: number;
+        [key: string]: unknown;
+      };
+      return incomePayload?.revenue && typeof incomePayload.revenue === 'number'
+        ? incomePayload.revenue
+        : null;
+    },
+  });
+
+  // Calculate Market Cap / Revenue ratio
+  // null = data not yet loaded, Infinity = revenue is zero
+  const mcToRevenueRatio = marketCapValue !== null && revenueValue !== null
+    ? (revenueValue > 0 ? marketCapValue / revenueValue : Infinity)
+    : null;
+
   return (
     <div className="container mx-auto p-4 max-w-7xl space-y-6">
       {/* --- TOP BAR: NAVIGATION --- */}
@@ -701,88 +858,127 @@ export default function SymbolAnalysisPage() {
       {/* --- ZONE A: THE HERO (THESIS & CONTEXT) --- */}
       <Card className="bg-card">
         <CardContent className="p-6">
-          <div className="flex flex-col lg:flex-row gap-6 justify-between items-start">
+          <div className="flex flex-col gap-6">
             {/* A1. Identity & Price */}
-            <div className="flex gap-4">
-              <div className="w-16 h-16 rounded-lg flex items-center justify-center text-2xl font-bold text-primary shrink-0 relative overflow-hidden">
-                {logoUrl ? (
-                  <>
-                    <Image
-                      src={createSecureImageUrl(logoUrl)}
-                      alt={`${companyName} logo`}
-                      fill
-                      sizes="64px"
-                      className="object-contain p-2"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = "none";
-                        // Show fallback when image fails
-                        const parent = target.parentElement;
-                        if (parent) {
-                          const fallback = parent.querySelector(".logo-fallback") as HTMLElement;
-                          if (fallback) fallback.style.display = "flex";
-                        }
-                      }}
-                      priority={false}
-                    />
-                    <span className="logo-fallback hidden absolute inset-0 items-center justify-center">
-                      {ticker.charAt(0)}
-                    </span>
-                  </>
-                ) : (
-                  <span>{ticker.charAt(0)}</span>
-                )}
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-                  {companyName} <span className="text-muted-foreground font-normal text-xl">({ticker})</span>
-                </h1>
-                <div className="flex items-center gap-3 mt-1">
-                  {currentPrice !== null ? (
+            <div className="flex flex-col md:flex-row justify-between gap-4 items-start">
+              <div className="flex gap-4 min-w-0 w-full">
+                <div className="w-16 h-16 rounded-lg flex items-center justify-center text-2xl font-bold text-primary shrink-0 relative overflow-hidden">
+                  {logoUrl ? (
                     <>
-                      <span className="text-2xl font-semibold">
-                        {formatFinancialValue(currentPrice, "USD", 2, exchangeRates)}
+                      <Image
+                        src={createSecureImageUrl(logoUrl)}
+                        alt={`${companyName} logo`}
+                        fill
+                        sizes="64px"
+                        className="object-contain p-2"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = "none";
+                          // Show fallback when image fails
+                          const parent = target.parentElement;
+                          if (parent) {
+                            const fallback = parent.querySelector(".logo-fallback") as HTMLElement;
+                            if (fallback) fallback.style.display = "flex";
+                          }
+                        }}
+                        priority={false}
+                      />
+                      <span className="logo-fallback hidden absolute inset-0 items-center justify-center">
+                        {ticker.charAt(0)}
                       </span>
-                      {priceChange !== null && (
-                        <Badge
-                          variant="default"
-                          className={cn(
-                            priceChange >= 0
-                              ? "bg-green-500/15 text-green-700 hover:bg-green-500/25 border-green-200"
-                              : "bg-red-500/15 text-red-700 hover:bg-red-500/25 border-red-200"
-                          )}
-                        >
-                          {priceChange >= 0 ? (
-                            <TrendingUp className="h-3 w-3 inline mr-1" />
-                          ) : (
-                            <TrendingDown className="h-3 w-3 inline mr-1" />
-                          )}
-                          {priceChange >= 0 ? "+" : ""}
-                          {priceChange.toFixed(2)}%
-                        </Badge>
-                      )}
                     </>
                   ) : (
-                    <div className="h-8 w-32 bg-muted animate-pulse rounded" />
+                    <span>{ticker.charAt(0)}</span>
                   )}
-                  <span className="text-sm text-muted-foreground">Realtime</span>
                 </div>
-                <div className="flex gap-2 mt-3">
-                  {Option.match(profile, {
-                    onNone: () => null,
-                    onSome: (p) => (
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-3xl font-bold tracking-tight flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <span className="break-words min-w-0 truncate sm:whitespace-normal sm:overflow-visible">{companyName}</span> 
+                    <span className="text-muted-foreground font-normal text-xl shrink-0">({ticker})</span>
+                  </h1>
+                  <div className="flex flex-wrap items-center gap-3 mt-1">
+                    {currentPrice !== null ? (
                       <>
-                        {p.sector && <Badge variant="outline">{p.sector}</Badge>}
-                        {p.exchange && <Badge variant="outline">{p.exchange}</Badge>}
+                        <span className="text-2xl font-semibold">
+                          {formatFinancialValue(currentPrice, "USD", 2, exchangeRates)}
+                        </span>
+                        {priceChange !== null && (
+                          <Badge
+                            variant="default"
+                            className={cn(
+                              priceChange >= 0
+                                ? "bg-green-500/15 text-green-700 hover:bg-green-500/25 border-green-200"
+                                : "bg-red-500/15 text-red-700 hover:bg-red-500/25 border-red-200"
+                            )}
+                          >
+                            {priceChange >= 0 ? (
+                              <TrendingUp className="h-3 w-3 inline mr-1" />
+                            ) : (
+                              <TrendingDown className="h-3 w-3 inline mr-1" />
+                            )}
+                            {priceChange >= 0 ? "+" : ""}
+                            {priceChange.toFixed(2)}%
+                          </Badge>
+                        )}
                       </>
-                    ),
-                  })}
+                    ) : (
+                      <div className="h-8 w-32 bg-muted animate-pulse rounded" />
+                    )}
+                    <span className="text-sm text-muted-foreground shrink-0">Realtime</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {Option.match(profile, {
+                      onNone: () => null,
+                      onSome: (p) => (
+                        <>
+                          {p.sector && <Badge variant="outline">{p.sector}</Badge>}
+                          {p.exchange && <Badge variant="outline">{p.exchange}</Badge>}
+                        </>
+                      ),
+                    })}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Key financial stats strip */}
+              <div className="flex flex-row md:flex-col lg:flex-row flex-wrap gap-x-6 gap-y-2 text-sm shrink-0 mt-2 md:mt-0 md:items-end lg:items-center">
+                <div className="flex items-center gap-1.5">
+                  <BarChart3 className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-muted-foreground">Revenue:</span>
+                  <span className="font-semibold">
+                    {revenueValue !== null
+                      ? formatFinancialValue(revenueValue, "USD", 2, exchangeRates)
+                      : <span className="inline-block h-4 w-14 bg-muted animate-pulse rounded align-middle" />}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-muted-foreground">Mkt Cap:</span>
+                  <span className="font-semibold">
+                    {marketCapValue !== null
+                      ? formatFinancialValue(marketCapValue, "USD", 2, exchangeRates)
+                      : <span className="inline-block h-4 w-14 bg-muted animate-pulse rounded align-middle" />}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Ratio className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-muted-foreground">MC/Rev:</span>
+                  <span className={cn(
+                    "font-semibold",
+                    mcToRevenueRatio !== null && isFinite(mcToRevenueRatio) && mcToRevenueRatio < 3 && "text-green-600",
+                    mcToRevenueRatio !== null && isFinite(mcToRevenueRatio) && mcToRevenueRatio >= 3 && mcToRevenueRatio < 10 && "text-yellow-600",
+                    mcToRevenueRatio !== null && (mcToRevenueRatio === Infinity || mcToRevenueRatio >= 10) && "text-red-600"
+                  )}>
+                    {mcToRevenueRatio !== null
+                      ? (isFinite(mcToRevenueRatio) ? `${mcToRevenueRatio.toFixed(1)}x` : "∞")
+                      : <span className="inline-block h-4 w-10 bg-muted animate-pulse rounded align-middle" />}
+                  </span>
                 </div>
               </div>
             </div>
 
             {/* A2. The "Intelligent" Scorecard */}
-            <div className="flex-1 w-full lg:w-auto grid grid-cols-2 sm:grid-cols-4 gap-4 bg-muted/30 p-4 rounded-xl border border-border/50">
+            <div className="w-full grid grid-cols-2 sm:grid-cols-4 gap-4 bg-muted/30 p-4 rounded-xl border border-border/50">
               {valuationStatus.status !== "Unknown" && (
                 <ScorecardItem
                   icon={<DollarSign className="h-4 w-4" />}
@@ -1267,6 +1463,88 @@ export default function SymbolAnalysisPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* B4. Growth & Scale */}
+          <Card className="border-l-4 border-l-blue-500">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-primary" />
+                Growth & Scale (Revenue vs Margins)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px] w-full">
+                {growthScaleData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart syncId="financialsSync" data={growthScaleData} margin={{ top: 20, right: 10, left: -20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                      <XAxis dataKey="fiscalYear" fontSize={12} tickMargin={10} minTickGap={20} />
+                      <YAxis yAxisId="left" tickFormatter={(val) => `${formatFinancialValue(val, "USD", 0, exchangeRates)}`} fontSize={12} orientation="left" />
+                      <YAxis yAxisId="right" domain={[incomeYAxisTicks[0], incomeYAxisTicks[incomeYAxisTicks.length - 1]]} ticks={incomeYAxisTicks} tickFormatter={(val) => `${(val * 100).toFixed(0)}%`} fontSize={12} orientation="right" />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "rgba(0,0,0,0.8)", borderColor: "#333", borderRadius: "8px", color: "#fff" }}
+                        formatter={(value: number, name: string) => {
+                          if (name === "Revenue") return [formatFinancialValue(value, "USD", 2, exchangeRates), name];
+                          return [`${(value * 100).toFixed(2)}%`, name];
+                        }}
+                        labelStyle={{ color: "#aaa", marginBottom: "8px" }}
+                      />
+                      <Legend />
+                      <ReferenceLine y={0} yAxisId="right" stroke="#888" strokeOpacity={0.5} strokeDasharray="3 3" />
+                      <Bar yAxisId="left" dataKey="revenue" fill="#3b82f6" name="Revenue" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                      <Line yAxisId="right" type="monotone" dataKey="grossMargin" stroke="#0ea5e9" strokeWidth={3} name="Gross Margin" dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                      <Line yAxisId="right" type="monotone" dataKey="operatingMargin" stroke="#10b981" strokeWidth={3} name="Operating Margin" dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                      <Line yAxisId="right" type="monotone" dataKey="netMargin" stroke="#f59e0b" strokeWidth={3} name="Net Margin" dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                      <Line yAxisId="right" type="monotone" dataKey="operatingCashFlowMargin" stroke="#d946ef" strokeWidth={3} name="Op. CF Margin" dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                      <Line yAxisId="right" type="monotone" dataKey="freeCashFlowMargin" stroke="#8b5cf6" strokeWidth={3} name="FCF Margin" dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center border border-dashed rounded-lg">
+                    <span className="text-sm text-muted-foreground">Historical data loading...</span>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* B5. Net Assets */}
+          <Card className="border-l-4 border-l-cyan-500">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Landmark className="h-5 w-5 text-primary" />
+                Net Assets Trend (Cash vs Debt)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[250px] w-full">
+                {growthScaleData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart syncId="financialsSync" data={growthScaleData} margin={{ top: 20, right: 10, left: -20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                      <XAxis dataKey="fiscalYear" fontSize={12} tickMargin={10} minTickGap={20} />
+                      <YAxis tickFormatter={(val) => `${formatFinancialValue(val, "USD", 0, exchangeRates)}`} fontSize={12} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "rgba(0,0,0,0.8)", borderColor: "#333", borderRadius: "8px", color: "#fff" }}
+                        formatter={(value: number, name: string) => [
+                          formatFinancialValue(value, "USD", 2, exchangeRates),
+                          name
+                        ]}
+                        labelStyle={{ color: "#aaa", marginBottom: "8px" }}
+                      />
+                      <Legend />
+                      <Line dataKey="freeCashFlow" name="Free Cash Flow" stroke="#8b5cf6" strokeWidth={0} dot={false} activeDot={false} />
+                      <Area type="monotone" dataKey="netAssets" fill="#06b6d4" stroke="#06b6d4" fillOpacity={0.2} name="Net Assets" dot={renderFcfArrow} activeDot={{ r: 6 }} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center border border-dashed rounded-lg">
+                    <span className="text-sm text-muted-foreground">Historical data loading...</span>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* --- ZONE C: SMART MONEY & SENTIMENT (RIGHT COL - 33%) --- */}
@@ -1418,6 +1696,35 @@ export default function SymbolAnalysisPage() {
 
             </CardContent>
           </Card>
+        </div>
+      </div>
+
+      {/* Freshness Footer */}
+      <div className="mt-12 border-t pt-6 text-xs text-muted-foreground flex flex-wrap gap-x-6 gap-y-2 justify-center pb-8">
+        <div className="flex items-center gap-1.5" title="Profile data freshness">
+          <Clock className="h-3 w-3" />
+          <span className="font-medium">Profile:</span>
+          <span>{formatFreshness(Option.match(profile, { onNone: () => null, onSome: p => p.modified_at }))}</span>
+        </div>
+        <div className="flex items-center gap-1.5" title="Live quote freshness">
+          <Clock className="h-3 w-3" />
+          <span className="font-medium">Quote:</span>
+          <span>{formatFreshness(Option.match(quote, { onNone: () => null, onSome: q => q.api_timestamp ? q.api_timestamp * 1000 : null }))}</span>
+        </div>
+        <div className="flex items-center gap-1.5" title="Financial statements freshness">
+          <Clock className="h-3 w-3" />
+          <span className="font-medium">Financials:</span>
+          <span>{formatFreshness(Option.match(financialStatement, { onNone: () => null, onSome: f => f.fetched_at }))}</span>
+        </div>
+        <div className="flex items-center gap-1.5" title="Insider transactions freshness">
+          <Clock className="h-3 w-3" />
+          <span className="font-medium">Insiders:</span>
+          <span>{formatFreshness(insiderTransactions.length > 0 ? Math.max(...insiderTransactions.map(t => new Date(t.fetched_at).getTime())) : null)}</span>
+        </div>
+        <div className="flex items-center gap-1.5" title="Key ratios freshness">
+          <Clock className="h-3 w-3" />
+          <span className="font-medium">Ratios:</span>
+          <span>{formatFreshness(Option.match(ratios, { onNone: () => null, onSome: r => r.fetched_at }))}</span>
         </div>
       </div>
     </div>
