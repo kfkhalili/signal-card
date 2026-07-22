@@ -94,7 +94,7 @@ END $$;
 -- The staleness checker reads directly from realtime.subscription via get_active_subscriptions_from_realtime()
 
 -- Helper function to list all cron jobs
-CREATE OR REPLACE FUNCTION list_queue_system_cron_jobs_v2()
+CREATE OR REPLACE FUNCTION public.list_queue_system_cron_jobs_v2()
 RETURNS TABLE(
   job_name TEXT,
   schedule TEXT,
@@ -119,10 +119,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-COMMENT ON FUNCTION list_queue_system_cron_jobs_v2 IS 'Lists all queue system cron jobs for monitoring and debugging.';
+COMMENT ON FUNCTION public.list_queue_system_cron_jobs_v2 IS 'Lists all queue system cron jobs for monitoring and debugging.';
 
 -- Helper function to unschedule all cron jobs (for rollback)
-CREATE OR REPLACE FUNCTION unschedule_all_queue_system_cron_jobs_v2()
+CREATE OR REPLACE FUNCTION public.unschedule_all_queue_system_cron_jobs_v2()
 RETURNS void AS $$
 BEGIN
   PERFORM cron.unschedule('check-stale-data-v2');
@@ -134,5 +134,4 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-COMMENT ON FUNCTION unschedule_all_queue_system_cron_jobs_v2 IS 'Unschedule all queue system cron jobs. Use for rollback.';
-
+COMMENT ON FUNCTION public.unschedule_all_queue_system_cron_jobs_v2 IS 'Unschedule all queue system cron jobs. Use for rollback.';

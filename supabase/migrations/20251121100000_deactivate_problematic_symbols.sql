@@ -19,7 +19,7 @@
 -- Step 1: Identify problematic symbols (funds, ADRs, ETFs, not trading, no volume, no market cap)
 WITH problematic_symbols AS (
   SELECT DISTINCT p.symbol
-  FROM profiles p
+  FROM public.profiles p
   WHERE p.is_fund = TRUE
      OR p.is_etf = TRUE
      OR p.is_actively_trading = FALSE
@@ -98,7 +98,7 @@ company_variants AS (
         LENGTH(symbol) ASC,  -- Prefer shorter symbols (main ticker like "RWAY" over "RWAYL")
         symbol ASC            -- Alphabetical tiebreaker
     ) as variant_rank
-  FROM profiles
+  FROM public.profiles
   WHERE company_name IS NOT NULL
     AND company_name != ''
 ),
@@ -124,7 +124,7 @@ company_variants_filtered AS (
 -- - Website (indicates a public-facing company presence)
 incomplete_company_data AS (
   SELECT DISTINCT p.symbol
-  FROM profiles p
+  FROM public.profiles p
   WHERE (p.full_time_employees IS NULL OR p.full_time_employees = 0)
     AND (p.website IS NULL OR p.website = '' OR p.website = 'N/A')
 ),
@@ -137,7 +137,7 @@ all_problematic AS (
   SELECT symbol FROM incomplete_company_data
 )
 -- Step 5: Update listed_symbols to set is_active = FALSE
-UPDATE listed_symbols ls
+UPDATE public.listed_symbols ls
 SET
   is_active = FALSE,
   last_processed_at = NOW()
@@ -152,11 +152,11 @@ DECLARE
   total_inactive_count INTEGER;
 BEGIN
   SELECT COUNT(*) INTO deactivated_count
-  FROM listed_symbols
+  FROM public.listed_symbols
   WHERE is_active = FALSE;
 
   SELECT COUNT(*) INTO total_inactive_count
-  FROM listed_symbols;
+  FROM public.listed_symbols;
 
   RAISE NOTICE 'Deactivated problematic symbols in listed_symbols';
   RAISE NOTICE 'Total inactive symbols: %', deactivated_count;
@@ -164,5 +164,4 @@ BEGIN
   RAISE NOTICE 'Active symbols: %', total_inactive_count - deactivated_count;
 END $$;
 
-COMMENT ON TABLE listed_symbols IS 'Stores all symbols that appear in live_quote_indicators. Symbols with is_active = FALSE are excluded from Compass leaderboard. Symbols are deactivated if they are: funds, ADRs, ETFs, not trading, no volume, no market cap, company name variants, or missing critical company data (no employees AND no website).';
-
+COMMENT ON TABLE public.listed_symbols IS 'Stores all symbols that appear in live_quote_indicators. Symbols with is_active = FALSE are excluded from Compass leaderboard. Symbols are deactivated if they are: funds, ADRs, ETFs, not trading, no volume, no market cap, company name variants, or missing critical company data (no employees AND no website).';

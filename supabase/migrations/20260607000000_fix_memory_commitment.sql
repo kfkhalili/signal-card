@@ -192,8 +192,8 @@ $$;
 -- This restored the entire staleness pipeline (1,440 failures/day eliminated).
 -- =============================================================================
 
-DROP FUNCTION IF EXISTS get_active_subscriptions_from_realtime();
-CREATE OR REPLACE FUNCTION get_active_subscriptions_from_realtime()
+DROP FUNCTION IF EXISTS public.get_active_subscriptions_from_realtime();
+CREATE OR REPLACE FUNCTION public.get_active_subscriptions_from_realtime()
 RETURNS TABLE(
   user_id UUID,
   symbol TEXT,
@@ -235,6 +235,6 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION get_active_subscriptions_from_realtime() TO service_role;
+GRANT EXECUTE ON FUNCTION public.get_active_subscriptions_from_realtime() TO service_role;
 
-COMMENT ON FUNCTION get_active_subscriptions_from_realtime IS 'Extracts active subscriptions from realtime.subscription table. Returns user_id, symbol, data_type, subscribed_at, and last_seen_at. Casts created_at to TIMESTAMPTZ to match return type declaration.';
+COMMENT ON FUNCTION public.get_active_subscriptions_from_realtime IS 'Extracts active subscriptions from realtime.subscription table. Returns user_id, symbol, data_type, subscribed_at, and last_seen_at. Casts created_at to TIMESTAMPTZ to match return type declaration.';

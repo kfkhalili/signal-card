@@ -67,5 +67,17 @@ GRANT ALL ON TABLE "public"."exchange_variants" TO "service_role";
 GRANT SELECT ON TABLE "public"."exchange_variants" TO "anon";
 GRANT SELECT ON TABLE "public"."exchange_variants" TO "authenticated";
 
--- Enable Realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE exchange_variants;
+-- Enable Realtime. Keep this schema-qualified and idempotent so the full
+-- migration chain can be replayed against a clean database and safely retried.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_publication_tables
+        WHERE pubname = 'supabase_realtime'
+          AND schemaname = 'public'
+          AND tablename = 'exchange_variants'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.exchange_variants;
+    END IF;
+END $$;
