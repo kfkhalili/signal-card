@@ -10,7 +10,7 @@
 
 -- Step 1: Create function to extract active subscriptions from realtime.subscription
 -- This replaces active_subscriptions_v2 for the staleness checker
-CREATE OR REPLACE FUNCTION get_active_subscriptions_from_realtime()
+CREATE OR REPLACE FUNCTION public.get_active_subscriptions_from_realtime()
 RETURNS TABLE(
   user_id UUID,
   symbol TEXT,
@@ -53,9 +53,9 @@ END;
 $$;
 
 -- Grant execute permission
-GRANT EXECUTE ON FUNCTION get_active_subscriptions_from_realtime() TO service_role;
+GRANT EXECUTE ON FUNCTION public.get_active_subscriptions_from_realtime() TO service_role;
 
-COMMENT ON FUNCTION get_active_subscriptions_from_realtime IS 'Extracts active subscriptions from realtime.subscription table. Replaces active_subscriptions_v2 for staleness checker. Returns user_id, symbol, data_type, subscribed_at, and last_seen_at (using created_at as proxy).';
+COMMENT ON FUNCTION public.get_active_subscriptions_from_realtime IS 'Extracts active subscriptions from realtime.subscription table. Replaces active_subscriptions_v2 for staleness checker. Returns user_id, symbol, data_type, subscribed_at, and last_seen_at (using created_at as proxy).';
 
 -- Step 2: Create background staleness checker that uses the function above
 CREATE OR REPLACE FUNCTION public.check_and_queue_stale_data_from_presence_v2()
@@ -305,4 +305,3 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.check_and_queue_stale_data_from_presence_v2 IS 'Background staleness checker. Runs every minute. MIGRATED: Now uses get_active_subscriptions_from_realtime() instead of active_subscriptions_v2. Financial-statements jobs automatically get priority 500 (unless user_count >= 1000 indicating UI priority). Uses LEFT JOIN to handle missing data (treats missing as stale). For exchange-variants, uses MAX(timestamp_column) to handle multiple records per symbol. Timeout-protected to complete within 50 seconds. For quote data type: always creates job if data missing (even if exchange closed), only checks exchange status if data exists. Quota-aware.';
-

@@ -7,7 +7,7 @@
 -- CRITICAL: Requires pg_net extension to be enabled
 -- CRITICAL: Uses service role key from vault for authentication
 -- CRITICAL: Uses project_url from vault for the base URL
-CREATE OR REPLACE FUNCTION invoke_edge_function_v2(
+CREATE OR REPLACE FUNCTION public.invoke_edge_function_v2(
   p_function_name TEXT,
   p_payload JSONB DEFAULT '{}'::jsonb,
   p_timeout_milliseconds INTEGER DEFAULT 300000 -- 5 minutes default
@@ -62,8 +62,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-COMMENT ON FUNCTION invoke_edge_function_v2 IS 'Invokes a Supabase Edge Function from SQL context using pg_net extension. Requires pg_net to be enabled. Uses vault.decrypted_secrets for project_url and supabase_service_role_key.';
+COMMENT ON FUNCTION public.invoke_edge_function_v2 IS 'Invokes a Supabase Edge Function from SQL context using pg_net extension. Requires pg_net to be enabled. Uses vault.decrypted_secrets for project_url and supabase_service_role_key.';
 
 -- Note: invoke_processor_if_healthy_v2 is updated in 20251117073704_create_processor_invoker_v2.sql
 -- This migration creates the helper function that it uses
-
