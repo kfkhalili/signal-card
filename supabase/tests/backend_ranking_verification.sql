@@ -226,6 +226,12 @@ BEGIN
      ) > 0 THEN
     RAISE EXCEPTION 'Asynchronous pg_net invoker still treats request id as a response';
   END IF;
+
+  IF pg_get_function_result(
+       'public.invoke_edge_function_v2(text,jsonb,integer)'::regprocedure
+     ) <> 'jsonb' THEN
+    RAISE EXCEPTION 'Asynchronous pg_net invoker must return jsonb';
+  END IF;
 END;
 $$;
 

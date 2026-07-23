@@ -272,7 +272,12 @@ $$;
 -- pg_net is asynchronous: http_post returns a request id, not a synchronous
 -- response record. Returning the id accurately reports that invocation was
 -- queued without pretending an HTTP response has already arrived.
-CREATE OR REPLACE FUNCTION public.invoke_edge_function_v2(
+-- PostgreSQL cannot change a function return type with CREATE OR REPLACE.
+-- Drop the exact signature first so this migration also reconciles databases
+-- where the function's return type drifted from the migration history.
+DROP FUNCTION IF EXISTS public.invoke_edge_function_v2(text, jsonb, integer);
+
+CREATE FUNCTION public.invoke_edge_function_v2(
   p_function_name text,
   p_payload jsonb DEFAULT '{}'::jsonb,
   p_timeout_milliseconds integer DEFAULT 300000
