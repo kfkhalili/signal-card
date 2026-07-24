@@ -1,6 +1,7 @@
 // supabase/functions/fetch-fmp-exchange-prices-api/index.ts
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { ensureInternalAuth } from "../_shared/auth.ts";
 import type {
   FmpExchangeQuoteData,
   LiveQuoteIndicatorRecord,
@@ -254,6 +255,11 @@ Deno.serve(async (_req: Request) => {
     return new Response("ok", { headers: CORS_HEADERS });
   }
 
+  const authError = await ensureInternalAuth(_req);
+  if (authError) {
+    return authError;
+  }
+
   const invocationTime: string = new Date().toISOString();
   console.log(
     `Edge function 'fetch-fmp-exchange-prices-api' invoked at: ${invocationTime}`
@@ -352,4 +358,3 @@ Deno.serve(async (_req: Request) => {
     });
   }
 });
-

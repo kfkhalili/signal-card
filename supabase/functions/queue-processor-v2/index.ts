@@ -14,6 +14,7 @@
 
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { ensureInternalAuth } from "../_shared/auth.ts";
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -65,6 +66,11 @@ Deno.serve(async (req: Request) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS_HEADERS });
+  }
+
+  const authError = await ensureInternalAuth(req);
+  if (authError) {
+    return authError;
   }
 
   // OPTIMIZATION: Overall function timeout

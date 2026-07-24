@@ -1,6 +1,6 @@
 // supabase/functions/fetch-fmp-shares-float/index.ts
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { CORS_HEADERS, ensureCronAuth } from "../_shared/auth.ts";
+import { CORS_HEADERS, ensureInternalAuth } from "../_shared/auth.ts";
 import type {
   FmpSharesFloatData,
   SupabaseSharesFloatRecord,
@@ -220,7 +220,7 @@ Deno.serve(async (_req: Request) => {
   }
 
   // --- 🔒 Centralized Authorization Check ---
-  const authError = ensureCronAuth(_req);
+  const authError = await ensureInternalAuth(_req);
   if (authError) {
     return authError; // Return the 401/500 response
   }
