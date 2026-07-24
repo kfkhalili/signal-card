@@ -1,6 +1,6 @@
 // supabase/functions/fetch-financial-statements/index.ts
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { CORS_HEADERS, ensureCronAuth } from "../_shared/auth.ts";
+import { CORS_HEADERS, ensureInternalAuth } from "../_shared/auth.ts";
 
 import type {
   FmpStatementEntryBase,
@@ -239,7 +239,7 @@ Deno.serve(async (_req: Request) => {
   }
 
   // --- 🔒 Centralized Authorization Check ---
-  const authError = ensureCronAuth(_req);
+  const authError = await ensureInternalAuth(_req);
   if (authError) {
     return authError; // Return the 401/500 response
   }

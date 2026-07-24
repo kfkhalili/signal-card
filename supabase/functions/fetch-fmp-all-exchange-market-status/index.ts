@@ -1,6 +1,6 @@
 // supabase/functions/fetch-all-exchange-market-status/index.ts
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { CORS_HEADERS, ensureCronAuth } from "../_shared/auth.ts";
+import { CORS_HEADERS, ensureInternalAuth } from "../_shared/auth.ts";
 import { parse, format } from "date-fns";
 
 // --- Interfaces for FMP API Responses ---
@@ -167,7 +167,7 @@ Deno.serve(async (_req: Request) => {
   }
 
   // --- 🔒 Centralized Authorization Check ---
-  const authError = ensureCronAuth(_req);
+  const authError = await ensureInternalAuth(_req);
   if (authError) {
     return authError; // Return the 401/500 response
   }

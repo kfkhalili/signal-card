@@ -1,19 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { CORS_HEADERS, ensureCronAuth } from "../_shared/auth.ts";
+import { CORS_HEADERS } from "../_shared/auth.ts";
 
 serve(async (_req) => {
   // Handle CORS preflight requests
   if (_req.method === "OPTIONS") {
     return new Response("ok", { headers: CORS_HEADERS });
   }
-
-  // --- 🔒 Centralized Authorization Check ---
-  const authError = ensureCronAuth(_req);
-  if (authError) {
-    return authError; // Return the 401/500 response
-  }
-  // --- ✅ Auth Check Passed ---
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");

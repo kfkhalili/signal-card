@@ -11,19 +11,43 @@
  * - /all-alerts - Returns all alert statuses in one response
  */
 
-import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  createClient,
+  type SupabaseClient,
+} from "https://esm.sh/@supabase/supabase-js@2";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "content-type",
+};
+
+const RESPONSE_HEADERS = {
+  ...CORS_HEADERS,
+  "Cache-Control": "no-store",
+  "Content-Type": "application/json",
 };
 
 interface AlertResult {
   alert_type: string;
   status: "healthy" | "alert";
-  message: string | null;
-  metric_value: number | null;
-  threshold: string;
+}
+
+function jsonResponse(
+  req: Request,
+  body: Record<string, unknown>,
+  status: number,
+): Response {
+  return new Response(req.method === "HEAD" ? null : JSON.stringify(body), {
+    status,
+    headers: RESPONSE_HEADERS,
+  });
+}
+
+function publicAlert(result: AlertResult): Record<string, string> {
+  return {
+    status: result.status,
+    check: result.alert_type,
+  };
 }
 
 // CRITICAL: This function is PUBLIC (no JWT verification) for UptimeRobot monitoring
@@ -31,7 +55,14 @@ interface AlertResult {
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: CORS_HEADERS });
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
+
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    return new Response(null, {
+      status: 405,
+      headers: { ...RESPONSE_HEADERS, "Allow": "GET, HEAD, OPTIONS" },
+    });
   }
 
   try {
@@ -39,15 +70,10 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
     if (!supabaseUrl || !supabaseServiceRoleKey) {
-      return new Response(
-        JSON.stringify({
-          error: "Server configuration error: Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY",
-        }),
-        {
-          status: 500,
-          headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
-        }
+      console.error(
+        "[monitoring-alerts] Missing required Supabase environment",
       );
+      return jsonResponse(req, { status: "error" }, 500);
     }
 
     // Use service role key to bypass RLS - this is a monitoring endpoint
@@ -75,51 +101,27 @@ Deno.serve(async (req: Request) => {
         result = await checkStuckJobs(supabase);
         break;
       case "all-alerts":
-        return await getAllAlerts(supabase);
+        return await getAllAlerts(req, supabase);
       default:
-        return new Response(
-          JSON.stringify({
-            error: "Unknown endpoint",
-            available_endpoints: [
-              "/queue-success-rate",
-              "/quota-usage",
-              "/stuck-jobs",
-              "/all-alerts",
-            ],
-          }),
-          {
-            status: 404,
-            headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
-          }
-        );
+        return jsonResponse(req, { status: "not_found" }, 404);
     }
 
     // Return 503 if alert condition is met, 200 if healthy
     statusCode = result.status === "alert" ? 503 : 200;
 
-    return new Response(JSON.stringify(result, null, 2), {
-      status: statusCode,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
-    });
+    return jsonResponse(req, publicAlert(result), statusCode);
   } catch (error) {
     console.error("[monitoring-alerts] Error:", error);
-    return new Response(
-      JSON.stringify({
-        error: "Internal server error",
-        message: error instanceof Error ? error.message : String(error),
-      }),
-      {
-        status: 500,
-        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
-      }
-    );
+    return jsonResponse(req, { status: "error" }, 500);
   }
 });
 
 /**
  * Check queue success rate (alert if <90%)
  */
-async function checkQueueSuccessRate(supabase: SupabaseClient): Promise<AlertResult> {
+async function checkQueueSuccessRate(
+  supabase: SupabaseClient,
+): Promise<AlertResult> {
   const { data, error } = await supabase.rpc("check_queue_success_rate_alert");
 
   if (error) {
@@ -127,22 +129,14 @@ async function checkQueueSuccessRate(supabase: SupabaseClient): Promise<AlertRes
   }
 
   interface QueueSuccessRateResult {
-    success_rate_percent?: string;
     alert_status?: string;
   }
   const result = (data as QueueSuccessRateResult[])?.[0];
-  const successRate = parseFloat(result?.success_rate_percent ?? "100");
   const alertStatus = result?.alert_status ?? "healthy";
 
   return {
     alert_type: "queue_success_rate",
     status: alertStatus === "alert" ? "alert" : "healthy",
-    message:
-      alertStatus === "alert"
-        ? `Queue success rate is ${successRate.toFixed(2)}% (below 90% threshold)`
-        : `Queue success rate is ${successRate.toFixed(2)}%`,
-    metric_value: successRate,
-    threshold: "90%",
   };
 }
 
@@ -157,22 +151,14 @@ async function checkQuotaUsage(supabase: SupabaseClient): Promise<AlertResult> {
   }
 
   interface QuotaUsageResult {
-    usage_percent?: string;
     alert_status?: string;
   }
   const result = (data as QuotaUsageResult[])?.[0];
-  const usagePercent = parseFloat(result?.usage_percent ?? "0");
   const alertStatus = result?.alert_status ?? "healthy";
 
   return {
     alert_type: "quota_usage",
     status: alertStatus === "alert" ? "alert" : "healthy",
-    message:
-      alertStatus === "alert"
-        ? `Quota usage is ${usagePercent.toFixed(2)}% (above 80% threshold)`
-        : `Quota usage is ${usagePercent.toFixed(2)}%`,
-    metric_value: usagePercent,
-    threshold: "80%",
   };
 }
 
@@ -187,31 +173,21 @@ async function checkStuckJobs(supabase: SupabaseClient): Promise<AlertResult> {
   }
 
   interface StuckJobsResult {
-    stuck_count?: string;
-    affected_data_types?: string;
     alert_status?: string;
   }
   const result = (data as StuckJobsResult[])?.[0];
-  const stuckCount = parseInt(result?.stuck_count ?? "0", 10);
-  const affectedTypes = parseInt(result?.affected_data_types ?? "0", 10);
   const alertStatus = result?.alert_status ?? "healthy";
 
   return {
     alert_type: "stuck_jobs",
     status: alertStatus === "alert" ? "alert" : "healthy",
-    message:
-      alertStatus === "alert"
-        ? `${stuckCount} stuck jobs detected (above 10 threshold) affecting ${affectedTypes} data types`
-        : `${stuckCount} stuck jobs (within threshold)`,
-    metric_value: stuckCount,
-    threshold: "10 jobs",
   };
 }
 
 /**
  * Get all alerts in one response
  */
-async function getAllAlerts(supabase: SupabaseClient) {
+async function getAllAlerts(req: Request, supabase: SupabaseClient) {
   const [queueSuccess, quotaUsage, stuckJobs] = await Promise.all([
     checkQueueSuccessRate(supabase),
     checkQuotaUsage(supabase),
@@ -222,24 +198,16 @@ async function getAllAlerts(supabase: SupabaseClient) {
   const hasAlert = alerts.some((a) => a.status === "alert");
   const statusCode = hasAlert ? 503 : 200;
 
-  return new Response(
-    JSON.stringify(
-      {
-        status: hasAlert ? "alert" : "healthy",
-        timestamp: new Date().toISOString(),
-        alerts: {
-          queue_success_rate: queueSuccess,
-          quota_usage: quotaUsage,
-          stuck_jobs: stuckJobs,
-        },
-      },
-      null,
-      2
-    ),
+  return jsonResponse(
+    req,
     {
-      status: statusCode,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
-    }
+      status: hasAlert ? "alert" : "healthy",
+      checks: {
+        queue_success_rate: queueSuccess.status,
+        quota_usage: quotaUsage.status,
+        stuck_jobs: stuckJobs.status,
+      },
+    },
+    statusCode,
   );
 }
-
