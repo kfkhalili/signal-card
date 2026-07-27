@@ -13,6 +13,11 @@ import type {
   FmpCashFlowEntry,
   FinancialStatementRecord,
 } from '../fetch-fmp-financial-statements/types.ts';
+import { syncDataQualityFindings } from '../_shared/data-quality-persistence.ts';
+import {
+  validateBalanceSheetReconciliation,
+  validateReportingPeriodIntegrity,
+} from '../_shared/data-quality-validation.ts';
 
 const FMP_API_KEY = Deno.env.get('FMP_API_KEY');
 const FMP_BASE_URL = 'https://financialmodelingprep.com/stable';
@@ -261,6 +266,22 @@ export async function fetchFinancialStatementsLogic(
         throw new Error(`Database upsert failed: ${upsertError.message}`);
       }
 
+      const dataQualityFindings = [
+        ...statementsForSymbolUpsert.flatMap((statement) =>
+          validateBalanceSheetReconciliation(statement)
+        ),
+        ...validateReportingPeriodIntegrity(statementsForSymbolUpsert),
+      ];
+
+      await syncDataQualityFindings(
+        supabase,
+        {
+          symbol: job.symbol,
+          provider: 'fmp',
+          endpoint: 'financial-statements',
+        },
+        dataQualityFindings
+      );
     } else {
       console.warn(`[fetchFinancialStatementsLogic] No consolidated statement data to upsert for ${job.symbol}`);
     }
@@ -277,4 +298,3 @@ export async function fetchFinancialStatementsLogic(
     };
   }
 }
-

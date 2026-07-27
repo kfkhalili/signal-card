@@ -12,6 +12,11 @@ import type {
   SymbolProcessingResult,
   FunctionResponse,
 } from "./types.ts";
+import { syncDataQualityFindings } from "../_shared/data-quality-persistence.ts";
+import {
+  validateBalanceSheetReconciliation,
+  validateReportingPeriodIntegrity,
+} from "../_shared/data-quality-validation.ts";
 
 const ENV_CONTEXT: string = Deno.env.get("ENV_CONTEXT") || "PROD";
 const FMP_API_KEY: string | undefined = Deno.env.get("FMP_API_KEY");
@@ -207,6 +212,23 @@ async function processSymbol(
       }
       const currentUpsertCount = count || 0;
       message += `  Successfully upserted/updated ${currentUpsertCount} statement periods for ${symbol}.\n`;
+
+      const dataQualityFindings = [
+        ...statementsForSymbolUpsert.flatMap((statement) =>
+          validateBalanceSheetReconciliation(statement)
+        ),
+        ...validateReportingPeriodIntegrity(statementsForSymbolUpsert),
+      ];
+
+      await syncDataQualityFindings(
+        supabaseAdmin,
+        {
+          symbol,
+          provider: "fmp",
+          endpoint: "financial-statements",
+        },
+        dataQualityFindings
+      );
 
       // Update last_processed_at for the symbol in supported_symbols table
       const { error: updateError } = await supabaseAdmin

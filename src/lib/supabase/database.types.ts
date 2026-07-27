@@ -418,6 +418,72 @@ export type Database = {
         }
         Relationships: []
       }
+      data_quality_issues: {
+        Row: {
+          check_code: string
+          detected_at: string
+          endpoint: string
+          evidence: Json
+          field_name: string | null
+          fingerprint: string
+          id: string
+          last_seen_at: string
+          message: string
+          occurrence_count: number
+          provider: string
+          resolved_at: string | null
+          severity: string
+          source_date: string | null
+          source_period: string | null
+          source_reference: string | null
+          status: string
+          symbol: string
+          updated_at: string
+        }
+        Insert: {
+          check_code: string
+          detected_at?: string
+          endpoint: string
+          evidence?: Json
+          field_name?: string | null
+          fingerprint: string
+          id?: string
+          last_seen_at?: string
+          message: string
+          occurrence_count?: number
+          provider: string
+          resolved_at?: string | null
+          severity: string
+          source_date?: string | null
+          source_period?: string | null
+          source_reference?: string | null
+          status?: string
+          symbol: string
+          updated_at?: string
+        }
+        Update: {
+          check_code?: string
+          detected_at?: string
+          endpoint?: string
+          evidence?: Json
+          field_name?: string | null
+          fingerprint?: string
+          id?: string
+          last_seen_at?: string
+          message?: string
+          occurrence_count?: number
+          provider?: string
+          resolved_at?: string | null
+          severity?: string
+          source_date?: string | null
+          source_period?: string | null
+          source_reference?: string | null
+          status?: string
+          symbol?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       dividend_history: {
         Row: {
           adj_dividend: number | null
@@ -1713,6 +1779,15 @@ export type Database = {
           p_safety_buffer?: number
         }
         Returns: boolean
+      }
+      sync_data_quality_issues: {
+        Args: {
+          p_endpoint: string
+          p_findings?: Json
+          p_provider: string
+          p_symbol: string
+        }
+        Returns: Json
       }
       upsert_profile: { Args: { profile_data: Json }; Returns: undefined }
     }

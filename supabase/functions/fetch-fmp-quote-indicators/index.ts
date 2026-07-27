@@ -9,6 +9,8 @@ import type {
   SymbolQuoteProcessingResult,
   QuoteFunctionResponse,
 } from "./types.ts";
+import { syncDataQualityFindings } from "../_shared/data-quality-persistence.ts";
+import { validateMarketCapReconciliation } from "../_shared/data-quality-validation.ts";
 
 const ENV_CONTEXT: string = Deno.env.get("ENV_CONTEXT") || "PROD";
 const FMP_API_KEY: string | undefined = Deno.env.get("FMP_API_KEY");
@@ -151,6 +153,16 @@ async function fetchAndProcessSymbolQuote(
         `Supabase upsert failed for ${actualFmpSymbol}: ${upsertError.message}`
       );
     }
+
+    await syncDataQualityFindings(
+      supabaseAdmin,
+      {
+        symbol: actualFmpSymbol,
+        provider: "fmp",
+        endpoint: "quote",
+      },
+      validateMarketCapReconciliation(quoteData)
+    );
 
     // Optionally, update a field like 'last_processed_quote_at' in 'supported_symbols'
     // This requires the 'supported_symbols' table to have such a column.

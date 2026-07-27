@@ -5,6 +5,8 @@
 import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { QueueJob, ProcessJobResult } from './types.ts';
+import { syncDataQualityFindings } from '../_shared/data-quality-persistence.ts';
+import { validateMarketCapReconciliation } from '../_shared/data-quality-validation.ts';
 
 const FMP_API_KEY = Deno.env.get('FMP_API_KEY');
 const FMP_QUOTE_BASE_URL = 'https://financialmodelingprep.com/stable/quote';
@@ -185,6 +187,16 @@ export async function fetchQuoteLogic(
       throw new Error(`Database upsert failed: ${upsertError.message}`);
     }
 
+    await syncDataQualityFindings(
+      supabase,
+      {
+        symbol: quote.symbol,
+        provider: 'fmp',
+        endpoint: 'quote',
+      },
+      validateMarketCapReconciliation(quote)
+    );
+
     return {
       success: true,
       dataSizeBytes: actualSizeBytes,
@@ -197,4 +209,3 @@ export async function fetchQuoteLogic(
     };
   }
 }
-

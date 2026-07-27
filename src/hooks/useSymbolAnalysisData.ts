@@ -15,6 +15,7 @@ import type {
 } from "@/lib/supabase/realtime-service";
 
 type FinancialStatementDBRow = Database["public"]["Tables"]["financial_statements"]["Row"];
+type DataQualityIssueDBRow = Database["public"]["Tables"]["data_quality_issues"]["Row"];
 
 export function useSymbolAnalysisData(ticker: string) {
   const { supabase } = useAuth();
@@ -30,6 +31,10 @@ export function useSymbolAnalysisData(ticker: string) {
   const [treasuryRates, setTreasuryRates] = useState<TreasuryRateDBRow[]>([]);
   const [gradesHistorical, setGradesHistorical] = useState<GradesHistoricalDBRow[]>([]);
   const [analystPriceTargets, setAnalystPriceTargets] = useState<Option.Option<AnalystPriceTargetsDBRow>>(Option.none());
+  const [dataQualityIssues, setDataQualityIssues] = useState<DataQualityIssueDBRow[]>([]);
+  const [isDataQualityLoading, setIsDataQualityLoading] = useState(true);
+  const [dataQualityError, setDataQualityError] = useState<string | null>(null);
+  const [dataQualityLoadedSymbol, setDataQualityLoadedSymbol] = useState("");
 
   const handleProfileUpdate = useCallback((profileData: ProfileDBRow) => {
     setProfile(Option.some(profileData));
@@ -126,6 +131,26 @@ export function useSymbolAnalysisData(ticker: string) {
     }
   }, []);
 
+  const handleDataQualityIssueChange = useCallback(
+    (next: DataQualityIssueDBRow | null, previousId: string | null) => {
+      setDataQualityIssues((current) => {
+        const withoutPrevious = previousId
+          ? current.filter((issue) => issue.id !== previousId)
+          : current;
+
+        if (!next || next.status !== "open") {
+          return withoutPrevious;
+        }
+
+        return [
+          ...withoutPrevious.filter((issue) => issue.id !== next.id),
+          next,
+        ];
+      });
+    },
+    []
+  );
+
   useStockData({
     symbol: symbolValid === true ? ticker : "",
     onProfileUpdate: handleProfileUpdate,
@@ -195,6 +220,74 @@ export function useSymbolAnalysisData(ticker: string) {
       supabase.removeChannel(channel);
     };
   }, [supabase, ticker, symbolValid, handleAnalystPriceTargetsUpdate]);
+
+  useEffect(() => {
+    if (!supabase || !ticker || symbolValid !== true) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const channel = supabase
+      .channel(`data-quality-${ticker}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "data_quality_issues",
+          filter: `symbol=eq.${ticker}`,
+        },
+        (payload) => {
+          const next = payload.new && Object.keys(payload.new).length > 0
+            ? payload.new as DataQualityIssueDBRow
+            : null;
+          const previous = payload.old && Object.keys(payload.old).length > 0
+            ? payload.old as Partial<DataQualityIssueDBRow>
+            : null;
+
+          handleDataQualityIssueChange(next, previous?.id ?? null);
+        }
+      )
+      .subscribe();
+
+    const loadIssues = async () => {
+      const { data, error } = await supabase
+        .from("data_quality_issues")
+        .select("*")
+        .eq("symbol", ticker)
+        .eq("status", "open")
+        .order("last_seen_at", { ascending: false });
+
+      if (cancelled) return;
+
+      setDataQualityLoadedSymbol(ticker);
+      if (error) {
+        console.error(
+          `[useSymbolAnalysisData] Error fetching data-quality issues:`,
+          error
+        );
+        setDataQualityError("Data-quality checks could not be loaded.");
+        setDataQualityIssues([]);
+      } else {
+        setDataQualityError(null);
+        setDataQualityIssues(data ?? []);
+      }
+      setIsDataQualityLoading(false);
+    };
+
+    void loadIssues();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [
+    supabase,
+    ticker,
+    symbolValid,
+    handleDataQualityIssueChange,
+  ]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -413,5 +506,11 @@ export function useSymbolAnalysisData(ticker: string) {
     treasuryRates,
     gradesHistorical,
     analystPriceTargets,
+    dataQualityIssues:
+      dataQualityLoadedSymbol === ticker ? dataQualityIssues : [],
+    isDataQualityLoading:
+      dataQualityLoadedSymbol === ticker ? isDataQualityLoading : true,
+    dataQualityError:
+      dataQualityLoadedSymbol === ticker ? dataQualityError : null,
   };
 }

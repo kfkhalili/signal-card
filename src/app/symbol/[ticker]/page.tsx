@@ -27,6 +27,12 @@ import { ScorecardItem } from "@/components/symbol/ScorecardItem";
 import { formatDistanceToNow } from "date-fns";
 
 import { formatFinancialValue } from "@/lib/formatters";
+import {
+  convertCurrency,
+  DISPLAY_CURRENCY,
+  normalizeCurrencyCode,
+} from "@/lib/financial-currency";
+import { summarizeDataConfidence } from "@/lib/data-confidence";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import {
   calculateROIC,
@@ -142,7 +148,93 @@ export default function SymbolAnalysisPage() {
     treasuryRates,
     gradesHistorical,
     analystPriceTargets,
+    dataQualityIssues,
+    isDataQualityLoading,
+    dataQualityError,
   } = useSymbolAnalysisData(ticker);
+
+  const dataConfidence = summarizeDataConfidence(
+    dataQualityIssues,
+    isDataQualityLoading,
+    dataQualityError
+  );
+
+  const blockingDataQualityIssues = useMemo(
+    () =>
+      dataQualityIssues.filter(
+        (issue) =>
+          issue.status === "open" &&
+          (issue.severity === "warning" || issue.severity === "critical")
+      ),
+    [dataQualityIssues]
+  );
+
+  const blockedStatementKeys = useMemo(
+    () =>
+      new Set(
+        blockingDataQualityIssues
+          .filter(
+            (issue) =>
+              (issue.check_code === "balance_sheet_reconciliation" ||
+                issue.check_code === "reporting_period_integrity") &&
+              issue.source_date &&
+              issue.source_period
+          )
+          .map((issue) => `${issue.source_date}|${issue.source_period}`)
+      ),
+    [blockingDataQualityIssues]
+  );
+
+  const latestStatementIsBlocked = Option.match(financialStatement, {
+    onNone: () => false,
+    onSome: (statement) =>
+      blockedStatementKeys.has(`${statement.date}|${statement.period}`),
+  });
+
+  const marketCapIsBlocked = blockingDataQualityIssues.some(
+    (issue) => issue.check_code === "market_cap_reconciliation"
+  );
+  const dataQualityChecksUnavailable =
+    isDataQualityLoading || dataQualityError !== null;
+
+  const securityCurrency = Option.match(profile, {
+    onNone: () => null,
+    onSome: (p) => normalizeCurrencyCode(p.currency),
+  });
+
+  const financialStatementCurrency = Option.match(financialStatement, {
+    onNone: () => null,
+    onSome: (fs) => normalizeCurrencyCode(fs.reported_currency),
+  });
+
+  const quoteMarketCapValue = Option.match(quote, {
+    onNone: () => null,
+    onSome: (q) => q.market_cap || null,
+  });
+
+  const marketCapInStatementCurrency = convertCurrency(
+    quoteMarketCapValue,
+    securityCurrency,
+    financialStatementCurrency,
+    exchangeRates
+  );
+
+  const comparableMarketCap =
+    marketCapInStatementCurrency === null ||
+    marketCapIsBlocked ||
+    latestStatementIsBlocked ||
+    dataQualityChecksUnavailable
+      ? Option.none<number>()
+      : Option.some(marketCapInStatementCurrency);
+
+  const formatMonetaryValue = (
+    value: number | null | undefined,
+    currency: string | null,
+    decimals = 2
+  ) =>
+    currency
+      ? formatFinancialValue(value, currency, decimals, exchangeRates)
+      : "N/A";
 
   const formatFreshness = (dateVal: string | number | null | undefined) => {
     if (!dateVal) return "Unknown";
@@ -233,14 +325,13 @@ export default function SymbolAnalysisPage() {
     });
 
     // Calculate ROIC from financial statements
-    const roic = calculateROIC(latestStatement);
+    const roic =
+      latestStatementIsBlocked || dataQualityChecksUnavailable
+        ? Option.none<number>()
+        : calculateROIC(latestStatement);
 
     // Calculate FCF Yield from financial statements and market cap
-    const marketCap = Option.match(quote, {
-      onNone: () => Option.none<number>(),
-      onSome: (q) => q.market_cap ? Option.some(q.market_cap) : Option.none<number>(),
-    });
-    const fcfYield = calculateFCFYield(latestStatement, marketCap);
+    const fcfYield = calculateFCFYield(latestStatement, comparableMarketCap);
 
     // Calculate WACC if we have the required data
     // Basic WACC calculation using CAPM for cost of equity
@@ -307,6 +398,13 @@ export default function SymbolAnalysisPage() {
       // Note: Cannot use useMemo here as it's inside an IIFE - calculate directly
       roicHistory: (() => {
         const history = financialStatementsHistory
+          .filter(
+            (statement) =>
+              !dataQualityChecksUnavailable &&
+              !blockedStatementKeys.has(
+                `${statement.date}|${statement.period}`
+              )
+          )
           .map((fs) => {
             const roic = calculateROIC(fs);
             return Option.match(roic, {
@@ -378,19 +476,27 @@ export default function SymbolAnalysisPage() {
     });
 
     // Get market cap for Altman Z-Score
-    const marketCap = Option.match(quote, {
-      onNone: () => Option.none<number>(),
-      onSome: (q) => q.market_cap ? Option.some(q.market_cap) : Option.none<number>(),
-    });
-
-    const netDebtToEbitda = calculateNetDebtToEbitda(latestStatement);
-    const altmanZScore = calculateAltmanZScore(latestStatement, marketCap);
-    const interestCoverage = calculateInterestCoverage(latestStatement);
+    const netDebtToEbitda =
+      latestStatementIsBlocked || dataQualityChecksUnavailable
+        ? Option.none<number>()
+        : calculateNetDebtToEbitda(latestStatement);
+    const altmanZScore =
+      latestStatementIsBlocked || dataQualityChecksUnavailable
+        ? Option.none<number>()
+        : calculateAltmanZScore(latestStatement, comparableMarketCap);
+    const interestCoverage =
+      latestStatementIsBlocked || dataQualityChecksUnavailable
+        ? Option.none<number>()
+        : calculateInterestCoverage(latestStatement);
 
     let ebitda = Option.none<number>();
     let netDebt = Option.none<number>();
 
-    if (latestStatement) {
+    if (
+      latestStatement &&
+      !latestStatementIsBlocked &&
+      !dataQualityChecksUnavailable
+    ) {
       const incomePayload = latestStatement.income_statement_payload as { 
         ebitda?: number; 
         operatingIncome?: number; 
@@ -578,6 +684,11 @@ export default function SymbolAnalysisPage() {
   // --- Calculate Growth & Scale Data ---
   const growthScaleData = useMemo(() => {
     return financialStatementsHistory
+      .filter(
+        (statement) =>
+          !dataQualityChecksUnavailable &&
+          !blockedStatementKeys.has(`${statement.date}|${statement.period}`)
+      )
       .slice()
       .reverse() // from oldest to newest
       .map(fs => {
@@ -595,6 +706,14 @@ export default function SymbolAnalysisPage() {
         // Net Assets = Net Debt * -1
         const netDebt = (bal?.netDebt as number) || 0;
         const netAssets = netDebt * -1;
+        const statementCurrency = normalizeCurrencyCode(fs.reported_currency);
+        const toDisplayCurrency = (value: number) =>
+          convertCurrency(
+            value,
+            statementCurrency,
+            DISPLAY_CURRENCY,
+            exchangeRates
+          );
 
         const grossMargin = revenue > 0 ? grossProfit / revenue : 0;
         const operatingMargin = revenue > 0 ? operatingIncome / revenue : 0;
@@ -605,11 +724,11 @@ export default function SymbolAnalysisPage() {
         return {
           date: fs.date,
           fiscalYear: fs.fiscal_year || new Date(fs.date).getFullYear().toString(),
-          revenue,
-          operatingIncome,
-          netIncome,
-          freeCashFlow,
-          netAssets,
+          revenue: toDisplayCurrency(revenue),
+          operatingIncome: toDisplayCurrency(operatingIncome),
+          netIncome: toDisplayCurrency(netIncome),
+          freeCashFlow: toDisplayCurrency(freeCashFlow),
+          netAssets: toDisplayCurrency(netAssets),
           grossMargin,
           operatingMargin,
           netMargin,
@@ -617,7 +736,12 @@ export default function SymbolAnalysisPage() {
           freeCashFlowMargin
         };
       });
-  }, [financialStatementsHistory]);
+  }, [
+    blockedStatementKeys,
+    dataQualityChecksUnavailable,
+    exchangeRates,
+    financialStatementsHistory,
+  ]);
 
   const maxFcf = useMemo(() => {
     return Math.max(...growthScaleData.map(d => Math.abs(d.freeCashFlow || 0)), 1);
@@ -657,7 +781,7 @@ export default function SymbolAnalysisPage() {
     cx?: number;
     cy?: number;
     payload?: {
-      freeCashFlow?: number;
+      freeCashFlow?: number | null;
       fiscalYear?: string;
     };
   }
@@ -804,10 +928,7 @@ export default function SymbolAnalysisPage() {
   });
 
   // Get market cap from live quotes
-  const marketCapValue = Option.match(quote, {
-    onNone: () => null,
-    onSome: (q) => q.market_cap || null,
-  });
+  const marketCapValue = quoteMarketCapValue;
 
   // Get revenue (TTM) from the latest financial statement
   const revenueValue = Option.match(financialStatement, {
@@ -825,9 +946,22 @@ export default function SymbolAnalysisPage() {
 
   // Calculate Market Cap / Revenue ratio
   // null = data not yet loaded, Infinity = revenue is zero
-  const mcToRevenueRatio = marketCapValue !== null && revenueValue !== null
-    ? (revenueValue > 0 ? marketCapValue / revenueValue : Infinity)
-    : null;
+  const mcToRevenueRatio = Option.match(comparableMarketCap, {
+    onNone: () => null,
+    onSome: (trustedMarketCap) =>
+      revenueValue !== null
+        ? (revenueValue > 0 ? trustedMarketCap / revenueValue : Infinity)
+        : null,
+  });
+  const mcToRevenueUnavailableReason = dataQualityError
+    ? "Data-quality checks are unavailable"
+    : isDataQualityLoading
+      ? "Data-quality checks are still loading"
+      : marketCapIsBlocked
+        ? "Market-cap reconciliation failed"
+        : latestStatementIsBlocked
+          ? "The latest financial statement has an open data-quality issue"
+          : "Currency metadata or exchange rate unavailable";
 
   return (
     <div className="container mx-auto p-4 max-w-7xl space-y-6">
@@ -900,7 +1034,7 @@ export default function SymbolAnalysisPage() {
                     {currentPrice !== null ? (
                       <>
                         <span className="text-2xl font-semibold">
-                          {formatFinancialValue(currentPrice, "USD", 2, exchangeRates)}
+                          {formatMonetaryValue(currentPrice, securityCurrency, 2)}
                         </span>
                         {priceChange !== null && (
                           <Badge
@@ -924,7 +1058,9 @@ export default function SymbolAnalysisPage() {
                     ) : (
                       <div className="h-8 w-32 bg-muted animate-pulse rounded" />
                     )}
-                    <span className="text-sm text-muted-foreground shrink-0">Realtime</span>
+                    <span className="text-sm text-muted-foreground shrink-0">
+                      Realtime · source {securityCurrency ?? "currency unknown"}
+                    </span>
                   </div>
                   <div className="flex flex-wrap gap-2 mt-3">
                     {Option.match(profile, {
@@ -936,6 +1072,22 @@ export default function SymbolAnalysisPage() {
                         </>
                       ),
                     })}
+                    <Badge
+                      variant="outline"
+                      className={cn("gap-1", dataConfidence.className)}
+                      title={dataConfidence.description}
+                    >
+                      {dataConfidence.label === "Low confidence" ||
+                      dataConfidence.label === "Review" ? (
+                        <AlertTriangle className="h-3 w-3" />
+                      ) : (
+                        <Shield className="h-3 w-3" />
+                      )}
+                      Data checks: {dataConfidence.label}
+                      {dataConfidence.openIssueCount > 0
+                        ? ` (${dataConfidence.openIssueCount})`
+                        : ""}
+                    </Badge>
                   </div>
                 </div>
               </div>
@@ -947,7 +1099,7 @@ export default function SymbolAnalysisPage() {
                   <span className="text-muted-foreground">Revenue:</span>
                   <span className="font-semibold">
                     {revenueValue !== null
-                      ? formatFinancialValue(revenueValue, "USD", 2, exchangeRates)
+                      ? formatMonetaryValue(revenueValue, financialStatementCurrency, 2)
                       : <span className="inline-block h-4 w-14 bg-muted animate-pulse rounded align-middle" />}
                   </span>
                 </div>
@@ -956,7 +1108,7 @@ export default function SymbolAnalysisPage() {
                   <span className="text-muted-foreground">Mkt Cap:</span>
                   <span className="font-semibold">
                     {marketCapValue !== null
-                      ? formatFinancialValue(marketCapValue, "USD", 2, exchangeRates)
+                      ? formatMonetaryValue(marketCapValue, securityCurrency, 2)
                       : <span className="inline-block h-4 w-14 bg-muted animate-pulse rounded align-middle" />}
                   </span>
                 </div>
@@ -971,7 +1123,9 @@ export default function SymbolAnalysisPage() {
                   )}>
                     {mcToRevenueRatio !== null
                       ? (isFinite(mcToRevenueRatio) ? `${mcToRevenueRatio.toFixed(1)}x` : "∞")
-                      : <span className="inline-block h-4 w-10 bg-muted animate-pulse rounded align-middle" />}
+                      : marketCapValue !== null && revenueValue !== null
+                        ? <span title={mcToRevenueUnavailableReason}>N/A</span>
+                        : <span className="inline-block h-4 w-10 bg-muted animate-pulse rounded align-middle" />}
                   </span>
                 </div>
               </div>
@@ -1094,10 +1248,14 @@ export default function SymbolAnalysisPage() {
                       />
                       <YAxis
                         tick={{ fontSize: 10 }}
-                        tickFormatter={(value) => value.toFixed(1)}
+                        tickFormatter={(value) =>
+                          formatMonetaryValue(value, securityCurrency, 1)
+                        }
                       />
                       <Tooltip
-                        formatter={(value: number) => value.toFixed(1)}
+                        formatter={(value: number) =>
+                          formatMonetaryValue(value, securityCurrency, 2)
+                        }
                         labelFormatter={(label, payload) => {
                           // Get the actual date string from the payload to avoid Recharts date conversion issues
                           const dateStr = payload?.[0]?.payload?.date || label;
@@ -1168,7 +1326,7 @@ export default function SymbolAnalysisPage() {
                   label="DCF Fair Value"
                   value={Option.match(valuationMetrics.dcfFairValue, {
                     onNone: () => null,
-                    onSome: (v) => formatFinancialValue(v, "USD", 2, exchangeRates),
+                    onSome: (v) => formatMonetaryValue(v, securityCurrency, 2),
                   })}
                   subtext={Option.match(valuationMetrics.currentPrice, {
                     onNone: () => "Calculating...",
@@ -1479,12 +1637,12 @@ export default function SymbolAnalysisPage() {
                     <ComposedChart syncId="financialsSync" data={growthScaleData} margin={{ top: 20, right: 10, left: -20, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
                       <XAxis dataKey="fiscalYear" fontSize={12} tickMargin={10} minTickGap={20} />
-                      <YAxis yAxisId="left" tickFormatter={(val) => `${formatFinancialValue(val, "USD", 0, exchangeRates)}`} fontSize={12} orientation="left" />
+                      <YAxis yAxisId="left" tickFormatter={(val) => formatFinancialValue(val, DISPLAY_CURRENCY, 0)} fontSize={12} orientation="left" />
                       <YAxis yAxisId="right" domain={[incomeYAxisTicks[0], incomeYAxisTicks[incomeYAxisTicks.length - 1]]} ticks={incomeYAxisTicks} tickFormatter={(val) => `${(val * 100).toFixed(0)}%`} fontSize={12} orientation="right" />
                       <Tooltip
                         contentStyle={{ backgroundColor: "rgba(0,0,0,0.8)", borderColor: "#333", borderRadius: "8px", color: "#fff" }}
                         formatter={(value: number, name: string) => {
-                          if (name === "Revenue") return [formatFinancialValue(value, "USD", 2, exchangeRates), name];
+                          if (name === "Revenue") return [formatFinancialValue(value, DISPLAY_CURRENCY, 2), name];
                           return [`${(value * 100).toFixed(2)}%`, name];
                         }}
                         labelStyle={{ color: "#aaa", marginBottom: "8px" }}
@@ -1523,11 +1681,11 @@ export default function SymbolAnalysisPage() {
                     <ComposedChart syncId="financialsSync" data={growthScaleData} margin={{ top: 20, right: 10, left: -20, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
                       <XAxis dataKey="fiscalYear" fontSize={12} tickMargin={10} minTickGap={20} />
-                      <YAxis tickFormatter={(val) => `${formatFinancialValue(val, "USD", 0, exchangeRates)}`} fontSize={12} />
+                      <YAxis tickFormatter={(val) => formatFinancialValue(val, DISPLAY_CURRENCY, 0)} fontSize={12} />
                       <Tooltip
                         contentStyle={{ backgroundColor: "rgba(0,0,0,0.8)", borderColor: "#333", borderRadius: "8px", color: "#fff" }}
                         formatter={(value: number, name: string) => [
-                          formatFinancialValue(value, "USD", 2, exchangeRates),
+                          formatFinancialValue(value, DISPLAY_CURRENCY, 2),
                           name
                         ]}
                         labelStyle={{ color: "#aaa", marginBottom: "8px" }}
@@ -1588,7 +1746,7 @@ export default function SymbolAnalysisPage() {
                   <span className="text-green-600 font-bold">
                     {Option.match(insiderActivity.netBuyVolume, {
                       onNone: () => <div className="h-4 w-16 bg-muted animate-pulse rounded" />,
-                      onSome: (v) => formatFinancialValue(v, "USD", 1, exchangeRates),
+                      onSome: (v) => formatMonetaryValue(v, securityCurrency, 1),
                     })}
                   </span>
                 </div>
@@ -1597,7 +1755,7 @@ export default function SymbolAnalysisPage() {
                   <span className="text-red-600 font-bold">
                     {Option.match(insiderActivity.netSellVolume, {
                       onNone: () => <div className="h-4 w-16 bg-muted animate-pulse rounded" />,
-                      onSome: (v) => formatFinancialValue(v, "USD", 1, exchangeRates),
+                      onSome: (v) => formatMonetaryValue(v, securityCurrency, 1),
                     })}
                   </span>
                 </div>
@@ -1678,7 +1836,7 @@ export default function SymbolAnalysisPage() {
                 label="Price Target"
                 value={Option.match(contrarianIndicators.priceTarget, {
                   onNone: () => "N/A",
-                  onSome: (v) => formatFinancialValue(v, "USD", 2, exchangeRates),
+                  onSome: (v) => formatMonetaryValue(v, securityCurrency, 2),
                 })}
                 subtext={Option.match(contrarianIndicators.priceTarget, {
                   onNone: () => "",
