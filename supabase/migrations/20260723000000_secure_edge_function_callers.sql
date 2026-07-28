@@ -152,11 +152,21 @@ GRANT EXECUTE
 ON FUNCTION public.invoke_processor_loop_v2(integer, integer)
 TO service_role;
 
--- Only the service-role client inside handle-new-user needs this RPC.
-REVOKE ALL
-ON FUNCTION public.handle_user_created_webhook(jsonb)
-FROM PUBLIC, anon, authenticated;
+-- Only the service-role client inside handle-new-user needs this RPC. Some
+-- environments retired the legacy function before this migration reached
+-- them, so keep the privilege hardening tolerant of that valid state.
+DO $$
+BEGIN
+  IF to_regprocedure(
+    'public.handle_user_created_webhook(jsonb)'
+  ) IS NOT NULL THEN
+    REVOKE ALL
+    ON FUNCTION public.handle_user_created_webhook(jsonb)
+    FROM PUBLIC, anon, authenticated;
 
-GRANT EXECUTE
-ON FUNCTION public.handle_user_created_webhook(jsonb)
-TO service_role;
+    GRANT EXECUTE
+    ON FUNCTION public.handle_user_created_webhook(jsonb)
+    TO service_role;
+  END IF;
+END;
+$$;
