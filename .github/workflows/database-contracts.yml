@@ -27,7 +27,7 @@ jobs:
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.110.0
 
       - name: Install PostgreSQL client and jq
         run: |
@@ -78,4 +78,3 @@ jobs:
           path: |
             tests/contracts/*.sql
           retention-days: 7
-
