@@ -260,6 +260,10 @@ Deno.serve(async (req: Request) => {
             const { error: failError } = await supabase.rpc('fail_queue_job_v2', {
               p_job_id: job.id,
               p_error_message: result.error || 'Unknown error',
+              // Failed validation/upsert responses still consume FMP
+              // bandwidth. Record the measured response size when the worker
+              // was able to observe it.
+              p_data_size_bytes: result.dataSizeBytes,
             });
 
             if (failError) {
