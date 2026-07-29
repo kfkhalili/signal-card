@@ -94,7 +94,13 @@ function_privileges AS (
 ),
 privilege_summary AS (
   SELECT
-    COUNT(*) = 4
+    COUNT(*) FILTER (
+      WHERE privilege.proname IN (
+        'invoke_edge_function_v2',
+        'invoke_processor_if_healthy_v2',
+        'invoke_processor_loop_v2'
+      )
+    ) = 3
       AND BOOL_AND(
         NOT privilege.anon_can_execute
         AND NOT privilege.authenticated_can_execute
