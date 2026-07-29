@@ -275,6 +275,42 @@ BEGIN
      ) = 0 THEN
     RAISE EXCEPTION 'Expected scheduler advisory-lock contract is missing';
   END IF;
+
+  IF substring(
+       '(symbol,eq,ADBE,f)'
+       FROM 'symbol,eq,([^,)]+)'
+     ) <> 'ADBE'
+     OR POSITION(
+       'symbol,eq,([^,)]+)'
+       IN pg_get_functiondef(
+         'public.get_active_subscriptions_from_realtime()'::regprocedure
+       )
+     ) = 0
+     OR POSITION(
+       'symbol,eq,([^,)]+)'
+       IN pg_get_functiondef(
+         'public.on_realtime_subscription_insert()'::regprocedure
+       )
+     ) = 0 THEN
+    RAISE EXCEPTION
+      'Realtime symbol parsing still includes the filter metadata suffix';
+  END IF;
+
+  IF POSITION(
+       'PERFORM public.invoke_edge_function_v2'
+       IN pg_get_functiondef(
+         'public.invoke_processor_if_healthy_v2()'::regprocedure
+       )
+     ) = 0
+     OR POSITION(
+       'RAISE WARNING'
+       IN pg_get_functiondef(
+         'public.invoke_processor_if_healthy_v2()'::regprocedure
+       )
+     ) > 0 THEN
+    RAISE EXCEPTION
+      'Processor invoker must queue through PERFORM and propagate failures';
+  END IF;
 END;
 $$;
 
