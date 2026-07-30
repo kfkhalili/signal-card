@@ -73,5 +73,8 @@ END $$;
 \i test_contract_18_security_definer.sql
 
 \echo ''
-\echo '✅ All contract tests completed!'
+\echo 'Running Contract #19: Successful Empty Fetch Freshness...'
+\i test_contract_19_negative_cache_freshness.sql
 
+\echo ''
+\echo '✅ All contract tests completed!'
