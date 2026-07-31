@@ -2,32 +2,37 @@
 // Library function for processing financial-statements jobs from the queue
 // CRITICAL: This function is imported directly by queue-processor-v2 (monofunction architecture)
 
-import type { SupabaseClient } from '@supabase/supabase-js';
-import type { QueueJob, ProcessJobResult } from './types.ts';
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { ProcessJobResult, QueueJob } from "./types.ts";
 
 // Import types from the original Edge Function
 import type {
-  FmpStatementEntryBase,
-  FmpIncomeStatementEntry,
+  FinancialStatementRecord,
   FmpBalanceSheetEntry,
   FmpCashFlowEntry,
-  FinancialStatementRecord,
-} from '../fetch-fmp-financial-statements/types.ts';
+  FmpIncomeStatementEntry,
+  FmpStatementEntryBase,
+} from "../fetch-fmp-financial-statements/types.ts";
+import { recordDataFetchFreshness } from "./record-data-fetch-freshness.ts";
 
-const FMP_API_KEY = Deno.env.get('FMP_API_KEY');
-const FMP_BASE_URL = 'https://financialmodelingprep.com/stable';
+const FMP_API_KEY = Deno.env.get("FMP_API_KEY");
+const FMP_BASE_URL = "https://financialmodelingprep.com/stable";
 const INCOME_STATEMENT_ENDPOINT = `${FMP_BASE_URL}/income-statement`;
 const BALANCE_SHEET_ENDPOINT = `${FMP_BASE_URL}/balance-sheet-statement`;
 const CASH_FLOW_ENDPOINT = `${FMP_BASE_URL}/cash-flow-statement`;
 const FMP_API_DELAY_MS = 300; // Delay between API calls to respect rate limits
 
+interface FmpFetchResult<T> {
+  data: T[];
+  responseSizeBytes: number;
+}
 
 async function fetchFmpData<T extends FmpStatementEntryBase>(
   baseUrl: string,
   symbol: string,
   statementType: string,
-  apiKey: string
-): Promise<T[]> {
+  apiKey: string,
+): Promise<FmpFetchResult<T>> {
   const fullUrl = `${baseUrl}?symbol=${symbol}&apikey=${apiKey}`;
 
   const controller = new AbortController();
@@ -38,8 +43,10 @@ async function fetchFmpData<T extends FmpStatementEntryBase>(
     response = await fetch(fullUrl, { signal: controller.signal });
   } catch (error) {
     clearTimeout(timeout);
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error(`FMP API request timed out after 10 seconds for ${statementType}.`);
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(
+        `FMP API request timed out after 10 seconds for ${statementType}.`,
+      );
     }
     throw error;
   } finally {
@@ -51,91 +58,112 @@ async function fetchFmpData<T extends FmpStatementEntryBase>(
     // CRITICAL: 429 rate limit errors should not be retried immediately
     // Retrying will just hit the rate limit again, wasting API calls
     if (response.status === 429) {
-      throw new Error(`RATE_LIMIT_429: FMP API rate limit reached for ${statementType}. ${errorText}`);
+      throw new Error(
+        `RATE_LIMIT_429: FMP API rate limit reached for ${statementType}. ${errorText}`,
+      );
     }
-    throw new Error(`FMP API error for ${statementType}: ${response.status} ${errorText}`);
+    throw new Error(
+      `FMP API error for ${statementType}: ${response.status} ${errorText}`,
+    );
   }
 
   // CRITICAL: Get the ACTUAL data transfer size (what FMP bills for)
-  const contentLength = response.headers.get('Content-Length');
+  const contentLength = response.headers.get("Content-Length");
   let actualSizeBytes = contentLength ? parseInt(contentLength, 10) : 0;
   if (actualSizeBytes === 0) {
-    console.warn(`[fetchFinancialStatementsLogic] Content-Length header missing for ${symbol}/${statementType}. Using fallback estimate.`);
+    console.warn(
+      `[fetchFinancialStatementsLogic] Content-Length header missing for ${symbol}/${statementType}. Using fallback estimate.`,
+    );
     actualSizeBytes = 200000; // 200 KB conservative estimate per statement type
   }
 
   const data: unknown = await response.json();
 
   if (!Array.isArray(data)) {
-    throw new Error(`Invalid data format for ${statementType}: Expected array, got ${typeof data}`);
+    throw new Error(
+      `Invalid data format for ${statementType}: Expected array, got ${typeof data}`,
+    );
   }
 
-  return data as T[];
+  return {
+    data: data as T[],
+    responseSizeBytes: actualSizeBytes,
+  };
 }
 
 export async function fetchFinancialStatementsLogic(
   job: QueueJob,
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
 ): Promise<ProcessJobResult> {
   // CRITICAL VALIDATION #1: Data Type Check (Prevents Misconfiguration)
-  if (job.data_type !== 'financial-statements') {
+  if (job.data_type !== "financial-statements") {
     return {
       success: false,
       dataSizeBytes: 0,
-      error: `Configuration Error: fetchFinancialStatementsLogic was called for job type ${job.data_type}. Expected 'financial-statements'.`,
+      error:
+        `Configuration Error: fetchFinancialStatementsLogic was called for job type ${job.data_type}. Expected 'financial-statements'.`,
     };
   }
 
+  let totalDataSizeBytes = 0;
+
   try {
     if (!FMP_API_KEY) {
-      throw new Error('FMP_API_KEY environment variable is not set');
+      throw new Error("FMP_API_KEY environment variable is not set");
     }
 
     const statementsForSymbolUpsert: FinancialStatementRecord[] = [];
-    let totalDataSizeBytes = 0;
-
     // Fetch income statements
     await new Promise((resolve) => setTimeout(resolve, FMP_API_DELAY_MS));
-    const incomeStatements: FmpIncomeStatementEntry[] = await fetchFmpData<FmpIncomeStatementEntry>(
+    const incomeResult = await fetchFmpData<FmpIncomeStatementEntry>(
       INCOME_STATEMENT_ENDPOINT,
       job.symbol,
-      'Income Statement',
-      FMP_API_KEY
+      "Income Statement",
+      FMP_API_KEY,
     );
-    totalDataSizeBytes += incomeStatements.length > 0 ? 200000 : 0; // Estimate per statement type
+    const incomeStatements = incomeResult.data;
+    totalDataSizeBytes += incomeResult.responseSizeBytes;
 
     // Fetch balance sheets
     await new Promise((resolve) => setTimeout(resolve, FMP_API_DELAY_MS));
-    const balanceSheets: FmpBalanceSheetEntry[] = await fetchFmpData<FmpBalanceSheetEntry>(
+    const balanceSheetResult = await fetchFmpData<FmpBalanceSheetEntry>(
       BALANCE_SHEET_ENDPOINT,
       job.symbol,
-      'Balance Sheet',
-      FMP_API_KEY
+      "Balance Sheet",
+      FMP_API_KEY,
     );
-    totalDataSizeBytes += balanceSheets.length > 0 ? 200000 : 0;
+    const balanceSheets = balanceSheetResult.data;
+    totalDataSizeBytes += balanceSheetResult.responseSizeBytes;
 
     // Fetch cash flow statements
     await new Promise((resolve) => setTimeout(resolve, FMP_API_DELAY_MS));
-    const cashFlows: FmpCashFlowEntry[] = await fetchFmpData<FmpCashFlowEntry>(
+    const cashFlowResult = await fetchFmpData<FmpCashFlowEntry>(
       CASH_FLOW_ENDPOINT,
       job.symbol,
-      'Cash Flow',
-      FMP_API_KEY
+      "Cash Flow",
+      FMP_API_KEY,
     );
-    totalDataSizeBytes += cashFlows.length > 0 ? 200000 : 0;
+    const cashFlows = cashFlowResult.data;
+    totalDataSizeBytes += cashFlowResult.responseSizeBytes;
 
     // Use a Map to consolidate data by a unique key (date + period)
-    const consolidatedStatements = new Map<string, Partial<FinancialStatementRecord>>();
+    const consolidatedStatements = new Map<
+      string,
+      Partial<FinancialStatementRecord>
+    >();
 
     const allStatements = [
-      ...incomeStatements.map((s) => ({ ...s, type: 'income' })),
-      ...balanceSheets.map((s) => ({ ...s, type: 'balance' })),
-      ...cashFlows.map((s) => ({ ...s, type: 'cashflow' })),
+      ...incomeStatements.map((s) => ({ ...s, type: "income" })),
+      ...balanceSheets.map((s) => ({ ...s, type: "balance" })),
+      ...cashFlows.map((s) => ({ ...s, type: "cashflow" })),
     ];
 
     for (const stmt of allStatements) {
       if (!stmt.date || !stmt.period || !stmt.symbol) {
-        console.warn(`Skipping statement entry with missing key fields for ${job.symbol}:`, stmt);
+        console.warn(
+          `Skipping statement entry with missing key fields for ${job.symbol}:`,
+          stmt,
+        );
         continue;
       }
       const key = `${stmt.date}-${stmt.period}`;
@@ -152,13 +180,14 @@ export async function fetchFinancialStatementsLogic(
 
       // CRITICAL: Always update fetched_at when processing statements (even if record already exists)
       // Type assertion needed because fetched_at is optional in the type definition
-      (existing as FinancialStatementRecord & { fetched_at: string }).fetched_at = new Date().toISOString();
+      (existing as FinancialStatementRecord & { fetched_at: string })
+        .fetched_at = new Date().toISOString();
 
-      if (stmt.type === 'income') {
+      if (stmt.type === "income") {
         existing.income_statement_payload = stmt as FmpIncomeStatementEntry;
-      } else if (stmt.type === 'balance') {
+      } else if (stmt.type === "balance") {
         existing.balance_sheet_payload = stmt as FmpBalanceSheetEntry;
-      } else if (stmt.type === 'cashflow') {
+      } else if (stmt.type === "cashflow") {
         existing.cash_flow_payload = stmt as FmpCashFlowEntry;
       }
 
@@ -183,14 +212,19 @@ export async function fetchFinancialStatementsLogic(
     // For financial-statements, we use accepted_date (when SEC accepted the filing) as the source timestamp.
     // We check the MAX(accepted_date) for the symbol to detect if we're getting older data.
     const { data: registryData, error: registryError } = await supabase
-      .from('data_type_registry_v2')
-      .select('source_timestamp_column')
-      .eq('data_type', 'financial-statements')
+      .from("data_type_registry_v2")
+      .select("source_timestamp_column")
+      .eq("data_type", "financial-statements")
       .single();
 
     if (registryError) {
-      console.warn(`[fetchFinancialStatementsLogic] Failed to fetch registry for source timestamp check: ${registryError.message}`);
-    } else if (registryData?.source_timestamp_column && statementsForSymbolUpsert.length > 0) {
+      console.warn(
+        `[fetchFinancialStatementsLogic] Failed to fetch registry for source timestamp check: ${registryError.message}`,
+      );
+    } else if (
+      registryData?.source_timestamp_column &&
+      statementsForSymbolUpsert.length > 0
+    ) {
       // Get the maximum accepted_date from the new data
       const maxNewAcceptedDate = statementsForSymbolUpsert
         .map((stmt) => stmt.accepted_date)
@@ -202,48 +236,48 @@ export async function fetchFinancialStatementsLogic(
         // Get the maximum accepted_date from existing data for this symbol
         // CRITICAL: accepted_date is stored as TIMESTAMPTZ in the database
         const { data: existingData, error: existingError } = await supabase
-          .from('financial_statements')
-          .select('accepted_date')
-          .eq('symbol', job.symbol)
-          .not('accepted_date', 'is', null)
-          .order('accepted_date', { ascending: false })
+          .from("financial_statements")
+          .select("accepted_date")
+          .eq("symbol", job.symbol)
+          .not("accepted_date", "is", null)
+          .order("accepted_date", { ascending: false })
           .limit(1)
           .maybeSingle();
 
         if (existingError) {
-          console.warn(`[fetchFinancialStatementsLogic] Failed to fetch existing data for source timestamp check: ${existingError.message}`);
+          console.warn(
+            `[fetchFinancialStatementsLogic] Failed to fetch existing data for source timestamp check: ${existingError.message}`,
+          );
         } else if (existingData?.accepted_date) {
           // Parse timestamps - accepted_date is in format "YYYY-MM-DD HH:MM:SS" or ISO string
           const oldSourceTimestamp = new Date(existingData.accepted_date);
           const newSourceTimestamp = new Date(maxNewAcceptedDate);
 
           // Validate that dates are valid
-          if (isNaN(oldSourceTimestamp.getTime()) || isNaN(newSourceTimestamp.getTime())) {
-            console.warn(`[fetchFinancialStatementsLogic] Invalid timestamp format. Old: ${existingData.accepted_date}, New: ${maxNewAcceptedDate}`);
+          if (
+            isNaN(oldSourceTimestamp.getTime()) ||
+            isNaN(newSourceTimestamp.getTime())
+          ) {
+            console.warn(
+              `[fetchFinancialStatementsLogic] Invalid timestamp format. Old: ${existingData.accepted_date}, New: ${maxNewAcceptedDate}`,
+            );
           } else {
             // CRITICAL: If new source timestamp is < old source timestamp, this is stale data
             // The API is returning older filings (caching bug, stale cache, etc.)
             // We must reject this to prevent "data laundering"
-            // CRITICAL: For UI jobs (priority 1000), be more lenient - accept equal timestamps
-            // This prevents UI jobs from failing when the API returns the same data
-            const isUIJob = job.priority >= 1000;
             if (newSourceTimestamp < oldSourceTimestamp) {
-              // Stale data detected - this is expected behavior, not a failure
-              // Return success with message indicating data was correctly rejected
+              // Do not advance freshness when the source actually regresses.
+              // Returning a failure preserves the measured bandwidth and lets
+              // the queue's normal retry/backoff policy handle the anomaly.
               return {
-                success: true,
-                dataSizeBytes: 0,
-                message: `Data was stale (source timestamp: ${maxNewAcceptedDate} vs existing: ${existingData.accepted_date}). Correctly rejected to prevent data laundering.`,
-              };
-            } else if (!isUIJob && newSourceTimestamp.getTime() === oldSourceTimestamp.getTime()) {
-              // For non-UI jobs, reject equal timestamps (data laundering prevention)
-              return {
-                success: true,
-                dataSizeBytes: 0,
-                message: `Data was stale (equal timestamps: ${maxNewAcceptedDate}). Correctly rejected to prevent data laundering.`,
+                success: false,
+                dataSizeBytes: totalDataSizeBytes,
+                error:
+                  `FMP returned older financial statements for ${job.symbol} (source timestamp: ${maxNewAcceptedDate} vs existing: ${existingData.accepted_date}).`,
               };
             }
-            // For UI jobs, accept equal timestamps (user is actively waiting, better to show data than fail)
+            // Equal source timestamps are normal between filings. The fetch is
+            // still current evidence, so upsert it to advance fetched_at.
           }
         }
       }
@@ -251,18 +285,33 @@ export async function fetchFinancialStatementsLogic(
 
     if (statementsForSymbolUpsert.length > 0) {
       const { error: upsertError } = await supabase
-        .from('financial_statements')
+        .from("financial_statements")
         .upsert(statementsForSymbolUpsert, {
-          onConflict: 'symbol,date,period',
-          count: 'exact',
+          onConflict: "symbol,date,period",
+          count: "exact",
         });
 
       if (upsertError) {
         throw new Error(`Database upsert failed: ${upsertError.message}`);
       }
 
+      await recordDataFetchFreshness(
+        supabase,
+        job,
+        true,
+        totalDataSizeBytes,
+      );
     } else {
-      console.warn(`[fetchFinancialStatementsLogic] No consolidated statement data to upsert for ${job.symbol}`);
+      console.warn(
+        `[fetchFinancialStatementsLogic] No consolidated statement data to upsert for ${job.symbol}`,
+      );
+
+      await recordDataFetchFreshness(
+        supabase,
+        job,
+        false,
+        totalDataSizeBytes,
+      );
     }
 
     return {
@@ -272,9 +321,8 @@ export async function fetchFinancialStatementsLogic(
   } catch (error) {
     return {
       success: false,
-      dataSizeBytes: 0,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      dataSizeBytes: totalDataSizeBytes,
+      error: error instanceof Error ? error.message : "Unknown error",
     };
   }
 }
-
