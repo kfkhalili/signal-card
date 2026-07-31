@@ -90,7 +90,7 @@ DECLARE
 BEGIN
   SELECT COUNT(*) INTO invalid_strategy_count
   FROM public.data_type_registry_v2
-  WHERE refresh_strategy NOT IN ('on-demand', 'scheduled');
+  WHERE refresh_strategy NOT IN ('on-demand', 'scheduled', 'hybrid');
 
   IF invalid_strategy_count > 0 THEN
     RAISE EXCEPTION 'Found % data types with invalid refresh_strategy', invalid_strategy_count;
@@ -116,4 +116,3 @@ BEGIN
 END $$;
 
 RAISE NOTICE 'All monofunction migration tests PASSED!';
-

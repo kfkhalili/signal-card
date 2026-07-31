@@ -41,7 +41,7 @@ END $$;
 \i test_contract_8_scheduled_job_priority.sql
 
 \echo ''
-\echo 'Running Contract #9: TABLESAMPLE...'
+\echo 'Running Contract #9: Bounded scheduled round robin...'
 \i test_contract_9_tablesample.sql
 
 \echo ''
@@ -75,6 +75,10 @@ END $$;
 \echo ''
 \echo 'Running Contract #19: Successful Empty Fetch Freshness...'
 \i test_contract_19_negative_cache_freshness.sql
+
+\echo ''
+\echo 'Running Contract #20: Scheduled durable-data baseline...'
+\i test_contract_20_scheduled_refresh_baseline.sql
 
 \echo ''
 \echo '✅ All contract tests completed!'

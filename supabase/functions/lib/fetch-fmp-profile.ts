@@ -2,13 +2,14 @@
 // Library function for processing profile jobs from the queue
 // CRITICAL: This function is imported directly by queue-processor-v2 (monofunction architecture)
 
-import { z } from 'zod';
-import type { SupabaseClient } from '@supabase/supabase-js';
-import type { QueueJob, ProcessJobResult } from './types.ts';
+import { z } from "zod";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { ProcessJobResult, QueueJob } from "./types.ts";
+import { recordDataFetchFreshness } from "./record-data-fetch-freshness.ts";
 
-const FMP_API_KEY = Deno.env.get('FMP_API_KEY');
-const FMP_PROFILE_BASE_URL = 'https://financialmodelingprep.com/stable/profile';
-const STORAGE_BUCKET_NAME = 'profile-images';
+const FMP_API_KEY = Deno.env.get("FMP_API_KEY");
+const FMP_PROFILE_BASE_URL = "https://financialmodelingprep.com/stable/profile";
+const STORAGE_BUCKET_NAME = "profile-images";
 
 // Zod schema for FMP Profile API response
 // CRITICAL: Strict schema validation - all required fields must be present and correct type
@@ -35,8 +36,8 @@ const FmpProfileSchema = z.object({
   website: z.union([
     z.string().url(), // Valid URL
     z.string(), // Any string (invalid URLs will be stored but not used)
-    z.literal(''),
-    z.null()
+    z.literal(""),
+    z.null(),
   ]).optional(), // FIXED: More lenient - accept any string, validate URL format later if needed
   description: z.string().nullish(), // FMP can return null or undefined
   ceo: z.string().nullish(), // FMP can return null or undefined
@@ -48,7 +49,7 @@ const FmpProfileSchema = z.object({
   city: z.string().nullish(), // FMP can return null or undefined
   state: z.string().nullish(), // FMP can return null or undefined
   zip: z.string().nullish(), // FMP can return null or undefined
-  image: z.string().url().optional().or(z.literal('')),
+  image: z.string().url().optional().or(z.literal("")),
   ipoDate: z.string().optional(), // "YYYY-MM-DD"
   defaultImage: z.boolean().optional(),
   isEtf: z.boolean().optional(),
@@ -57,22 +58,25 @@ const FmpProfileSchema = z.object({
   isFund: z.boolean().optional(),
 });
 
-function parseFmpFullTimeEmployees(employeesStr: string | undefined): number | null {
+function parseFmpFullTimeEmployees(
+  employeesStr: string | undefined,
+): number | null {
   if (!employeesStr) return null;
-  const num = parseInt(employeesStr.replace(/,/g, ''), 10);
+  const num = parseInt(employeesStr.replace(/,/g, ""), 10);
   return isNaN(num) ? null : num;
 }
 
 export async function fetchProfileLogic(
   job: QueueJob,
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
 ): Promise<ProcessJobResult> {
   // CRITICAL VALIDATION #1: Data Type Check (Prevents Misconfiguration)
-  if (job.data_type !== 'profile') {
+  if (job.data_type !== "profile") {
     return {
       success: false,
       dataSizeBytes: 0,
-      error: `Configuration Error: fetchProfileLogic was called for job type ${job.data_type}. Expected 'profile'.`,
+      error:
+        `Configuration Error: fetchProfileLogic was called for job type ${job.data_type}. Expected 'profile'.`,
     };
   }
 
@@ -83,11 +87,14 @@ export async function fetchProfileLogic(
 
     let response: Response;
     try {
-      const profileUrl = `${FMP_PROFILE_BASE_URL}?symbol=${job.symbol}&apikey=${FMP_API_KEY}`;
+      const profileUrl =
+        `${FMP_PROFILE_BASE_URL}?symbol=${job.symbol}&apikey=${FMP_API_KEY}`;
       response = await fetch(profileUrl, { signal: controller.signal });
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error('FMP API request timed out after 10 seconds. This indicates API brownout or network issue.');
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new Error(
+          "FMP API request timed out after 10 seconds. This indicates API brownout or network issue.",
+        );
       }
       throw error;
     } finally {
@@ -95,15 +102,19 @@ export async function fetchProfileLogic(
     }
 
     if (!response.ok) {
-      throw new Error(`FMP API error: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `FMP API error: ${response.status} ${response.statusText}`,
+      );
     }
 
     // CRITICAL: Get the ACTUAL data transfer size (what FMP bills for)
     // Do NOT use JSON.stringify().length - that measures the parsed object, not the HTTP payload
-    const contentLength = response.headers.get('Content-Length');
+    const contentLength = response.headers.get("Content-Length");
     let actualSizeBytes = contentLength ? parseInt(contentLength, 10) : 0;
     if (actualSizeBytes === 0) {
-      console.warn(`[fetchProfileLogic] Content-Length header missing for ${job.symbol}. Using fallback estimate.`);
+      console.warn(
+        `[fetchProfileLogic] Content-Length header missing for ${job.symbol}. Using fallback estimate.`,
+      );
       actualSizeBytes = 50000; // 50 KB conservative estimate
     }
 
@@ -113,8 +124,26 @@ export async function fetchProfileLogic(
     // Manual "spot-checks" are insufficient - APIs can change field names without versioning
     // This causes undefined values to be written as NULL, corrupting the database
     // MUST use strict, holistic schema parsing (Zod) to validate the ENTIRE response
-    if (!Array.isArray(data) || data.length === 0) {
-      throw new Error(`FMP API returned empty array or invalid response for ${job.symbol}`);
+    if (!Array.isArray(data)) {
+      throw new Error(
+        `FMP API returned invalid response for ${job.symbol}. Expected an array.`,
+      );
+    }
+
+    if (data.length === 0) {
+      await recordDataFetchFreshness(
+        supabase,
+        job,
+        false,
+        actualSizeBytes,
+      );
+
+      return {
+        success: true,
+        dataSizeBytes: actualSizeBytes,
+        message:
+          `No profile data found for ${job.symbol}. Recorded successful empty freshness.`,
+      };
     }
 
     // Parse the data - this IS the validation
@@ -140,22 +169,28 @@ export async function fetchProfileLogic(
           .list(undefined, { limit: 1, search: imageFileName });
 
         if (listError) {
-          console.warn(`[fetchProfileLogic] Storage list error for ${job.symbol}: ${listError.message}`);
+          console.warn(
+            `[fetchProfileLogic] Storage list error for ${job.symbol}: ${listError.message}`,
+          );
         } else if (!existingFiles || existingFiles.length === 0) {
           const imageResponse = await fetch(profile.image);
           if (!imageResponse.ok) {
-            console.warn(`[fetchProfileLogic] Failed to download image for ${job.symbol}`);
+            console.warn(
+              `[fetchProfileLogic] Failed to download image for ${job.symbol}`,
+            );
           } else {
             const imageBlob = await imageResponse.blob();
             const { error: uploadError } = await supabase.storage
               .from(STORAGE_BUCKET_NAME)
               .upload(imageFileName, imageBlob, {
-                contentType: 'image/png',
+                contentType: "image/png",
                 upsert: false,
               });
 
             if (uploadError) {
-              console.warn(`[fetchProfileLogic] Upload error for ${job.symbol}: ${uploadError.message}`);
+              console.warn(
+                `[fetchProfileLogic] Upload error for ${job.symbol}: ${uploadError.message}`,
+              );
             } else {
               const { data: urlData } = supabase.storage
                 .from(STORAGE_BUCKET_NAME)
@@ -170,7 +205,9 @@ export async function fetchProfileLogic(
           finalImageUrl = urlData.publicUrl;
         }
       } catch (imageError) {
-        console.warn(`[fetchProfileLogic] Image processing failed for ${job.symbol}: ${imageError}`);
+        console.warn(
+          `[fetchProfileLogic] Image processing failed for ${job.symbol}: ${imageError}`,
+        );
         finalImageUrl = profile.image || null;
       }
     }
@@ -182,7 +219,9 @@ export async function fetchProfileLogic(
       symbol: profile.symbol,
       price: profile.price,
       beta: profile.beta ?? null,
-      average_volume: profile.averageVolume ? Math.trunc(profile.averageVolume) : null,
+      average_volume: profile.averageVolume
+        ? Math.trunc(profile.averageVolume)
+        : null,
       market_cap: profile.marketCap ? Math.trunc(profile.marketCap) : null,
       last_dividend: profile.lastDividend ?? null,
       range: profile.range ?? null,
@@ -196,12 +235,16 @@ export async function fetchProfileLogic(
       exchange: profile.exchange ?? null,
       exchange_full_name: profile.exchangeFullName ?? null,
       industry: profile.industry ?? null,
-      website: (profile.website && profile.website !== '') ? profile.website : null, // Store null for empty strings or invalid URLs
+      website: (profile.website && profile.website !== "")
+        ? profile.website
+        : null, // Store null for empty strings or invalid URLs
       description: profile.description ?? null,
       ceo: profile.ceo ?? null,
       sector: profile.sector ?? null,
       country: profile.country ?? null,
-      full_time_employees: parseFmpFullTimeEmployees(profile.fullTimeEmployees ?? undefined),
+      full_time_employees: parseFmpFullTimeEmployees(
+        profile.fullTimeEmployees ?? undefined,
+      ),
       phone: profile.phone ?? null,
       address: profile.address ?? null,
       city: profile.city ?? null,
@@ -218,13 +261,20 @@ export async function fetchProfileLogic(
     };
 
     // Upsert to database using RPC function
-    const { error: rpcError } = await supabase.rpc('upsert_profile', {
+    const { error: rpcError } = await supabase.rpc("upsert_profile", {
       profile_data: recordToUpsert,
     });
 
     if (rpcError) {
       throw new Error(`Database upsert failed: ${rpcError.message}`);
     }
+
+    await recordDataFetchFreshness(
+      supabase,
+      job,
+      true,
+      actualSizeBytes,
+    );
 
     return {
       success: true,
@@ -234,8 +284,7 @@ export async function fetchProfileLogic(
     return {
       success: false,
       dataSizeBytes: 0,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : "Unknown error",
     };
   }
 }
-
