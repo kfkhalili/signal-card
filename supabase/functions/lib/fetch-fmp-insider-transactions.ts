@@ -6,6 +6,7 @@
 import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { QueueJob, ProcessJobResult } from './types.ts';
+import { recordDataFetchFreshness } from './record-data-fetch-freshness.ts';
 
 const FMP_API_KEY = Deno.env.get('FMP_API_KEY');
 const FMP_INSIDER_TRANSACTIONS_BASE_URL = 'https://financialmodelingprep.com/stable/insider-trading/search';
@@ -96,20 +97,8 @@ export async function fetchInsiderTransactionsLogic(
         Object.keys(fmpResult).length === 0
       ) {
         // No insider transaction data found - this is a valid response
-        // CRITICAL: Update fetched_at for existing records to prevent infinite job creation
-        const { error: updateError } = await supabase
-          .from('insider_transactions')
-          .update({ fetched_at: new Date().toISOString() })
-          .eq('symbol', job.symbol);
-
-        if (updateError) {
-          console.warn(
-            `[fetchInsiderTransactionsLogic] Failed to update fetched_at for ${job.symbol}:`,
-            updateError.message
-          );
-        }
-
-        console.log(`[fetchInsiderTransactionsLogic] No insider transaction data found for ${job.symbol} (empty object returned by FMP). Updated fetched_at to prevent infinite job creation.`);
+        await recordDataFetchFreshness(supabase, job, false, actualSizeBytes);
+        console.log(`[fetchInsiderTransactionsLogic] No insider transaction data found for ${job.symbol} (empty object returned by FMP). Recorded successful empty freshness.`);
         return {
           success: true,
           dataSizeBytes: actualSizeBytes,
@@ -120,20 +109,8 @@ export async function fetchInsiderTransactionsLogic(
 
     if (fmpResult.length === 0) {
       // Empty array - no insider transaction data found
-      // CRITICAL: Update fetched_at for existing records to prevent infinite job creation
-      const { error: updateError } = await supabase
-        .from('insider_transactions')
-        .update({ fetched_at: new Date().toISOString() })
-        .eq('symbol', job.symbol);
-
-      if (updateError) {
-        console.warn(
-          `[fetchInsiderTransactionsLogic] Failed to update fetched_at for ${job.symbol}:`,
-          updateError.message
-        );
-      }
-
-      console.log(`[fetchInsiderTransactionsLogic] No insider transaction data found for ${job.symbol} (empty array returned by FMP). Updated fetched_at to prevent infinite job creation.`);
+      await recordDataFetchFreshness(supabase, job, false, actualSizeBytes);
+      console.log(`[fetchInsiderTransactionsLogic] No insider transaction data found for ${job.symbol} (empty array returned by FMP). Recorded successful empty freshness.`);
       return {
         success: true,
         dataSizeBytes: actualSizeBytes,
@@ -221,6 +198,12 @@ export async function fetchInsiderTransactionsLogic(
       throw new Error(`Failed to upsert insider transactions for ${job.symbol}: ${upsertError.message}`);
     }
 
+    await recordDataFetchFreshness(
+      supabase,
+      job,
+      deduplicatedRecords.length > 0,
+      actualSizeBytes
+    );
 
     return {
       success: true,
@@ -236,4 +219,3 @@ export async function fetchInsiderTransactionsLogic(
     };
   }
 }
-
