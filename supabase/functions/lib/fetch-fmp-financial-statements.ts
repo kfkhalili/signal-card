@@ -13,6 +13,10 @@ import type {
   FmpIncomeStatementEntry,
   FmpStatementEntryBase,
 } from "../fetch-fmp-financial-statements/types.ts";
+import {
+  recordFinancialSourceRegression,
+  resolveFinancialSourceRegression,
+} from "./financial-source-regression.ts";
 import { recordDataFetchFreshness } from "./record-data-fetch-freshness.ts";
 
 const FMP_API_KEY = Deno.env.get("FMP_API_KEY");
@@ -266,14 +270,22 @@ export async function fetchFinancialStatementsLogic(
             // The API is returning older filings (caching bug, stale cache, etc.)
             // We must reject this to prevent "data laundering"
             if (newSourceTimestamp < oldSourceTimestamp) {
-              // Do not advance freshness when the source actually regresses.
-              // Returning a failure preserves the measured bandwidth and lets
-              // the queue's normal retry/backoff policy handle the anomaly.
+              // Persist the deterministic provider anomaly before returning.
+              // "Stale source timestamp" intentionally matches the queue's
+              // immediate-failure rule, avoiding wasteful retries while
+              // successful freshness remains unchanged.
+              const regressionMessage = await recordFinancialSourceRegression(
+                supabase,
+                job,
+                maxNewAcceptedDate,
+                existingData.accepted_date,
+                totalDataSizeBytes,
+              );
+
               return {
                 success: false,
                 dataSizeBytes: totalDataSizeBytes,
-                error:
-                  `FMP returned older financial statements for ${job.symbol} (source timestamp: ${maxNewAcceptedDate} vs existing: ${existingData.accepted_date}).`,
+                error: regressionMessage,
               };
             }
             // Equal source timestamps are normal between filings. The fetch is
@@ -301,6 +313,11 @@ export async function fetchFinancialStatementsLogic(
         true,
         totalDataSizeBytes,
       );
+
+      // A validated response at least as new as the stored source clears only
+      // this specific regression finding. Other financial-data findings are
+      // deliberately left untouched.
+      await resolveFinancialSourceRegression(supabase, job.symbol);
     } else {
       console.warn(
         `[fetchFinancialStatementsLogic] No consolidated statement data to upsert for ${job.symbol}`,
