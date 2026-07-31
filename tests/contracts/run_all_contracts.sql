@@ -85,4 +85,8 @@ END $$;
 \i test_contract_21_financial_source_regression.sql
 
 \echo ''
+\echo 'Running Contract #22: Cross-cycle refresh failure cooldown...'
+\i test_contract_22_refresh_failure_cooldown.sql
+
+\echo ''
 \echo '✅ All contract tests completed!'
