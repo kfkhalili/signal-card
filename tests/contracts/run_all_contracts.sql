@@ -81,4 +81,8 @@ END $$;
 \i test_contract_20_scheduled_refresh_baseline.sql
 
 \echo ''
+\echo 'Running Contract #21: Financial source timestamp regressions...'
+\i test_contract_21_financial_source_regression.sql
+
+\echo ''
 \echo '✅ All contract tests completed!'
