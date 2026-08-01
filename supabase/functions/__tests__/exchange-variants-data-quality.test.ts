@@ -120,6 +120,7 @@ function mockClient(options: {
 async function withFmpResponse(
   payload: unknown,
   callback: () => Promise<void>,
+  includeContentLength = true,
 ) {
   const originalFetch = globalThis.fetch;
   try {
@@ -127,7 +128,7 @@ async function withFmpResponse(
       Promise.resolve(
         new Response(JSON.stringify(payload), {
           status: 200,
-          headers: { "Content-Length": "100" },
+          headers: includeContentLength ? { "Content-Length": "100" } : {},
         }),
       );
     await callback();
@@ -163,6 +164,26 @@ Deno.test(
         (findings[0].evidence as Record<string, unknown>).endpointUrl,
       );
     });
+  },
+);
+
+Deno.test(
+  "missing content length records measured response bytes",
+  async () => {
+    const payload = [baseVariant];
+    await withFmpResponse(payload, async () => {
+      const { supabase } = mockClient({
+        profile: { exchange: "NASDAQ" },
+        exchanges: ["NASDAQ"],
+      });
+      const result = await fetchExchangeVariantsLogic(job, supabase);
+
+      assertEquals(result, {
+        success: true,
+        dataSizeBytes: new TextEncoder().encode(JSON.stringify(payload))
+          .byteLength,
+      });
+    }, false);
   },
 );
 
