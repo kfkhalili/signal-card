@@ -11,8 +11,8 @@ import type {
   SupabaseExchangeVariantRecord,
 } from '../fetch-fmp-exchange-variants/types.ts';
 import {
-  recordEmptyExchangeVariantsResponse,
-  resolveEmptyExchangeVariantsResponse,
+  syncExchangeVariantQualityFindings,
+  validateExchangeVariantsResponse,
 } from './exchange-variants-quality.ts';
 
 const FMP_API_KEY = Deno.env.get('FMP_API_KEY');
@@ -30,6 +30,8 @@ export async function fetchExchangeVariantsLogic(
       error: `Configuration Error: fetchExchangeVariantsLogic was called for job type ${job.data_type}. Expected 'exchange-variants'.`,
     };
   }
+
+  let actualSizeBytes = 0;
 
   try {
     if (!FMP_API_KEY) {
@@ -61,7 +63,7 @@ export async function fetchExchangeVariantsLogic(
 
     // CRITICAL: Get the ACTUAL data transfer size (what FMP bills for)
     const contentLength = response.headers.get('Content-Length');
-    let actualSizeBytes = contentLength ? parseInt(contentLength, 10) : 0;
+    actualSizeBytes = contentLength ? parseInt(contentLength, 10) : 0;
     if (actualSizeBytes === 0) {
       console.warn(`[fetchExchangeVariantsLogic] Content-Length header missing for ${job.symbol}. Using fallback estimate.`);
       actualSizeBytes = 80000; // 80 KB conservative estimate
@@ -73,143 +75,64 @@ export async function fetchExchangeVariantsLogic(
       throw new Error(`FMP API returned invalid response format for ${job.symbol}. Expected array, got: ${typeof fmpVariantsResult}`);
     }
 
+    let qualityFindings: ReturnType<typeof validateExchangeVariantsResponse>;
+
     if (fmpVariantsResult.length === 0) {
-      // An empty array is not valid exchange coverage for a listed symbol.
-      // Persist the upstream anomaly before creating the profile-derived
-      // sentinel, so the rendering fallback cannot mask the quality issue.
-      await recordEmptyExchangeVariantsResponse(
+      qualityFindings = validateExchangeVariantsResponse({
+        symbol: job.symbol,
+        response: fmpVariantsResult,
+        profileExchange: null,
+        profileExists: true,
+        knownExchanges: [],
+        existingVariants: [],
+      });
+    } else {
+      const [profileResult, existingResult, exchangesResult] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('exchange')
+          .eq('symbol', job.symbol)
+          .maybeSingle(),
+        supabase
+          .from('exchange_variants')
+          .select('symbol_variant, exchange_short_name, is_actively_trading')
+          .eq('symbol', job.symbol),
+        supabase.from('available_exchanges').select('exchange'),
+      ]);
+
+      if (profileResult.error && profileResult.error.code !== 'PGRST116') {
+        throw new Error(`Profile lookup failed: ${profileResult.error.message}`);
+      }
+      if (existingResult.error) {
+        throw new Error(`Existing variant lookup failed: ${existingResult.error.message}`);
+      }
+      if (exchangesResult.error) {
+        throw new Error(`Exchange registry lookup failed: ${exchangesResult.error.message}`);
+      }
+
+      qualityFindings = validateExchangeVariantsResponse({
+        symbol: job.symbol,
+        response: fmpVariantsResult,
+        profileExchange: profileResult.data?.exchange ?? null,
+        profileExists: profileResult.data != null,
+        knownExchanges: (exchangesResult.data ?? []).map((row) => row.exchange),
+        existingVariants: existingResult.data ?? [],
+      });
+    }
+
+    if (qualityFindings.length > 0) {
+      await syncExchangeVariantQualityFindings(
         supabase,
         job,
+        qualityFindings,
         actualSizeBytes,
       );
-
-      // CRITICAL: Create a sentinel record for exchange-variants if FMP returns empty array
-      // This prevents infinite retries for symbols that genuinely have no exchange variants
-      // CRITICAL: The sentinel record uses the actual symbol as symbol_variant (not a sentinel value)
-      // This allows the card to visualize it as "the only variant" (the base symbol itself)
-      // CRITICAL: Populate sentinel record with data from profiles table so it can render correctly
-
-      // Fetch profile data to populate the sentinel record
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('price, beta, average_volume, market_cap, last_dividend, range, change, currency, cik, isin, cusip, exchange, image, ipo_date, default_image, is_actively_trading')
-        .eq('symbol', job.symbol)
-        .maybeSingle();
-
-      if (profileError && profileError.code !== 'PGRST116') {
-        console.warn(`[fetchExchangeVariantsLogic] Error fetching profile data for sentinel record: ${profileError.message}`);
-      }
-
-      // Derive exchange_short_name from profile data
-      // The exchange field in profiles is usually the short name (e.g., "NYSE", "NASDAQ")
-      // Use it directly, or 'N/A' if not available
-      const exchangeShortName = profileData?.exchange ?? 'N/A';
-
-      const sentinelRecord: SupabaseExchangeVariantRecord = {
-        symbol: job.symbol,
-        symbol_variant: job.symbol, // CRITICAL: Use actual symbol, not sentinel value - this makes it visualizable
-        exchange_short_name: exchangeShortName, // Use exchange from profile, or 'N/A' if not available
-        fetched_at: new Date().toISOString(),
-        // Populate from profile data if available
-        price: profileData?.price ?? null,
-        beta: profileData?.beta ?? null,
-        vol_avg: profileData?.average_volume ?? null, // Map average_volume to vol_avg
-        mkt_cap: profileData?.market_cap ?? null,
-        last_div: profileData?.last_dividend ?? null,
-        range: profileData?.range ?? null,
-        changes: profileData?.change ?? null, // Map change to changes
-        currency: profileData?.currency ?? null,
-        cik: profileData?.cik ?? null,
-        isin: profileData?.isin ?? null,
-        cusip: profileData?.cusip ?? null,
-        exchange: profileData?.exchange ?? null,
-        dcf_diff: null, // Not available in profiles
-        dcf: null, // Not available in profiles
-        image: profileData?.image ?? null,
-        ipo_date: profileData?.ipo_date ?? null,
-        default_image: profileData?.default_image ?? null,
-        is_actively_trading: profileData?.is_actively_trading ?? true, // Use profile value, default to true
-      } as SupabaseExchangeVariantRecord; // Type assertion for fetched_at
-
-      // Check if sentinel record already exists
-      // CRITICAL: Check for both old format (exchange_short_name = 'N/A') and new format (exchange_short_name = actual exchange)
-      // This handles migration from old sentinel records to new populated ones
-      const { data: existingSentinel, error: checkError } = await supabase
-        .from('exchange_variants')
-        .select('symbol_variant, exchange_short_name')
-        .eq('symbol', job.symbol)
-        .eq('symbol_variant', job.symbol)
-        .in('exchange_short_name', [exchangeShortName, 'N/A']) // Check both old and new format
-        .maybeSingle();
-
-      if (checkError && checkError.code !== 'PGRST116') {
-        console.warn(`[fetchExchangeVariantsLogic] Error checking for sentinel record: ${checkError.message}`);
-      }
-
-      if (!existingSentinel) {
-        // Insert sentinel record
-        const { error: upsertError } = await supabase
-          .from('exchange_variants')
-          .upsert(sentinelRecord, {
-            onConflict: 'symbol_variant,exchange_short_name',
-            count: 'exact',
-          });
-
-        if (upsertError) {
-          throw new Error(`Database upsert of sentinel record failed: ${upsertError.message}`);
-        }
-        console.log(`[fetchExchangeVariantsLogic] Created sentinel exchange-variants record for ${job.symbol} (treating as the only variant).`);
-      } else {
-        // Update existing sentinel record with latest profile data
-        // This ensures the sentinel record stays in sync with profile updates
-        const updateData: Partial<SupabaseExchangeVariantRecord> = {
-          fetched_at: new Date().toISOString(),
-        };
-
-        // Update fields from profile if available
-        if (profileData) {
-          updateData.price = profileData.price ?? null;
-          updateData.beta = profileData.beta ?? null;
-          updateData.vol_avg = profileData.average_volume ?? null;
-          updateData.mkt_cap = profileData.market_cap ?? null;
-          updateData.last_div = profileData.last_dividend ?? null;
-          updateData.range = profileData.range ?? null;
-          updateData.changes = profileData.change ?? null;
-          updateData.currency = profileData.currency ?? null;
-          updateData.cik = profileData.cik ?? null;
-          updateData.isin = profileData.isin ?? null;
-          updateData.cusip = profileData.cusip ?? null;
-          updateData.exchange = profileData.exchange ?? null;
-          updateData.image = profileData.image ?? null;
-          updateData.ipo_date = profileData.ipo_date ?? null;
-          updateData.default_image = profileData.default_image ?? null;
-          updateData.is_actively_trading = profileData.is_actively_trading ?? true;
-
-          // Update exchange_short_name if exchange changed
-          if (profileData.exchange) {
-            updateData.exchange_short_name = profileData.exchange;
-          }
-        }
-
-        // CRITICAL: Update using the existing sentinel's exchange_short_name (could be 'N/A' or actual exchange)
-        // This allows migration from old format to new format
-        const { error: updateError } = await supabase
-          .from('exchange_variants')
-          .update(updateData)
-          .eq('symbol', job.symbol)
-          .eq('symbol_variant', job.symbol)
-          .in('exchange_short_name', [exchangeShortName, 'N/A']); // Update both old and new format
-
-        if (updateError) {
-          console.warn(`[fetchExchangeVariantsLogic] Failed to update sentinel record: ${updateError.message}`);
-        } else {
-          console.log(`[fetchExchangeVariantsLogic] Updated sentinel exchange-variants record for ${job.symbol} with profile data.`);
-        }
-      }
-
       return {
-        success: true,
-        dataSizeBytes: actualSizeBytes, // Still count the API call size
+        success: false,
+        dataSizeBytes: actualSizeBytes,
+        error: `Exchange-variant response failed data-quality checks for ${job.symbol}: ${[
+          ...new Set(qualityFindings.map((finding) => finding.checkCode)),
+        ].join(', ')}. Stored data was preserved.`,
       };
     }
 
@@ -222,19 +145,9 @@ export async function fetchExchangeVariantsLogic(
 
     // CRITICAL: Map FMP data to Supabase record format
     // NOTE: job.symbol is the symbol (e.g., "AAPL"), and FMP returns variant symbols (e.g., "AAPL.DE")
-    const recordsToUpsert: SupabaseExchangeVariantRecord[] = (
+    const recordsToReplace: SupabaseExchangeVariantRecord[] = (
       fmpVariantsResult as FmpExchangeVariantData[]
     )
-      .filter((fmpEntry) => {
-        const isValid = fmpEntry.symbol && fmpEntry.exchangeShortName;
-        if (!isValid) {
-          console.warn(
-            `[fetchExchangeVariantsLogic] Skipping invalid FMP exchange variant record for ${job.symbol} due to missing symbol or exchangeShortName:`,
-            fmpEntry
-          );
-        }
-        return isValid;
-      })
       .map((fmpEntry) => ({
         symbol: job.symbol, // CRITICAL: Use job.symbol as symbol (renamed from base_symbol)
         symbol_variant: fmpEntry.symbol, // Renamed from variant_symbol
@@ -260,23 +173,20 @@ export async function fetchExchangeVariantsLogic(
         fetched_at: new Date().toISOString(), // CRITICAL: Update fetched_at on upsert to prevent infinite job creation
       }));
 
-    if (recordsToUpsert.length > 0) {
-      const { error: upsertError } = await supabase
-        .from('exchange_variants')
-        .upsert(recordsToUpsert, {
-          onConflict: 'symbol_variant,exchange_short_name',
-          count: 'exact',
-        });
-
-      if (upsertError) {
-        throw new Error(`Database upsert failed: ${upsertError.message}`);
-      }
-
+    const { error: replaceError } = await supabase.rpc(
+      'replace_exchange_variants_v2',
+      { p_symbol: job.symbol, p_records: recordsToReplace },
+    );
+    if (replaceError) {
+      throw new Error(`Atomic exchange-variant replacement failed: ${replaceError.message}`);
     }
 
-    // A successfully persisted non-empty response clears only the matching
-    // empty-response anomaly. Other exchange-variant findings remain open.
-    await resolveEmptyExchangeVariantsResponse(supabase, job.symbol);
+    await syncExchangeVariantQualityFindings(
+      supabase,
+      job,
+      [],
+      actualSizeBytes,
+    );
 
     return {
       success: true,
@@ -285,7 +195,7 @@ export async function fetchExchangeVariantsLogic(
   } catch (error) {
     return {
       success: false,
-      dataSizeBytes: 0,
+      dataSizeBytes: actualSizeBytes,
       error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
