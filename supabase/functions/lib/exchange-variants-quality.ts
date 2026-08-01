@@ -12,6 +12,12 @@ interface ExistingExchangeVariant {
   is_actively_trading: boolean | null;
 }
 
+interface OwnedExchangeVariant {
+  symbol: string;
+  symbol_variant: string;
+  exchange_short_name: string;
+}
+
 interface ExchangeVariantQualityContext {
   symbol: string;
   response: unknown[];
@@ -19,6 +25,7 @@ interface ExchangeVariantQualityContext {
   profileExists: boolean;
   knownExchanges: string[];
   existingVariants: ExistingExchangeVariant[];
+  variantOwners: OwnedExchangeVariant[];
 }
 
 function normalized(value: unknown): string | null {
@@ -102,6 +109,34 @@ export function validateExchangeVariantsResponse(
       message: "FMP returned duplicate exchange-variant records.",
       evidence: { duplicateKeys: [...duplicateKeys].sort() },
       sourceReference: "duplicate-records",
+    });
+  }
+
+  const ownershipConflicts = context.variantOwners
+    .map((variant) => ({
+      key: variantKey(
+        variant.symbol_variant,
+        variant.exchange_short_name,
+      ),
+      existingOwner: normalized(variant.symbol),
+    }))
+    .filter(
+      (conflict): conflict is { key: string; existingOwner: string } =>
+        conflict.key !== null &&
+        conflict.existingOwner !== null &&
+        conflict.existingOwner !== baseSymbol &&
+        incomingKeys.has(conflict.key),
+    )
+    .sort((left, right) => left.key.localeCompare(right.key));
+  if (ownershipConflicts.length > 0) {
+    findings.push({
+      checkCode: "exchange_variant_ownership_conflict",
+      fieldName: "symbol_variant",
+      severity: "critical",
+      message:
+        "FMP returned exchange variants already assigned to a different base symbol.",
+      evidence: { ownershipConflicts },
+      sourceReference: "cross-symbol-ownership-conflict",
     });
   }
 
@@ -206,7 +241,10 @@ export function validateExchangeVariantsResponse(
       severity: "warning",
       message:
         "FMP omitted one or more previously known active exchange variants.",
-      evidence: { missingExistingActiveVariants },
+      evidence: {
+        missingExistingActiveVariants,
+        incomingVariantKeys: [...incomingKeys].sort(),
+      },
       sourceReference: "missing-previously-active-variants",
     });
   }
