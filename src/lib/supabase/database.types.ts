@@ -858,18 +858,24 @@ export type Database = {
       listed_symbols: {
         Row: {
           added_at: string
+          fmp_is_actively_trading: boolean | null
+          fmp_status_checked_at: string | null
           is_active: boolean
           last_processed_at: string | null
           symbol: string
         }
         Insert: {
           added_at?: string
+          fmp_is_actively_trading?: boolean | null
+          fmp_status_checked_at?: string | null
           is_active?: boolean
           last_processed_at?: string | null
           symbol: string
         }
         Update: {
           added_at?: string
+          fmp_is_actively_trading?: boolean | null
+          fmp_status_checked_at?: string | null
           is_active?: boolean
           last_processed_at?: string | null
           symbol?: string
