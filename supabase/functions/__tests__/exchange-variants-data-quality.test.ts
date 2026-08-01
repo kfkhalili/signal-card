@@ -66,6 +66,11 @@ function mockClient(options: {
     exchange_short_name: string;
     is_actively_trading: boolean | null;
   }>;
+  owners?: Array<{
+    symbol: string;
+    symbol_variant: string;
+    exchange_short_name: string;
+  }>;
   exchanges?: string[];
   profile?: { exchange: string } | null;
   syncError?: string;
@@ -98,6 +103,8 @@ function mockClient(options: {
           select: () => chain,
           eq: () =>
             Promise.resolve({ data: options.existing ?? [], error: null }),
+          in: () =>
+            Promise.resolve({ data: options.owners ?? [], error: null }),
         };
         return chain;
       }
@@ -144,6 +151,10 @@ Deno.test(
       const result = await fetchExchangeVariantsLogic(job, supabase);
 
       assertEquals(result.success, false);
+      assertEquals(
+        result.error?.startsWith("Non-retryable data-quality failure:"),
+        true,
+      );
       assertEquals(result.dataSizeBytes, 100);
       assertEquals(fromCalls, []);
       assertEquals(rpcCalls.map((call) => call.name), [
@@ -158,6 +169,37 @@ Deno.test(
       assertExists(
         (findings[0].evidence as Record<string, unknown>).endpointUrl,
       );
+    });
+  },
+);
+
+Deno.test(
+  "cross-symbol ownership conflict is recorded before atomic replacement",
+  async () => {
+    await withFmpResponse([baseVariant], async () => {
+      const { supabase, rpcCalls } = mockClient({
+        profile: { exchange: "NASDAQ" },
+        exchanges: ["NASDAQ"],
+        owners: [{
+          symbol: "OTHER",
+          symbol_variant: "TEST",
+          exchange_short_name: "NASDAQ",
+        }],
+      });
+      const result = await fetchExchangeVariantsLogic(job, supabase);
+
+      assertEquals(result.success, false);
+      assertEquals(rpcCalls.map((call) => call.name), [
+        "sync_data_quality_issues",
+      ]);
+      const findings = rpcCalls[0].args.p_findings as Array<
+        Record<string, unknown>
+      >;
+      assertEquals(
+        findings[0].check_code,
+        "exchange_variant_ownership_conflict",
+      );
+      assertEquals(findings[0].severity, "critical");
     });
   },
 );
@@ -276,6 +318,7 @@ Deno.test("validator rejects incomplete and unknown exchange data", () => {
     profileExists: true,
     knownExchanges: ["NASDAQ"],
     existingVariants: [],
+    variantOwners: [],
   });
 
   assertEquals(
@@ -292,6 +335,7 @@ Deno.test("validator flags duplicate records and a base-exchange mismatch", () =
     profileExists: true,
     knownExchanges: ["NASDAQ", "NYSE", "XETRA"],
     existingVariants: [],
+    variantOwners: [],
   });
 
   assertEquals(

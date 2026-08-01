@@ -17,6 +17,7 @@ import {
 
 const FMP_API_KEY = Deno.env.get('FMP_API_KEY');
 const FMP_EXCHANGE_VARIANTS_BASE_URL = 'https://financialmodelingprep.com/stable/search-exchange-variants';
+const NON_RETRYABLE_DATA_QUALITY_PREFIX = 'Non-retryable data-quality failure:';
 
 export async function fetchExchangeVariantsLogic(
   job: QueueJob,
@@ -85,9 +86,33 @@ export async function fetchExchangeVariantsLogic(
         profileExists: true,
         knownExchanges: [],
         existingVariants: [],
+        variantOwners: [],
       });
     } else {
-      const [profileResult, existingResult, exchangesResult] = await Promise.all([
+      const incomingVariantSymbols = [...new Set(
+        fmpVariantsResult
+          .map((entry) =>
+            entry && typeof entry === 'object' && !Array.isArray(entry)
+              ? (entry as Record<string, unknown>).symbol
+              : null
+          )
+          .filter((symbol): symbol is string =>
+            typeof symbol === 'string' && symbol.trim().length > 0
+          )
+          .map((symbol) => symbol.trim().toUpperCase()),
+      )];
+      const ownershipPromise = incomingVariantSymbols.length === 0
+        ? Promise.resolve({ data: [], error: null })
+        : supabase
+          .from('exchange_variants')
+          .select('symbol, symbol_variant, exchange_short_name')
+          .in('symbol_variant', incomingVariantSymbols);
+      const [
+        profileResult,
+        existingResult,
+        exchangesResult,
+        ownershipResult,
+      ] = await Promise.all([
         supabase
           .from('profiles')
           .select('exchange')
@@ -98,6 +123,7 @@ export async function fetchExchangeVariantsLogic(
           .select('symbol_variant, exchange_short_name, is_actively_trading')
           .eq('symbol', job.symbol),
         supabase.from('available_exchanges').select('exchange'),
+        ownershipPromise,
       ]);
 
       if (profileResult.error && profileResult.error.code !== 'PGRST116') {
@@ -109,6 +135,9 @@ export async function fetchExchangeVariantsLogic(
       if (exchangesResult.error) {
         throw new Error(`Exchange registry lookup failed: ${exchangesResult.error.message}`);
       }
+      if (ownershipResult.error) {
+        throw new Error(`Variant ownership lookup failed: ${ownershipResult.error.message}`);
+      }
 
       qualityFindings = validateExchangeVariantsResponse({
         symbol: job.symbol,
@@ -117,6 +146,7 @@ export async function fetchExchangeVariantsLogic(
         profileExists: profileResult.data != null,
         knownExchanges: (exchangesResult.data ?? []).map((row) => row.exchange),
         existingVariants: existingResult.data ?? [],
+        variantOwners: ownershipResult.data ?? [],
       });
     }
 
@@ -130,7 +160,7 @@ export async function fetchExchangeVariantsLogic(
       return {
         success: false,
         dataSizeBytes: actualSizeBytes,
-        error: `Exchange-variant response failed data-quality checks for ${job.symbol}: ${[
+        error: `${NON_RETRYABLE_DATA_QUALITY_PREFIX} Exchange-variant response failed data-quality checks for ${job.symbol}: ${[
           ...new Set(qualityFindings.map((finding) => finding.checkCode)),
         ].join(', ')}. Stored data was preserved.`,
       };
