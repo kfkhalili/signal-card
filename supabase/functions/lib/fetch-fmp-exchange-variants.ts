@@ -86,33 +86,9 @@ export async function fetchExchangeVariantsLogic(
         profileExists: true,
         knownExchanges: [],
         existingVariants: [],
-        variantOwners: [],
       });
     } else {
-      const incomingVariantSymbols = [...new Set(
-        fmpVariantsResult
-          .map((entry) =>
-            entry && typeof entry === 'object' && !Array.isArray(entry)
-              ? (entry as Record<string, unknown>).symbol
-              : null
-          )
-          .filter((symbol): symbol is string =>
-            typeof symbol === 'string' && symbol.trim().length > 0
-          )
-          .map((symbol) => symbol.trim().toUpperCase()),
-      )];
-      const ownershipPromise = incomingVariantSymbols.length === 0
-        ? Promise.resolve({ data: [], error: null })
-        : supabase
-          .from('exchange_variants')
-          .select('symbol, symbol_variant, exchange_short_name')
-          .in('symbol_variant', incomingVariantSymbols);
-      const [
-        profileResult,
-        existingResult,
-        exchangesResult,
-        ownershipResult,
-      ] = await Promise.all([
+      const [profileResult, existingResult, exchangesResult] = await Promise.all([
         supabase
           .from('profiles')
           .select('exchange')
@@ -123,7 +99,6 @@ export async function fetchExchangeVariantsLogic(
           .select('symbol_variant, exchange_short_name, is_actively_trading')
           .eq('symbol', job.symbol),
         supabase.from('available_exchanges').select('exchange'),
-        ownershipPromise,
       ]);
 
       if (profileResult.error && profileResult.error.code !== 'PGRST116') {
@@ -135,10 +110,6 @@ export async function fetchExchangeVariantsLogic(
       if (exchangesResult.error) {
         throw new Error(`Exchange registry lookup failed: ${exchangesResult.error.message}`);
       }
-      if (ownershipResult.error) {
-        throw new Error(`Variant ownership lookup failed: ${ownershipResult.error.message}`);
-      }
-
       qualityFindings = validateExchangeVariantsResponse({
         symbol: job.symbol,
         response: fmpVariantsResult,
@@ -146,7 +117,6 @@ export async function fetchExchangeVariantsLogic(
         profileExists: profileResult.data != null,
         knownExchanges: (exchangesResult.data ?? []).map((row) => row.exchange),
         existingVariants: existingResult.data ?? [],
-        variantOwners: ownershipResult.data ?? [],
       });
     }
 

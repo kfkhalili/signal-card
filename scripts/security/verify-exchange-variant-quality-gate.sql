@@ -1,7 +1,9 @@
 BEGIN;
 
 INSERT INTO public.profiles (symbol, exchange, is_actively_trading)
-VALUES ('QAVX', 'NASDAQ', true)
+VALUES
+  ('QAVX', 'NASDAQ', true),
+  ('QAVY', 'NASDAQ', true)
 ON CONFLICT (symbol) DO NOTHING;
 
 INSERT INTO public.exchange_variants (
@@ -13,7 +15,7 @@ INSERT INTO public.exchange_variants (
 VALUES
   ('QAVX', 'QAVX', 'NASDAQ', true),
   ('QAVX', 'QAVX.DE', 'XETRA', true)
-ON CONFLICT (symbol_variant, exchange_short_name) DO UPDATE
+ON CONFLICT (symbol, symbol_variant, exchange_short_name) DO UPDATE
 SET symbol = EXCLUDED.symbol;
 
 DO $$
@@ -43,6 +45,31 @@ BEGIN
      )
   THEN
     RAISE EXCEPTION 'validated replacement did not remove the obsolete row';
+  END IF;
+END;
+$$;
+
+DO $$
+BEGIN
+  PERFORM public.replace_exchange_variants_v2(
+    'QAVY',
+    '[{
+      "symbol": "QAVY",
+      "symbol_variant": "QAVX",
+      "exchange_short_name": "NASDAQ",
+      "price": 10,
+      "is_actively_trading": true
+    }]'::jsonb
+  );
+
+  IF (
+    SELECT count(*)
+    FROM public.exchange_variants
+    WHERE symbol_variant = 'QAVX'
+      AND exchange_short_name = 'NASDAQ'
+  ) <> 2 THEN
+    RAISE EXCEPTION
+      'overlapping variant was not retained for both base symbols';
   END IF;
 END;
 $$;
