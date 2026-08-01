@@ -32,6 +32,10 @@ const BALANCE_CRITICAL_THRESHOLD = 0.05;
 const MARKET_CAP_WARNING_THRESHOLD = 0.05;
 const MARKET_CAP_CRITICAL_THRESHOLD = 0.20;
 const FUTURE_PERIOD_GRACE_DAYS = 7;
+// EDGAR generally assigns the next business day's filing date to submissions
+// accepted after 5:30 p.m. ET. Weekends and holidays can therefore make a
+// valid acceptance timestamp precede filing_date by several calendar days.
+const ACCEPTED_BEFORE_FILING_GRACE_DAYS = 7;
 
 function finiteNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -327,16 +331,25 @@ export function validateReportingPeriodIntegrity(
         sourcePeriod,
         sourceReference: "invalid-accepted-date",
       });
-    } else if (acceptedDate && filingDate && acceptedDate < filingDate) {
+    } else if (
+      acceptedDate &&
+      filingDate &&
+      filingDate.getTime() - acceptedDate.getTime() >
+        ACCEPTED_BEFORE_FILING_GRACE_DAYS * 86_400_000
+    ) {
+      const acceptedBeforeFilingDays =
+        (filingDate.getTime() - acceptedDate.getTime()) / 86_400_000;
       findings.push({
         checkCode: "reporting_period_integrity",
         fieldName: "accepted_date",
         severity: "warning",
         message:
-          "Financial statement acceptance timestamp precedes its filing date.",
+          "Financial statement acceptance timestamp materially precedes its filing date.",
         evidence: {
           filingDate: statement.filing_date,
           acceptedDate: statement.accepted_date,
+          acceptedBeforeFilingDays,
+          graceDays: ACCEPTED_BEFORE_FILING_GRACE_DAYS,
         },
         sourceDate,
         sourcePeriod,
