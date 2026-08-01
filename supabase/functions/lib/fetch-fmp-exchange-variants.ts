@@ -62,15 +62,26 @@ export async function fetchExchangeVariantsLogic(
       throw new Error(`FMP API error: ${response.status} ${errorText}`);
     }
 
-    // CRITICAL: Get the ACTUAL data transfer size (what FMP bills for)
+    const responseBody = new Uint8Array(await response.arrayBuffer());
+
+    // Prefer FMP's reported transfer size. When it omits Content-Length,
+    // measure the body we actually received instead of booking an arbitrary
+    // 80 KB fallback for a response that is usually only a few kilobytes.
     const contentLength = response.headers.get('Content-Length');
-    actualSizeBytes = contentLength ? parseInt(contentLength, 10) : 0;
-    if (actualSizeBytes === 0) {
-      console.warn(`[fetchExchangeVariantsLogic] Content-Length header missing for ${job.symbol}. Using fallback estimate.`);
-      actualSizeBytes = 80000; // 80 KB conservative estimate
+    const reportedSizeBytes = contentLength ? parseInt(contentLength, 10) : 0;
+    if (Number.isFinite(reportedSizeBytes) && reportedSizeBytes > 0) {
+      actualSizeBytes = reportedSizeBytes;
+    } else {
+      actualSizeBytes = responseBody.byteLength;
+      console.warn(`[fetchExchangeVariantsLogic] Content-Length header missing or invalid for ${job.symbol}. Measured ${actualSizeBytes} response bytes.`);
     }
 
-    const fmpVariantsResult: unknown = await response.json();
+    let fmpVariantsResult: unknown;
+    try {
+      fmpVariantsResult = JSON.parse(new TextDecoder().decode(responseBody));
+    } catch {
+      throw new Error(`FMP API returned invalid JSON for ${job.symbol}`);
+    }
 
     if (!Array.isArray(fmpVariantsResult)) {
       throw new Error(`FMP API returned invalid response format for ${job.symbol}. Expected array, got: ${typeof fmpVariantsResult}`);
