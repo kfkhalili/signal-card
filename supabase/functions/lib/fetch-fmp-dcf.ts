@@ -78,7 +78,6 @@ export async function fetchDcfLogic(
       return {
         success: true,
         dataSizeBytes: actualSizeBytes,
-        error: null,
       };
     }
 
@@ -100,7 +99,6 @@ export async function fetchDcfLogic(
       return {
         success: true,
         dataSizeBytes: actualSizeBytes,
-        error: null,
       };
     }
 
@@ -130,7 +128,6 @@ export async function fetchDcfLogic(
     return {
       success: true,
       dataSizeBytes: actualSizeBytes,
-      error: null,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -142,4 +139,3 @@ export async function fetchDcfLogic(
     };
   }
 }
-

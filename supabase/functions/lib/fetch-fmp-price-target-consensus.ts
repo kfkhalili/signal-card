@@ -79,7 +79,6 @@ export async function fetchPriceTargetConsensusLogic(
       return {
         success: true,
         dataSizeBytes: actualSizeBytes,
-        error: null,
       };
     }
 
@@ -111,7 +110,6 @@ export async function fetchPriceTargetConsensusLogic(
     return {
       success: true,
       dataSizeBytes: actualSizeBytes,
-      error: null,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -123,4 +121,3 @@ export async function fetchPriceTargetConsensusLogic(
     };
   }
 }
-
