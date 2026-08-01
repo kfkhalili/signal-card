@@ -13,6 +13,11 @@ import type {
   FmpIncomeStatementEntry,
   FmpStatementEntryBase,
 } from "../fetch-fmp-financial-statements/types.ts";
+import { syncDataQualityFindings } from "../_shared/data-quality-persistence.ts";
+import {
+  validateBalanceSheetReconciliation,
+  validateReportingPeriodIntegrity,
+} from "../_shared/data-quality-validation.ts";
 import {
   recordFinancialSourceRegression,
   resolveFinancialSourceRegression,
@@ -306,6 +311,23 @@ export async function fetchFinancialStatementsLogic(
       if (upsertError) {
         throw new Error(`Database upsert failed: ${upsertError.message}`);
       }
+
+      const dataQualityFindings = [
+        ...statementsForSymbolUpsert.flatMap((statement) =>
+          validateBalanceSheetReconciliation(statement)
+        ),
+        ...validateReportingPeriodIntegrity(statementsForSymbolUpsert),
+      ];
+
+      await syncDataQualityFindings(
+        supabase,
+        {
+          symbol: job.symbol,
+          provider: "fmp",
+          endpoint: "financial-statements",
+        },
+        dataQualityFindings,
+      );
 
       await recordDataFetchFreshness(
         supabase,
