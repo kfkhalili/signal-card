@@ -6,6 +6,8 @@ DECLARE
   v_retryable_job uuid := gen_random_uuid();
   v_status text;
   v_retry_count integer;
+  v_retry_after timestamptz;
+  v_last_failure_at timestamptz;
 BEGIN
   INSERT INTO public.api_call_queue_v2 (
     id,
@@ -53,6 +55,18 @@ BEGIN
       v_status,
       v_retry_count;
   END IF;
+  SELECT cooldown.retry_after, cooldown.last_failure_at
+  INTO v_retry_after, v_last_failure_at
+  FROM public.refresh_failure_cooldowns_v2 AS cooldown
+  WHERE cooldown.symbol = 'QAVT'
+    AND cooldown.data_type = 'exchange-variants';
+
+  IF v_retry_after IS NULL
+     OR v_retry_after - v_last_failure_at < interval '24 hours'
+  THEN
+    RAISE EXCEPTION
+      'deterministic data-quality failure did not receive a 24-hour cooldown';
+  END IF;
   IF NOT EXISTS (
     SELECT 1
     FROM public.api_data_usage_v2
@@ -80,6 +94,14 @@ BEGIN
       'ordinary failure did not retain normal retry behavior: status %, retry %',
       v_status,
       v_retry_count;
+  END IF;
+
+  IF public.refresh_failure_retry_interval_v2(
+       'temporary database error',
+       1
+     ) <> interval '1 hour'
+  THEN
+    RAISE EXCEPTION 'ordinary failure backoff changed unexpectedly';
   END IF;
 END;
 $$;
