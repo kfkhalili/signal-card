@@ -40,27 +40,23 @@ jobs:
   test-contracts:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: latest
+        uses: supabase/setup-cli@v2
 
       - name: Start local Supabase
         run: supabase start
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-
-      - name: Install pgTAP
-        run: |
-          DATABASE_URL=$(supabase status --output json | jq -r '.DB_URL')
-          psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;"
 
       - name: Run contract tests
         run: npm run test:contracts
-        env:
-          DATABASE_URL: $(supabase status --output json | jq -r '.DB_URL')
 
       - name: Stop Supabase
         if: always()
@@ -227,4 +223,3 @@ PR can merge      PR BLOCKED
 | CI/CD on PR | ✅ **Implemented** | ✅ **Blocks PR merge** |
 
 **Status:** ✅ Step 3 (CI/CD Integration) complete. Contract tests now run automatically on every PR and block merges if violations are detected.
-

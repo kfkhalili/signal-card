@@ -3,7 +3,7 @@
 -- coverage. Presence may raise their priority, but quotes remain on demand.
 
 BEGIN;
-SELECT plan(18);
+SELECT plan(19);
 
 SELECT is(
   (
@@ -30,6 +30,16 @@ SELECT is(
   ),
   'on-demand',
   'Contract #20: quotes remain on demand'
+);
+
+SELECT is(
+  (
+    SELECT refresh_strategy
+    FROM public.data_type_registry_v2
+    WHERE data_type = 'exchange-variants'
+  ),
+  'scheduled',
+  'Contract #20: exchange variants receive scheduled full-universe coverage'
 );
 
 SELECT is(
@@ -195,8 +205,8 @@ SET
 
 SELECT is(
   public.queue_scheduled_refreshes_v2(),
-  5,
-  'Contract #20: fixture queues exactly the five stale durable inputs'
+  6,
+  'Contract #20: fixture queues exactly the six stale scheduled inputs'
 );
 
 SELECT is(
@@ -217,8 +227,8 @@ SELECT is(
     WHERE symbol = 'SCHED_WITHPROFILE'
       AND status = 'pending'
   ),
-  4,
-  'Contract #20: an existing profile unlocks the four stale dependent inputs'
+  5,
+  'Contract #20: an existing profile unlocks the five stale dependent inputs'
 );
 
 SELECT is(
@@ -240,7 +250,7 @@ SELECT is(
       AND status = 'pending'
       AND priority = -1
   ),
-  5,
+  6,
   'Contract #20: every scheduled fixture job stays below demand priority'
 );
 

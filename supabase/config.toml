@@ -2,7 +2,7 @@
 deno_version = 2
 
 [db]
-major_version = 15
+major_version = 17
 
 [functions.fetch-fmp-quote-indicators]
 enabled = false
