@@ -25,39 +25,17 @@ jobs:
         continue-on-error: false
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: 2.110.0
-
-      - name: Install PostgreSQL client and jq
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client jq
+        uses: supabase/setup-cli@v2
 
       - name: Start local Supabase
         run: supabase start
-        env:
-          # SUPABASE_ACCESS_TOKEN is optional for local development
-          # Only needed if using Supabase cloud features
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-
-      - name: Install pgTAP extension
-        run: |
-          # Get database URL from Supabase status
-          DB_URL=$(supabase status --output json | jq -r '.DB_URL')
-          psql "$DB_URL" -c "CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;"
-        continue-on-error: false
 
       - name: Apply migrations
         run: supabase migration up
         continue-on-error: false
 
       - name: Run contract tests
-        run: |
-          # Get DATABASE_URL from Supabase status and export it
-          export DATABASE_URL=$(supabase status --output json | jq -r '.DB_URL')
-          echo "Using DATABASE_URL: $DATABASE_URL"
-          npm run test:contracts
+        run: npm run test:contracts
 
       - name: Stop Supabase
         if: always()

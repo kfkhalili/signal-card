@@ -100,42 +100,44 @@ SELECT ok(
 
 ## When Enforcement Happens
 
-### Current State: Manual Execution
+### Local Execution
 
 ```bash
 npm run test:contracts
 ```
 
-Tests run manually during development. If any test fails:
+The pinned Supabase CLI runs each pgTAP file against the local stack. If any
+test fails:
 - ❌ Script exits with error code 1
 - ❌ Clear error messages show which contract was violated
 - ❌ Developer must fix the function (not the test)
 
-### Future State: CI/CD Integration (Required)
+### CI/CD Integration
 
-**GitHub Actions Workflow** (to be created):
+**GitHub Actions Workflow:**
 
 ```yaml
 # .github/workflows/database-contracts.yml
 name: Database Contract Tests
 
-on: [pull_request]
+on: [pull_request, push]
 
 jobs:
   test-contracts:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: Setup Supabase
-        uses: supabase/setup-cli@v1
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v2
       - name: Start local Supabase
         run: supabase start
-      - name: Install pgTAP
-        run: psql $DATABASE_URL -c "CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;"
       - name: Run contract tests
         run: npm run test:contracts
-        env:
-          DATABASE_URL: $(supabase status | grep 'DB URL' | awk '{print $NF}')
 ```
 
 **What this enforces:**
@@ -333,4 +335,3 @@ npm run test:contracts
 5. **Clear failures** - Provides specific error messages for quick fixes
 
 **Result:** Sacred Contracts become **executable code**, not just documentation. Violations are caught automatically before they reach production.
-

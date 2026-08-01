@@ -6,75 +6,23 @@ This directory contains automated tests that enforce the **Sacred Contracts** de
 
 The Sacred Contracts are the system's greatest defense against catastrophic bugs. These tests ensure that contracts are **enforced automatically** rather than relying on an "honor system" that can be ignored under pressure.
 
-## Test Target: Local vs Production
+## Test Target
 
-**Default: Local Supabase Database** ✅
-
-Contract tests should **primarily run against your local Supabase database** because:
-
-1. **Safety** - No risk to production data or systems
-2. **Speed** - Faster iteration during development
-3. **Pre-deployment validation** - Catch contract violations before deploying
-4. **Read-only** - Tests check function definitions/structure, not data
-
-**Production Testing (Optional):**
-
-You can run tests against production for verification, but:
-- ⚠️ **Be explicit** - Set `DATABASE_URL` to production connection string
-- ⚠️ **Tests are read-only** - They only check function definitions, but still exercise the database
-- ⚠️ **Use with caution** - Prefer local testing for development
-
-**Best Practice:**
-- ✅ Run tests locally during development
-- ✅ Run tests in CI/CD against a test/staging database
-- ✅ Optionally verify against production after deployment (with explicit DATABASE_URL)
-
-## Prerequisites
-
-### 1. Install pgTAP Extension
-
-**For Local Development:**
-```sql
-CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-```
-
-**Note:** We use the `extensions` schema for consistency with other non-system extensions in the project (pg_net, moddatetime, pgcrypto, etc.).
-
-**For Supabase Production:**
-- pgTAP may require superuser privileges
-- Contact Supabase support to enable the extension
-- Or use a local PostgreSQL instance for testing
-
-### 2. Verify Installation
-
-```sql
-SELECT * FROM pg_available_extensions WHERE name = 'pgtap';
-```
-
-If pgTAP is not available, tests will fail with a clear error message.
+Contract tests run only against the local Supabase database. They execute inside
+transactions and roll back their fixtures. Production is not a supported target
+for this command.
 
 ## Running Tests
 
 ### Prerequisites
 
-1. **Set DATABASE_URL** (or let the script auto-detect from Supabase CLI):
-   ```bash
-   # Option 1: Auto-detect from Supabase (if running locally)
-   # The script will try to get it automatically
+1. Node.js 20 or newer
+2. Docker Desktop
+3. `npm ci`
+4. `npx supabase start`
 
-   # Option 2: Set manually
-   export DATABASE_URL='postgresql://postgres:postgres@localhost:54322/postgres'
-
-   # Option 3: Get from Supabase CLI
-   export DATABASE_URL=$(supabase status | grep -i 'database url' | awk '{print $NF}')
-   ```
-
-   See `DATABASE_URL_SETUP.md` for detailed instructions.
-
-2. **Install pgTAP extension**:
-   ```sql
-   CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
-   ```
+The migration chain installs pgTAP automatically. No host `psql`, `jq`, or
+`DATABASE_URL` is required.
 
 ### Run All Contract Tests
 
@@ -82,18 +30,11 @@ If pgTAP is not available, tests will fail with a clear error message.
 npm run test:contracts
 ```
 
-The script will automatically try to detect `DATABASE_URL` from Supabase CLI if not set.
-
-Or directly:
-```bash
-cd tests/contracts
-psql $DATABASE_URL -f run_all_contracts.sql
-```
-
 ### Run Individual Contract Tests
 
 ```bash
-psql $DATABASE_URL -f tests/contracts/test_contract_1_atomic_batch_claiming.sql
+npx supabase test db --local \
+  tests/contracts/test_contract_1_atomic_batch_claiming.sql
 ```
 
 ## Test Structure
@@ -163,8 +104,7 @@ When adding a new Sacred Contract:
 1. Add the contract to `docs/architecture/MASTER-ARCHITECTURE.md` Section 9
 2. **IMMEDIATELY** write a test that enforces it
 3. Add the test to this directory
-4. Update `run_all_contracts.sql` to include the new test
-5. Document the test in this README
+4. Document the test in this README
 
 ## Test Maintenance
 
@@ -175,4 +115,3 @@ When adding a new Sacred Contract:
 4. If the contract is obsolete, remove both the contract AND the test
 
 **This moves contracts from "documentation" to "executable code."**
-
