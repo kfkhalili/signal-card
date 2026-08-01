@@ -12,12 +12,6 @@ interface ExistingExchangeVariant {
   is_actively_trading: boolean | null;
 }
 
-interface OwnedExchangeVariant {
-  symbol: string;
-  symbol_variant: string;
-  exchange_short_name: string;
-}
-
 interface ExchangeVariantQualityContext {
   symbol: string;
   response: unknown[];
@@ -25,7 +19,6 @@ interface ExchangeVariantQualityContext {
   profileExists: boolean;
   knownExchanges: string[];
   existingVariants: ExistingExchangeVariant[];
-  variantOwners: OwnedExchangeVariant[];
 }
 
 function normalized(value: unknown): string | null {
@@ -109,34 +102,6 @@ export function validateExchangeVariantsResponse(
       message: "FMP returned duplicate exchange-variant records.",
       evidence: { duplicateKeys: [...duplicateKeys].sort() },
       sourceReference: "duplicate-records",
-    });
-  }
-
-  const ownershipConflicts = context.variantOwners
-    .map((variant) => ({
-      key: variantKey(
-        variant.symbol_variant,
-        variant.exchange_short_name,
-      ),
-      existingOwner: normalized(variant.symbol),
-    }))
-    .filter(
-      (conflict): conflict is { key: string; existingOwner: string } =>
-        conflict.key !== null &&
-        conflict.existingOwner !== null &&
-        conflict.existingOwner !== baseSymbol &&
-        incomingKeys.has(conflict.key),
-    )
-    .sort((left, right) => left.key.localeCompare(right.key));
-  if (ownershipConflicts.length > 0) {
-    findings.push({
-      checkCode: "exchange_variant_ownership_conflict",
-      fieldName: "symbol_variant",
-      severity: "critical",
-      message:
-        "FMP returned exchange variants already assigned to a different base symbol.",
-      evidence: { ownershipConflicts },
-      sourceReference: "cross-symbol-ownership-conflict",
     });
   }
 
@@ -225,14 +190,28 @@ export function validateExchangeVariantsResponse(
     }
   }
 
+  const incomingVariantSymbols = new Set(
+    responseEntries
+      .map((entry) => normalized(entry.symbol))
+      .filter((symbol): symbol is string => symbol !== null),
+  );
   const missingExistingActiveVariants = context.existingVariants
     .filter((variant) => variant.is_actively_trading === true)
-    .map((variant) =>
-      variantKey(variant.symbol_variant, variant.exchange_short_name)
-    )
+    .map((variant) => ({
+      key: variantKey(
+        variant.symbol_variant,
+        variant.exchange_short_name,
+      ),
+      symbol: normalized(variant.symbol_variant),
+    }))
     .filter(
-      (key): key is string => key !== null && !incomingKeys.has(key),
+      (variant): variant is { key: string; symbol: string } =>
+        variant.key !== null &&
+        variant.symbol !== null &&
+        !incomingKeys.has(variant.key) &&
+        !incomingVariantSymbols.has(variant.symbol),
     )
+    .map((variant) => variant.key)
     .sort();
   if (missingExistingActiveVariants.length > 0) {
     findings.push({

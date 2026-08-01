@@ -117,7 +117,7 @@ async function fetchAndProcessSymbolExchangeVariants(
       const { error: upsertError, count } = await supabaseAdmin
         .from("exchange_variants")
         .upsert(recordsToUpsert, {
-          onConflict: "symbol_variant,exchange_short_name",
+          onConflict: "symbol,symbol_variant,exchange_short_name",
           count: "exact",
         });
 
