@@ -96,6 +96,11 @@ enabled = true
 verify_jwt = false
 entrypoint = "./functions/queue-processor-v2/index.ts"
 
+[functions.sync-fmp-symbol-universe]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/sync-fmp-symbol-universe/index.ts"
+
 [functions.refresh-analytics-from-presence-v2]
 enabled = false
 verify_jwt = false
