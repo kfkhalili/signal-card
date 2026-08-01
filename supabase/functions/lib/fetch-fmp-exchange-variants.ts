@@ -10,6 +10,10 @@ import type {
   FmpExchangeVariantData,
   SupabaseExchangeVariantRecord,
 } from '../fetch-fmp-exchange-variants/types.ts';
+import {
+  recordEmptyExchangeVariantsResponse,
+  resolveEmptyExchangeVariantsResponse,
+} from './exchange-variants-quality.ts';
 
 const FMP_API_KEY = Deno.env.get('FMP_API_KEY');
 const FMP_EXCHANGE_VARIANTS_BASE_URL = 'https://financialmodelingprep.com/stable/search-exchange-variants';
@@ -70,6 +74,15 @@ export async function fetchExchangeVariantsLogic(
     }
 
     if (fmpVariantsResult.length === 0) {
+      // An empty array is not valid exchange coverage for a listed symbol.
+      // Persist the upstream anomaly before creating the profile-derived
+      // sentinel, so the rendering fallback cannot mask the quality issue.
+      await recordEmptyExchangeVariantsResponse(
+        supabase,
+        job,
+        actualSizeBytes,
+      );
+
       // CRITICAL: Create a sentinel record for exchange-variants if FMP returns empty array
       // This prevents infinite retries for symbols that genuinely have no exchange variants
       // CRITICAL: The sentinel record uses the actual symbol as symbol_variant (not a sentinel value)
@@ -261,6 +274,10 @@ export async function fetchExchangeVariantsLogic(
 
     }
 
+    // A successfully persisted non-empty response clears only the matching
+    // empty-response anomaly. Other exchange-variant findings remain open.
+    await resolveEmptyExchangeVariantsResponse(supabase, job.symbol);
+
     return {
       success: true,
       dataSizeBytes: actualSizeBytes,
@@ -273,4 +290,3 @@ export async function fetchExchangeVariantsLogic(
     };
   }
 }
-
