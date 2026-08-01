@@ -97,6 +97,40 @@ describe("provider data-quality validators", () => {
       ]));
     });
 
+    it("allows EDGAR acceptance before the next-business-day filing date", () => {
+      const findings = validateReportingPeriodIntegrity([{
+        date: "2024-12-31",
+        period: "FY",
+        fiscal_year: "2024",
+        filing_date: "2025-01-06",
+        accepted_date: "2025-01-03T19:00:00.000Z",
+      }], now);
+
+      expect(findings).not.toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          sourceReference: "accepted-before-filing",
+        }),
+      ]));
+    });
+
+    it("detects acceptance timestamps materially before filing", () => {
+      const findings = validateReportingPeriodIntegrity([{
+        date: "2024-12-31",
+        period: "FY",
+        fiscal_year: "2024",
+        filing_date: "2025-01-15",
+        accepted_date: "2025-01-01T12:00:00.000Z",
+      }], now);
+
+      expect(findings).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          severity: "warning",
+          sourceReference: "accepted-before-filing",
+          evidence: expect.objectContaining({ graceDays: 7 }),
+        }),
+      ]));
+    });
+
     it("detects multiple dates mapped to one fiscal period", () => {
       const findings = validateReportingPeriodIntegrity(
         [
