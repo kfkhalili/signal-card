@@ -35,14 +35,24 @@ VALUES
   ('VFY_ALPHA', 'Verification Alpha'),
   ('VFY_BETA', 'Verification Beta'),
   ('VFY_GAMMA', 'Verification Gamma'),
-  ('VFY_NULL', 'Verification Missing Data');
+  ('VFY_NULL', 'Verification Missing Metric'),
+  ('VFY_WEIGHTED', 'Verification Weighted Score'),
+  ('VFY_FMP_OFF', 'Verification FMP Inactive'),
+  ('VFY_NO_SCORE', 'Verification Missing Score Row');
 
-INSERT INTO public.listed_symbols (symbol, is_active)
+INSERT INTO public.listed_symbols (
+  symbol,
+  is_active,
+  fmp_is_actively_trading
+)
 VALUES
-  ('VFY_ALPHA', TRUE),
-  ('VFY_BETA', FALSE),
-  ('VFY_GAMMA', TRUE),
-  ('VFY_NULL', TRUE);
+  ('VFY_ALPHA', TRUE, TRUE),
+  ('VFY_BETA', FALSE, TRUE),
+  ('VFY_GAMMA', TRUE, TRUE),
+  ('VFY_NULL', TRUE, TRUE),
+  ('VFY_WEIGHTED', TRUE, TRUE),
+  ('VFY_FMP_OFF', TRUE, FALSE),
+  ('VFY_NO_SCORE', TRUE, TRUE);
 
 INSERT INTO public.compass_pillar_scores (
   symbol, industry, market_cap, revenue_ttm,
@@ -57,31 +67,44 @@ VALUES
   ('VFY_ALPHA', 'VFY Technology', 1000, 500, 80, 1, 80, 1, 80, 1, 80, 1, 80, 1, 80, 1, 80, 1, 80, 1),
   ('VFY_BETA', 'VFY Technology', 900, 450, 60, 2, 60, 2, 60, 2, 60, 2, 60, 2, 60, 2, 60, 2, 60, 2),
   ('VFY_GAMMA', 'VFY Healthcare', 800, 400, 100, 3, 0, 3, 100, 3, 0, 3, 100, 3, 0, 3, 100, 3, 0, 3),
-  ('VFY_NULL', 'VFY Technology', 700, NULL, NULL, 4, 40, 4, 40, 4, 40, 4, 40, 4, 40, 4, 40, 4, 40, 4);
+  ('VFY_NULL', 'VFY Technology', 700, NULL, NULL, 4, 40, 4, 40, 4, 40, 4, 40, 4, 40, 4, 40, 4, 40, 4),
+  ('VFY_WEIGHTED', 'VFY Industrials', 600, 300, 10, 5, 20, 5, 30, 5, 50, 5, 60, 5, 40, 5, 70, 5, 80, 5),
+  ('VFY_FMP_OFF', 'VFY Technology', 500, 250, 100, 6, 100, 6, 100, 6, 100, 6, 100, 6, 100, 6, 100, 6, 100, 6);
 
 INSERT INTO public.exchange_variants (
   symbol, symbol_variant, exchange_short_name
 )
 VALUES
-  ('VFY_ALPHA', 'VFY_ALPHA', 'NASDAQ'),
-  ('VFY_BETA', 'VFY_BETA', 'NYSE'),
-  ('VFY_GAMMA', 'VFY_GAMMA', 'NASDAQ'),
-  ('VFY_NULL', 'VFY_NULL', 'NASDAQ');
+  ('VFY_ALPHA', 'VFY_ALPHA', 'VFY-XNAS'),
+  ('VFY_BETA', 'VFY_BETA', 'VFY-XNYS'),
+  ('VFY_GAMMA', 'VFY_GAMMA', 'VFY-XNAS'),
+  ('VFY_NULL', 'VFY_NULL', 'VFY-XNAS'),
+  ('VFY_WEIGHTED', 'VFY_WEIGHTED', 'VFY-XNYS'),
+  ('VFY_FMP_OFF', 'VFY_FMP_OFF', 'VFY-XNAS'),
+  ('VFY_NO_SCORE', 'VFY_NO_SCORE', 'VFY-XNAS');
 
 DO $$
 DECLARE
   equal_weights CONSTANT jsonb :=
     '{"revenue":0.125,"value":0.125,"sentiment":0.125,"growth":0.125,"profitability":0.125,"buyback":0.125,"income":0.125,"health":0.125}'::jsonb;
+  custom_weights CONSTANT jsonb :=
+    '{"revenue":0.05,"value":0.10,"sentiment":0.15,"growth":0.20,"profitability":0.10,"buyback":0.15,"income":0.10,"health":0.15}'::jsonb;
   actual_symbols text[];
   expected_symbols text[];
   actual_score numeric;
+  actual_count integer;
 BEGIN
   SELECT array_agg(symbol ORDER BY rank)
   INTO actual_symbols
-  FROM public.get_weighted_leaderboard(equal_weights, ARRAY['VFY Technology', 'VFY Healthcare'], NULL)
+  FROM public.get_weighted_leaderboard(
+    equal_weights,
+    ARRAY['VFY Technology', 'VFY Healthcare', 'VFY Industrials'],
+    NULL
+  )
   WHERE symbol LIKE 'VFY\_%' ESCAPE '\';
 
-  IF actual_symbols IS DISTINCT FROM ARRAY['VFY_ALPHA', 'VFY_GAMMA', 'VFY_NULL']::text[] THEN
+  IF actual_symbols IS DISTINCT FROM
+     ARRAY['VFY_ALPHA', 'VFY_GAMMA', 'VFY_WEIGHTED', 'VFY_NULL']::text[] THEN
     RAISE EXCEPTION 'Ranking/active/missing-data order mismatch: %', actual_symbols;
   END IF;
 
@@ -103,9 +126,36 @@ BEGIN
     RAISE EXCEPTION 'Manual score mismatch for VFY_GAMMA: expected 50.00, got %', actual_score;
   END IF;
 
+  SELECT composite_score
+  INTO actual_score
+  FROM public.get_weighted_leaderboard(custom_weights, ARRAY['VFY Industrials'], NULL)
+  WHERE symbol = 'VFY_WEIGHTED';
+
+  IF actual_score IS DISTINCT FROM 48.00::numeric THEN
+    RAISE EXCEPTION 'Manual score mismatch for VFY_WEIGHTED: expected 48.00, got %', actual_score;
+  END IF;
+
   SELECT array_agg(symbol ORDER BY rank)
   INTO actual_symbols
-  FROM public.get_weighted_leaderboard(equal_weights, ARRAY['VFY Technology'], ARRAY['nasdaq'])
+  FROM public.get_weighted_leaderboard(equal_weights, ARRAY['VFY Technology'], NULL)
+  WHERE symbol LIKE 'VFY\_%' ESCAPE '\';
+
+  IF actual_symbols IS DISTINCT FROM ARRAY['VFY_ALPHA', 'VFY_NULL']::text[] THEN
+    RAISE EXCEPTION 'Industry-only filter or eligibility mismatch: %', actual_symbols;
+  END IF;
+
+  SELECT array_agg(symbol ORDER BY rank)
+  INTO actual_symbols
+  FROM public.get_weighted_leaderboard(equal_weights, NULL, ARRAY['vfy-xnas'])
+  WHERE symbol LIKE 'VFY\_%' ESCAPE '\';
+
+  IF actual_symbols IS DISTINCT FROM ARRAY['VFY_ALPHA', 'VFY_GAMMA', 'VFY_NULL']::text[] THEN
+    RAISE EXCEPTION 'Exchange-only filter or case-folding mismatch: %', actual_symbols;
+  END IF;
+
+  SELECT array_agg(symbol ORDER BY rank)
+  INTO actual_symbols
+  FROM public.get_weighted_leaderboard(equal_weights, ARRAY['VFY Technology'], ARRAY['vfy-xnas'])
   WHERE symbol LIKE 'VFY\_%' ESCAPE '\';
 
   IF actual_symbols IS DISTINCT FROM ARRAY['VFY_ALPHA', 'VFY_NULL']::text[] THEN
@@ -123,6 +173,40 @@ BEGIN
   IF actual_symbols IS DISTINCT FROM expected_symbols THEN
     RAISE EXCEPTION 'Empty filters should behave as no filters: empty=%, null=%',
       actual_symbols, expected_symbols;
+  END IF;
+
+  SELECT COUNT(*)
+  INTO actual_count
+  FROM public.get_weighted_leaderboard(
+    equal_weights,
+    ARRAY['VFY Does Not Exist'],
+    ARRAY['VFY-NONE']
+  );
+
+  IF actual_count <> 0 THEN
+    RAISE EXCEPTION 'Nonmatching filters should return zero rows, got %', actual_count;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM public.get_weighted_leaderboard(
+      equal_weights,
+      ARRAY['VFY Technology', 'VFY Healthcare', 'VFY Industrials'],
+      NULL
+    )
+    WHERE symbol IN ('VFY_BETA', 'VFY_FMP_OFF', 'VFY_NO_SCORE')
+  ) THEN
+    RAISE EXCEPTION
+      'Inactive, FMP-inactive, or absent-score symbols leaked into the leaderboard';
+  END IF;
+
+  SELECT composite_score
+  INTO actual_score
+  FROM public.get_weighted_leaderboard(equal_weights, ARRAY['VFY Technology'], NULL)
+  WHERE symbol = 'VFY_NULL';
+
+  IF actual_score IS NOT NULL THEN
+    RAISE EXCEPTION 'Missing normalized metric should yield a NULL composite score';
   END IF;
 END;
 $$;
@@ -254,11 +338,20 @@ BEGIN
   END IF;
 
   IF (SELECT COUNT(*) FROM cron.job WHERE jobname = 'check-stale-data-v2') <> 1
-     OR (SELECT COUNT(*) FROM cron.job WHERE jobname = 'queue-scheduled-refreshes-v2') <> 1
      OR (SELECT COUNT(*) FROM cron.job WHERE jobname = 'invoke-processor-v2') <> 1
      OR (SELECT COUNT(*) FROM cron.job WHERE jobname = 'maintain-queue-partitions-v2') <> 1
      OR (SELECT COUNT(*) FROM cron.job WHERE jobname = 'refresh-compass-leaderboard-mv') <> 1 THEN
     RAISE EXCEPTION 'One or more required scheduler jobs are missing or non-unique';
+  END IF;
+
+  -- Clean installs intentionally leave scheduled queueing absent until the
+  -- guarded production activation step. If activated, it must still be unique.
+  IF (
+    SELECT COUNT(*)
+    FROM cron.job
+    WHERE jobname = 'queue-scheduled-refreshes-v2'
+  ) > 1 THEN
+    RAISE EXCEPTION 'Scheduled refresh queue job is duplicated';
   END IF;
 
   IF POSITION(
