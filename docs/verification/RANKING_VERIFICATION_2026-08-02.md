@@ -7,6 +7,11 @@ filter, and missing-data checks on both a clean PostgreSQL 17 database and a
 fresh allowlisted production-like snapshot. The snapshot benchmark also
 establishes a new query-plan and server-side latency baseline.
 
+This verifies implementation correctness, not investment-model quality. The
+separate [financial model audit](./COMPASS_FINANCIAL_MODEL_AUDIT_2026-08-02.md)
+documents value-trap and comparability failures found in the live leaders and
+the shadow-validation path for Compass v2.
+
 - PostgreSQL: 17.6
 - Supabase CLI used by the project: 2.111.0
 - FMP requests made: 0

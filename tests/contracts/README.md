@@ -73,6 +73,7 @@ ROLLBACK;
 - ✅ **Contract #16:** Polite partition maintenance (`maintain_queue_partitions_v2`)
 - ✅ **Contract #17:** Deadlock-aware error handling (processor)
 - ✅ **Contract #18:** `SECURITY DEFINER` on `check_and_queue_stale_batch_v2`
+- ✅ **Contract #23:** Compass quality shadow audit remains read-only and service-only
 
 ### TypeScript Contracts (ESLint Rules)
 
