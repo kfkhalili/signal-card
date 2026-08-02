@@ -2,7 +2,7 @@
 -- not derive growth from PEG.
 
 BEGIN;
-SELECT plan(4);
+SELECT plan(5);
 
 SELECT ok(
   EXISTS (
@@ -67,6 +67,22 @@ SELECT ok(
     )
   ) = 0,
   'Contract #24: Growth v2 neither queues work nor invokes HTTP'
+);
+
+SELECT ok(
+  position(
+    'compass_pillar_scores'
+    IN pg_get_functiondef(
+      'public.get_compass_growth_shadow_leaderboard_v2(integer,text[],text[])'::regprocedure
+    )
+  ) > 0
+  AND position(
+    'financial_statements'
+    IN pg_get_functiondef(
+      'public.get_compass_growth_shadow_leaderboard_v2(integer,text[],text[])'::regprocedure
+    )
+  ) = 0,
+  'Contract #24: leaderboard reads use precomputed pillar scores'
 );
 
 SELECT * FROM finish();

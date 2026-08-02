@@ -51,6 +51,25 @@ VALUES
   ('VFY_GROWTH_DILUTED', true, true),
   ('VFY_GROWTH_BANK', true, true);
 
+-- Growth v2 follows the production Compass strategy and stores its calculated
+-- pillar beside the existing precomputed pillars.
+INSERT INTO public.compass_pillar_scores (
+  symbol,
+  industry,
+  market_cap,
+  updated_at
+)
+VALUES
+  ('VFY_GROWTH_GOOD', 'VFY Growth', 500000000, pg_catalog.now()),
+  ('VFY_GROWTH_SLOW', 'VFY Growth', 500000000, pg_catalog.now()),
+  ('VFY_GROWTH_DILUTED', 'VFY Growth', 500000000, pg_catalog.now()),
+  ('VFY_GROWTH_BANK', 'VFY Growth', 500000000, pg_catalog.now())
+ON CONFLICT (symbol) DO UPDATE
+SET
+  industry = EXCLUDED.industry,
+  market_cap = EXCLUDED.market_cap,
+  updated_at = EXCLUDED.updated_at;
+
 INSERT INTO public.financial_statements (
   symbol,
   date,
@@ -145,6 +164,8 @@ VALUES
     '{"totalStockholdersEquity":50,"totalDebt":10,"cashAndCashEquivalents":5}',
     '{"freeCashFlow":8}'
   );
+
+SELECT public.refresh_compass_growth_shadow_scores_v2();
 
 DO $$
 DECLARE
