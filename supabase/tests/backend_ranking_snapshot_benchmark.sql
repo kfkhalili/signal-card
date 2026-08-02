@@ -40,6 +40,18 @@ SELECT
   (SELECT COUNT(*) FROM public.profiles) AS profiles,
   (SELECT COUNT(*) FROM public.listed_symbols) AS listed_symbols,
   (SELECT COUNT(*) FROM public.listed_symbols WHERE is_active) AS active_symbols,
+  (
+    SELECT COUNT(*)
+    FROM public.listed_symbols
+    WHERE is_active
+      AND fmp_is_actively_trading IS DISTINCT FROM false
+  ) AS leaderboard_eligible_symbols,
+  (
+    SELECT COUNT(*)
+    FROM public.listed_symbols
+    WHERE is_active
+      AND fmp_is_actively_trading = false
+  ) AS fmp_inactive_symbols,
   (SELECT COUNT(*) FROM public.exchange_variants) AS exchange_variants,
   (SELECT COUNT(*) FROM public.compass_pillar_scores) AS scored_symbols,
   (
@@ -114,7 +126,7 @@ BEGIN
     benchmark_weights, selected_industries, selected_exchanges
   );
 
-  FOR sample_number IN 1..30 LOOP
+  FOR sample_number IN 1..100 LOOP
     started_at := clock_timestamp();
     PERFORM *
     FROM public.get_weighted_leaderboard(benchmark_weights, NULL, NULL);
@@ -138,7 +150,7 @@ BEGIN
 END;
 $$;
 
-\echo 'SNAPSHOT: 30-sample latency summary (server-side milliseconds)'
+\echo 'SNAPSHOT: 100-sample latency summary (server-side milliseconds)'
 SELECT
   variant,
   COUNT(*) AS samples,
