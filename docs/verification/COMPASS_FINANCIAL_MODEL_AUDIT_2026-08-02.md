@@ -99,6 +99,37 @@ The audit also warns about less severe liquidity, dilution, accrual, debt,
 revenue, and invalid-ratio risks. These thresholds are hypotheses to measure,
 not final production policy.
 
+## Growth v2 shadow model
+
+Migration `20260802010000_add_compass_growth_v2_shadow.sql` adds a second
+service-only, read-only leaderboard for operating companies. It leaves the
+production Growth ranking unchanged and makes no FMP requests.
+
+The score measures growth in the underlying business on a per-share basis:
+
+- revenue-per-share CAGR: 25%;
+- operating-income-per-share CAGR: 25%;
+- free-cash-flow-per-share CAGR: 25%;
+- consistency of positive annual growth: 15%;
+- latest return on invested capital: 10%.
+
+Using per-share results prevents new share issuance from masquerading as
+shareholder growth. The provisional eligibility floor requires at least three
+annual statements, three positive free-cash-flow years, a recent annual filing,
+positive revenue-per-share growth, positive operating-income-per-share or
+free-cash-flow-per-share growth, positive return on invested capital, and no
+more than 50% measured year-over-year dilution. Financial and real-estate
+companies remain excluded until their accounting receives specialized models.
+
+PEG is deliberately absent. It combines a valuation multiple with an earnings
+growth estimate; it is not a direct measure of business growth, and a negative
+PEG value is not evidence of attractive growth. The model direction is
+consistent with Aswath Damodaran's decomposition of sustainable growth into
+reinvestment and return on capital: [The Determinants of Growth](https://pages.stern.nyu.edu/~adamodar/New_Home_Page/invfables/growthdeterminants.htm).
+
+All thresholds and weights remain provisional until the shadow top 50 is
+compared with the current production leaders and reviewed company by company.
+
 ## Validation sequence
 
 1. Run the shadow audit against each current investor profile.

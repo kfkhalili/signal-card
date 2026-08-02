@@ -74,6 +74,7 @@ ROLLBACK;
 - ✅ **Contract #17:** Deadlock-aware error handling (processor)
 - ✅ **Contract #18:** `SECURITY DEFINER` on `check_and_queue_stale_batch_v2`
 - ✅ **Contract #23:** Compass quality shadow audit remains read-only and service-only
+- ✅ **Contract #24:** Compass Growth v2 remains PEG-free, read-only, and service-only
 
 ### TypeScript Contracts (ESLint Rules)
 
