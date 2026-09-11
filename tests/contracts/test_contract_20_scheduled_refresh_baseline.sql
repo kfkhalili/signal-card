@@ -1,6 +1,7 @@
 -- Contract #20: Scheduled Durable-Data Baseline
 -- Compass-critical durable inputs must receive full-universe scheduled
--- coverage. Presence may raise their priority, but quotes remain on demand.
+-- coverage. Presence may raise priority for hybrid data; quote and analyst
+-- inputs used by Hidden Gems also receive bandwidth-aware scheduled coverage.
 
 BEGIN;
 SELECT plan(19);
@@ -28,8 +29,8 @@ SELECT is(
     FROM public.data_type_registry_v2
     WHERE data_type = 'quote'
   ),
-  'on-demand',
-  'Contract #20: quotes remain on demand'
+  'scheduled',
+  'Contract #20: quotes receive scheduled full-universe coverage'
 );
 
 SELECT is(
@@ -205,8 +206,8 @@ SET
 
 SELECT is(
   public.queue_scheduled_refreshes_v2(),
-  6,
-  'Contract #20: fixture queues exactly the six stale scheduled inputs'
+  8,
+  'Contract #20: fixture queues exactly the eight stale scheduled inputs'
 );
 
 SELECT is(
@@ -227,8 +228,8 @@ SELECT is(
     WHERE symbol = 'SCHED_WITHPROFILE'
       AND status = 'pending'
   ),
-  5,
-  'Contract #20: an existing profile unlocks the five stale dependent inputs'
+  7,
+  'Contract #20: an existing profile unlocks the seven stale dependent inputs'
 );
 
 SELECT is(
@@ -238,8 +239,8 @@ SELECT is(
     WHERE data_type = 'quote'
       AND status = 'pending'
   ),
-  0,
-  'Contract #20: the full-universe scheduler never queues quotes'
+  1,
+  'Contract #20: the full-universe scheduler queues stale daily quotes'
 );
 
 SELECT is(
@@ -250,7 +251,7 @@ SELECT is(
       AND status = 'pending'
       AND priority = -1
   ),
-  6,
+  8,
   'Contract #20: every scheduled fixture job stays below demand priority'
 );
 
