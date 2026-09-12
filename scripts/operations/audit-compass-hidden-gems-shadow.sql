@@ -10,6 +10,22 @@ summary AS (
     'captured_at', pg_catalog.now(),
     'screen', 'Compass opportunity shadow',
     'candidate_count', pg_catalog.count(*),
+    'quality_dislocation_candidates',
+      pg_catalog.count(*) FILTER (
+        WHERE opportunity_type = 'quality_dislocation'
+      ),
+    'neglected_compounder_candidates',
+      pg_catalog.count(*) FILTER (
+        WHERE opportunity_type = 'neglected_compounder'
+      ),
+    'candidates_without_risk_flags',
+      pg_catalog.count(*) FILTER (
+        WHERE pg_catalog.cardinality(risk_flags) = 0
+      ),
+    'candidates_requiring_growth_review',
+      pg_catalog.count(*) FILTER (
+        WHERE 'growth_rate_over_100pct_requires_review' = ANY(risk_flags)
+      ),
     'candidates_with_positive_net_insider_buying',
       pg_catalog.count(*) FILTER (WHERE net_insider_value > 0),
     'candidates_missing_fresh_quote_proxy',
