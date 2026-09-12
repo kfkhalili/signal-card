@@ -1,7 +1,7 @@
 -- Contract #25: Hidden Gems is a read-only, service-only discovery screen.
 
 BEGIN;
-SELECT plan(9);
+SELECT plan(13);
 
 SELECT ok(
   EXISTS (
@@ -100,7 +100,7 @@ VALUES
   ),
   (
     'VFY_GEM_REPRICED', 'Verification Already Repriced', 30, 5000000000,
-    100000, 'NASDAQ', 'Technology', 'VFY Hidden Gem',
+    100000, 'NYSE', 'Technology', 'VFY Hidden Gem',
     false, false, false, pg_catalog.now()
   ),
   (
@@ -110,6 +110,21 @@ VALUES
   ),
   (
     'VFY_GEM_QUALITY_DIP', 'Verification Quality Dislocation', 80, 100000000000,
+    100000, 'NASDAQ', 'Technology', 'VFY Hidden Gem',
+    false, false, false, pg_catalog.now()
+  ),
+  (
+    'VFY_GEM_NO_QUOTE', 'Verification Missing Quote', 10, 200000000,
+    100000, 'NASDAQ', 'Technology', 'VFY Hidden Gem',
+    false, false, false, pg_catalog.now()
+  ),
+  (
+    'VFY_GEM_NO_GRADES', 'Verification Missing Analyst Grades', 10, 250000000,
+    100000, 'NASDAQ', 'Technology', 'VFY Hidden Gem',
+    false, false, false, pg_catalog.now()
+  ),
+  (
+    'VFY_GEM_NO_RATIOS', 'Verification Missing Ratios', 10, 300000000,
     100000, 'NASDAQ', 'Technology', 'VFY Hidden Gem',
     false, false, false, pg_catalog.now()
   );
@@ -123,7 +138,10 @@ VALUES
   ('VFY_GEM_EARLY', true, true),
   ('VFY_GEM_REPRICED', true, true),
   ('VFY_GEM_BAD_DATA', true, true),
-  ('VFY_GEM_QUALITY_DIP', true, true);
+  ('VFY_GEM_QUALITY_DIP', true, true),
+  ('VFY_GEM_NO_QUOTE', true, true),
+  ('VFY_GEM_NO_GRADES', true, true),
+  ('VFY_GEM_NO_RATIOS', true, true);
 
 INSERT INTO public.compass_pillar_scores (
   symbol,
@@ -155,6 +173,21 @@ VALUES
     'VFY_GEM_QUALITY_DIP', 'VFY Hidden Gem', 100000000000, 95, 95,
     '{"growth_consistency":0.95,"risk_flags":[]}'::jsonb,
     pg_catalog.now(), pg_catalog.now()
+  ),
+  (
+    'VFY_GEM_NO_QUOTE', 'VFY Hidden Gem', 200000000, 50, 20,
+    '{"growth_consistency":0.50,"risk_flags":[]}'::jsonb,
+    pg_catalog.now(), pg_catalog.now()
+  ),
+  (
+    'VFY_GEM_NO_GRADES', 'VFY Hidden Gem', 250000000, 50, 20,
+    '{"growth_consistency":0.50,"risk_flags":[]}'::jsonb,
+    pg_catalog.now(), pg_catalog.now()
+  ),
+  (
+    'VFY_GEM_NO_RATIOS', 'VFY Hidden Gem', 300000000, 50, 20,
+    '{"growth_consistency":0.50,"risk_flags":[]}'::jsonb,
+    pg_catalog.now(), pg_catalog.now()
   );
 
 INSERT INTO public.ratios_ttm (
@@ -168,7 +201,9 @@ VALUES
   ('VFY_GEM_EARLY', 4, 5, pg_catalog.now(), pg_catalog.now()),
   ('VFY_GEM_REPRICED', 5, 6, pg_catalog.now(), pg_catalog.now()),
   ('VFY_GEM_BAD_DATA', 2, 3, pg_catalog.now(), pg_catalog.now()),
-  ('VFY_GEM_QUALITY_DIP', 10, 15, pg_catalog.now(), pg_catalog.now());
+  ('VFY_GEM_QUALITY_DIP', 10, 15, pg_catalog.now(), pg_catalog.now()),
+  ('VFY_GEM_NO_QUOTE', 15, 20, pg_catalog.now(), pg_catalog.now()),
+  ('VFY_GEM_NO_GRADES', 15, 20, pg_catalog.now(), pg_catalog.now());
 
 INSERT INTO public.live_quote_indicators (
   symbol,
@@ -199,6 +234,16 @@ VALUES
     'VFY_GEM_QUALITY_DIP', 80,
     EXTRACT(EPOCH FROM pg_catalog.now())::bigint,
     100, 150, 75, pg_catalog.now()
+  ),
+  (
+    'VFY_GEM_NO_GRADES', 10,
+    EXTRACT(EPOCH FROM pg_catalog.now())::bigint,
+    10, 15, 5, pg_catalog.now()
+  ),
+  (
+    'VFY_GEM_NO_RATIOS', 10,
+    EXTRACT(EPOCH FROM pg_catalog.now())::bigint,
+    10, 15, 5, pg_catalog.now()
   );
 
 INSERT INTO public.grades_historical (
@@ -213,7 +258,9 @@ INSERT INTO public.grades_historical (
 VALUES
   ('VFY_GEM_EARLY', CURRENT_DATE, 1, 0, 0, 0, 0),
   ('VFY_GEM_REPRICED', CURRENT_DATE, 5, 5, 10, 0, 0),
-  ('VFY_GEM_QUALITY_DIP', CURRENT_DATE, 10, 10, 10, 0, 0);
+  ('VFY_GEM_QUALITY_DIP', CURRENT_DATE, 10, 10, 10, 0, 0),
+  ('VFY_GEM_NO_QUOTE', CURRENT_DATE, 1, 1, 1, 0, 0),
+  ('VFY_GEM_NO_RATIOS', CURRENT_DATE, 1, 1, 1, 0, 0);
 
 INSERT INTO public.insider_transactions (
   symbol,
@@ -317,6 +364,62 @@ SELECT ok(
     WHERE result.symbol = 'VFY_GEM_QUALITY_DIP'
   ),
   'Contract #25: a strong company below its price trend enters the quality-dislocation lane'
+);
+
+SELECT is(
+  (
+    SELECT pg_catalog.array_agg(result.symbol ORDER BY result.symbol)
+    FROM public.get_compass_hidden_gems_shadow_v1(
+      20,
+      ARRAY['VFY Hidden Gem'],
+      ARRAY['nyse']
+    ) AS result
+  ),
+  ARRAY['VFY_GEM_REPRICED']::text[],
+  'Contract #25: exchange filters are case-insensitive and exclude other exchanges'
+);
+
+SELECT ok(
+  (
+    SELECT result.opportunity_type = 'neglected_compounder'
+      AND result.quality_dislocation_score = 0
+      AND 'quote_missing_or_stale' = ANY(result.risk_flags)
+      AND 'price_history_proxy_incomplete' = ANY(result.risk_flags)
+    FROM public.get_compass_hidden_gems_shadow_v1(
+      20,
+      ARRAY['VFY Hidden Gem'],
+      NULL
+    ) AS result
+    WHERE result.symbol = 'VFY_GEM_NO_QUOTE'
+  ),
+  'Contract #25: missing quotes remain visible but cannot create a quality-dislocation signal'
+);
+
+SELECT ok(
+  (
+    SELECT result.analyst_coverage_count IS NULL
+      AND 'analyst_coverage_missing' = ANY(result.risk_flags)
+    FROM public.get_compass_hidden_gems_shadow_v1(
+      20,
+      ARRAY['VFY Hidden Gem'],
+      NULL
+    ) AS result
+    WHERE result.symbol = 'VFY_GEM_NO_GRADES'
+  ),
+  'Contract #25: missing analyst coverage stays explicit without excluding the candidate'
+);
+
+SELECT ok(
+  NOT EXISTS (
+    SELECT 1
+    FROM public.get_compass_hidden_gems_shadow_v1(
+      20,
+      ARRAY['VFY Hidden Gem'],
+      NULL
+    ) AS result
+    WHERE result.symbol = 'VFY_GEM_NO_RATIOS'
+  ),
+  'Contract #25: candidates missing required valuation inputs are excluded'
 );
 
 SELECT * FROM finish();
