@@ -1,5 +1,5 @@
--- Contract #24: Growth v2 is a read-only, service-only shadow model and does
--- not derive growth from PEG.
+-- Contract #24: the Growth v2 diagnostic RPC remains read-only and
+-- service-only, and its model does not derive growth from PEG.
 
 BEGIN;
 SELECT plan(5);

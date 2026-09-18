@@ -62,7 +62,7 @@ SELECT
        OR norm_sentiment IS NULL
        OR norm_profitability_yield IS NULL
        OR norm_buyback_yield IS NULL
-       OR norm_peg IS NULL
+       OR norm_growth_v2 IS NULL
        OR norm_div_yield IS NULL
        OR norm_health IS NULL
   ) AS incomplete_scores;

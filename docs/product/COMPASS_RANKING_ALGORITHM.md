@@ -8,6 +8,8 @@ This document provides a complete, standalone analysis of the Compass ranking al
 
 **Document Scope**: This document covers the complete algorithm from raw financial data to final ranked output, including all intermediate calculations, design decisions, and practical examples.
 
+> **Current implementation (September 2026):** Compass exposes eight weights: Revenue, Value, Sentiment, Growth, Profitability, Buyback, Income, and Health. Growth uses Growth v2, not PEG. It scores revenue-per-share, operating-income-per-share, and free-cash-flow-per-share growth, growth consistency, and return on invested capital. Companies must pass its data-quality, liquidity, cash-flow, dilution, and business-type eligibility checks whenever the user assigns Growth a positive weight. Five-pillar and PEG examples later in this document describe the retired Growth v1 model.
+
 ---
 
 ## Overview
@@ -102,7 +104,7 @@ These metrics measure how "cheap" a stock is relative to its fundamentals. Lower
 
 **Note**: Enterprise Value = Market Cap + Debt - Cash, so it accounts for the company's capital structure.
 
-#### Price-to-Earnings Growth Ratio (PEG)
+#### Price-to-Earnings Growth Ratio (PEG, legacy Growth v1)
 
 **Definition**: Price-to-Earnings ratio divided by earnings growth rate.
 
@@ -119,7 +121,7 @@ These metrics measure how "cheap" a stock is relative to its fundamentals. Lower
 
 **Example**: If P/E = 20 and earnings growth = 10%, PEG = 2.0 (expensive). If P/E = 15 and growth = 20%, PEG = 0.75 (cheap).
 
-**Note**: This metric is used for the Growth pillar, not Value, because it measures growth value.
+**Note**: PEG remains available elsewhere in the product as a valuation metric, but Compass no longer uses it for the Growth pillar.
 
 ### Positive Metrics (Higher is Better)
 
@@ -278,13 +280,13 @@ norm_evm = (1 - PERCENT_RANK() OVER (ORDER BY enterprise_value_multiple_ttm ASC)
 - **Source**: `ratios_ttm.enterprise_value_multiple_ttm`
 - **Interpretation**: Lower EVM ratios score higher
 
-**4. Price-to-Earnings Growth Ratio (PEG)**
+**4. Price-to-Earnings Growth Ratio (PEG, legacy Growth v1)**
 ```sql
 norm_peg = (1 - PERCENT_RANK() OVER (ORDER BY price_to_earnings_growth_ratio_ttm ASC)) * 100
 ```
 - **Source**: `ratios_ttm.price_to_earnings_growth_ratio_ttm`
 - **Interpretation**: Lower PEG ratios indicate better growth value
-- **Note**: This metric is used directly for the Growth pillar score
+- **Note**: Retained for historical reference; the public Compass ranking no longer uses this score
 
 #### Positive Metrics (Higher is Better)
 
@@ -390,13 +392,24 @@ value_score = (norm_pb + norm_ps + norm_evm) / 3
 
 **Formula:**
 ```sql
-growth_score = norm_peg
+growth_score =
+  revenue_per_share_growth_score * 0.25 +
+  operating_income_per_share_growth_score * 0.25 +
+  free_cash_flow_per_share_growth_score * 0.25 +
+  growth_consistency_score * 0.15 +
+  capital_efficiency_score * 0.10
 ```
 
 **Components:**
-- Price-to-Earnings Growth Ratio (norm_peg)
+- Revenue-per-share CAGR
+- Operating-income-per-share CAGR
+- Free-cash-flow-per-share CAGR
+- Consistency of positive per-share growth
+- Return on invested capital
 
-**Rationale**: The PEG ratio measures how much investors pay for each unit of earnings growth. Lower PEG ratios indicate better growth value, which is why the normalized PEG (which inverts low values to high scores) is used directly.
+**Rationale**: Growth v2 rewards durable growth in the economics attributable to each share, so issuing shares cannot manufacture a high score. It also rewards repeatability and productive use of capital instead of relying on a valuation ratio.
+
+**Eligibility**: When Growth has a positive weight, Compass requires a precomputed Growth v2 score. The company must clear the model's freshness, history, liquidity, cash-flow, dilution, profitability, and security-type checks. Setting Growth to zero leaves non-Growth candidates eligible.
 
 **Range**: 0-100
 
@@ -966,7 +979,7 @@ Some financial ratios can be negative, which requires special handling:
 - Including negative values in the percentile ranking
 - Companies with negative equity typically get very low health scores
 
-**Negative PEG**: If earnings are declining (negative growth), PEG can be negative. The algorithm treats negative PEGs as worse than positive ones, so they get lower percentile ranks.
+**Negative PEG**: PEG can be negative when earnings decline. Compass Growth v2 does not consume PEG, so a negative PEG cannot create an artificially high Growth score.
 
 ### Missing Data (NULL Values)
 
@@ -1111,8 +1124,8 @@ To validate the algorithm works correctly, verify:
 - Growth stocks with high valuations should move down
 
 **When Increasing Growth Weight**:
-- Stocks with low PEG ratios should move up
-- Value stocks with slow growth should move down
+- Companies with strong, consistent per-share growth and sound capital efficiency should move up
+- Companies that fail Growth v2 eligibility should not appear while Growth has a positive weight
 
 **When Increasing Income Weight**:
 - High-dividend stocks (utilities, REITs) should move up
@@ -1229,7 +1242,8 @@ norm_metric = PERCENT_RANK(metric ASC) × 100
 **Pillar Scores**:
 ```
 value_score = (norm_pb + norm_ps + norm_evm) / 3
-growth_score = norm_peg
+growth_score = 25% revenue/share growth + 25% operating-income/share growth
+             + 25% free-cash-flow/share growth + 15% consistency + 10% ROIC
 profitability_score = (norm_npm + norm_at) / 2
 income_score = norm_div_yield
 health_score = norm_de
@@ -1250,4 +1264,3 @@ final_score = Σ(pillar_score × pillar_weight)
 ### Contact and Support
 
 For questions, issues, or suggestions regarding the Compass ranking algorithm, refer to the main project documentation or contact the development team.
-

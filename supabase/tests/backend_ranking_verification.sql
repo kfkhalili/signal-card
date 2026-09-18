@@ -61,15 +61,16 @@ INSERT INTO public.compass_pillar_scores (
   norm_profitability_yield, profitability_rank,
   norm_buyback_yield, buyback_rank,
   norm_peg, peg_rank, norm_div_yield, div_yield_rank,
-  norm_health, health_rank
+  norm_health, health_rank,
+  norm_growth_v2, growth_v2_rank
 )
 VALUES
-  ('VFY_ALPHA', 'VFY Technology', 1000, 500, 80, 1, 80, 1, 80, 1, 80, 1, 80, 1, 80, 1, 80, 1, 80, 1),
-  ('VFY_BETA', 'VFY Technology', 900, 450, 60, 2, 60, 2, 60, 2, 60, 2, 60, 2, 60, 2, 60, 2, 60, 2),
-  ('VFY_GAMMA', 'VFY Healthcare', 800, 400, 100, 3, 0, 3, 100, 3, 0, 3, 100, 3, 0, 3, 100, 3, 0, 3),
-  ('VFY_NULL', 'VFY Technology', 700, NULL, NULL, 4, 40, 4, 40, 4, 40, 4, 40, 4, 40, 4, 40, 4, 40, 4),
-  ('VFY_WEIGHTED', 'VFY Industrials', 600, 300, 10, 5, 20, 5, 30, 5, 50, 5, 60, 5, 40, 5, 70, 5, 80, 5),
-  ('VFY_FMP_OFF', 'VFY Technology', 500, 250, 100, 6, 100, 6, 100, 6, 100, 6, 100, 6, 100, 6, 100, 6, 100, 6);
+  ('VFY_ALPHA', 'VFY Technology', 1000, 500, 80, 1, 80, 1, 80, 1, 80, 1, 80, 1, 80, 1, 80, 1, 80, 1, 80, 1),
+  ('VFY_BETA', 'VFY Technology', 900, 450, 60, 2, 60, 2, 60, 2, 60, 2, 60, 2, 60, 2, 60, 2, 60, 2, 60, 2),
+  ('VFY_GAMMA', 'VFY Healthcare', 800, 400, 100, 3, 0, 3, 100, 3, 0, 3, 100, 3, 0, 3, 100, 3, 0, 3, 0, 3),
+  ('VFY_NULL', 'VFY Technology', 700, NULL, NULL, 4, 40, 4, 40, 4, 40, 4, 40, 4, 40, 4, 40, 4, 40, 4, 40, 4),
+  ('VFY_WEIGHTED', 'VFY Industrials', 600, 300, 10, 5, 20, 5, 30, 5, 50, 5, 60, 5, 40, 5, 70, 5, 80, 5, 90, 5),
+  ('VFY_FMP_OFF', 'VFY Technology', 500, 250, 100, 6, 100, 6, 100, 6, 100, 6, 100, 6, 100, 6, 100, 6, 100, 6, 100, 6);
 
 INSERT INTO public.exchange_variants (
   symbol, symbol_variant, exchange_short_name
@@ -104,7 +105,7 @@ BEGIN
   WHERE symbol LIKE 'VFY\_%' ESCAPE '\';
 
   IF actual_symbols IS DISTINCT FROM
-     ARRAY['VFY_ALPHA', 'VFY_GAMMA', 'VFY_WEIGHTED', 'VFY_NULL']::text[] THEN
+     ARRAY['VFY_ALPHA', 'VFY_WEIGHTED', 'VFY_GAMMA', 'VFY_NULL']::text[] THEN
     RAISE EXCEPTION 'Ranking/active/missing-data order mismatch: %', actual_symbols;
   END IF;
 
@@ -131,8 +132,8 @@ BEGIN
   FROM public.get_weighted_leaderboard(custom_weights, ARRAY['VFY Industrials'], NULL)
   WHERE symbol = 'VFY_WEIGHTED';
 
-  IF actual_score IS DISTINCT FROM 48.00::numeric THEN
-    RAISE EXCEPTION 'Manual score mismatch for VFY_WEIGHTED: expected 48.00, got %', actual_score;
+  IF actual_score IS DISTINCT FROM 58.00::numeric THEN
+    RAISE EXCEPTION 'Growth v2 manual score mismatch for VFY_WEIGHTED: expected 58.00, got %', actual_score;
   END IF;
 
   SELECT array_agg(symbol ORDER BY rank)

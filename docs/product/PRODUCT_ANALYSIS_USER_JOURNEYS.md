@@ -116,10 +116,13 @@ Most financial platforms show:
 - Popular stocks (by volume)
 - Trending stocks (by price movement)
 
-**Compass is unique:** Personalized, multi-dimensional ranking based on **5 financial pillars:**
-- Value (P/B, P/S, EV multiples)
-- Growth (PEG ratio)
+**Compass is unique:** Personalized, multi-dimensional ranking based on **8 financial signals:**
+- Revenue
+- Value (enterprise-value multiple)
+- Insider sentiment
+- Growth (durable per-share growth, consistency, and capital efficiency)
 - Profitability (Net profit margin, Asset turnover)
+- Buyback yield
 - Income (Dividend yield)
 - Health (Debt-to-equity)
 
@@ -312,4 +315,3 @@ Most financial platforms show:
 
 **Document Status:** Initial Analysis
 **Next Review:** After user research and analytics review
-

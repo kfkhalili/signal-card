@@ -25,7 +25,9 @@ INSERT INTO public.compass_pillar_scores (
   norm_profitability_yield, profitability_rank,
   norm_buyback_yield, buyback_rank,
   norm_peg, peg_rank, norm_div_yield, div_yield_rank,
-  norm_health, health_rank, updated_at
+  norm_health, health_rank,
+  norm_growth_v2, growth_v2_rank,
+  updated_at
 )
 SELECT
   'VFY_BENCH_' || LPAD(series::text, 5, '0'),
@@ -45,6 +47,7 @@ SELECT
   (series * 17) % 101, series,
   (series * 19) % 101, series,
   (series * 23) % 101, series,
+  (series * 29) % 101, series,
   NOW() - ((series % 120) || ' minutes')::interval
 FROM generate_series(1, 18000) AS series;
 
