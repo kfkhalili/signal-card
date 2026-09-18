@@ -39,6 +39,7 @@ Deno.test(
   async () => {
     const originalFetch = globalThis.fetch;
     const rpcCalls: RpcCall[] = [];
+    const fetchUrls: string[] = [];
     const baseStatement = {
       date: "2025-12-31",
       symbol: "TEST",
@@ -49,6 +50,14 @@ Deno.test(
       fiscalYear: "2025",
       period: "FY",
     };
+    const quarterlyStatement = {
+      ...baseStatement,
+      date: "2026-03-31",
+      filingDate: "2026-04-30",
+      acceptedDate: "2026-04-30T12:00:00Z",
+      fiscalYear: "2026",
+      period: "Q4",
+    };
     const responses = [
       { ...baseStatement, revenue: 1_000 },
       {
@@ -58,12 +67,21 @@ Deno.test(
         totalEquity: 400,
       },
       { ...baseStatement, operatingCashFlow: 100 },
+      { ...quarterlyStatement, revenue: 300 },
+      {
+        ...quarterlyStatement,
+        totalAssets: 1_100,
+        totalLiabilities: 650,
+        totalEquity: 450,
+      },
+      { ...quarterlyStatement, operatingCashFlow: 30 },
     ];
 
     try {
-      globalThis.fetch = () => {
+      globalThis.fetch = (input) => {
+        fetchUrls.push(String(input));
         const payload = responses.shift();
-        if (!payload) throw new Error("Unexpected fourth FMP request");
+        if (!payload) throw new Error("Unexpected seventh FMP request");
         return Promise.resolve(
           new Response(JSON.stringify([payload]), {
             status: 200,
@@ -114,8 +132,16 @@ Deno.test(
       );
 
       assertEquals(result.success, true);
-      assertEquals(result.dataSizeBytes, 300);
+      assertEquals(result.dataSizeBytes, 600);
       assertEquals(responses, []);
+      assertEquals(fetchUrls, [
+        "https://financialmodelingprep.com/stable/income-statement?symbol=TEST&apikey=data-quality-wiring-test-key",
+        "https://financialmodelingprep.com/stable/balance-sheet-statement?symbol=TEST&apikey=data-quality-wiring-test-key",
+        "https://financialmodelingprep.com/stable/cash-flow-statement?symbol=TEST&apikey=data-quality-wiring-test-key",
+        "https://financialmodelingprep.com/stable/income-statement?symbol=TEST&period=quarter&limit=5&apikey=data-quality-wiring-test-key",
+        "https://financialmodelingprep.com/stable/balance-sheet-statement?symbol=TEST&period=quarter&limit=5&apikey=data-quality-wiring-test-key",
+        "https://financialmodelingprep.com/stable/cash-flow-statement?symbol=TEST&period=quarter&limit=5&apikey=data-quality-wiring-test-key",
+      ]);
       assertEquals(
         rpcCalls.map((call) => call.name),
         [

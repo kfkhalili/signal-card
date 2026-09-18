@@ -41,8 +41,10 @@ async function fetchFmpData<T extends FmpStatementEntryBase>(
   symbol: string,
   statementType: string,
   apiKey: string,
+  period?: "quarter",
 ): Promise<FmpFetchResult<T>> {
-  const fullUrl = `${baseUrl}?symbol=${symbol}&apikey=${apiKey}`;
+  const periodQuery = period === "quarter" ? "&period=quarter&limit=5" : "";
+  const fullUrl = `${baseUrl}?symbol=${symbol}${periodQuery}&apikey=${apiKey}`;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000); // 10-second timeout
@@ -155,6 +157,46 @@ export async function fetchFinancialStatementsLogic(
     const cashFlows = cashFlowResult.data;
     totalDataSizeBytes += cashFlowResult.responseSizeBytes;
 
+    // Preserve the established annual fetches and add a bounded quarterly
+    // window. Five rows are enough to calculate trailing-four-quarter values
+    // while leaving one prior quarter for continuity checks.
+    await new Promise((resolve) => setTimeout(resolve, FMP_API_DELAY_MS));
+    const quarterlyIncomeResult = await fetchFmpData<
+      FmpIncomeStatementEntry
+    >(
+      INCOME_STATEMENT_ENDPOINT,
+      job.symbol,
+      "Quarterly Income Statement",
+      FMP_API_KEY,
+      "quarter",
+    );
+    const quarterlyIncomeStatements = quarterlyIncomeResult.data;
+    totalDataSizeBytes += quarterlyIncomeResult.responseSizeBytes;
+
+    await new Promise((resolve) => setTimeout(resolve, FMP_API_DELAY_MS));
+    const quarterlyBalanceSheetResult = await fetchFmpData<
+      FmpBalanceSheetEntry
+    >(
+      BALANCE_SHEET_ENDPOINT,
+      job.symbol,
+      "Quarterly Balance Sheet",
+      FMP_API_KEY,
+      "quarter",
+    );
+    const quarterlyBalanceSheets = quarterlyBalanceSheetResult.data;
+    totalDataSizeBytes += quarterlyBalanceSheetResult.responseSizeBytes;
+
+    await new Promise((resolve) => setTimeout(resolve, FMP_API_DELAY_MS));
+    const quarterlyCashFlowResult = await fetchFmpData<FmpCashFlowEntry>(
+      CASH_FLOW_ENDPOINT,
+      job.symbol,
+      "Quarterly Cash Flow",
+      FMP_API_KEY,
+      "quarter",
+    );
+    const quarterlyCashFlows = quarterlyCashFlowResult.data;
+    totalDataSizeBytes += quarterlyCashFlowResult.responseSizeBytes;
+
     // Use a Map to consolidate data by a unique key (date + period)
     const consolidatedStatements = new Map<
       string,
@@ -165,6 +207,9 @@ export async function fetchFinancialStatementsLogic(
       ...incomeStatements.map((s) => ({ ...s, type: "income" })),
       ...balanceSheets.map((s) => ({ ...s, type: "balance" })),
       ...cashFlows.map((s) => ({ ...s, type: "cashflow" })),
+      ...quarterlyIncomeStatements.map((s) => ({ ...s, type: "income" })),
+      ...quarterlyBalanceSheets.map((s) => ({ ...s, type: "balance" })),
+      ...quarterlyCashFlows.map((s) => ({ ...s, type: "cashflow" })),
     ];
 
     for (const stmt of allStatements) {

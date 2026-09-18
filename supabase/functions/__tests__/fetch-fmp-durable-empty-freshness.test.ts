@@ -135,11 +135,11 @@ Deno.test(
           name: string;
           args: Record<string, unknown>;
         }> = [];
-        const responseSizes = [11, 13, 17];
+        const responseSizes = [11, 13, 17, 19, 23, 29];
         globalThis.fetch = () => {
           const size = responseSizes.shift();
           if (size === undefined) {
-            throw new Error("Unexpected fourth financial statement request");
+            throw new Error("Unexpected seventh financial statement request");
           }
           return Promise.resolve(
             new Response("[]", {
@@ -155,7 +155,7 @@ Deno.test(
         );
 
         assertEquals(result.success, true);
-        assertEquals(result.dataSizeBytes, 41);
+        assertEquals(result.dataSizeBytes, 112);
         assertEquals(responseSizes, []);
         assertEquals(calls, [{
           name: "record_data_fetch_freshness_v2",
@@ -163,7 +163,7 @@ Deno.test(
             p_symbol: "EMPTY",
             p_data_type: "financial-statements",
             p_has_data: false,
-            p_response_size_bytes: 41,
+            p_response_size_bytes: 112,
           },
         }]);
       }

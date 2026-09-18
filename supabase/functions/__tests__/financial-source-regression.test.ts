@@ -209,7 +209,7 @@ Deno.test("financial handler records regressions without advancing freshness", a
     const result = await fetchFinancialStatementsLogic(job, supabase);
 
     assertEquals(result.success, false);
-    assertEquals(result.dataSizeBytes, 600000);
+    assertEquals(result.dataSizeBytes, 1200000);
     assertStringIncludes(result.error ?? "", "Stale source timestamp");
     assertEquals(
       rpcCalls.map((call) => call.name),
