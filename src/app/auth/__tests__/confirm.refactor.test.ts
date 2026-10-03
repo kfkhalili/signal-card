@@ -1,19 +1,21 @@
-/**
- * Tests for app/auth/confirm/route.ts refactoring
- * These tests verify that auth.verifyOtp() uses Result types
- *
- * Run: npm test -- src/app/auth/__tests__/confirm.refactor.test.ts
- */
+import { readFileSync } from "node:fs";
+import path from "node:path";
 
-import { describe, it, expect } from '@jest/globals';
+describe("email confirmation routing contract", () => {
+  const source = readFileSync(
+    path.join(process.cwd(), "src/app/auth/confirm/route.ts"),
+    "utf8"
+  );
 
-describe('auth/confirm route - Refactoring Tests', () => {
-  describe('After Refactoring (Expected Behavior)', () => {
-    it('should use fromPromise for auth.verifyOtp()', async () => {
-      // After refactoring: auth.verifyOtp() should use fromPromise() and Result types
-      // Verified by code inspection
-      expect(true).toBe(true);
-    });
+  it("verifies the token and routes success to profile completion", () => {
+    expect(source).toContain("supabase.auth.verifyOtp");
+    expect(source).toContain(
+      "new URL('/auth/complete-profile', request.url)"
+    );
+  });
+
+  it("routes invalid confirmation links to the auth error page", () => {
+    expect(source).toContain("redirectUrl.pathname = '/auth/auth-error'");
+    expect(source).toContain("'Invalid token or link expired.'");
   });
 });
-

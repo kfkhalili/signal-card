@@ -127,15 +127,22 @@ protected proxy.
 
 #### UA0.1 — Freeze the acquisition baseline
 
-- Record current landing, auth, confirmation, profile-completion, Compass, and
+- [x] Record current landing, auth, confirmation, profile-completion, Compass, and
   first-research-action behavior on desktop and mobile.
-- Add contract tests for CTA destinations, `next` preservation, auth methods,
+- [x] Add contract tests for CTA destinations, `next` preservation, auth methods,
   post-confirmation routing, and protected-route behavior.
-- Record current performance, accessibility, and SEO baselines for the landing
+- [x] Record current performance, accessibility, and SEO baselines for the landing
   and auth pages.
 
 **Pass gate:** The current funnel and its failure states can be reproduced
 without changing production behavior.
+
+**Verified 2026-10-03:** The current route hand-offs, desktop/mobile entry
+points, protected-route redirects, auth methods, and first company-research
+action are frozen in tests. Local production Lighthouse baselines and the
+observed routing, accessibility, performance, and SEO gaps are recorded in
+[`USER_ACQUISITION_BASELINE.md`](./USER_ACQUISITION_BASELINE.md). No product
+behavior or provider-data path changed in this increment.
 
 #### UA0.2 — Add privacy-safe funnel analytics
 
@@ -156,6 +163,10 @@ research action, with no duplicate events or personal data leakage.
   contain real content; use `noindex` where removal is inappropriate.
 - Do not advertise paid plans, API access, live status, newsletters, or real-time
   data unless the corresponding experience exists and is supported.
+- Reconcile the sitemap and `robots.txt`: do not advertise protected product
+  routes to crawlers while simultaneously disallowing them.
+- Replace unsupported API, real-time, and institutional-grade metadata claims
+  with the approved research-product position.
 - Replace the public demo-card data path with deterministic synthetic fixtures;
   do not merely hide the provider key while returning provider-derived data.
 - Audit all unauthenticated routes, metadata images, screenshots, and generated
@@ -174,6 +185,10 @@ consistent, makes only supportable claims, and contains no FMP-derived data.
 - Add one low-friction secondary action: **See how it works**, anchored to the
   product explanation on the same page.
 - State that Tickered is a research tool, not a promise of returns.
+- Correct the measured signup-CTA contrast and preview touch-target failures;
+  preserve keyboard behavior and mobile readability.
+- Treat the recorded landing LCP as a regression baseline and remove avoidable
+  render delay while changing the hero.
 
 **Pass gate:** In a five-person comprehension check, at least four people can
 say what Tickered helps them do and what happens after signup.
@@ -209,6 +224,8 @@ where its inputs come from before signing up.
 
 - Preserve the requested destination and acquisition attribution through email
   confirmation, Google auth, errors, and retries.
+- Preserve any allowlisted acquisition query parameters rather than only the
+  pathname, without creating an open redirect.
 - Default acquisition CTAs to signup while keeping login obvious for returning
   users.
 - Make auth errors actionable and retain entered intent after recovery.
@@ -353,5 +370,6 @@ Recommended defaults are in bold.
 
 ## Immediate next step after approval
 
-Execute **UA0.1 only**: freeze the acquisition and activation contract. Do not
-redesign the landing page until that gate passes.
+Execute **UA0.2 only**: add the minimum privacy-safe funnel event contract and
+report. Do not redesign the landing page until acquisition and activation are
+observable.

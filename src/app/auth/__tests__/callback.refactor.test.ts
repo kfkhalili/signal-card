@@ -1,19 +1,23 @@
-/**
- * Tests for app/auth/callback/route.ts refactoring
- * These tests verify that auth.exchangeCodeForSession() uses Result types
- *
- * Run: npm test -- src/app/auth/__tests__/callback.refactor.test.ts
- */
+import { readFileSync } from "node:fs";
+import path from "node:path";
 
-import { describe, it, expect } from '@jest/globals';
+describe("auth callback routing contract", () => {
+  const source = readFileSync(
+    path.join(process.cwd(), "src/app/auth/callback/route.ts"),
+    "utf8"
+  );
 
-describe('auth/callback route - Refactoring Tests', () => {
-  describe('After Refactoring (Expected Behavior)', () => {
-    it('should use fromPromise for auth.exchangeCodeForSession()', async () => {
-      // After refactoring: auth.exchangeCodeForSession() should use fromPromise() and Result types
-      // Verified by code inspection
-      expect(true).toBe(true);
-    });
+  it("exchanges the code and preserves an explicit next destination", () => {
+    expect(source).toContain("supabase.auth.exchangeCodeForSession(code)");
+    expect(source).toContain(
+      'requestUrl.searchParams.get("next") ?? "/"'
+    );
+    expect(source).toContain("NextResponse.redirect(`${origin}${next}`)");
+  });
+
+  it("defaults failed callbacks to the auth error page", () => {
+    expect(source).toContain(
+      "NextResponse.redirect(`${origin}/auth/auth-error`)"
+    );
   });
 });
-
