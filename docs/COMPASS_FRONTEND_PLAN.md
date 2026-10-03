@@ -78,13 +78,17 @@ gap without adding visual or conceptual weight.
 
 #### FE1a — User-facing growth label
 
-- [ ] Label the pillar **Growth** wherever the user sees it.
-- [ ] Keep `peg_rank` only as an internal compatibility field in TypeScript.
-- [ ] Do not mention version numbers or the old PEG implementation in visible UI.
+- [x] Label the pillar **Growth** wherever the user sees it.
+- [x] Keep `peg_rank` only as an internal compatibility field in TypeScript.
+- [x] Do not mention version numbers or the old PEG implementation in visible UI.
 
 **Validation:** Search rendered Compass copy for `PEG`, `Growth v2`, and
 `peg_rank`; none should be user-visible. Confirm the value still comes from the
 same response field.
+
+**Decision (2026-10-03): Keep.** Desktop and 390 px mobile checks show the
+existing rank as **Growth**, with no visible PEG/version terminology and no
+change to the RPC, payload, filters, ordering, or freshness behavior.
 
 #### FE1b — Rank explanation
 

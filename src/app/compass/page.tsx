@@ -833,8 +833,8 @@ export default function CompassPage() {
                             <span className="inline-flex items-center rounded border px-1 text-[9px] font-medium text-muted-foreground bg-muted/50" title="Enterprise Value Multiple Rank">
                               EVM: {item.evm_rank ?? "—"}
                             </span>
-                            <span className="inline-flex items-center rounded border px-1 text-[9px] font-medium text-muted-foreground bg-muted/50" title="PEG Rank">
-                              PEG: {item.peg_rank ?? "—"}
+                            <span className="inline-flex items-center rounded border px-1 text-[9px] font-medium text-muted-foreground bg-muted/50" title="Growth Rank">
+                              Growth: {item.peg_rank ?? "—"}
                             </span>
                             <span className="inline-flex items-center rounded border px-1 text-[9px] font-medium text-muted-foreground bg-muted/50" title="Profitability Rank">
                               Prof: {item.profitability_rank ?? "—"}

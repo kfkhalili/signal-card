@@ -107,6 +107,14 @@ describe("Compass page presentation contract", () => {
     expect(screen.getAllByText(/—/).length).toBeGreaterThan(0);
   });
 
+  it("presents the legacy peg_rank field as Growth", () => {
+    render(<CompassPage />);
+
+    expect(screen.getByText("Growth: 7")).toBeTruthy();
+    expect(screen.queryByText(/PEG:/)).toBeNull();
+    expect(screen.queryByText(/Growth v2/)).toBeNull();
+  });
+
   it.each([
     [
       "loading",

@@ -19,6 +19,7 @@ export interface LeaderboardEntry {
   sentiment_rank: number | null;
   profitability_rank: number | null;
   buyback_rank: number | null;
+  // Legacy RPC field name; the value is the current Growth rank.
   peg_rank: number | null;
   div_yield_rank: number | null;
   health_rank: number | null;
