@@ -9,8 +9,9 @@ const config = {
   setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],
   testEnvironment: "jest-environment-jsdom",
 
-  // Resolve Deno bare specifiers when running supabase/functions tests in Node
+  // Resolve application aliases and Deno specifiers in Node-based tests.
   moduleNameMapper: {
+    "^@/(.*)$": "<rootDir>/src/$1",
     "^deno_dom$": "<rootDir>/supabase/functions/__tests__/deno_dom_shim.ts",
   },
 
