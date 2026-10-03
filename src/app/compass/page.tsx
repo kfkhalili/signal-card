@@ -741,6 +741,11 @@ export default function CompassPage() {
           </div>
         )}
         {!isLoading && !error && leaderboardData.length > 0 && (
+          <p className="mb-2 text-xs text-muted-foreground">
+            Pillar ranks show how each company compares with other eligible companies. Lower is better.
+          </p>
+        )}
+        {!isLoading && !error && leaderboardData.length > 0 && (
           <div className="bg-card border rounded-lg overflow-hidden">
             {/* Table Header */}
             <div className="grid grid-cols-[30px_1fr_auto] sm:grid-cols-[50px_1fr_140px] gap-2 sm:gap-4 px-2 sm:px-4 py-3 bg-muted/50 border-b text-xs font-medium text-muted-foreground uppercase tracking-wider">

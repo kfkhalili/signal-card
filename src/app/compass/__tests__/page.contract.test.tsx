@@ -115,6 +115,16 @@ describe("Compass page presentation contract", () => {
     expect(screen.queryByText(/Growth v2/)).toBeNull();
   });
 
+  it("explains pillar ranks above populated results", () => {
+    render(<CompassPage />);
+
+    expect(
+      screen.getByText(
+        "Pillar ranks show how each company compares with other eligible companies. Lower is better."
+      )
+    ).toBeTruthy();
+  });
+
   it.each([
     [
       "loading",
@@ -137,6 +147,7 @@ describe("Compass page presentation contract", () => {
     render(<CompassPage />);
 
     expect(screen.getByText(expectedCopy)).toBeTruthy();
+    expect(screen.queryByText(/Pillar ranks show how/)).toBeNull();
   });
 
   it.each([

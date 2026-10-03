@@ -92,16 +92,20 @@ change to the RPC, payload, filters, ordering, or freshness behavior.
 
 #### FE1b — Rank explanation
 
-- [ ] Add one compact line immediately above the results:
+- [x] Add one compact line immediately above the results:
       **“Pillar ranks show how each company compares with other eligible
       companies. Lower is better.”**
-- [ ] Keep the wording informational. Do not add a score, confidence label,
+- [x] Keep the wording informational. Do not add a score, confidence label,
       expected return, or recommendation claim.
-- [ ] Ensure the explanation remains visible on mobile without occupying a table
+- [x] Ensure the explanation remains visible on mobile without occupying a table
       column.
 
 **Pass gate:** A user can correctly explain what a pillar rank means after seeing
 the page, and the rendered leaderboard is otherwise unchanged.
+
+**Decision (2026-10-03): Keep.** The sentence appears once above populated
+results, remains readable at 390 px without horizontal overflow, and stays out
+of loading, empty, and error states.
 
 ### FE2 — Replace cryptic abbreviations one at a time
 
