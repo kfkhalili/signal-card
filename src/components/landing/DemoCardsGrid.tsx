@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { fromPromise } from "neverthrow";
 import type { DisplayableCard } from "@/components/game/types";
 import { ActiveCards } from "@/components/game/ActiveCards";
+import { SYNTHETIC_DEMO_DATA_ORIGIN } from "@/lib/demo/syntheticDemoCards";
 
 const CardSkeleton: FC = () => (
   <div className="w-full aspect-[63/88] rounded-2xl bg-card/50 animate-pulse shadow-lg" />
@@ -43,6 +44,18 @@ const DemoCardsGrid: FC = () => {
           setDemoCards([]);
           return;
         }
+
+        if (
+          response.headers.get("X-Tickered-Data-Origin") !==
+          SYNTHETIC_DEMO_DATA_ORIGIN
+        ) {
+          console.error(
+            "Refusing to render demo cards without the synthetic-data marker."
+          );
+          setDemoCards([]);
+          return;
+        }
+
         const cards: DisplayableCard[] = await response.json();
         setDemoCards(cards);
       } catch (error) {
@@ -84,6 +97,10 @@ const DemoCardsGrid: FC = () => {
 
   return (
     <div className="w-full">
+      <p className="mb-3 text-center text-xs text-muted-foreground">
+        Synthetic product preview — fictional company and illustrative values,
+        not current market data.
+      </p>
       <ActiveCards
         cards={demoCards}
         onToggleFlipCard={handleInteraction}

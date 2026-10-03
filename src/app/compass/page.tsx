@@ -794,6 +794,7 @@ export default function CompassPage() {
                             src={createSecureImageUrl(logoUrl)}
                             alt={companyName || item.symbol}
                             fill
+                            unoptimized
                             className="object-cover"
                             onError={(e) => {
                               // Hide image on error, show fallback

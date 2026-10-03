@@ -1,20 +1,21 @@
-/**
- * Tests for app/api/images/[...path]/route.ts refactoring
- * These tests verify that storage queries use Result types where possible
- *
- * Run: npm test -- src/app/api/__tests__/images.refactor.test.ts
- */
+import fs from "node:fs";
+import path from "node:path";
 
-import { describe, it, expect } from '@jest/globals';
+describe("profile image licensing boundary", () => {
+  const routeSource = fs.readFileSync(
+    path.join(process.cwd(), "src/app/api/images/[...path]/route.ts"),
+    "utf8"
+  );
 
-describe('images route - Refactoring Tests', () => {
-  describe('After Refactoring (Expected Behavior)', () => {
-    it('should use fromPromise for storage queries if supported', async () => {
-      // After refactoring: Storage query should use fromPromise() if Supabase storage supports it
-      // Note: Storage API may have different patterns
-      // Verified by code inspection
-      expect(true).toBe(true);
-    });
+  it("requires an authenticated user before reading provider-backed images", () => {
+    expect(routeSource).toContain("createSupabaseServerClient");
+    expect(routeSource).toContain("supabase.auth.getUser()");
+    expect(routeSource).toContain('new Response("Unauthorized"');
+    expect(routeSource).toContain("status: 401");
+  });
+
+  it("does not permit shared public caching", () => {
+    expect(routeSource).toContain('"private, max-age=86400"');
+    expect(routeSource).not.toContain('"public, max-age=31536000');
   });
 });
-

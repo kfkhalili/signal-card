@@ -869,6 +869,7 @@ export default function SymbolAnalysisPage() {
                         src={createSecureImageUrl(logoUrl)}
                         alt={`${companyName} logo`}
                         fill
+                        unoptimized
                         sizes="64px"
                         className="object-contain p-2"
                         onError={(e) => {
