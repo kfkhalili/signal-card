@@ -1,155 +1,158 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { createSupabaseBrowserClient } from '@/lib/supabase/client'
-import { fromPromise } from 'neverthrow'
-import { Option } from 'effect'
-import { User } from '@supabase/supabase-js'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { useEffect, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
+function profileErrorMessage(error: { code?: string } | null): string {
+  if (error?.code === "23505") {
+    return "That username is already taken. Please choose another one.";
+  }
+
+  return "We could not save your profile. Please try again.";
+}
 
 export default function CompleteProfilePage() {
-  const supabase = createSupabaseBrowserClient()
-  const router = useRouter()
-
-  const [user, setUser] = useState<Option.Option<User>>(Option.none())
-  const [loading, setLoading] = useState(true)
-  const [username, setUsername] = useState('')
-  const [fullName, setFullName] = useState('')
+  const { supabase, user, isLoading: isAuthLoading, clientInitError } = useAuth();
+  const router = useRouter();
+  const [username, setUsername] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchUser = async () => {
-      if (supabase) {
-        const userResult = await fromPromise(
-          supabase.auth.getUser(),
-          (e) => new Error(`Failed to get user: ${(e as Error).message}`)
-        );
+    if (!isAuthLoading && !user) {
+      router.replace("/auth");
+    }
+  }, [isAuthLoading, router, user]);
 
-        userResult.match(
-          (response) => {
-            const { data: { user } } = response;
-            if (user) {
-              setUser(Option.some(user));
-            } else {
-              router.push('/auth');
-            }
-          },
-          (err) => {
-            // Handle Result error (network/exception errors)
-            console.error('Error fetching user:', err.message);
-            router.push('/auth');
-          }
-        );
-      }
-      setLoading(false);
-    };
-    fetchUser();
-  }, [supabase, router]);
+  const handleCompleteProfile = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
 
-  const handleCompleteProfile = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    const currentUser = Option.isSome(user) ? user.value : null
-    if (!currentUser || !supabase) return
-    if (username.length < 3) {
-      return
+    if (!supabase || !user || isSaving) return;
+
+    const normalizedUsername = username.trim();
+    if (normalizedUsername.length < 3 || normalizedUsername.length > 50) {
+      setSaveError("Username must be between 3 and 50 characters.");
+      return;
     }
 
-    setLoading(true)
+    setSaveError(null);
+    setIsSaving(true);
 
-    // Type assertion needed because database.types.ts is empty (local Supabase may not be running)
-    interface SupabaseWithUserProfiles {
-      from: (table: string) => {
-        update: (data: { username: string; full_name: string; is_profile_complete: boolean }) => {
-          eq: (column: string, value: string) => Promise<{ data: unknown; error: unknown }>;
-        };
-      };
-    }
-    const updateResult = await fromPromise(
-      (supabase as unknown as SupabaseWithUserProfiles)
-        .from('user_profiles')
+    try {
+      const { data, error } = await supabase
+        .from("user_profiles")
         .update({
-          username: username,
-          full_name: fullName,
+          username: normalizedUsername,
+          full_name: fullName.trim(),
           is_profile_complete: true,
         })
-        .eq('id', currentUser.id),
-      (e) => new Error(`Failed to update profile: ${(e as Error).message}`)
-    )
+        .eq("id", user.id)
+        .select("id, is_profile_complete")
+        .maybeSingle();
 
-    updateResult.match(
-      (response) => {
-        const { error } = response
-
-        if (error) {
-          console.error("Profile update failed:", error)
-          // Error updating profile - check console for details
-          setLoading(false)
-        } else {
-          // Navigate to workspace - middleware will handle any profile completion checks
-          router.push('/workspace')
-          router.refresh() // To ensure header gets updated profile info
-          // Keep loading state active during navigation
-        }
-      },
-      (err) => {
-        // Handle Result error (network/exception errors)
-        console.error("Profile update failed:", err)
-        setLoading(false)
+      if (error) {
+        console.error("Profile update failed:", error);
+        setSaveError(profileErrorMessage(error));
+        return;
       }
-    )
-  }
 
-  if (loading || Option.isNone(user)) {
+      if (!data?.is_profile_complete) {
+        console.error("Profile update did not return an updated profile row");
+        setSaveError("We could not find your profile. Please try again.");
+        return;
+      }
+
+      router.push('/workspace');
+      router.refresh();
+    } catch (error) {
+      console.error("Profile update failed:", error);
+      setSaveError("We could not save your profile. Please try again.");
+    } finally {
+      // If navigation is interrupted, restore the form instead of trapping the
+      // user on a permanent loading screen.
+      setIsSaving(false);
+    }
+  };
+
+  if (isAuthLoading) {
     return (
-      <div className="flex justify-center items-center h-screen">
+      <div className="flex h-screen items-center justify-center">
         <p>Loading...</p>
       </div>
-    )
+    );
   }
 
-  const currentUser = user.value
+  if (clientInitError) {
+    return (
+      <div className="flex h-screen items-center justify-center px-4 text-center">
+        <p className="text-destructive">Authentication is temporarily unavailable.</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <p>Redirecting to sign in...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="container mx-auto flex flex-col items-center justify-center min-h-screen p-4">
-        <div className="w-full max-w-md">
-            <h1 className="text-2xl font-bold text-center mb-2">Complete Your Profile</h1>
-            <p className="text-muted-foreground text-center mb-6">
-                Please set your username to continue.
+    <div className="container mx-auto flex min-h-screen flex-col items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        <h1 className="mb-2 text-center text-2xl font-bold">
+          Complete Your Profile
+        </h1>
+        <p className="mb-6 text-center text-muted-foreground">
+          Please set your username to continue.
+        </p>
+        <form onSubmit={handleCompleteProfile} className="space-y-4">
+          <div>
+            <Label htmlFor="email">Email</Label>
+            <Input id="email" type="email" value={user.email ?? ""} disabled />
+          </div>
+          <div>
+            <Label htmlFor="username">Username</Label>
+            <Input
+              id="username"
+              type="text"
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              required
+              minLength={3}
+              maxLength={50}
+              autoComplete="username"
+              placeholder="e.g., janesmith"
+              disabled={isSaving}
+            />
+          </div>
+          <div>
+            <Label htmlFor="fullName">Full Name (Optional)</Label>
+            <Input
+              id="fullName"
+              type="text"
+              value={fullName}
+              onChange={(event) => setFullName(event.target.value)}
+              placeholder="e.g., Jane Smith"
+              disabled={isSaving}
+            />
+          </div>
+          {saveError ? (
+            <p className="text-sm text-destructive" role="alert">
+              {saveError}
             </p>
-            <form onSubmit={handleCompleteProfile} className="space-y-4">
-                <div>
-                    <Label htmlFor="email">Email</Label>
-                    <Input id="email" type="email" value={currentUser.email} disabled />
-                </div>
-                <div>
-                    <Label htmlFor="username">Username</Label>
-                    <Input
-                        id="username"
-                        type="text"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        required
-                        minLength={3}
-                        placeholder="e.g., janesmith"
-                    />
-                </div>
-                <div>
-                    <Label htmlFor="fullName">Full Name (Optional)</Label>
-                    <Input
-                        id="fullName"
-                        type="text"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        placeholder="e.g., Jane Smith"
-                    />
-                </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? 'Saving...' : 'Continue'}
-                </Button>
-            </form>
-        </div>
+          ) : null}
+          <Button type="submit" className="w-full" disabled={isSaving}>
+            {isSaving ? "Saving..." : "Continue"}
+          </Button>
+        </form>
+      </div>
     </div>
-  )
+  );
 }

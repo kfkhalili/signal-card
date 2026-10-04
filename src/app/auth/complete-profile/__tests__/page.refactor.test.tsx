@@ -1,35 +1,127 @@
-/**
- * Tests for complete-profile/page.tsx refactoring
- * These tests verify Result types are used for Supabase queries
- *
- * Run: npm test -- src/app/auth/complete-profile/__tests__/page.refactor.test.tsx
- */
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  afterAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from "@jest/globals";
 
-import { describe, it, expect } from '@jest/globals';
+type ProfileUpdateResponse = {
+  data: { id: string; is_profile_complete: boolean } | null;
+  error: { code?: string } | null;
+};
 
-describe('complete-profile/page - Refactoring Tests', () => {
-  describe('API Contract', () => {
-    it('should have CompleteProfilePage component (module loads correctly)', async () => {
-      // CompleteProfilePage is a Next.js page component
-      // This test verifies the module structure is correct
-      // The refactoring is verified by code inspection
-      expect(true).toBe(true);
+const mockUseAuth = jest.fn();
+const mockPush = jest.fn();
+const mockRefresh = jest.fn();
+const mockReplace = jest.fn();
+const mockMaybeSingle = jest.fn<() => Promise<ProfileUpdateResponse>>();
+const mockSelect = jest.fn(() => ({ maybeSingle: mockMaybeSingle }));
+const mockEq = jest.fn(() => ({ select: mockSelect }));
+const mockUpdate = jest.fn(() => ({ eq: mockEq }));
+
+jest.mock("@/contexts/AuthContext", () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
+jest.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: mockPush,
+    refresh: mockRefresh,
+    replace: mockReplace,
+  }),
+}));
+
+// Import after the mocks so the page receives the controlled auth client.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const CompleteProfilePage = require("../page").default as typeof import("../page").default;
+
+const mockSupabase = {
+  from: jest.fn(() => ({ update: mockUpdate })),
+};
+
+const consoleErrorSpy = jest
+  .spyOn(console, "error")
+  .mockImplementation(() => undefined);
+
+function submitProfile(username = "new-user") {
+  fireEvent.change(screen.getByLabelText("Username"), {
+    target: { value: username },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+}
+
+describe("profile completion", () => {
+  afterAll(() => {
+    consoleErrorSpy.mockRestore();
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseAuth.mockReturnValue({
+      supabase: mockSupabase,
+      user: { id: "user-1", email: "person@example.com" },
+      isLoading: false,
+      clientInitError: null,
     });
   });
 
-  describe('After Refactoring (Expected Behavior)', () => {
-    it('should use Result types for Supabase update query', async () => {
-      // After refactoring, the update query should use fromPromise and Result types
-      // Verified by code inspection - module loads without errors
-      expect(true).toBe(true);
+  it("navigates only after confirming the profile row was updated", async () => {
+    mockMaybeSingle.mockResolvedValue({
+      data: { id: "user-1", is_profile_complete: true },
+      error: null,
     });
 
-    it('should handle errors with Result types instead of direct error checking', async () => {
-      // Errors should be handled with Result.match() instead of if (error)
-      // The if (error) check inside Result.match() is acceptable for Supabase response errors
-      // Verified by code inspection
-      expect(true).toBe(true);
+    render(<CompleteProfilePage />);
+    submitProfile();
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith("/workspace");
+      expect(mockRefresh).toHaveBeenCalled();
+      expect(
+        (screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement)
+          .disabled
+      ).toBe(false);
+    });
+  });
+
+  it("restores the form when no profile row was updated", async () => {
+    mockMaybeSingle.mockResolvedValue({ data: null, error: null });
+
+    render(<CompleteProfilePage />);
+    submitProfile();
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toBe(
+        "We could not find your profile. Please try again."
+      );
+      expect(
+        (screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement)
+          .disabled
+      ).toBe(false);
+    });
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("shows a useful message when the username is already taken", async () => {
+    mockMaybeSingle.mockResolvedValue({
+      data: null,
+      error: { code: "23505" },
+    });
+
+    render(<CompleteProfilePage />);
+    submitProfile();
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toBe(
+        "That username is already taken. Please choose another one."
+      );
+      expect(
+        (screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement)
+          .disabled
+      ).toBe(false);
     });
   });
 });
-
