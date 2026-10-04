@@ -8,6 +8,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import DemoCardsGrid from "@/components/landing/DemoCardsGrid";
+import {
+  ACQUISITION_EVENT_NAMES,
+  trackAcquisitionEvent,
+} from "@/lib/analytics/acquisition";
 
 export default function LandingPage() {
   const { user, isLoading } = useAuth();
@@ -44,7 +48,17 @@ export default function LandingPage() {
             size="lg"
             asChild
             className="bg-primary hover:bg-primary/90 text-primary-foreground">
-            <Link href="/auth#auth-sign-up">Sign up</Link>
+            <Link
+              href="/auth#auth-sign-up"
+              onClick={() =>
+                void trackAcquisitionEvent(
+                  ACQUISITION_EVENT_NAMES.signupCtaClicked,
+                  { cta_location: "hero" }
+                )
+              }
+            >
+              Sign up
+            </Link>
           </Button>
         </div>
       </div>

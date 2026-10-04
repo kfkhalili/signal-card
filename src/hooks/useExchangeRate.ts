@@ -6,12 +6,12 @@ import { fromPromise } from "neverthrow";
 type ExchangeRates = Record<string, number>;
 
 export function useExchangeRate() {
-  const { supabase } = useAuth();
+  const { supabase, user } = useAuth();
   const [exchangeRates, setExchangeRates] = useState<ExchangeRates>({});
 
   useEffect(() => {
     async function fetchRates() {
-      if (!supabase) return;
+      if (!supabase || !user) return;
 
       const queryResult = await fromPromise(
         supabase.from("exchange_rates").select("*"),
@@ -43,7 +43,7 @@ export function useExchangeRate() {
     }
 
     fetchRates();
-  }, [supabase]);
+  }, [supabase, user]);
 
   return exchangeRates;
 }

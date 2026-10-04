@@ -242,6 +242,7 @@ const BaseCard: FC<BaseCardProps> = ({
         src={secureLogoUrl}
         alt={`${companyName || sourceCardSymbol} logo`}
         fill
+        unoptimized
         sizes="(max-width: 640px) 28px, (max-width: 768px) 32px, 40px"
         className="object-contain rounded"
         onError={(e) => {

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AnalyticsConsentControls } from "@/components/privacy/AnalyticsConsentControls";
 
 export const dynamic = 'force-dynamic';
 
@@ -46,8 +47,8 @@ export default function CookiesPage() {
             <p>
               This Cookie Policy explains what cookies are, how Tickered uses
               cookies and similar technologies on our website and platform, and
-              your choices regarding cookies. By using our Service, you consent
-              to the use of cookies in accordance with this policy.
+              your choices regarding cookies. Optional analytics are disabled
+              unless you explicitly allow them.
             </p>
 
             <h2 className="!text-2xl !font-semibold">1. What Are Cookies?</h2>
@@ -61,14 +62,11 @@ export default function CookiesPage() {
 
             <h2 className="!text-2xl !font-semibold">2. How We Use Cookies</h2>
             <p>
-              We use cookies for several essential purposes: to maintain your
-              authentication session and keep you logged in securely, to remember
-              your preferences and settings (such as workspace configurations and
-              dashboard layouts), to analyze how our Service is used and improve
-              performance, and to ensure the security and integrity of our
-              financial data platform. Cookies help us deliver personalized
-              experiences and maintain the reliability of our real-time market data
-              feeds and API services.
+              Essential cookies and local storage maintain your authentication
+              session, remember product settings, and protect the Service. With
+              your permission, Tickered also records a small signup funnel so we
+              can understand whether visitors reach a useful first research
+              action.
             </p>
 
             <h2 className="!text-2xl !font-semibold">
@@ -78,23 +76,22 @@ export default function CookiesPage() {
               We use both session cookies, which are temporary and deleted when you
               close your browser, and persistent cookies, which remain on your
               device for a set period or until you delete them. We primarily use
-              first-party cookies, which are set directly by Tickered. We may also
-              use third-party cookies from trusted service providers who help us
-              deliver and improve our Service. These cookies are used for
-              authentication, security, analytics, and functionality purposes.
+              first-party cookies, which are set directly by Tickered. If you
+              allow analytics, we use PostHog&apos;s EU service for eight defined
+              acquisition events. Analytics do not include names, email
+              addresses, symbols, company names, portfolio contents, financial
+              values, provider payloads, or free-form research.
             </p>
 
             <h2 className="!text-2xl !font-semibold">4. Your Choices</h2>
             <p>
-              You can control and manage cookies through your browser settings.
-              Most browsers allow you to refuse cookies or delete existing cookies.
-              However, please note that disabling cookies may affect the
-              functionality of our Service, including your ability to access
-              certain features, maintain your login session, and receive
-              personalized content. Some features of our financial data platform
-              and API integration services may require cookies to function
-              properly.
+              You can allow or withdraw optional analytics at any time below.
+              Declining analytics does not disable the product. Browser settings
+              can also remove essential cookies and local storage, but doing so
+              may sign you out or reset saved product preferences.
             </p>
+
+            <AnalyticsConsentControls />
           </div>
         </div>
       </main>

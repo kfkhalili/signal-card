@@ -17,6 +17,10 @@ import { cn, createSecureImageUrl } from "@/lib/utils";
 import { fromPromise } from "neverthrow";
 import { formatDistanceToNow } from "date-fns";
 import { useCompassFreshness } from "@/hooks/useCompassFreshness";
+import {
+  ACQUISITION_EVENT_NAMES,
+  trackAcquisitionEvent,
+} from "@/lib/analytics/acquisition";
 
 type Pillar = "value" | "growth" | "profitability" | "income" | "health"| "revenue" | "sentiment" | "buyback";
 type Weights = Record<Pillar, number>;
@@ -642,6 +646,10 @@ export default function CompassPage() {
     setAddingSymbols((prev) => new Set(prev).add(symbol));
     try {
       await addCard(symbol, ["profile"]);
+      await trackAcquisitionEvent(
+        ACQUISITION_EVENT_NAMES.firstResearchAction,
+        { research_action: "workspace_added" }
+      );
     } finally {
       setAddingSymbols((prev) => {
         const next = new Set(prev);
@@ -659,6 +667,10 @@ export default function CompassPage() {
       // Add all top 3 to workspace at once
       await addCards(
         top3.map((item) => ({ symbol: item.symbol, cardTypes: ["profile"] }))
+      );
+      await trackAcquisitionEvent(
+        ACQUISITION_EVENT_NAMES.firstResearchAction,
+        { research_action: "workspace_added" }
       );
     } finally {
       setAddingSymbols(new Set());
@@ -741,6 +753,11 @@ export default function CompassPage() {
           </div>
         )}
         {!isLoading && !error && leaderboardData.length > 0 && (
+          <p className="mb-2 text-xs text-muted-foreground">
+            Pillar ranks show how each company compares with other eligible companies. Lower is better.
+          </p>
+        )}
+        {!isLoading && !error && leaderboardData.length > 0 && (
           <div className="bg-card border rounded-lg overflow-hidden">
             {/* Table Header */}
             <div className="grid grid-cols-[30px_1fr_auto] sm:grid-cols-[50px_1fr_140px] gap-2 sm:gap-4 px-2 sm:px-4 py-3 bg-muted/50 border-b text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -789,6 +806,7 @@ export default function CompassPage() {
                             src={createSecureImageUrl(logoUrl)}
                             alt={companyName || item.symbol}
                             fill
+                            unoptimized
                             className="object-cover"
                             onError={(e) => {
                               // Hide image on error, show fallback
@@ -833,8 +851,8 @@ export default function CompassPage() {
                             <span className="inline-flex items-center rounded border px-1 text-[9px] font-medium text-muted-foreground bg-muted/50" title="Enterprise Value Multiple Rank">
                               EVM: {item.evm_rank ?? "—"}
                             </span>
-                            <span className="inline-flex items-center rounded border px-1 text-[9px] font-medium text-muted-foreground bg-muted/50" title="PEG Rank">
-                              PEG: {item.peg_rank ?? "—"}
+                            <span className="inline-flex items-center rounded border px-1 text-[9px] font-medium text-muted-foreground bg-muted/50" title="Growth Rank">
+                              Growth: {item.peg_rank ?? "—"}
                             </span>
                             <span className="inline-flex items-center rounded border px-1 text-[9px] font-medium text-muted-foreground bg-muted/50" title="Profitability Rank">
                               Prof: {item.profitability_rank ?? "—"}

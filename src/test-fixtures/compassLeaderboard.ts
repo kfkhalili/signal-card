@@ -1,0 +1,36 @@
+import type { LeaderboardEntry } from "@/stores/compassStore";
+
+export const compassLeaderboardFixture: LeaderboardEntry[] = [
+  {
+    rank: 1,
+    symbol: "ALPHA",
+    composite_score: 84.44,
+    market_cap: 1_500_000_000,
+    revenue: 400_000_000,
+    ps_rank: 21,
+    evm_rank: 12,
+    sentiment_rank: 81,
+    profitability_rank: 15,
+    buyback_rank: 44,
+    peg_rank: 7,
+    div_yield_rank: null,
+    health_rank: 9,
+    industry: "Software",
+  },
+  {
+    rank: 2,
+    symbol: "BETA",
+    composite_score: null,
+    market_cap: null,
+    revenue: null,
+    ps_rank: null,
+    evm_rank: null,
+    sentiment_rank: null,
+    profitability_rank: null,
+    buyback_rank: null,
+    peg_rank: null,
+    div_yield_rank: null,
+    health_rank: null,
+    industry: null,
+  },
+];

@@ -64,6 +64,12 @@ export default function PrivacyPage() {
               financial data services, we may collect information about your data
               requests and usage patterns.
             </p>
+            <p>
+              Optional acquisition analytics are disabled unless you consent.
+              When enabled, the analytics contract excludes names, email
+              addresses, symbols, company names, portfolio contents, financial
+              values, provider payloads, and free-form research.
+            </p>
 
             <h2 className="!text-2xl !font-semibold">
               2. How We Use Your Information

@@ -52,6 +52,7 @@
     "lucide-react": "^0.475.0",
     "neverthrow": "^8.2.0",
     "next": "16.0.10",
+    "posthog-js": "^1.435.8",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-hook-form": "^7.57.0",

@@ -3,6 +3,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { fromPromise } from "neverthrow";
 import { NextRequest } from "next/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
@@ -17,6 +18,19 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return new Response("Unauthorized", {
+      status: 401,
+      headers: { "Cache-Control": "private, no-store" },
+    });
+  }
+
   const { path } = await params;
   const filePath = path.join("/");
 
@@ -70,7 +84,8 @@ export async function GET(
 
     const headers = new Headers();
     headers.set("Content-Type", downloadData.data.type);
-    headers.set("Cache-Control", "public, max-age=31536000, immutable");
+    headers.set("Cache-Control", "private, max-age=86400");
+    headers.set("Vary", "Cookie");
 
     return new Response(downloadData.data.stream(), { status: 200, headers });
   } catch (e) {

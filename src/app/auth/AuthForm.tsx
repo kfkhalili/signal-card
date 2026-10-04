@@ -8,6 +8,11 @@ import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
+import {
+  ACQUISITION_EVENT_NAMES,
+  markSignupSubmitted,
+  trackAcquisitionEvent,
+} from "@/lib/analytics/acquisition";
 
 type AuthViewType =
   | "sign_in"
@@ -59,6 +64,15 @@ export default function AuthForm() {
       window.removeEventListener("hashchange", handleDirectHashChange);
     };
   }, []);
+
+  useEffect(() => {
+    if (authView === "sign_up") {
+      void trackAcquisitionEvent(
+        ACQUISITION_EVENT_NAMES.signupFormViewed,
+        {}
+      );
+    }
+  }, [authView]);
 
   useEffect(() => {
     if (!supabase) {
@@ -121,43 +135,58 @@ export default function AuthForm() {
   }
 
   return (
-    <Auth
-      key={authView}
-      supabaseClient={supabase}
-      appearance={{
-        theme: ThemeSupa,
-        variables: {
-          default: {
-            colors: {
-              brand: "hsl(var(--primary))",
-              brandAccent: "hsl(var(--primary))",
-              brandButtonText: "hsl(var(--primary-foreground))",
+    <div
+      onSubmitCapture={() => {
+        if (authView === "sign_up") {
+          void markSignupSubmitted("email");
+        }
+      }}
+      onClickCapture={(event) => {
+        if (authView !== "sign_up") return;
+        const button = (event.target as HTMLElement).closest("button");
+        if (button?.textContent?.toLowerCase().includes("google")) {
+          void markSignupSubmitted("google");
+        }
+      }}
+    >
+      <Auth
+        key={authView}
+        supabaseClient={supabase}
+        appearance={{
+          theme: ThemeSupa,
+          variables: {
+            default: {
+              colors: {
+                brand: "hsl(var(--primary))",
+                brandAccent: "hsl(var(--primary))",
+                brandButtonText: "hsl(var(--primary-foreground))",
+              },
             },
           },
-        },
-      }}
-      view={authView}
-      providers={['google']}
-      redirectTo={`${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`}
-      localization={{
-        variables: {
-          sign_in: {
-            email_label: "Email address",
-            password_label: "Password",
-            button_label: "Log in",
-            link_text: "Already have an account? Log in",
+        }}
+        view={authView}
+        providers={['google']}
+        redirectTo={`${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback`}
+        localization={{
+          variables: {
+            sign_in: {
+              email_label: "Email address",
+              password_label: "Password",
+              button_label: "Log in",
+              link_text: "Already have an account? Log in",
+            },
+            sign_up: {
+              email_label: "Email address",
+              password_label: "Create a Password",
+              button_label: "Sign up",
+              link_text: "New here? Create an account",
+            },
           },
-          sign_up: {
-            email_label: "Email address",
-            password_label: "Create a Password",
-            button_label: "Sign up",
-            link_text: "New here? Create an account",
-          },
-        },
-      }}
-      queryParams={{
-        hl: 'en',
-      }}
-    />
+        }}
+        queryParams={{
+          hl: 'en',
+        }}
+      />
+    </div>
   );
 }
