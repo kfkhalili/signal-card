@@ -28,6 +28,31 @@ test.describe("unauthenticated acquisition baseline", () => {
       const signup = main.getByRole("link", { name: "Sign up", exact: true });
       await expect(signup).toHaveAttribute("href", "/auth#auth-sign-up");
 
+      const acceptAnalytics = page.getByRole("button", {
+        name: "Accept analytics",
+      });
+      const declineAnalytics = page.getByRole("button", {
+        name: "Decline analytics",
+      });
+      await expect(acceptAnalytics).toBeVisible();
+      await expect(declineAnalytics).toBeVisible();
+
+      const declineBox = await declineAnalytics.boundingBox();
+      expect(declineBox).not.toBeNull();
+      expect(declineBox!.x + declineBox!.width).toBeLessThanOrEqual(
+        viewport.width
+      );
+
+      await declineAnalytics.click();
+      await expect(acceptAnalytics).not.toBeVisible();
+      expect(
+        await page.evaluate(() =>
+          window.localStorage.getItem(
+            "tickered_acquisition_analytics_consent_v1"
+          )
+        )
+      ).toBe("false");
+
       await page.goto("/auth#auth-sign-up");
       await expect(
         page.getByRole("button", { name: "Sign in with Google", exact: true })

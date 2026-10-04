@@ -12,6 +12,10 @@ import Avatar from "@/components/ui/Avatar";
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { Database } from '@/lib/supabase/database.types'
 import { fromPromise } from "neverthrow";
+import {
+  ACQUISITION_EVENT_NAMES,
+  trackAcquisitionEvent,
+} from "@/lib/analytics/acquisition";
 
 type Profile = Database['public']['Tables']['user_profiles']['Row'];
 
@@ -155,7 +159,17 @@ const Header: FC = () => {
           {!clientInitError && !isLoading && !user && (
             <>
               <Button asChild variant="default" size="sm">
-                <Link href="/auth#auth-sign-up">Sign Up</Link>
+                <Link
+                  href="/auth#auth-sign-up"
+                  onClick={() =>
+                    void trackAcquisitionEvent(
+                      ACQUISITION_EVENT_NAMES.signupCtaClicked,
+                      { cta_location: "header" }
+                    )
+                  }
+                >
+                  Sign Up
+                </Link>
               </Button>
               <Button asChild variant="secondary" size="sm">
                 <Link href="/auth#auth-sign-in">Login</Link>

@@ -1,6 +1,6 @@
 # Tickered User Acquisition Plan
 
-**Status:** Draft for product review  
+**Status:** Active
 **Primary objective:** Increase the number of qualified visitors who create an
 account and reach a first useful research action.  
 **North-star metric:** Weekly activated new users.
@@ -50,8 +50,9 @@ this as a release-blocking constraint, not a copy preference.
 - The landing-page card grid previously rendered stored provider-derived data.
   UA0.0 replaced that path with a clearly labeled, versioned synthetic fixture
   and protected the remaining profile-image route behind authentication.
-- No product analytics currently measure acquisition, signup completion, or the
-  first useful action.
+- UA0.2 now defines and instruments the privacy-safe acquisition funnel. It
+  remains inert until an EU PostHog project token is configured and a visitor
+  explicitly accepts analytics.
 - Signup supports email and Google, but confirmed users are forced through a
   separate profile-completion form before reaching the product.
 - Profile completion redirects to Workspace even though the authenticated home
@@ -146,14 +147,25 @@ behavior or provider-data path changed in this increment.
 
 #### UA0.2 — Add privacy-safe funnel analytics
 
-- Select one analytics system capable of anonymous acquisition attribution and
+- [x] Select one analytics system capable of anonymous acquisition attribution and
   authenticated funnel analysis.
-- Add the minimum event contract listed above.
-- Respect cookie consent and verify that no disallowed personal data is sent.
-- Add a small internal funnel report; do not add unrelated behavioral tracking.
+- [x] Add the minimum event contract listed above.
+- [x] Respect cookie consent and verify that no disallowed personal data is sent.
+- [x] Define the small internal funnel and retention reports; do not add unrelated
+  behavioral tracking.
 
 **Pass gate:** A test signup can be followed from landing source through first
 research action, with no duplicate events or personal data leakage.
+
+**Implementation verified 2026-10-03:** The typed PostHog EU integration is
+opt-in, fails closed without its public project token, disables broad behavioral
+capture, deduplicates each funnel milestone, and identifies accounts only by
+their opaque Supabase UUID. Contract tests exercise landing through first
+research action and reject disallowed properties. The exact report definitions
+and production smoke procedure are recorded in
+[`ACQUISITION_ANALYTICS.md`](./ACQUISITION_ANALYTICS.md). The production pass
+gate remains open until the deployment token is configured and one consented
+test signup is inspected in the EU project.
 
 #### UA0.3 — Remove misleading public claims and dead acquisition surfaces
 

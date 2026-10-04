@@ -17,6 +17,10 @@ import { cn, createSecureImageUrl } from "@/lib/utils";
 import { fromPromise } from "neverthrow";
 import { formatDistanceToNow } from "date-fns";
 import { useCompassFreshness } from "@/hooks/useCompassFreshness";
+import {
+  ACQUISITION_EVENT_NAMES,
+  trackAcquisitionEvent,
+} from "@/lib/analytics/acquisition";
 
 type Pillar = "value" | "growth" | "profitability" | "income" | "health"| "revenue" | "sentiment" | "buyback";
 type Weights = Record<Pillar, number>;
@@ -642,6 +646,10 @@ export default function CompassPage() {
     setAddingSymbols((prev) => new Set(prev).add(symbol));
     try {
       await addCard(symbol, ["profile"]);
+      await trackAcquisitionEvent(
+        ACQUISITION_EVENT_NAMES.firstResearchAction,
+        { research_action: "workspace_added" }
+      );
     } finally {
       setAddingSymbols((prev) => {
         const next = new Set(prev);
@@ -659,6 +667,10 @@ export default function CompassPage() {
       // Add all top 3 to workspace at once
       await addCards(
         top3.map((item) => ({ symbol: item.symbol, cardTypes: ["profile"] }))
+      );
+      await trackAcquisitionEvent(
+        ACQUISITION_EVENT_NAMES.firstResearchAction,
+        { research_action: "workspace_added" }
       );
     } finally {
       setAddingSymbols(new Set());

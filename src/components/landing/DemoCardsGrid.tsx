@@ -7,6 +7,10 @@ import { fromPromise } from "neverthrow";
 import type { DisplayableCard } from "@/components/game/types";
 import { ActiveCards } from "@/components/game/ActiveCards";
 import { SYNTHETIC_DEMO_DATA_ORIGIN } from "@/lib/demo/syntheticDemoCards";
+import {
+  ACQUISITION_EVENT_NAMES,
+  trackAcquisitionEvent,
+} from "@/lib/analytics/acquisition";
 
 const CardSkeleton: FC = () => (
   <div className="w-full aspect-[63/88] rounded-2xl bg-card/50 animate-pulse shadow-lg" />
@@ -70,6 +74,10 @@ const DemoCardsGrid: FC = () => {
   }, []);
 
   const handleInteraction = () => {
+    void trackAcquisitionEvent(
+      ACQUISITION_EVENT_NAMES.signupCtaClicked,
+      { cta_location: "synthetic_demo" }
+    );
     router.push("/auth#auth-sign-up");
   };
 

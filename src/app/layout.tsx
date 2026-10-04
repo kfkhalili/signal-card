@@ -32,6 +32,7 @@ import "./globals.css";
 import type { Viewport } from "next";
 
 import { QueryProvider } from "@/components/providers/QueryProvider";
+import { AcquisitionAnalytics } from "@/components/providers/AcquisitionAnalytics";
 
 export const metadata = homeMetadata;
 
@@ -62,6 +63,7 @@ export default function RootLayout({
         className={`${GeistSans.variable} ${GeistMono.variable} font-sans overflow-y-scroll`}>
         <QueryProvider>
           <AuthProvider>
+            <AcquisitionAnalytics />
             <RealtimeStockProvider>
               <div className="flex flex-col min-h-screen">
                 <Header />

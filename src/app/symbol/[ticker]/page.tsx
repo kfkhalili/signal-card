@@ -25,6 +25,10 @@ import { useSymbolAnalysisData } from "@/hooks/useSymbolAnalysisData";
 import { MetricRow } from "@/components/symbol/MetricRow";
 import { ScorecardItem } from "@/components/symbol/ScorecardItem";
 import { formatDistanceToNow } from "date-fns";
+import {
+  ACQUISITION_EVENT_NAMES,
+  trackAcquisitionEvent,
+} from "@/lib/analytics/acquisition";
 
 import { formatFinancialValue } from "@/lib/formatters";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
@@ -744,6 +748,10 @@ export default function SymbolAnalysisPage() {
     setAddingToWorkspace(true);
     try {
       await addCard(ticker, relevantCardTypes);
+      await trackAcquisitionEvent(
+        ACQUISITION_EVENT_NAMES.firstResearchAction,
+        { research_action: "workspace_added" }
+      );
     } finally {
       setAddingToWorkspace(false);
     }

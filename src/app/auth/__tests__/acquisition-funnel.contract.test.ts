@@ -47,4 +47,31 @@ describe("acquisition funnel baseline contract", () => {
       'url.searchParams.set("message", "Please log in to access this page.")'
     );
   });
+
+  it("wires each acquisition milestone to the real funnel surfaces", () => {
+    const landing = readSource("src/app/page.tsx");
+    const header = readSource("src/components/layout/Header.tsx");
+    const demo = readSource("src/components/landing/DemoCardsGrid.tsx");
+    const authForm = readSource("src/app/auth/AuthForm.tsx");
+    const analyticsProvider = readSource(
+      "src/components/providers/AcquisitionAnalytics.tsx"
+    );
+    const compass = readSource("src/app/compass/page.tsx");
+    const company = readSource("src/app/symbol/[ticker]/page.tsx");
+
+    expect(landing).toContain("ACQUISITION_EVENT_NAMES.signupCtaClicked");
+    expect(header).toContain("ACQUISITION_EVENT_NAMES.signupCtaClicked");
+    expect(demo).toContain("ACQUISITION_EVENT_NAMES.signupCtaClicked");
+    expect(authForm).toContain("ACQUISITION_EVENT_NAMES.signupFormViewed");
+    expect(authForm).toContain("markSignupSubmitted");
+    expect(analyticsProvider).toContain("completePendingSignup");
+    expect(analyticsProvider).toContain(
+      "ACQUISITION_EVENT_NAMES.firstCompassView"
+    );
+    expect(analyticsProvider).toContain(
+      "ACQUISITION_EVENT_NAMES.firstResearchAction"
+    );
+    expect(compass).toContain('research_action: "workspace_added"');
+    expect(company).toContain('research_action: "workspace_added"');
+  });
 });
