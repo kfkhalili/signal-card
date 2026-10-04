@@ -34,12 +34,33 @@ import { Tables } from "@/lib/supabase/database.types";
 
 type UserProfile = Tables<"user_profiles">;
 
+function accountDeletionErrorMessage(error: unknown): string {
+  const status =
+    typeof error === "object" &&
+    error !== null &&
+    "context" in error &&
+    typeof error.context === "object" &&
+    error.context !== null &&
+    "status" in error.context &&
+    typeof error.context.status === "number"
+      ? error.context.status
+      : null;
+
+  if (status === 401) {
+    return "Your session is no longer valid. Sign in again and retry.";
+  }
+
+  return "We could not delete your account. Please try again.";
+}
+
 export default function ProfilePage(): ReactElement {
   const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const [profile, setProfile] = useState<Option.Option<UserProfile>>(Option.none());
   const [pageLoading, setPageLoading] = useState<boolean>(true);
   const [supabase] = useState(() => createSupabaseBrowserClient());
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!supabase) {
@@ -139,56 +160,68 @@ export default function ProfilePage(): ReactElement {
 
   const handleDeleteAccount = async () => {
     if (!supabase) {
+      setDeleteError("Account deletion is temporarily unavailable.");
+      return;
+    }
+
+    setDeleteError(null);
+    setIsDeleting(true);
+
+    try {
+      const sessionResult = await fromPromise(
+        supabase.auth.getSession(),
+        (e) => new Error(`Failed to get session: ${(e as Error).message}`)
+      );
+
+      if (sessionResult.isErr()) {
+        console.error("Could not verify session:", sessionResult.error);
+        setDeleteError("We could not verify your session. Please try again.");
         return;
-    }
-    const sessionResult = await fromPromise(
-      supabase.auth.getSession(),
-      (e) => new Error(`Failed to get session: ${(e as Error).message}`)
-    );
-
-    if (sessionResult.isErr()) {
-      console.error("Could not verify session:", sessionResult.error);
-      return;
-    }
-
-    const { data: { session } } = sessionResult.value;
-
-    if (!session) {
-      return;
-    }
-
-    const deleteResult = await fromPromise(
-      supabase.functions.invoke("delete-user", {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      }),
-      (e) => new Error(`Failed to delete account: ${(e as Error).message}`)
-    );
-
-    deleteResult.match(
-      (response) => {
-        const { error } = response;
-
-        if (error) {
-          console.error("Error deleting account:", (error as Error).message);
-        } else {
-          void fromPromise(
-            supabase.auth.signOut(),
-            (e) => new Error(`Failed to sign out: ${(e as Error).message}`)
-          ).then((result) => {
-            result.mapErr((error) => {
-              console.error("[Profile] Error signing out:", error.message);
-            });
-          });
-          router.push("/");
-        }
-      },
-      (err) => {
-        // Handle Result error (network/exception errors)
-        console.error("Error deleting account:", err.message);
       }
-    );
+
+      const {
+        data: { session },
+      } = sessionResult.value;
+
+      if (!session) {
+        setDeleteError("Your session has expired. Sign in again and retry.");
+        return;
+      }
+
+      const deleteResult = await fromPromise(
+        supabase.functions.invoke<{ success?: boolean }>("delete-user", {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        }),
+        (e) => new Error(`Failed to delete account: ${(e as Error).message}`)
+      );
+
+      if (deleteResult.isErr()) {
+        console.error("Error deleting account:", deleteResult.error.message);
+        setDeleteError("We could not delete your account. Please try again.");
+        return;
+      }
+
+      const { data, error } = deleteResult.value;
+      if (error || !data?.success) {
+        console.error("Error deleting account:", error);
+        setDeleteError(accountDeletionErrorMessage(error));
+        return;
+      }
+
+      const { error: signOutError } = await supabase.auth.signOut({
+        scope: "local",
+      });
+      if (signOutError) {
+        console.error("[Profile] Error clearing local session:", signOutError);
+      }
+
+      router.replace("/");
+      router.refresh();
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   if (authLoading || pageLoading) {
@@ -252,10 +285,12 @@ export default function ProfilePage(): ReactElement {
               action is irreversible.
             </CardDescription>
           </CardHeader>
-          <CardFooter>
+          <CardFooter className="flex-col items-start gap-3">
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="destructive">Delete My Account</Button>
+                <Button variant="destructive" disabled={isDeleting}>
+                  {isDeleting ? "Deleting Account..." : "Delete My Account"}
+                </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
@@ -267,12 +302,20 @@ export default function ProfilePage(): ReactElement {
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => void handleDeleteAccount()}>
+                  <AlertDialogAction
+                    disabled={isDeleting}
+                    onClick={() => void handleDeleteAccount()}
+                  >
                     Continue
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+            {deleteError ? (
+              <p className="text-sm text-destructive" role="alert">
+                {deleteError}
+              </p>
+            ) : null}
           </CardFooter>
         </Card>
       </div>
