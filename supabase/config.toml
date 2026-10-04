@@ -87,7 +87,7 @@ entrypoint = "./functions/monitoring-alerts/index.ts"
 
 [functions.delete-user]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/delete-user/deno.json"
 entrypoint = "./functions/delete-user/index.ts"
 
