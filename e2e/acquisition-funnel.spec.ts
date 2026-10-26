@@ -17,7 +17,10 @@ test.describe("unauthenticated acquisition baseline", () => {
 
       const main = page.locator("main");
       await expect(
-        main.getByRole("heading", { name: "Spot the Trends" })
+        main.getByRole("heading", { name: "Find Overlooked Companies" })
+      ).toBeVisible();
+      await expect(
+        main.getByRole("heading", { name: "Inspect the Evidence" })
       ).toBeVisible();
       await expect(
         main.getByText(

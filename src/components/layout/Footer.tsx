@@ -22,9 +22,9 @@ const Footer = () => {
               <span className="text-xl font-bold">Tickered</span>
             </div>
             <p className="text-sm text-muted-foreground max-w-xs">
-              Transform complex financial data into interactive, digestible
-              experiences. Spot trends, see moves, and build your unique
-              collection of market insights.
+              Find financially sound companies the market may be overlooking,
+              then inspect the evidence yourself. Tickered is a research tool,
+              not investment advice.
             </p>
             <div className="flex space-x-3">
               <Link

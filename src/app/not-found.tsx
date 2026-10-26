@@ -18,8 +18,8 @@ export default function NotFound() {
             </h2>
             <p className="text-lg text-muted-foreground mb-8">
               The page you&apos;re looking for doesn&apos;t exist or has been moved.
-              Return to our financial data platform to explore stock analysis,
-              institutional-grade market data, and real-time market feeds.
+              Return to Tickered to discover overlooked companies and inspect
+              the evidence behind them.
             </p>
           </div>
 
@@ -60,4 +60,3 @@ export default function NotFound() {
     </div>
   );
 }
-
