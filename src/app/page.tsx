@@ -36,13 +36,16 @@ export default function LandingPage() {
       <div className="w-full">
         <div className="flex flex-col items-center justify-center text-center min-h-[50vh]">
           <h1 className="text-4xl sm:text-5xl md:text-6xl uppercase mb-0 font-bold font-['FaktCondensed',_AvenirNextCondensed-Medium,_'Segoe_UI',_sans-serif]">
-            Spot the Trends
+            Find Overlooked Companies
           </h1>
           <h2 className="text-4xl sm:text-5xl md:text-6xl uppercase underline decoration-primary decoration-[8px] sm:decoration-[10px] md:decoration-[12px] underline-offset-[6px] sm:underline-offset-8 mb-6 font-bold font-['FaktCondensed',_AvenirNextCondensed-Medium,_'Segoe_UI',_sans-serif] -mt-1 sm:-mt-2">
-            See the Moves
+            Inspect the Evidence
           </h2>
           <p className="text-base sm:text-lg md:text-xl text-foreground/80 max-w-xl md:max-w-2xl mb-8">
-            Market Signals, Simplified. Access institutional-grade data and real-time market feeds through our financial services platform. Dive into dynamic financial data, capture key market events, and build your unique collection with API integration.
+            Tickered helps self-directed investors surface financially sound
+            companies the market may be overlooking, then inspect the evidence
+            themselves. It is a research tool, not investment advice or a
+            promise of returns.
           </p>
           <Button
             size="lg"

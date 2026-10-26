@@ -163,12 +163,23 @@ capture, deduplicates each funnel milestone, and identifies accounts only by
 their opaque Supabase UUID. Contract tests exercise landing through first
 research action and reject disallowed properties. The exact report definitions
 and production smoke procedure are recorded in
-[`ACQUISITION_ANALYTICS.md`](./ACQUISITION_ANALYTICS.md). The production pass
-gate remains open until the deployment token is configured and one consented
-test signup is inspected in the EU project.
+[`ACQUISITION_ANALYTICS.md`](./ACQUISITION_ANALYTICS.md).
+
+**Production verified 2026-10-26:** Aggregate-only PostHog queries confirmed an
+email signup and the 2026-10-17 Google signup through account confirmation,
+Compass, and a first research action, plus one seven-day return. No user-level
+records or personal properties were retrieved. Interpret Google
+`acquisition_signup_submitted` as an OAuth initiation: it fires on the provider
+button click, while `acquisition_account_confirmed` remains the completed-signup
+measure. Traffic is still too small for acquisition decisions, so retain the
+instrumentation and let the baseline accumulate.
 
 #### UA0.3 — Remove misleading public claims and dead acquisition surfaces
 
+- [x] Correct the landing hero, home metadata, shared footer, and not-found page
+  to use the approved research-product position without API, enterprise,
+  institutional-grade, or real-time-market claims.
+- [x] Add a focused regression contract for those primary public surfaces.
 - Inventory every public claim against actual product behavior and data
   freshness.
 - Remove placeholder pages from the sitemap and public navigation until they
@@ -380,8 +391,9 @@ Recommended defaults are in bold.
    never publish FMP-derived data, the live leaderboard, or the proprietary
    formula**.
 
-## Immediate next step after approval
+## Immediate next step
 
-Execute **UA0.2 only**: add the minimum privacy-safe funnel event contract and
-report. Do not redesign the landing page until acquisition and activation are
-observable.
+Complete **UA0.3** in small increments. Next, reconcile the sitemap and
+`robots.txt`, removing protected and unfinished acquisition routes from search
+discovery before rewriting or expanding any placeholder pages. Keep the live
+product, ranking behavior, and provider-data boundary unchanged.
