@@ -233,13 +233,23 @@ say what Tickered helps them do and what happens after signup.
 
 #### UA1.2 — Demonstrate the complete workflow
 
-- Show three concise steps: personalize Compass, inspect a candidate, save
+- [x] Show three concise steps: personalize Compass, inspect a candidate, save
   research to Workspace.
-- Use the real product shell populated only with clearly labeled synthetic
+- [x] Use the real product shell populated only with clearly labeled synthetic
   fixtures, not provider-derived values, abstract stock imagery, or invented
   testimonials.
-- Explain why a company appears without publishing proprietary weights or
+- [x] Explain why a company appears without publishing proprietary weights or
   presenting the result as advice.
+
+**Implemented 2026-10-27:** The landing page now walks visitors through
+personalizing Compass, inspecting a fictional candidate in the existing card
+interface, and saving research to Workspace. The example explains selection in
+plain language, calls the result a research lead rather than a recommendation,
+and keeps every public value inside the existing `synthetic-v1` boundary.
+Desktop and mobile funnel checks cover the workflow structure and disclosure.
+Five optimized local-production samples recorded a 104 ms median landing LCP
+and 236 ms maximum, improving on the UA1.1 132/284 ms baseline. The manual
+comprehension check remains the only open part of the pass gate.
 
 **Pass gate:** The workflow is understandable without creating an account and
 does not materially slow the landing page.
@@ -408,7 +418,7 @@ Recommended defaults are in bold.
 
 ## Immediate next step
 
-Begin **UA1.2** with one bounded landing-page increment: add a concise
-three-step synthetic workflow explaining how a user personalizes Compass,
-inspects a candidate, and saves research to Workspace. Keep the live product,
-ranking behavior, and provider-data boundary unchanged.
+Verify **UA1.2** against its performance and comprehension gate, then begin
+**UA1.3** with one bounded trust increment: add a short methodology summary and
+clear limitations without exposing provider-derived values or proprietary
+weights.

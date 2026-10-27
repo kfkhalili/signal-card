@@ -9,6 +9,9 @@ describe("acquisition funnel baseline contract", () => {
     const landing = readSource("src/app/page.tsx");
     const header = readSource("src/components/layout/Header.tsx");
     const demo = readSource("src/components/landing/DemoCardsGrid.tsx");
+    const workflow = readSource(
+      "src/components/landing/SyntheticWorkflow.tsx"
+    );
 
     expect(landing).toContain('href="/auth#auth-sign-up"');
     expect(landing).toContain("Create a free account");
@@ -18,6 +21,11 @@ describe("acquisition funnel baseline contract", () => {
     expect(header).toContain('href="/auth#auth-sign-up"');
     expect(header).toContain('href="/auth#auth-sign-in"');
     expect(demo).toContain('router.push("/auth#auth-sign-up")');
+    expect(workflow).toContain("Personalize Compass");
+    expect(workflow).toContain("Inspect a candidate");
+    expect(workflow).toContain("Save to Workspace");
+    expect(workflow).toContain("not a recommendation");
+    expect(workflow).toContain("<DemoCardsGrid />");
   });
 
   it("offers email/password and Google authentication", () => {
