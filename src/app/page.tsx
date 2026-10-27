@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import DemoCardsGrid from "@/components/landing/DemoCardsGrid";
+import SyntheticWorkflow from "@/components/landing/SyntheticWorkflow";
 import {
   ACQUISITION_EVENT_NAMES,
   trackAcquisitionEvent,
@@ -84,12 +84,12 @@ export default function LandingPage() {
             See how Tickered works
           </h2>
           <p className="mt-2 text-sm text-foreground/80 sm:text-base">
-            Preview how a research card organizes a company&apos;s financial
-            evidence. Create an account to personalize Compass and research
-            real companies inside Tickered.
+            Follow a research lead from personalized discovery to saved
+            evidence. This public walkthrough uses a fictional company and
+            illustrative values throughout.
           </p>
         </div>
-        <DemoCardsGrid />
+        <SyntheticWorkflow />
       </section>
     </div>
   );

@@ -103,6 +103,29 @@ test.describe("unauthenticated acquisition baseline", () => {
         main.getByRole("heading", { name: "See how Tickered works" })
       ).toBeVisible();
 
+      const workflow = main.getByRole("list", {
+        name: "Three-step research workflow",
+      });
+      await expect(workflow.getByRole("listitem")).toHaveCount(3);
+      await expect(
+        workflow.getByRole("heading", { name: "Personalize Compass" })
+      ).toBeVisible();
+      await expect(
+        workflow.getByRole("heading", { name: "Inspect a candidate" })
+      ).toBeVisible();
+      await expect(
+        workflow.getByRole("heading", { name: "Save to Workspace" })
+      ).toBeVisible();
+      await expect(
+        workflow.getByText(
+          "The result is a research lead, not a recommendation.",
+          { exact: false }
+        )
+      ).toBeVisible();
+      await expect(
+        main.getByLabel("Interactive synthetic evidence preview")
+      ).toBeVisible();
+
       const acceptAnalytics = page.getByRole("button", {
         name: "Accept analytics",
       });
