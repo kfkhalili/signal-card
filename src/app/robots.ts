@@ -1,4 +1,5 @@
 import { MetadataRoute } from "next";
+import { PROTECTED_PATH_PREFIXES } from "@/lib/search-discovery";
 
 export default function robots(): MetadataRoute.Robots {
   const baseUrl =
@@ -9,16 +10,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: [
-          "/workspace/",
-          "/compass/",
-          "/auth/",
-          "/api/",
-          "/_next/",
-          "/admin/",
-          "/profile/",
-          "/settings/",
-        ],
+        disallow: [...PROTECTED_PATH_PREFIXES],
       },
       {
         // Disallow common AI crawlers
