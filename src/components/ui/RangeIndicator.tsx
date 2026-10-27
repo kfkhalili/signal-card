@@ -117,7 +117,7 @@ export const RangeIndicator: React.FC<RangeIndicatorProps> = ({
           }
           isInteractive={!!onLowLabelClick}
           onClickHandler={onLowLabelClick}
-          baseClassName="p-0.5 rounded-sm relative"
+          baseClassName="min-h-11 min-w-11 p-0.5 rounded-sm relative inline-flex items-center justify-center"
           data-testid={`${lowLabel
             .toLowerCase()
             .replace(/\s+/g, "-")}-clickable`}
@@ -131,7 +131,7 @@ export const RangeIndicator: React.FC<RangeIndicatorProps> = ({
           }
           isInteractive={!!onHighLabelClick}
           onClickHandler={onHighLabelClick}
-          baseClassName="p-0.5 rounded-sm relative"
+          baseClassName="min-h-11 min-w-11 p-0.5 rounded-sm relative inline-flex items-center justify-center"
           data-testid={`${highLabel
             .toLowerCase()
             .replace(/\s+/g, "-")}-clickable`}

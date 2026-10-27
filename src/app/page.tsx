@@ -47,28 +47,50 @@ export default function LandingPage() {
             themselves. It is a research tool, not investment advice or a
             promise of returns.
           </p>
-          <Button
-            size="lg"
-            asChild
-            className="bg-primary hover:bg-primary/90 text-primary-foreground">
-            <Link
-              href="/auth#auth-sign-up"
-              onClick={() =>
-                void trackAcquisitionEvent(
-                  ACQUISITION_EVENT_NAMES.signupCtaClicked,
-                  { cta_location: "hero" }
-                )
-              }
-            >
-              Sign up
-            </Link>
-          </Button>
+          <div className="flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center">
+            <Button
+              size="lg"
+              asChild
+              className="bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Link
+                href="/auth#auth-sign-up"
+                onClick={() =>
+                  void trackAcquisitionEvent(
+                    ACQUISITION_EVENT_NAMES.signupCtaClicked,
+                    { cta_location: "hero" }
+                  )
+                }
+              >
+                Create a free account
+              </Link>
+            </Button>
+            <Button size="lg" variant="outline" asChild>
+              <Link href="#how-it-works">See how it works</Link>
+            </Button>
+          </div>
         </div>
       </div>
 
-      <div className="w-full">
+      <section
+        id="how-it-works"
+        aria-labelledby="how-it-works-heading"
+        className="w-full scroll-mt-24"
+      >
+        <div className="mx-auto mb-6 max-w-2xl">
+          <h2
+            id="how-it-works-heading"
+            className="text-2xl font-bold sm:text-3xl"
+          >
+            See how Tickered works
+          </h2>
+          <p className="mt-2 text-sm text-foreground/80 sm:text-base">
+            Preview how a research card organizes a company&apos;s financial
+            evidence. Create an account to personalize Compass and research
+            real companies inside Tickered.
+          </p>
+        </div>
         <DemoCardsGrid />
-      </div>
+      </section>
     </div>
   );
 }

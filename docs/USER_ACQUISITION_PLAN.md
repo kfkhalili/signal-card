@@ -210,15 +210,23 @@ consistent, makes only supportable claims, and contains no FMP-derived data.
 
 #### UA1.1 — Correct the hero and CTA
 
-- Replace API/enterprise copy with the overlooked-company research promise.
-- Use one primary CTA: **Create a free account**.
-- Add one low-friction secondary action: **See how it works**, anchored to the
+- [x] Replace API/enterprise copy with the overlooked-company research promise.
+- [x] Use one primary CTA: **Create a free account**.
+- [x] Add one low-friction secondary action: **See how it works**, anchored to the
   product explanation on the same page.
-- State that Tickered is a research tool, not a promise of returns.
-- Correct the measured signup-CTA contrast and preview touch-target failures;
+- [x] State that Tickered is a research tool, not a promise of returns.
+- [x] Correct the measured signup-CTA contrast and preview touch-target failures;
   preserve keyboard behavior and mobile readability.
-- Treat the recorded landing LCP as a regression baseline and remove avoidable
+- [x] Treat the recorded landing LCP as a regression baseline and remove avoidable
   render delay while changing the hero.
+
+**Verified 2026-10-27:** The light-theme primary action was corrected from a
+measured 3.16:1 contrast ratio to approximately 5.05:1, while the secondary
+action remains above 16:1. The preview's interactive 52-week labels now meet
+the 44×44 px target minimum. Five optimized local-production browser samples
+recorded a 132 ms median landing LCP and 284 ms maximum, so no rendering or auth
+restructure was justified. Desktop and mobile funnel checks cover the CTA
+destinations, contrast, target sizes, and in-page anchor.
 
 **Pass gate:** In a five-person comprehension check, at least four people can
 say what Tickered helps them do and what happens after signup.
@@ -400,7 +408,7 @@ Recommended defaults are in bold.
 
 ## Immediate next step
 
-Begin **UA1.1** with the smallest measurable landing-page improvement: converge
-the hero on one primary **Create a free account** CTA and one in-page **See how
-it works** action, then verify desktop/mobile accessibility and funnel events.
-Keep the live product, ranking behavior, and provider-data boundary unchanged.
+Begin **UA1.2** with one bounded landing-page increment: add a concise
+three-step synthetic workflow explaining how a user personalizes Compass,
+inspects a candidate, and saves research to Workspace. Keep the live product,
+ranking behavior, and provider-data boundary unchanged.
