@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { NON_INDEXABLE_PUBLIC_PATHS } from "./src/lib/search-discovery";
 
 const nextConfig: NextConfig = {
   compiler: {
@@ -41,6 +42,15 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      ...NON_INDEXABLE_PUBLIC_PATHS.map((path) => ({
+        source: `${path}/:path*`,
+        headers: [
+          {
+            key: "X-Robots-Tag",
+            value: "noindex, nofollow",
+          },
+        ],
+      })),
     ];
   },
   images: {

@@ -180,14 +180,18 @@ instrumentation and let the baseline accumulate.
   to use the approved research-product position without API, enterprise,
   institutional-grade, or real-time-market claims.
 - [x] Add a focused regression contract for those primary public surfaces.
+- [x] Reconcile the sitemap and `robots.txt` so only useful public pages are
+  advertised and protected product routes are excluded consistently.
+- [x] Add `noindex, nofollow` response headers to unfinished public pages while
+  keeping them reachable for later review or replacement.
+- [x] Retire the speculative API, pricing, and status pages. Revisit them only
+  after retained users demonstrate demand and the advertised experiences exist.
 - Inventory every public claim against actual product behavior and data
   freshness.
-- Remove placeholder pages from the sitemap and public navigation until they
-  contain real content; use `noindex` where removal is inappropriate.
+- [x] Keep placeholder pages out of the sitemap and active public navigation
+  until they contain real content; use `noindex` where removal is inappropriate.
 - Do not advertise paid plans, API access, live status, newsletters, or real-time
   data unless the corresponding experience exists and is supported.
-- Reconcile the sitemap and `robots.txt`: do not advertise protected product
-  routes to crawlers while simultaneously disallowing them.
 - Replace unsupported API, real-time, and institutional-grade metadata claims
   with the approved research-product position.
 - Replace the public demo-card data path with deterministic synthetic fixtures;
@@ -393,7 +397,8 @@ Recommended defaults are in bold.
 
 ## Immediate next step
 
-Complete **UA0.3** in small increments. Next, reconcile the sitemap and
-`robots.txt`, removing protected and unfinished acquisition routes from search
-discovery before rewriting or expanding any placeholder pages. Keep the live
-product, ranking behavior, and provider-data boundary unchanged.
+Complete **UA0.3** in small increments. Next, inventory the remaining public
+pages against actual product behavior and decide, page by page, whether each
+should be retired, replaced, or rewritten before it can return to search
+discovery. Keep the live product, ranking behavior, and provider-data boundary
+unchanged.
