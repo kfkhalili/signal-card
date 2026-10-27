@@ -9,6 +9,9 @@ const PUBLIC_POSITIONING_FILES = [
   "src/app/metadata.ts",
   "src/components/layout/Footer.tsx",
   "src/app/not-found.tsx",
+  "src/app/privacy/page.tsx",
+  "src/app/terms/page.tsx",
+  "src/app/cookies/page.tsx",
 ];
 
 describe("public positioning contract", () => {

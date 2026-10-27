@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: "Terms of Service - Tickered Financial Data Platform",
+  title: "Terms of Service - Tickered",
   description:
-    "Tickered Terms of Service. Read the terms and conditions for using our financial data API, real-time market feeds, and enterprise market services platform.",
+    "Read the terms and conditions for using Tickered's website and investment-research tools.",
   alternates: {
     canonical: "/terms",
   },
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Terms of Service - Tickered",
     description:
-      "Terms and conditions for using Tickered's financial data platform and API services.",
+      "Terms and conditions for using Tickered's website and investment-research tools.",
     type: "website",
     url: "/terms",
   },
@@ -45,8 +45,8 @@ export default function TermsPage() {
           <div className="space-y-8 prose prose-lg dark:prose-invert max-w-none">
             <p>
               These Terms of Service (&quot;Terms&quot;) govern your access to
-              and use of Tickered&apos;s financial data platform, website, API,
-              and related services (collectively, the &quot;Service&quot;)
+              and use of Tickered&apos;s website and investment-research tools
+              (collectively, the &quot;Service&quot;)
               operated by Tickered (&quot;we,&quot; &quot;our,&quot; or
               &quot;us&quot;). By accessing or using our Service, you agree to be
               bound by these Terms. If you disagree with any part of these Terms,
@@ -55,8 +55,8 @@ export default function TermsPage() {
 
             <h2 className="!text-2xl !font-semibold">1. Acceptance of Terms</h2>
             <p>
-              By creating an account, accessing our website, or using our API and
-              financial data services, you acknowledge that you have read,
+              By creating an account, accessing our website, or using our
+              research tools, you acknowledge that you have read,
               understood, and agree to be bound by these Terms and our Privacy
               Policy. These Terms constitute a legally binding agreement between
               you and Tickered. If you are using the Service on behalf of an
@@ -70,12 +70,11 @@ export default function TermsPage() {
             <p>
               Subject to your compliance with these Terms, we grant you a limited,
               non-exclusive, non-transferable, revocable license to access and use
-              our Service for your personal or internal business purposes. This
-              license includes access to our real-time market data feeds,
-              institutional-grade financial data, API integration services, and
-              data visualization tools. You may not resell, redistribute, or
-              commercially exploit any data obtained through our Service without
-              explicit written permission.
+              our Service for your personal use. This license includes access to
+              the research and visualization tools made available through the
+              Service. You may not resell, redistribute, or commercially exploit
+              data or content obtained through our Service without explicit
+              written permission.
             </p>
 
             <h2 className="!text-2xl !font-semibold">
@@ -88,9 +87,8 @@ export default function TermsPage() {
               in accordance with these Terms. You must not use the Service to
               violate any applicable laws, infringe upon the rights of others, or
               transmit any harmful code or malicious software. You are responsible
-              for ensuring that your use of our API and data feeds complies with
-              all applicable regulations and does not violate any third-party
-              rights.
+              for ensuring that your use of the Service complies with all
+              applicable regulations and does not violate third-party rights.
             </p>
 
             <h2 className="!text-2xl !font-semibold">
@@ -98,15 +96,15 @@ export default function TermsPage() {
             </h2>
             <p>
               The information, data, and content provided through our Service,
-              including real-time market data feeds and financial analytics, are
-              for informational purposes only and do not constitute financial,
-              investment, or trading advice. We are not a registered investment
-              advisor, broker-dealer, or financial planner. You should consult
-              with qualified financial professionals before making any investment
+              are for informational and research purposes only and do not
+              constitute financial, investment, or trading advice. Information
+              may be delayed, incomplete, or inaccurate. We are not a registered
+              investment advisor, broker-dealer, or financial planner. You should
+              consult qualified financial professionals before making investment
               decisions. To the maximum extent permitted by law, Tickered shall
               not be liable for any indirect, incidental, special, consequential,
               or punitive damages arising from your use of the Service or reliance
-              on any data provided through the Service.
+              on information provided through the Service.
             </p>
 
             <h2 className="!text-2xl !font-semibold">5. Governing Law</h2>

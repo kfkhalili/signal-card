@@ -186,19 +186,22 @@ instrumentation and let the baseline accumulate.
   keeping them reachable for later review or replacement.
 - [x] Retire the speculative API, pricing, and status pages. Revisit them only
   after retained users demonstrate demand and the advertised experiences exist.
-- Inventory every public claim against actual product behavior and data
+- [x] Retire the unfinished about, blog, careers, contact, features, help, and
+  press pages. Revisit them only when retained users create a concrete need;
+  keep support available through the working footer email.
+- [x] Inventory every public claim against actual product behavior and data
   freshness.
 - [x] Keep placeholder pages out of the sitemap and active public navigation
   until they contain real content; use `noindex` where removal is inappropriate.
-- Do not advertise paid plans, API access, live status, newsletters, or real-time
-  data unless the corresponding experience exists and is supported.
-- Replace unsupported API, real-time, and institutional-grade metadata claims
-  with the approved research-product position.
-- Replace the public demo-card data path with deterministic synthetic fixtures;
+- [x] Do not advertise paid plans, API access, live status, newsletters, or
+  real-time data unless the corresponding experience exists and is supported.
+- [x] Replace unsupported API, real-time, and institutional-grade metadata
+  claims with the approved research-product position.
+- [x] Replace the public demo-card data path with deterministic synthetic fixtures;
   do not merely hide the provider key while returning provider-derived data.
-- Audit all unauthenticated routes, metadata images, screenshots, and generated
-  content for FMP-derived values, and add a regression test that fails if a
-  public acquisition surface imports the authenticated market-data path.
+- [x] Audit all unauthenticated routes, metadata images, screenshots, and
+  generated content for FMP-derived values, and add a regression test that fails
+  if a public acquisition surface imports the authenticated market-data path.
 
 **Pass gate:** Every indexed public page is useful, complete, internally
 consistent, makes only supportable claims, and contains no FMP-derived data.
@@ -397,8 +400,7 @@ Recommended defaults are in bold.
 
 ## Immediate next step
 
-Complete **UA0.3** in small increments. Next, inventory the remaining public
-pages against actual product behavior and decide, page by page, whether each
-should be retired, replaced, or rewritten before it can return to search
-discovery. Keep the live product, ranking behavior, and provider-data boundary
-unchanged.
+Begin **UA1.1** with the smallest measurable landing-page improvement: converge
+the hero on one primary **Create a free account** CTA and one in-page **See how
+it works** action, then verify desktop/mobile accessibility and funnel events.
+Keep the live product, ranking behavior, and provider-data boundary unchanged.
