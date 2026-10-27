@@ -5,6 +5,31 @@ const viewports = [
   { name: "mobile", width: 390, height: 844 },
 ];
 
+const relativeLuminance = ([red, green, blue]: number[]) =>
+  [red, green, blue]
+    .map((channel) => {
+      const normalized = channel / 255;
+      return normalized <= 0.04045
+        ? normalized / 12.92
+        : ((normalized + 0.055) / 1.055) ** 2.4;
+    })
+    .reduce(
+      (sum, channel, index) =>
+        sum + channel * [0.2126, 0.7152, 0.0722][index],
+      0
+    );
+
+const contrastRatio = (foreground: string, background: string) => {
+  const parseRgb = (value: string) =>
+    (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+  const luminances = [
+    relativeLuminance(parseRgb(foreground)),
+    relativeLuminance(parseRgb(background)),
+  ].sort((left, right) => right - left);
+
+  return (luminances[0] + 0.05) / (luminances[1] + 0.05);
+};
+
 test.describe("unauthenticated acquisition baseline", () => {
   test.beforeEach(async ({ context }) => {
     await context.clearCookies();
@@ -28,8 +53,55 @@ test.describe("unauthenticated acquisition baseline", () => {
         )
       ).toBeVisible();
 
-      const signup = main.getByRole("link", { name: "Sign up", exact: true });
+      const signup = main.getByRole("link", {
+        name: "Create a free account",
+        exact: true,
+      });
       await expect(signup).toHaveAttribute("href", "/auth#auth-sign-up");
+
+      const howItWorks = main.getByRole("link", {
+        name: "See how it works",
+        exact: true,
+      });
+      await expect(howItWorks).toHaveAttribute("href", "#how-it-works");
+
+      for (const callToAction of [signup, howItWorks]) {
+        const callToActionBox = await callToAction.boundingBox();
+        expect(callToActionBox).not.toBeNull();
+        expect(callToActionBox!.height).toBeGreaterThanOrEqual(44);
+        expect(callToActionBox!.x).toBeGreaterThanOrEqual(0);
+        expect(
+          callToActionBox!.x + callToActionBox!.width
+        ).toBeLessThanOrEqual(viewport.width);
+
+        const colors = await callToAction.evaluate((element) => {
+          const style = window.getComputedStyle(element);
+          return {
+            foreground: style.color,
+            background: style.backgroundColor,
+          };
+        });
+        expect(
+          contrastRatio(colors.foreground, colors.background)
+        ).toBeGreaterThanOrEqual(4.5);
+      }
+
+      for (const rangeLabel of ["Interact with 52W Low", "Interact with 52W High"]) {
+        const control = main.getByRole("button", {
+          name: rangeLabel,
+          exact: true,
+        });
+        const controlBox = await control.boundingBox();
+        expect(controlBox).not.toBeNull();
+        expect(controlBox!.height).toBeGreaterThanOrEqual(44);
+        expect(controlBox!.width).toBeGreaterThanOrEqual(44);
+      }
+
+      await howItWorks.click();
+      await expect(page).toHaveURL(/\/#how-it-works$/);
+      await expect(
+        main.getByRole("heading", { name: "See how Tickered works" })
+      ).toBeVisible();
 
       const acceptAnalytics = page.getByRole("button", {
         name: "Accept analytics",
@@ -62,7 +134,9 @@ test.describe("unauthenticated acquisition baseline", () => {
       ).toBeVisible();
       await expect(page.getByLabel("Email address")).toBeVisible();
       await expect(page.getByLabel("Create a Password")).toBeVisible();
-      await expect(page.getByRole("button", { name: "Sign up", exact: true })).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Sign up", exact: true })
+      ).toBeVisible();
     });
   }
 

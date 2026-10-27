@@ -11,6 +11,10 @@ describe("acquisition funnel baseline contract", () => {
     const demo = readSource("src/components/landing/DemoCardsGrid.tsx");
 
     expect(landing).toContain('href="/auth#auth-sign-up"');
+    expect(landing).toContain("Create a free account");
+    expect(landing).toContain('href="#how-it-works"');
+    expect(landing).toContain("See how it works");
+    expect(landing).toContain('id="how-it-works"');
     expect(header).toContain('href="/auth#auth-sign-up"');
     expect(header).toContain('href="/auth#auth-sign-in"');
     expect(demo).toContain('router.push("/auth#auth-sign-up")');
