@@ -4,9 +4,9 @@ import { AnalyticsConsentControls } from "@/components/privacy/AnalyticsConsentC
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: "Cookie Policy - Tickered Financial Data Platform",
+  title: "Cookie Policy - Tickered",
   description:
-    "Tickered Cookie Policy. Learn about how we use cookies on our financial data platform, API services, and real-time market data feeds.",
+    "Learn how Tickered uses essential storage and optional analytics on our website and investment-research tools.",
   alternates: {
     canonical: "/cookies",
   },
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Cookie Policy - Tickered",
     description:
-      "Learn about how Tickered uses cookies on our financial data platform and API services.",
+      "Learn how Tickered uses essential storage and optional analytics.",
     type: "website",
     url: "/cookies",
   },

@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy - Tickered Financial Data Platform",
+  title: "Privacy Policy - Tickered",
   description:
-    "Tickered Privacy Policy. Learn how we collect, use, and protect your information when using our financial data API, real-time market feeds, and enterprise market services platform.",
+    "Learn how Tickered collects, uses, and protects information when you use our website and investment-research tools.",
   alternates: {
     canonical: "/privacy",
   },
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Privacy Policy - Tickered",
     description:
-      "Learn how Tickered protects your privacy and handles your data when using our financial data platform and API services.",
+      "Learn how Tickered protects your privacy and handles data when you use our website and investment-research tools.",
     type: "website",
     url: "/privacy",
   },
@@ -45,9 +45,8 @@ export default function PrivacyPage() {
               Tickered (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;) is
               committed to protecting your privacy. This Privacy Policy explains
               how we collect, use, disclose, and safeguard your information when
-              you use our financial data platform and services, including our
-              website, API, and related services (collectively, the
-              &quot;Service&quot;).
+              you use our website and investment-research tools (collectively,
+              the &quot;Service&quot;).
             </p>
 
             <h2 className="!text-2xl !font-semibold">
@@ -55,14 +54,12 @@ export default function PrivacyPage() {
             </h2>
             <p>
               We collect information that you provide directly to us, including:
-              account registration information (email address, username, password),
-              user-generated content (custom financial cards, workspace
-              configurations, dashboard layouts), and profile information. We also
-              automatically collect usage data, including your interactions with
-              the platform, API usage patterns, and device information. When you
-              access our real-time market data feeds and institutional-grade
-              financial data services, we may collect information about your data
-              requests and usage patterns.
+              account registration information (such as your email address,
+              username, and profile information) and content you save in the
+              Service, such as workspace configurations. We also automatically
+              collect technical and usage information needed to operate and
+              secure the Service, including device information and interactions
+              with product features.
             </p>
             <p>
               Optional acquisition analytics are disabled unless you consent.
@@ -76,26 +73,20 @@ export default function PrivacyPage() {
             </h2>
             <p>
               We use the information we collect to provide, maintain, and improve
-              our Service, including delivering real-time market data feeds,
-              processing API integration requests, and personalizing your
-              experience. We use your information to communicate with you about
-              your account, service updates, and important notices. We also use
-              collected data for security purposes, fraud prevention, and to comply
-              with legal obligations. Your information helps us optimize our
-              financial data delivery infrastructure and ensure reliable access to
-              institutional-grade market data.
+              our Service and personalize your experience. We use your
+              information to communicate with you about your account, service
+              updates, and important notices. We also use collected data for
+              security, fraud prevention, troubleshooting, and compliance with
+              legal obligations.
             </p>
 
             <h2 className="!text-2xl !font-semibold">3. Data Security</h2>
             <p>
               We implement industry-standard security measures to protect your
-              information, including encryption in transit and at rest, secure
-              authentication protocols, and access controls. Our infrastructure
-              uses enterprise-grade security practices to safeguard financial data
-              and personal information. We partner with trusted service providers,
-              including Supabase, who maintain robust security standards. However,
-              no method of transmission over the Internet or electronic storage is
-              100% secure, and we cannot guarantee absolute security.
+              information, including authentication and access controls. We work
+              with service providers, including Supabase, to operate the Service.
+              However, no method of transmission over the Internet or electronic
+              storage is 100% secure, and we cannot guarantee absolute security.
             </p>
 
             <h2 className="!text-2xl !font-semibold">

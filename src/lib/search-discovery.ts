@@ -5,20 +5,20 @@ export const INDEXABLE_PUBLIC_PATHS = [
   "/cookies",
 ] as const;
 
-export const UNFINISHED_PUBLIC_PATHS = [
+export const RETIRED_PUBLIC_PATHS = [
   "/about",
+  "/api",
   "/blog",
   "/careers",
   "/contact",
   "/features",
   "/help",
   "/press",
+  "/pricing",
+  "/status",
 ] as const;
 
-export const RETIRED_PUBLIC_PATHS = ["/api", "/pricing", "/status"] as const;
-
 export const NON_INDEXABLE_PUBLIC_PATHS = [
-  ...UNFINISHED_PUBLIC_PATHS,
   ...RETIRED_PUBLIC_PATHS,
 ] as const;
 

@@ -13,7 +13,7 @@ import {
 describe("search discovery contract", () => {
   it("advertises only useful public pages in the sitemap", () => {
     const paths = sitemap().map(({ url }) => new URL(url).pathname);
-    const excludedPaths = new Set([
+    const excludedPaths = new Set<string>([
       ...PROTECTED_PATH_PREFIXES,
       ...NON_INDEXABLE_PUBLIC_PATHS,
     ]);
@@ -23,14 +23,15 @@ describe("search discovery contract", () => {
   });
 
   it("keeps protected product routes out of crawler discovery", () => {
-    const wildcardRule = robots().rules.find(
+    const rules = robots().rules;
+    const wildcardRule = (Array.isArray(rules) ? rules : [rules]).find(
       (rule) => rule.userAgent === "*"
     );
 
     expect(wildcardRule?.disallow).toEqual([...PROTECTED_PATH_PREFIXES]);
   });
 
-  it("adds a noindex response header to every unfinished public page", async () => {
+  it("adds a noindex response header to every retired public page", async () => {
     const headerRules = (await nextConfig.headers?.()) ?? [];
     const noindexSources = headerRules
       .filter((rule) =>
@@ -47,7 +48,7 @@ describe("search discovery contract", () => {
     );
   });
 
-  it("does not ship speculative product pages that have been retired", () => {
+  it("does not ship public pages that have been retired", () => {
     RETIRED_PUBLIC_PATHS.forEach((retiredPath) => {
       const pageFile = path.join(
         process.cwd(),
