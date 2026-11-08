@@ -28,8 +28,8 @@ Tickered: stock research through interactive financial cards and **Compass**, a 
 - `npm run typecheck` · `npm run lint` · `npm test` (Jest) · `npm run test:e2e` (Playwright) · `npm run build`
 - `npm run test:contracts` — SQL contract tests against the local Supabase stack (`supabase start` first; Docker must be running).
 - `npm run knip` — unused files, exports and dependencies.
-- Deno tests for edge functions: `cd supabase/functions && deno test --allow-env --allow-net --allow-read __tests__/`
-- Before calling work done: `typecheck`, `lint` and `npm test` pass; `test:contracts` too when a migration changed; `test:e2e` when something on screen changed. Say plainly which checks you did not run.
+- `npm run test:deno` — edge-function tests that call `Deno.test` (Deno via `npx`). Jest skips exactly these files, so `supabase/functions/__tests__/` holds both kinds: a test that calls `Deno.test` runs under Deno, any other under Jest.
+- Before calling work done: `typecheck`, `lint` and `npm test` pass; `test:deno` too when `supabase/functions/` changed; `test:contracts` when a migration changed; `test:e2e` when something on screen changed. Say plainly which checks you did not run.
 
 ## Where decisions live
 
