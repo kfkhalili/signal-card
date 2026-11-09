@@ -98,7 +98,7 @@ function normalizedSymbol(value: string): string {
 }
 
 function rejectDuplicateSymbols(
-  rows: Array<{ symbol: string }>,
+  rows: { symbol: string }[],
   endpoint: string,
 ): void {
   const seen = new Set<string>();

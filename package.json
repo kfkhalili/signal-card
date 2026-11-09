@@ -17,6 +17,7 @@
     "test": "jest",
     "test:queue-system": "bash scripts/test-queue-system.sh",
     "test:contracts": "bash scripts/run-contract-tests.sh",
+    "test:deno": "bash scripts/run-deno-tests.sh",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:e2e": "npx playwright test",
