@@ -64,7 +64,7 @@ export function validateExchangeVariantsResponse(
   const malformedIndexes: number[] = [];
   const incomingKeys = new Set<string>();
   const duplicateKeys = new Set<string>();
-  const responseEntries: Array<Record<string, unknown>> = [];
+  const responseEntries: Record<string, unknown>[] = [];
 
   context.response.forEach((entry, index) => {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
