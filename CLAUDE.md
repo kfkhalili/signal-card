@@ -16,8 +16,8 @@ Adapted from [andrej-karpathy-skills](https://github.com/forrestchang/andrej-kar
 Tickered: stock research through interactive financial cards and **Compass**, a ranking of stocks by weighted pillars. Next.js 15 (App Router) + Tailwind/shadcn on Vercel; Supabase (Postgres, auth, Realtime, Deno edge functions); market data from FinancialModelingPrep (FMP).
 
 - `src/app/` routes · `src/components/game/cards/` one folder per card type · `src/hooks/`, `src/stores/` client state · `src/lib/` shared modules (`src/lib/supabase/` clients and realtime)
-- `supabase/functions/` edge functions: `queue-processor-v2` (runs queue jobs), `lib/` (one fetcher per data type), `_shared/`, `__tests__/` (Deno)
-- `supabase/migrations/` schema, functions, cron · `tests/contracts/` SQL contract tests · `e2e/` Playwright · `eslint-rules/` contract lint rules
+- `e2e/` Playwright · `eslint-rules/` contract lint rules
+- `supabase/functions/`, `supabase/migrations/` and `tests/contracts/` are **outdated copies** of the back end, kept only until they are removed. They are not the source of truth and never change here (see "The back end lives in the private repo").
 
 **Domain words.** A **data type** is one kind of FMP data (`quote`, `profile`, `financial-statements`, …), registered as a row of `data_type_registry_v2`. A **queue job** fetches one data type for one symbol. A row is **stale** when the registry's rules say it must be fetched again; **freshness** is when it was last fetched, including a fetch that legitimately found no data. A **card type** is one kind of card on a workspace. A **pillar** is one ranked dimension of Compass.
 
@@ -29,7 +29,7 @@ Tickered: stock research through interactive financial cards and **Compass**, a 
 - `npm run test:contracts` — SQL contract tests against the local Supabase stack (`supabase start` first; Docker must be running).
 - `npm run knip` — unused files, exports and dependencies.
 - `npm run test:deno` — edge-function tests that call `Deno.test` (Deno via `npx`). Jest skips exactly these files, so `supabase/functions/__tests__/` holds both kinds: a test that calls `Deno.test` runs under Deno, any other under Jest.
-- Before calling work done: `typecheck`, `lint` and `npm test` pass; `test:deno` too when `supabase/functions/` changed; `test:contracts` when a migration changed; `test:e2e` when something on screen changed. Say plainly which checks you did not run.
+- Before calling work done: `typecheck`, `lint` and `npm test` pass; `test:e2e` when something on screen changed. (`test:deno` and `test:contracts` exercise the outdated back-end copies.) Say plainly which checks you did not run.
 
 ## Where decisions live
 
@@ -62,12 +62,13 @@ Tickered: stock research through interactive financial cards and **Compass**, a 
 - **A bug fix starts with a failing test** that reproduces it.
 - **A test leaves nothing behind:** restore stubbed globals (`globalThis.fetch`, env vars), timers and mocks in `afterEach` or `finally`.
 
-### Supabase and migrations
+### The back end lives in the private repo
 
-- **Every schema, function, policy, cron or index change is a migration** in `supabase/migrations/YYYYMMDDHHMMSS_snake_case.sql`, timestamped with `date -u +%Y%m%d%H%M%S` and later than the newest file there. Data fixes and test data are not migrations.
-- **A migration that has reached any shared database is immutable.** Fix it with a new migration. Amend a migration in place only while it exists on your branch alone.
-- **Develop and test against the local stack** (`supabase start`). Never run `supabase db push`, `supabase db reset --linked` or other `--linked` writes from a session. Production changes go through the owner.
-- **Functions** set `search_path`; `SECURITY DEFINER` only where a Sacred Contract or ADR says so (Contract #18), and never without RLS reasoning in the migration's comment.
+This repo is **public** and holds the client only. The database schema, migrations, Edge Functions, ingestion and the Compass ranking live in the private back-end repo, which is the only place allowed to change the production database or deploy server functions.
+
+- **Never add or edit migrations, Edge Functions, ranking formulas, weights or fixtures that reveal them here.** A change that needs one stops and becomes a card for the back-end repo (a draft on the board, never a public issue).
+- **The client reads the database through `src/lib/supabase/` and the generated types.** When the back end changes a table or RPC, the types are regenerated from the live schema; the client never guesses a shape.
+- **Never run `supabase db push`, `supabase db reset --linked`, `supabase functions deploy` or other `--linked` writes from here.**
 
 ### Paths and secrets
 
@@ -78,8 +79,7 @@ Tickered: stock research through interactive financial cards and **Compass**, a 
 
 These exist today and are being worked down. Don't extend them, and don't use them as templates:
 
-- `supabase/functions/lib/fetch-fmp-*.ts` each re-implement the same HTTP, timeout, byte counting, upsert and error handling, and `supabase/functions/lib/README.md` documents that copy-paste template. Only some record freshness or report real bytes on failure. When touching one, don't add a new copy.
-- `supabase/functions/fetch-fmp-*/index.ts` (the per-type edge functions) are an older second copy of fetch logic whose crons were removed. Don't edit them to match changes in `lib/`; raise their deletion instead.
+- `supabase/functions/`, `supabase/migrations/` and `tests/contracts/` are an outdated copy of the back end (see above). Don't touch them; their removal is a card on the board.
 - `queue-processor-v2/index.ts` dispatches with a hand-written `switch` and redeclares `QueueJob` (the type lives in `lib/types.ts`).
 - Card types register through four side-effect import lists (`initializers.ts`, `rehydrators.ts`, `updateHandlerInitializer.ts`, `rendererRegistryInitializer.tsx`), and `useWorkspaceManager.ts` branches on card names.
 - `src/app/symbol/[ticker]/page.tsx` and `src/app/compass/page.tsx` hold domain logic inline, and some tests in `src/app/symbol/__tests__/` re-implement it.
