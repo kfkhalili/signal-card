@@ -59,3 +59,8 @@ node_modules/
 /playwright/.cache/
 
 minutes.md
+# Claude Code session state, except the project settings (the card hook) and the
+# work board's skills. `.claude/board.json` is each checkout's own (scripts/board-setup.mjs).
+.claude/*
+!.claude/settings.json
+!.claude/skills/
